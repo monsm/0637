@@ -32,6 +32,13 @@ targets:
         # generated Info.plist only carries it when these are set.
         MARKETING_VERSION: "0.1"
         CURRENT_PROJECT_VERSION: "1"
+        # Xcode 26 defaults Debug builds to the "debug dylib" layout
+        # (Duck.debug.dylib + __preview.dylib, stub executable). CLI-built
+        # apps in that mode are signed with Identifier=Duck-<hash> and an
+        # unbound Info.plist, and CoreSimulator then refuses to install them
+        # with a misleading "Missing bundle ID".
+        ENABLE_DEBUG_DYLIB: NO
+        ENABLE_PREVIEWS: NO
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
