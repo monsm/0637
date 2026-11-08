@@ -26,12 +26,21 @@ fn mujoco_libs(libdir: &str) -> Vec<String> {
 /// MuJoCo's mesh decoders (stl/obj) register themselves from constructors —
 /// nothing references their objects, so they would be dropped and scene
 /// loading fails with "no decoder found". Pull the whole archive.
-fn link_mujoco(libdir: &str) {
-    println!("cargo:rustc-link-arg=-Wl,--whole-archive");
+fn link_mujoco(libdir: &str, apple: bool) {
+    // Whole-archive is spelled differently on each linker family.
+    if apple {
+        println!("cargo:rustc-link-arg=-Wl,-all_load");
+    } else {
+        println!("cargo:rustc-link-arg=-Wl,--whole-archive");
+    }
     for lib in mujoco_libs(libdir) {
         println!("cargo:rustc-link-lib=static={lib}");
     }
-    println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
+    if apple {
+        println!("cargo:rustc-link-arg=-Wl,-noall_load");
+    } else {
+        println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
+    }
 }
 
 /// The NDK's per-target sysroot library directory, where `libc++_static.a`
@@ -83,7 +92,7 @@ fn main() {
     println!("cargo:rustc-link-search=native={libdir}");
     match target_os.as_str() {
         "android" => {
-            link_mujoco(&libdir);
+            link_mujoco(&libdir, false);
             // 16 KB page-size devices (Android 15+ kernels) refuse to load
             // 4 KB-aligned ELF segments.
             println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
@@ -122,7 +131,7 @@ fn main() {
             println!("cargo:rustc-link-arg=-Wl,--no-undefined");
         }
         "ios" | "macos" => {
-            link_mujoco(&libdir);
+            link_mujoco(&libdir, true);
             // Apple's libc++ is a system library; the simulator and device
             // slices both have it.
             println!("cargo:rustc-link-lib=dylib=c++");
