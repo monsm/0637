@@ -209,6 +209,19 @@ jobs:
           done
           exit $status
 
+      - name: Enable KVM for the emulator
+        id: kvm
+        run: |
+          # The runner exposes /dev/kvm but the build user is not in the kvm
+          # group; the emulator then falls back to software emulation, which
+          # is ~50x slower and stalls MuJoCo's scene load.
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm || true
+            ls -l /dev/kvm
+          else
+            echo "no /dev/kvm; the emulator will run in software mode"
+          fi
+
       - name: Emulator smoke test
         id: emulator
         uses: reactivecircus/android-emulator-runner@v2
