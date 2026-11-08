@@ -183,7 +183,16 @@ jobs:
             exit 1
           fi
           echo "--- control experiment: can this simulator install any app? ---"
+          xcrun simctl list runtimes | sed -n '1,12p'
           bash ios/scripts/control-app.sh "$UDID" || true
+          echo "--- re-sign our app with an explicit identifier and retry ---"
+          /usr/bin/codesign --force --sign - --identifier ai.duck.microduck "$APP" || true
+          /usr/bin/codesign -dv "$APP" 2>&1 | head -10 || true
+          if xcrun simctl install "$UDID" "$APP"; then
+            echo "INSTALL-OK-AFTER-RESIGN"
+          else
+            echo "INSTALL-FAILED-AFTER-RESIGN"
+          fi
           xcrun simctl install "$UDID" "$APP" || {
             echo "::error::simctl install failed — dumping bundle diagnostics"
             ls -la "$APP"

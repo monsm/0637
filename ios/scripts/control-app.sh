@@ -32,6 +32,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: test.control.app
         GENERATE_INFOPLIST_FILE: YES
         ENABLE_DEBUG_DYLIB: NO
+        IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 YML
 
 cd "$WORK"
