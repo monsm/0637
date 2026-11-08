@@ -184,30 +184,7 @@ jobs:
           api-level: 34
           arch: x86_64
           target: google_apis
-          script: |
-            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            adb logcat -c
-            adb shell am start -W -n ai.duck.microduck/.MainActivity | tee am-start.log
-            sleep 30
-            PID=$(adb shell pidof ai.duck.microduck | tr -d '\r' || true)
-            adb logcat -d > android-logcat.log || true
-            adb shell "dumpsys activity processes | grep -A2 ai.duck.microduck" > android-procinfo.log || true
-            if [ -z "$PID" ]; then
-              echo "::error::app process is not running — it crashed on open"
-              grep -nE "FATAL|AndroidRuntime|signal |Abort message" android-logcat.log | head -40 || true
-              exit 1
-            fi
-            echo "app alive with pid $PID"
-            # The core's intent API proves the whole native stack: MuJoCo
-            # loaded the scene, policies loaded, the 50 Hz loop is ticking.
-            adb reverse tcp:8765 tcp:8765
-            sleep 2
-            curl -sf http://127.0.0.1:8765/state | tee intent-state.json || {
-              echo "::error::intent API did not answer — the core is not ticking"
-              exit 1
-            }
-            curl -sf http://127.0.0.1:8765/skills | tee intent-skills.json || true
-            adb logcat -d > android-logcat.log
+          script: bash android/scripts/smoke-test.sh
 
       - name: Publish smoke-test logs
         id: publishlogs

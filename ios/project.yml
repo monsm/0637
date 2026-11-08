@@ -24,6 +24,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck
+        # CoreSimulator needs CFBundleVersion to identify the app; the
+        # generated Info.plist only carries it when these are set.
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES

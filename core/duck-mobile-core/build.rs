@@ -87,8 +87,17 @@ fn main() {
             // one for libonnxruntime.so).
             if let Some(dir) = ndk_sysroot_lib_dir() {
                 println!("cargo:rustc-link-search=native={dir}");
+                // Newer NDKs merge the ABI into libc++_static; older ones
+                // ship libc++abi.a separately.
+                if std::path::Path::new(&dir).join("libc++abi.a").exists() {
+                    println!("cargo:rustc-link-lib=static=c++abi");
+                }
             }
+            // libc++_static covers libc++ itself. Without --no-undefined a
+            // shared library links happily with unresolved symbols and only
+            // fails at dlopen time on the device.
             println!("cargo:rustc-link-lib=static=c++_static");
+            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
         }
         "ios" | "macos" => {
             link_mujoco(&libdir);
