@@ -93,9 +93,9 @@ jobs:
       - name: Publish failure logs
         if: failure()
         run: |
-          mkdir -p ci-logs
-          find ios/third_party android/third_party -maxdepth 3 -name '*.log' \
-            -exec cp {} ci-logs/ \; 2>/dev/null || true
+          mkdir -p ci-logs/ios
+          find ios/third_party -maxdepth 3 -name '*.log' \
+            -exec cp {} ci-logs/ios/ \; 2>/dev/null || true
           {
             echo "checkout=${{ steps.checkout.outcome }}"
             echo "upstream=${{ steps.upstream.outcome }}"
@@ -108,12 +108,17 @@ jobs:
             echo "rustcore=${{ steps.rustcore.outcome }}"
             echo "xcodegen=${{ steps.xcodegen.outcome }}"
             echo "xcodebuild=${{ steps.xcodebuild.outcome }}"
-          } > ci-logs/steps.txt
+          } > ci-logs/ios/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
           git add ci-logs || true
-          git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
-          git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:main || true
+          git commit -m "ci-logs: iOS run ${{ github.run_id }} [skip ci]" || true
+          URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          for attempt in 1 2 3; do
+            git pull --rebase "$URL" main > /dev/null 2>&1 || true
+            if git push "$URL" HEAD:main; then break; fi
+            sleep 2
+          done
 
       - uses: actions/upload-artifact@v4
         id: artifact
