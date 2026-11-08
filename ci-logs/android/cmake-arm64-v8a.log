@@ -1,0 +1,1096 @@
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/CMakeDetermineSystem.cmake:146 (include)
+  CMakeLists.txt:30 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeDetermineSystem.cmake:146 (include)
+  CMakeLists.txt:30 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  CMakeLists.txt:30 (project)
+
+
+-- The C compiler identification is Clang 18.0.3
+-- The CXX compiler identification is Clang 18.0.3
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  CMakeLists.txt:30 (project)
+
+
+-- Detecting C compiler ABI info
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-xbMZCt/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-xbMZCt/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-xbMZCt/CMakeLists.txt:4 (project)
+
+
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DQzDmS/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DQzDmS/CMakeLists.txt:4 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DQzDmS/CMakeLists.txt:4 (project)
+
+
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CAN_BUILD_AVX
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HM0frt/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HM0frt/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HM0frt/CMakeLists.txt:5 (project)
+
+
+-- Performing Test CAN_BUILD_AVX - Failed
+-- Performing Test SUPPORTS_LLD
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wGERG6/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wGERG6/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wGERG6/CMakeLists.txt:5 (project)
+
+
+-- Performing Test SUPPORTS_LLD - Success
+-- Performing Test SUPPORTS_GC_SECTIONS
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-vWH3ys/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-vWH3ys/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-vWH3ys/CMakeLists.txt:5 (project)
+
+
+-- Performing Test SUPPORTS_GC_SECTIONS - Success
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(lodepng) is deprecated, call
+  FetchContent_MakeAvailable(lodepng) instead.  Policy CMP0169 can be set to
+  OLD to allow FetchContent_Populate(lodepng) to be called directly for now,
+  but the ability to call it with declared details will be removed completely
+  in a future version.
+Call Stack (most recent call first):
+  cmake/MujocoDependencies.cmake:100 (FetchContent_Populate)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(marchingcubecpp) is deprecated, call
+  FetchContent_MakeAvailable(marchingcubecpp) instead.  Policy CMP0169 can be
+  set to OLD to allow FetchContent_Populate(marchingcubecpp) to be called
+  directly for now, but the ability to call it with declared details will be
+  removed completely in a future version.
+Call Stack (most recent call first):
+  cmake/MujocoDependencies.cmake:124 (FetchContent_Populate)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- mujoco::FindOrFetch: checking for targets in package `qhull`
+-- mujoco::FindOrFetch: checking for targets in package `qhull` - target `qhull` not defined.
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `qhull`
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(qhull) is deprecated, call
+  FetchContent_MakeAvailable(qhull) instead.  Policy CMP0169 can be set to
+  OLD to allow FetchContent_Populate(qhull) to be called directly for now,
+  but the ability to call it with declared details will be removed completely
+  in a future version.
+Call Stack (most recent call first):
+  cmake/FindOrFetch.cmake:128 (FetchContent_Populate)
+  cmake/MujocoDependencies.cmake:135 (findorfetch)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Looking for sys/types.h
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-LC0bDI/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-LC0bDI/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-LC0bDI/CMakeLists.txt:3 (project)
+
+
+-- Looking for sys/types.h - found
+-- Looking for inttypes.h
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Paj61O/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Paj61O/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Paj61O/CMakeLists.txt:3 (project)
+
+
+-- Looking for inttypes.h - found
+-- Looking for stddef.h
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zpWGj2/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zpWGj2/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zpWGj2/CMakeLists.txt:3 (project)
+
+
+-- Looking for stddef.h - found
+-- Looking for stdint.h
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-3xdiZ5/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-3xdiZ5/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-3xdiZ5/CMakeLists.txt:3 (project)
+
+
+-- Looking for stdint.h - found
+-- Check size of off_t
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Vk6w45/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Vk6w45/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Vk6w45/CMakeLists.txt:3 (project)
+
+
+-- Check size of off_t - done
+-- Looking for fseeko
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-F77Ru6/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-F77Ru6/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-F77Ru6/CMakeLists.txt:3 (project)
+
+
+-- Looking for fseeko - found
+-- Looking for ftello
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RfytQo/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RfytQo/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RfytQo/CMakeLists.txt:3 (project)
+
+
+-- Looking for ftello - found
+-- Looking for PRIdMAX
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-u5xTII/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-u5xTII/CMakeLists.txt:3 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-u5xTII/CMakeLists.txt:3 (project)
+
+
+-- Looking for PRIdMAX - found
+-- 
+-- ========== qhull Build Information ==========
+-- Build Version:                             8.1-alpha3
+-- Install Prefix (CMAKE_INSTALL_PREFIX):     /usr/local
+-- Binary Directory (CMAKE_INSTALL_BINDIR):   bin
+-- Library Directory (CMAKE_INSTALL_LIBDIR):  lib
+-- Include Directory (CMAKE_INSTALL_INCLUDEDIR): include
+-- Documentation Directory (CMAKE_INSTALL_DOCDIR): share/doc/mujoco
+-- Man Pages Directory (CMAKE_INSTALL_MANDIR): share/man
+-- Build Type (CMAKE_BUILD_TYPE):             Release
+-- Build static libraries:                    ON
+-- Build shared library:                      OFF
+-- Use shared library for linking apps:       OFF
+-- Build tests:				   OFF
+-- To override these options, add -D{OPTION_NAME}=... to the cmake command
+--   Build the debug targets                  -DCMAKE_BUILD_TYPE=Debug
+-- 
+-- To build and install qhull, enter "make" and "make install"
+-- To smoketest qhull, enter "ctest"
+-- 
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `qhull` - Done
+-- mujoco::FindOrFetch: checking for targets in package `tinyxml2`
+-- mujoco::FindOrFetch: checking for targets in package `tinyxml2` - target `tinyxml2` not defined.
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `tinyxml2`
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(tinyxml2) is deprecated, call
+  FetchContent_MakeAvailable(tinyxml2) instead.  Policy CMP0169 can be set to
+  OLD to allow FetchContent_Populate(tinyxml2) to be called directly for now,
+  but the ability to call it with declared details will be removed completely
+  in a future version.
+Call Stack (most recent call first):
+  cmake/FindOrFetch.cmake:128 (FetchContent_Populate)
+  cmake/MujocoDependencies.cmake:160 (findorfetch)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `tinyxml2` - Done
+-- mujoco::FindOrFetch: checking for targets in package `tinyobjloader`
+-- mujoco::FindOrFetch: checking for targets in package `tinyobjloader` - target `tinyobjloader` not defined.
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `tinyobjloader`
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(tinyobjloader) is deprecated, call
+  FetchContent_MakeAvailable(tinyobjloader) instead.  Policy CMP0169 can be
+  set to OLD to allow FetchContent_Populate(tinyobjloader) to be called
+  directly for now, but the ability to call it with declared details will be
+  removed completely in a future version.
+Call Stack (most recent call first):
+  cmake/FindOrFetch.cmake:128 (FetchContent_Populate)
+  cmake/MujocoDependencies.cmake:183 (findorfetch)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Deprecation Warning at /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/tinyobjloader-src/CMakeLists.txt:5 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `tinyobjloader` - Done
+-- mujoco::FindOrFetch: checking for targets in package `ccd`
+-- mujoco::FindOrFetch: checking for targets in package `ccd` - target `ccd` not defined.
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `ccd`
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(ccd) is deprecated, call
+  FetchContent_MakeAvailable(ccd) instead.  Policy CMP0169 can be set to OLD
+  to allow FetchContent_Populate(ccd) to be called directly for now, but the
+  ability to call it with declared details will be removed completely in a
+  future version.
+Call Stack (most recent call first):
+  cmake/FindOrFetch.cmake:128 (FetchContent_Populate)
+  cmake/MujocoDependencies.cmake:216 (findorfetch)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+CMake Deprecation Warning at /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/ccd-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+CMake Warning (dev) at /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/ccd-src/CMakeLists.txt:9 (project):
+  Policy CMP0048 is not set: project() command manages VERSION variables.
+  Run "cmake --help-policy CMP0048" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+
+  The following variable(s) would be set to empty:
+
+    PROJECT_VERSION
+    PROJECT_VERSION_MAJOR
+    PROJECT_VERSION_MINOR
+    PROJECT_VERSION_PATCH
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Performing Test COMPILER_SUPPORTS_VISIBILITY
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-9MOulf/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-9MOulf/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-9MOulf/CMakeLists.txt:5 (project)
+
+
+-- Performing Test COMPILER_SUPPORTS_VISIBILITY - Success
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `ccd` - Done
+-- mujoco::FindOrFetch: checking for targets in package `miniz`
+-- mujoco::FindOrFetch: checking for targets in package `miniz` - target `miniz` not defined.
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `miniz`
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(miniz) is deprecated, call
+  FetchContent_MakeAvailable(miniz) instead.  Policy CMP0169 can be set to
+  OLD to allow FetchContent_Populate(miniz) to be called directly for now,
+  but the ability to call it with declared details will be removed completely
+  in a future version.
+Call Stack (most recent call first):
+  cmake/FindOrFetch.cmake:128 (FetchContent_Populate)
+  cmake/FindOrFetch.cmake:194 (FindOrFetch)
+  cmake/MujocoDependencies.cmake:257 (fetchpackage)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KWUxJ8/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KWUxJ8/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KWUxJ8/CMakeLists.txt:5 (project)
+
+
+-- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY - Success
+-- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RORj7b/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RORj7b/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RORj7b/CMakeLists.txt:5 (project)
+
+
+-- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY - Success
+-- Performing Test COMPILER_HAS_DEPRECATED_ATTR
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Xvkgmx/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Xvkgmx/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Xvkgmx/CMakeLists.txt:5 (project)
+
+
+-- Performing Test COMPILER_HAS_DEPRECATED_ATTR - Success
+-- mujoco::FindOrFetch: Using FetchContent to retrieve `miniz` - Done
+CMake Warning (dev) at /usr/local/share/cmake-3.31/Modules/FetchContent.cmake:1953 (message):
+  Calling FetchContent_Populate(Eigen3) is deprecated, call
+  FetchContent_MakeAvailable(Eigen3) instead.  Policy CMP0169 can be set to
+  OLD to allow FetchContent_Populate(Eigen3) to be called directly for now,
+  but the ability to call it with declared details will be removed completely
+  in a future version.
+Call Stack (most recent call first):
+  cmake/MujocoDependencies.cmake:382 (FetchContent_Populate)
+  CMakeLists.txt:112 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mA4GA7/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mA4GA7/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mA4GA7/CMakeLists.txt:5 (project)
+
+
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
+-- Looking for pthread_create in pthreads
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-0AIl8B/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-0AIl8B/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-0AIl8B/CMakeLists.txt:5 (project)
+
+
+-- Looking for pthread_create in pthreads - not found
+-- Looking for pthread_create in pthread
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Bw7TLp/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Bw7TLp/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Bw7TLp/CMakeLists.txt:5 (project)
+
+
+-- Looking for pthread_create in pthread - not found
+-- Check if compiler accepts -pthread
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-tChgHG/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-tChgHG/CMakeLists.txt:5 (project)
+
+
+CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+Call Stack (most recent call first):
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
+  /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
+  /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-tChgHG/CMakeLists.txt:5 (project)
+
+
+-- Check if compiler accepts -pthread - yes
+-- Found Threads: TRUE
+-- Configuring done (14.3s)
+-- Generating done (0.1s)
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    MUJOCO_BUILD_CSHARP
+    MUJOCO_BUILD_PYTHON
+
+
+-- Build files have been written to: /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a
