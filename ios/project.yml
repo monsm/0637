@@ -60,8 +60,9 @@ targets:
       # a script-copied framework confused codesign into ignoring the app's
       # Info.plist ("Info.plist=not bound"), and CoreSimulator then refuses
       # the install with "Missing bundle ID".
-      - library: Frameworks/libduck_mobile_core.dylib
+      - framework: Frameworks/libduck_mobile_core.dylib
         embed: true
+        codeSign: true
       - framework: third_party/onnxruntime.xcframework
         embed: true
         codeSign: true
