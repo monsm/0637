@@ -72,19 +72,36 @@ pub unsafe extern "C" fn duck_core_new(
     error: *mut c_char,
     error_size: c_int,
 ) -> *mut DuckCore {
-    // A panic inside this extern "C" function aborts the process; on Android
-    // route the message to logcat so CI can see the reason.
+    // A panic inside this extern "C" function would abort the process
+    // (panic_cannot_unwind). Catch it and surface the message through the
+    // error buffer instead; on Android also mirror it to logcat.
     #[cfg(target_os = "android")]
-    std::panic::set_hook(Box::new(|info| {
-        unsafe extern "C" {
-            fn duck_android_log_error(message: *const c_char);
-        }
-        let message = CString::new(format!("rust panic at {:?}: {info}", info.location()))
-            .unwrap_or_else(|_| CString::new("rust panic").expect("static"));
-        unsafe { duck_android_log_error(message.as_ptr()) };
-    }));
+    {
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            unsafe extern "C" {
+                fn duck_android_log_error(message: *const c_char);
+            }
+            let payload = if let Some(text) = info.payload().downcast_ref::<&str>() {
+                (*text).to_owned()
+            } else if let Some(text) = info.payload().downcast_ref::<String>() {
+                text.clone()
+            } else {
+                "unknown panic".to_owned()
+            };
+            let location = info
+                .location()
+                .map(|l| format!("{}:{}", l.file(), l.line()))
+                .unwrap_or_default();
+            let message =
+                CString::new(format!("rust panic: {payload} at {location}"))
+                    .unwrap_or_else(|_| CString::new("rust panic").expect("static"));
+            unsafe { duck_android_log_error(message.as_ptr()) };
+            default_hook(info);
+        }));
+    }
 
-    let result = (|| -> Result<DuckCore, String> {
+    let result = std::panic::catch_unwind(|| -> Result<DuckCore, String> {
         let scene = c_string(scene_path)?;
         let policies = PathBuf::from(c_string(policies_dir)?);
         let bundle = crate::manifest::load(&policies)?;
@@ -123,7 +140,14 @@ pub unsafe extern "C" fn duck_core_new(
             intents,
             server_started: false,
         })
-    })();
+    });
+
+    let result = match result {
+        Ok(result) => result,
+        Err(payload) => Err(format!(
+            "panic during core creation: {payload:?}"
+        )),
+    };
 
     match result {
         Ok(core) => Box::into_raw(Box::new(core)),
