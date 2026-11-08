@@ -242,7 +242,9 @@ jobs:
           git fetch --depth 1 origin ci-logs \
             && git checkout FETCH_HEAD -- ci-logs || true
           cp sim-launch.log ci-logs/ios/ 2>/dev/null || true
-          cp sim-syslog.log ci-logs/ios/ 2>/dev/null || true
+          # The unified log can be hundreds of MB; keep only the tail.
+          tail -c 1500000 sim-syslog.log > ci-logs/ios/sim-syslog.log 2>/dev/null || true
+          tail -c 1500000 sim-syslog-all.log > ci-logs/ios/sim-syslog-all.log 2>/dev/null || true
           cp intent-state.json ci-logs/ios/ 2>/dev/null || true
           cp intent-skills.json ci-logs/ios/ 2>/dev/null || true
           cp sim-screenshot.png ci-logs/ios/ 2>/dev/null || true
