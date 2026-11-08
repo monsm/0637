@@ -18,11 +18,10 @@ targets:
       - path: DuckApp
         excludes:
           - "Resources/**"
-          - "Shaders.metal"
-      # Shipped as source and compiled at runtime: a compiled default.metallib
-      # at the bundle root breaks code signing on Xcode 26.
-      - path: DuckApp/Shaders.metal
-        buildPhase: resources
+      # Shaders.metal lives inside the Resources folder reference, which is
+      # copied verbatim: Xcode never compiles it, so no default.metallib ends
+      # up at the bundle root (Xcode 26 refuses to code sign that), and the
+      # app compiles the shader at runtime instead.
       - path: DuckApp/Resources
         type: folder
         buildPhase: resources
