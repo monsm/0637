@@ -61,3 +61,29 @@ targets:
           IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
           /usr/bin/codesign --force --sign "$IDENTITY" --timestamp=none \
             "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/libduck_mobile_core.dylib"
+      - name: Embed ONNX Runtime
+        basedOnDependencyAnalysis: false
+        script: |
+          # ort-sys links the XCFramework's onnxruntime.framework dynamically,
+          # so the app has to carry it. The slice name differs between Xcode
+          # versions; take whichever the archive has for this simulator.
+          XCFWK="${SRCROOT}/third_party/onnxruntime.xcframework"
+          if [ ! -d "$XCFWK" ]; then
+            echo "warning: $XCFWK not found — run ios/scripts/fetch-ort-ios.sh"
+            exit 0
+          fi
+          for slice in $( [ "${PLATFORM_NAME}" = "iphonesimulator" ] \
+              && echo "ios-arm64_x86_64-simulator ios-arm64-simulator" \
+              || echo "ios-arm64" ); do
+            if [ -d "$XCFWK/$slice/onnxruntime.framework" ]; then
+              mkdir -p "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}"
+              rm -rf "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/onnxruntime.framework"
+              cp -R "$XCFWK/$slice/onnxruntime.framework" \
+                "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/"
+              IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
+              /usr/bin/codesign --force --sign "$IDENTITY" --timestamp=none \
+                "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/onnxruntime.framework"
+              exit 0
+            fi
+          done
+          echo "warning: no simulator slice in $XCFWK"

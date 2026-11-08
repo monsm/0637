@@ -13,8 +13,18 @@ esac
 export MUJOCO_INCLUDE_DIR="$MUJOCO/include"
 export MUJOCO_LIB_DIR="$MUJOCO/lib"
 export ORT_IOS_XCFWK_LOCATION="$ROOT/ios/third_party/onnxruntime.xcframework"
-export ORT_CXX_STDLIB=libc++
-export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-install_name,@rpath/libduck_mobile_core.dylib"
+# ort-sys passes this value straight to `-l`; it must be the link name (`c++`),
+# not the file name — `libc++` would turn into `-llibc++`.
+export ORT_CXX_STDLIB=c++
+
+# rustc links with -nodefaultlibs, which also suppresses the driver's SDK
+# setup: without an explicit sysroot, ld searches no SDK and `-lc++` fails.
+case "$TARGET" in
+  *-sim) SDK_NAME=iphonesimulator ;;
+  *)     SDK_NAME=iphoneos ;;
+esac
+SDK="$(xcrun --sdk "$SDK_NAME" --show-sdk-path)"
+export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-isysroot -C link-arg=$SDK -C link-arg=-Wl,-install_name,@rpath/libduck_mobile_core.dylib"
 
 # rustup picks the toolchain from the working directory, and
 # core/rust-toolchain.toml is what pins 1.99.1 — so the build has to run from
