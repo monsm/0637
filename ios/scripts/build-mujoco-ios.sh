@@ -93,5 +93,9 @@ build() {
 }
 
 build iphonesimulator "$ROOT/ios/third_party/mujoco-sim"
-build iphoneos "$ROOT/ios/third_party/mujoco-device"
-echo "MuJoCo $VERSION built for simulator and device"
+if [ "${BUILD_DEVICE:-0}" = "1" ]; then
+  build iphoneos "$ROOT/ios/third_party/mujoco-device"
+  echo "MuJoCo $VERSION built for simulator and device"
+else
+  echo "MuJoCo $VERSION built for simulator (set BUILD_DEVICE=1 for device)"
+fi
