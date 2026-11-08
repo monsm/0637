@@ -180,7 +180,13 @@ jobs:
             tail -20 sim-boot.log sim-bootstatus.log 2>/dev/null || true
             exit 1
           fi
-          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl install "$UDID" "$APP" || {
+            echo "::error::simctl install failed — dumping bundle diagnostics"
+            ls -la "$APP"
+            plutil -p "$APP/Info.plist" | head -30 || true
+            /usr/bin/codesign -dv "$APP" 2>&1 || true
+            exit 1
+          }
           xcrun simctl launch "$UDID" ai.duck.microduck | tee sim-launch.log
           sleep 30
           if xcrun simctl spawn "$UDID" launchctl list | grep -q ai.duck.microduck; then
