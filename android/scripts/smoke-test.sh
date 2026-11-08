@@ -8,7 +8,23 @@ set -uo pipefail
 
 APK="android/app/build/outputs/apk/debug/app-debug.apk"
 
-adb install -r "$APK"
+# The emulator may report boot before system_server is fully up; installs
+# fail with "Can't find service: activity" until then.
+adb wait-for-device
+for _ in $(seq 1 60); do
+  [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '')" = "1" ] && break
+  sleep 5
+done
+
+INSTALL_OK=0
+for _ in $(seq 1 3); do
+  if adb install -r "$APK"; then
+    INSTALL_OK=1
+    break
+  fi
+  sleep 10
+done
+[ "$INSTALL_OK" = "1" ] || { echo "::error::apk install failed"; exit 1; }
 adb logcat -c
 adb shell am start -n ai.duck.microduck/.MainActivity | tee am-start.log
 
@@ -38,10 +54,10 @@ echo "app alive with pid $PID"
 
 adb reverse tcp:8765 tcp:8765
 STATE=""
-for _ in $(seq 1 40); do
-  STATE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state || true)
+for _ in $(seq 1 60); do
+  STATE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
   [ -n "$STATE" ] && break
-  sleep 3
+  sleep 5
 done
 
 adb logcat -d > android-logcat.log || true
