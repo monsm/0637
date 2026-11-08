@@ -8,16 +8,6 @@
 #include <string.h>
 #include <stdexcept>
 
-#if defined(__ANDROID__)
-#include <android/log.h>
-
-/* Rust panics abort inside extern "C"; route the message to logcat so CI
-   can see why duck_core_new died. */
-void duck_android_log_error(const char* message) {
-    __android_log_print(ANDROID_LOG_ERROR, "duck-rust", "%s", message);
-}
-#endif
-
 struct DuckMj {
     mjModel* m;
     mjData* d;

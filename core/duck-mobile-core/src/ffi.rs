@@ -79,8 +79,15 @@ pub unsafe extern "C" fn duck_core_new(
     {
         let default_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
+            // __android_log_print lives in liblog, which rustc links for
+            // Android targets; the device exports it from /system/lib64.
             unsafe extern "C" {
-                fn duck_android_log_error(message: *const c_char);
+                fn __android_log_print(
+                    prio: c_int,
+                    tag: *const c_char,
+                    text: *const c_char,
+                    ...
+                ) -> c_int;
             }
             let payload = if let Some(text) = info.payload().downcast_ref::<&str>() {
                 (*text).to_owned()
@@ -96,7 +103,16 @@ pub unsafe extern "C" fn duck_core_new(
             let message =
                 CString::new(format!("rust panic: {payload} at {location}"))
                     .unwrap_or_else(|_| CString::new("rust panic").expect("static"));
-            unsafe { duck_android_log_error(message.as_ptr()) };
+            const ANDROID_LOG_ERROR: c_int = 4;
+            let tag = CString::new("duck-rust").expect("static");
+            unsafe {
+                __android_log_print(
+                    ANDROID_LOG_ERROR,
+                    tag.as_ptr(),
+                    message.as_ptr(),
+                    std::ptr::null::<c_char>(),
+                )
+            };
             default_hook(info);
         }));
     }
