@@ -268,9 +268,13 @@ pub unsafe extern "C" fn duck_core_start_intent_server(
         Ok(()) => {
             core.server_started = true;
             publish_state(core);
+            stage("intent server listening");
             0
         }
-        Err(_) => -1,
+        Err(error) => {
+            stage(&format!("intent server failed: {error}"));
+            -1
+        }
     }
 }
 
