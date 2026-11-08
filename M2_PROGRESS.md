@@ -154,7 +154,9 @@
 | 7 | 847ba60 | 配置通过！编译失败：MuJoCo 给 APPLE 加 `-mmacosx-version-min=11`，iOS 下与 `-mios-simulator-version-min` 冲突；Android `setupandroid=failure`（setup-android@v3 在 ubuntu-24.04 挂了） | 删掉 setup-android action（用 runner 预装 SDK + 自举 cmdline-tools）；iOS 开始补丁 MujocoMacOS.cmake |
 | 8 | 5d57314 | 补丁只改了函数，但 CMakeLists 还直接把 `${MUJOCO_MACOS_*}` 加到 mujoco target → 仍残留 `-mmacosx-version-min` | 改为补文件顶层 `if(APPLE)` → iOS 走 else()，两组 flag 与 `-Werror=availability` 全空 |
 | 9 | 43a6dc4 | iOS：MuJoCo 配置/编译到 109/111 后链接的是 **shared dylib**，脚本找不到 `libmujoco.a`；Android：`aligned_alloc` 已被 API 28 修好，但 `localtime_r` 检测仍报错（缓存里的 CMakeCache 是旧 flags，env CFLAGS 未生效） | MuJoCo CMakeLists 把 `add_library(mujoco SHARED)` 写死 → 打补丁改 **STATIC**；Android 需要重建时先删构建目录，保证 `_POSIX_C_SOURCE` 进入 cache |
-| 10 | 6ce1a62 + 75606eb | 进行中 | 干净重建：STATIC 静态库 + Android POSIX 宏生效。若越过 MuJoCo，下一风险点是 Rust 链接（iOS: ort 静态 + muJoCo + c++）与 Swift/Xcode、Kotlin/Gradle 首次编译 |
+| 10 | 6ce1a62 + 75606eb | iOS：MuJoCo 静态库成功、stage 成功，`rustcore` 失败 = **CI 克隆的上游没带我们的 duck-control 补丁**（feature 不存在）；Android：STATIC 化后 `install(EXPORT)` 依赖 miniz/lodepng 报错 | 导出 `patches/duck-control-mobile.patch`，CI 固定 checkout `da34a22` 后 apply；Android 加 `CMAKE_SKIP_INSTALL_RULES=ON` |
+| 11 | 324c099 / e30b08b | Android：`localtime_r` 仍失败——env `CFLAGS` 被 NDK toolchain 覆盖 | 改为**源码补丁**：MuJoCo 的 localtime 检测加 `__ANDROID__`（bionic 有 localtime_r） |
+| 12 | c1b4802 / cb7e3cc | 进行中 | 同时补上 Xcode/Gradle 失败日志回传；iOS 待 macOS runner 排队 |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。
