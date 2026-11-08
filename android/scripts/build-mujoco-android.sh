@@ -50,11 +50,10 @@ PY
 fi
 
 for abi in arm64-v8a x86_64; do
+  BUILD="$OUT/build-$abi"
   if [ -f "$OUT/$abi/lib/libmujoco.a" ]; then
     echo "MuJoCo cached for $abi — skipping build"
-    continue
-  fi
-  BUILD="$OUT/build-$abi"
+  else
   # A restored cache may hold a pre-patch (shared/.so) configure. Start clean
   # so the patched CMakeLists and flags actually take effect.
   rm -rf "$BUILD"
@@ -95,6 +94,25 @@ for abi in arm64-v8a x86_64; do
   fi
   cp "$LIBRARY" "$OUT/$abi/lib/"
   cp "$SRC"/include/mujoco/*.h "$OUT/$abi/include/mujoco/"
+  fi
+
+  # A static MuJoCo archive does not absorb its own dependencies: copy the
+  # ones it needs next to it and record the link order, dependents first.
+  # The allowlist matters — qhull also builds libqhull.a and libqhullstatic.a,
+  # which would collide with the renamed libqhull_r.a MuJoCo links. This runs
+  # for cached builds too: the archives are in the cached build tree.
+  mkdir -p "$OUT/$abi/lib"
+  echo "mujoco" > "$OUT/$abi/lib/libs.txt"
+  for dep in lodepng miniz tinyxml2 qhull_r; do
+    found="$(find "$BUILD" -name "lib$dep.a" -print -quit)"
+    if [ -z "$found" ]; then
+      echo "::warning::lib$dep.a not found under $BUILD"
+      continue
+    fi
+    cp "$found" "$OUT/$abi/lib/"
+    echo "$dep" >> "$OUT/$abi/lib/libs.txt"
+  done
+  echo "MuJoCo link order: $(tr '\n' ' ' < "$OUT/$abi/lib/libs.txt")"
 done
 
 echo "MuJoCo $VERSION built for Android"

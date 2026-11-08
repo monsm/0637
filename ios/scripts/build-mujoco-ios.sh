@@ -61,12 +61,11 @@ build() {
   local out="$2"
   local build="$out/build"
 
-  # Cached from a previous run — nothing to do.
+  # Cached from a previous run — nothing to build, but the dependency
+  # archives still have to be collected below.
   if [ -f "$out/lib/libmujoco.a" ]; then
     echo "MuJoCo cached at $out — skipping build"
-    return 0
-  fi
-
+  else
   # A restored cache may hold a pre-patch (shared/dylib) configure. Start clean
   # so the patched CMakeLists and flags actually take effect.
   rm -rf "$build"
@@ -113,6 +112,25 @@ build() {
   fi
   cp "$library" "$out/lib/"
   cp "$SRC"/include/mujoco/*.h "$out/include/mujoco/"
+  fi
+
+  # A static MuJoCo archive does not absorb its own dependencies: copy the
+  # ones it needs next to it and record the link order, dependents first.
+  # The allowlist matters — qhull also builds libqhull.a and libqhullstatic.a,
+  # which would collide with the renamed libqhull_r.a MuJoCo links. This runs
+  # for cached builds too: the archives are in the cached build tree.
+  mkdir -p "$out/lib"
+  echo "mujoco" > "$out/lib/libs.txt"
+  for dep in lodepng miniz tinyxml2 qhull_r; do
+    dep_found="$(find "$build" -name "lib$dep.a" -print -quit)"
+    if [ -z "$dep_found" ]; then
+      echo "::warning::lib$dep.a not found under $build"
+      continue
+    fi
+    cp "$dep_found" "$out/lib/"
+    echo "$dep" >> "$out/lib/libs.txt"
+  done
+  echo "MuJoCo link order: $(tr '\n' ' ' < "$out/lib/libs.txt")"
 }
 
 build iphonesimulator "$ROOT/ios/third_party/mujoco-sim"

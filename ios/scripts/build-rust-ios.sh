@@ -16,12 +16,17 @@ export ORT_IOS_XCFWK_LOCATION="$ROOT/ios/third_party/onnxruntime.xcframework"
 export ORT_CXX_STDLIB=libc++
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-install_name,@rpath/libduck_mobile_core.dylib"
 
-rustup target add --toolchain 1.99.1 "$TARGET" >/dev/null 2>&1 || true
+# rustup picks the toolchain from the working directory, and
+# core/rust-toolchain.toml is what pins 1.99.1 — so the build has to run from
+# inside core/. RUSTUP_TOOLCHAIN pins it regardless of where cargo is called.
+export RUSTUP_TOOLCHAIN=1.99.1
+rustup target add --toolchain 1.99.1 "$TARGET"
+rustup target list --toolchain 1.99.1 --installed
 
 LOG="$ROOT/ios/third_party/rust-$TARGET.log"
 mkdir -p "$(dirname "$LOG")"
+cd "$ROOT/core"
 if ! cargo build \
-  --manifest-path "$ROOT/core/Cargo.toml" \
   -p duck-mobile-core \
   --lib \
   --release \
