@@ -70,7 +70,7 @@ fn ndk_sysroot_lib_dir() -> Option<String> {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=native/duck_mj_shim.c");
+    println!("cargo:rerun-if-changed=native/duck_mj_shim.cpppp");
     println!("cargo:rerun-if-changed=native/duck_mj_shim.h");
     println!("cargo:rerun-if-env-changed=MUJOCO_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=MUJOCO_LIB_DIR");
@@ -88,7 +88,9 @@ fn main() {
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
 
     cc::Build::new()
-        .file("native/duck_mj_shim.c")
+        .cpp(true)
+        .std("c++17") // mjspec.h's C++ branch uses std::byte
+        .file("native/duck_mj_shim.cpp")
         .include("native")
         .include(&include)
         .warnings(false)

@@ -1,10 +1,12 @@
 #include "duck_mj_shim.h"
 
+#include <cstddef> // std::byte, used by mjspec.h in C++ builds
 #include <mujoco/mujoco.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdexcept>
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -21,7 +23,25 @@ struct DuckMj {
     mjData* d;
 };
 
+DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size);
+
 DuckMj* duck_mj_load(const char* xml_path, char* error, int error_size) {
+    /* MuJoCo throws C++ exceptions (mjCError and friends); a C++ exception
+       crossing into Rust aborts the process as a foreign exception. Guard
+       every MuJoCo call here and surface the message through the error
+       buffer instead. */
+    try {
+        return duck_mj_load_impl(xml_path, error, error_size);
+    } catch (const std::exception& e) {
+        snprintf(error, error_size, "mujoco exception: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        snprintf(error, error_size, "unknown mujoco exception");
+        return nullptr;
+    }
+}
+
+DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
     char err[1000] = {0};
     mjModel* m = mj_loadXML(xml_path, NULL, err, sizeof(err));
     if (!m) {
