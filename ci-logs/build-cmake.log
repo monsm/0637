@@ -186,4 +186,9 @@ This warning is for project developers.  Use -Wno-author to suppress it.
 -- Performing Test CMAKE_HAVE_LIBC_PTHREAD
 -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
 -- Found Threads: TRUE
+CMake Warning in CMakeLists.txt:
+  CMAKE_SKIP_INSTALL_RULES was enabled even though installation rules have
+  been specified
+
+
 -- Configuring incomplete, errors occurred!
