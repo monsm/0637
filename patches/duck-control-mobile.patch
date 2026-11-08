@@ -1,8 +1,8 @@
 diff --git a/duck-control/Cargo.toml b/duck-control/Cargo.toml
-index b53d572..99719ee 100644
+index b53d572..072887d 100644
 --- a/duck-control/Cargo.toml
 +++ b/duck-control/Cargo.toml
-@@ -29,20 +29,31 @@ tracing.workspace = true
+@@ -29,20 +29,33 @@ tracing.workspace = true
  libloading = "0.8"
  # Identify unchanged networks when a different slot is hot-swapped.
  sha2 = "0.11.0"
@@ -32,8 +32,10 @@ index b53d572..99719ee 100644
 +# Desktop/board: dlopen the ONNX Runtime shared library.
 +onnx-dynamic = ["ort/load-dynamic"]
 +# iOS/static: link libonnxruntime.a from an XCFramework
-+# (ORT_IOS_XCFWK_LOCATION), with no dylib probe.
-+onnx-static = []
++# (ORT_IOS_XCFWK_LOCATION), with no dylib probe. `std` is what unlocks the
++# Session API; ort-sys picks up the xcframework whenever that env var is set
++# for an iOS target.
++onnx-static = ["ort/std"]
  
  [dev-dependencies]
  serde_json.workspace = true
@@ -68,7 +70,7 @@ index 900e3ff..71fd75f 100644
  pub mod fall;
  pub mod imu;
 diff --git a/duck-control/src/policy.rs b/duck-control/src/policy.rs
-index 17a5a97..d6465da 100644
+index 17a5a97..f660c7c 100644
 --- a/duck-control/src/policy.rs
 +++ b/duck-control/src/policy.rs
 @@ -14,6 +14,7 @@
@@ -95,15 +97,30 @@ index 17a5a97..d6465da 100644
  pub(crate) fn ensure_runtime() -> Result<(), PolicyError> {
      static PROBE: OnceLock<Result<(), String>> = OnceLock::new();
      let outcome = PROBE.get_or_init(|| {
-@@ -258,6 +261,7 @@ impl Policy {
+@@ -150,6 +153,14 @@ pub(crate) fn ensure_runtime() -> Result<(), PolicyError> {
+         })
+ }
+ 
++/// Static ONNX Runtime (iOS, `onnx-static`) is linked into the binary, so there
++/// is no dylib to probe — the same guarantee `ensure_runtime` buys on the
++/// dynamic path already holds by construction.
++#[cfg(all(feature = "onnx-static", not(feature = "onnx-dynamic")))]
++pub(crate) fn ensure_runtime() -> Result<(), PolicyError> {
++    Ok(())
++}
++
+ /// Run the `ort` calls, turning a panic from inside them into a [`PolicyError`].
+ ///
+ /// `ort` treats some initialisation failures as unrecoverable and panics rather than
+@@ -258,6 +269,7 @@ impl Policy {
      /// `stand` is optional: without it the walking policy runs at every velocity, which is
      /// what a single-policy bundle does.
      pub fn load(paths: &PolicyPaths, standing_threshold: f64) -> Result<Self, PolicyError> {
-+        #[cfg(feature = "onnx-dynamic")]
++        #[cfg(any(feature = "onnx-dynamic", feature = "onnx-static"))]
          ensure_runtime()?;
  
          // Everything below calls into `ort`, and `ort` panics on failures it considers
-@@ -450,6 +454,7 @@ impl Policy {
+@@ -450,6 +462,7 @@ impl Policy {
  /// spend — so the IPC caller runs it on its own runtime, and the loop only ever calls it in its
  /// preamble, before the first tick is due.
  pub fn validate(path: &Path) -> Result<(), PolicyError> {

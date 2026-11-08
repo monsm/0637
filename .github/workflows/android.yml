@@ -37,13 +37,16 @@ jobs:
         id: env
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
+          # The runner preinstalls an NDK; use exactly that one everywhere
+          # (cargo-ndk prefers ANDROID_NDK_ROOT and warns on a mismatch).
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_ROOT:-$SDK_ROOT/ndk/27.3.13750724}" >> "$GITHUB_ENV"
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
 
       - name: Rust targets and cargo-ndk
         id: rusttoolchain
         run: |
+          rustup toolchain install 1.99.1 --profile minimal
           rustup target add aarch64-linux-android x86_64-linux-android
           cargo install cargo-ndk --locked
 
@@ -133,6 +136,10 @@ jobs:
           } > ci-logs/android/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
+          # Overlay onto the existing ci-logs branch so the other platform's
+          # logs survive this force-push.
+          git fetch --depth 1 origin ci-logs \
+            && git checkout FETCH_HEAD -- ci-logs || true
           git add -f ci-logs || true
           git commit -m "ci-logs: Android run ${{ github.run_id }} [skip ci]" || true
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"

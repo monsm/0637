@@ -157,7 +157,9 @@
 | 10 | 6ce1a62 + 75606eb | iOS：MuJoCo 静态库成功、stage 成功，`rustcore` 失败 = **CI 克隆的上游没带我们的 duck-control 补丁**（feature 不存在）；Android：STATIC 化后 `install(EXPORT)` 依赖 miniz/lodepng 报错 | 导出 `patches/duck-control-mobile.patch`，CI 固定 checkout `da34a22` 后 apply；Android 加 `CMAKE_SKIP_INSTALL_RULES=ON` |
 | 11 | 324c099 / e30b08b | Android：`localtime_r` 仍失败——env `CFLAGS` 被 NDK toolchain 覆盖 | 改为**源码补丁**：MuJoCo 的 localtime 检测加 `__ANDROID__`（bionic 有 localtime_r） |
 | 12 | c1b4802 / cb7e3cc | Android：Rust 编译错误 `[0i8; 1024]`——Android 上 `c_char` 是 `u8`（Windows 是 i8，本地过了）；iOS 日志通道被 main 上的日志提交互相冲突弄丢 | `c_char` 修正 + `#![allow(unsafe_op_in_unsafe_fn)]`；日志改推独立分支 `ci-logs`（force push，永不冲突） |
-| 13 | 55a6d35 / af69f10 | 进行中 | Android：jni.rs 编译后进入链接（`c++_static`）；iOS：补丁后的 Rust 编译 + 首次 Xcode/Swift 编译 |
+| 13 | 55a6d35 / af69f10 | Android：jni.rs `c_char` 未导入（E0425）→ 修；链接时找不到 `libc++_static.a` → build.rs 加 NDK per-triple lib 搜索路径；iOS：runner 排队慢 + 连续推送把运行取消了几轮，日志停在补丁前 | 批量修复，一次推送 |
+| 14 | 9af3a72 | 两个平台都在 **Rust core** 失败：`build.rs` 里 `env::consts::OS.as_str()` 是不稳定 API（`str_as_str`，E0658）——runner 的 rustc 比本地 1.99.1 旧；之前的 `c++_static` 报错是**旧日志**（Android 的 force-push 用 main 上残留的旧 `ci-logs/` 覆盖了 iOS 刚发的日志） | `core/rust-toolchain.toml` 钉死 1.99.1；删掉 main 上的旧 `ci-logs/`；发布日志步骤先 fetch `ci-logs` 分支再叠加，平台间不再互相覆盖 |
+| 15 | 本地预检后推送 | 本地 `cargo check` 复现并修掉下一个 iOS 失败：`onnx-static = []` 让 ort 连 `std` 都没有（Session API 全变 `!`），且上游 `pickup.rs` 无条件用 `ensure_runtime` | `onnx-static = ["ort/std"]`（链接由 ort-sys 的 `ORT_IOS_XCFWK_LOCATION` 处理）；`ensure_runtime` 在静态路径下为 no-op；Android 的 c++ 改 `-static-libstdc++`（NDK clang 自解析，不再猜 NDK 路径）；SDK 不再下第二个 NDK（用 runner 预装的 27.3） |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。

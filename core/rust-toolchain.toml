@@ -1,0 +1,5 @@
+# Pin the toolchain CI builds with: the runner images ship an older stable
+# that rejects some code the workspace compiles (e.g. `str::as_str`).
+[toolchain]
+channel = "1.99.1"
+profile = "minimal"

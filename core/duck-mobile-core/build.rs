@@ -27,30 +27,12 @@ fn main() {
     println!("cargo:rustc-link-search=native={libdir}");
     match target_os.as_str() {
         "android" => {
-            // NDK static MuJoCo; c++_static keeps the APK free of an extra
-            // libc++_shared.so dependency.
+            // NDK static MuJoCo; static libc++ keeps the APK free of an extra
+            // bundled libc++_shared.so for this library itself (ORT's AAR still
+            // ships one for libonnxruntime.so). `-static-libstdc++` is resolved
+            // by the NDK clang driver in its own sysroot — no NDK path guessing.
             println!("cargo:rustc-link-lib=static=mujoco");
-            println!("cargo:rustc-link-lib=static=c++_static");
-            // rustc doesn't know the NDK sysroot's per-triple lib dir where
-            // libc++_static.a lives.
-            let ndk = env::var("ANDROID_NDK_HOME")
-                .or_else(|_| env::var("ANDROID_NDK_ROOT"))
-                .or_else(|_| {
-                    env::var("ANDROID_HOME")
-                        .map(|home| format!("{home}/ndk/27.2.12479018"))
-                })
-                .unwrap_or_default();
-            if !ndk.is_empty() {
-                let host = match env::consts::OS.as_str() {
-                    "macos" => "darwin-x86_64",
-                    "windows" => "windows-x86_64",
-                    _ => "linux-x86_64",
-                };
-                let triple = env::var("TARGET").unwrap_or_default();
-                println!(
-                    "cargo:rustc-link-search=native={ndk}/toolchains/llvm/prebuilt/{host}/sysroot/usr/lib/{triple}"
-                );
-            }
+            println!("cargo:rustc-link-arg=-static-libstdc++");
         }
         "ios" | "macos" => {
             // CI supplies a MuJoCo 3.10 static library built for the target.

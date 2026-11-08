@@ -41,6 +41,7 @@ jobs:
         id: toolchain
         run: |
           brew install xcodegen cmake ninja
+          rustup toolchain install 1.99.1 --profile minimal
           rustup target add aarch64-apple-ios-sim
 
       - name: Cache native deps
@@ -120,6 +121,10 @@ jobs:
           } > ci-logs/ios/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
+          # Overlay onto the existing ci-logs branch so the other platform's
+          # logs survive this force-push.
+          git fetch --depth 1 origin ci-logs \
+            && git checkout FETCH_HEAD -- ci-logs || true
           git add -f ci-logs || true
           git commit -m "ci-logs: iOS run ${{ github.run_id }} [skip ci]" || true
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"

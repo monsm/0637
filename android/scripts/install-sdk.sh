@@ -23,8 +23,10 @@ fi
 
 yes | "$SDKM" --sdk_root="$SDK_ROOT" --licenses > /dev/null 2>&1 || true
 
+# No NDK here: the runner image preinstalls one and the Environment step pins
+# everything to it — downloading a second NDK only adds version-skew risk.
 if ! "$SDKM" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-35" \
-  "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1" \
+  "build-tools;35.0.0" "cmake;3.22.1" \
   >"$LOG" 2>&1; then
   echo "::error::sdkmanager failed — see step summary"
   tail -n 200 "$LOG" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$LOG"
