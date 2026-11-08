@@ -127,6 +127,7 @@ jobs:
             echo "rustcore=${{ steps.rustcore.outcome }}"
             echo "xcodegen=${{ steps.xcodegen.outcome }}"
             echo "xcodebuild=${{ steps.xcodebuild.outcome }}"
+            echo "simsmoke=${{ steps.simsmoke.outcome }}"
           } > ci-logs/ios/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
@@ -138,8 +139,76 @@ jobs:
             sleep 2
           done
 
+      - name: Simulator smoke test
+        id: simsmoke
+        run: |
+          set -uo pipefail
+          APP="ios/build/Build/Products/Debug-iphonesimulator/Duck.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::app bundle missing at $APP"
+            exit 1
+          fi
+          # Use a pre-created simulator from the runner image; no name guessing.
+          UDID=$(xcrun simctl list devices available | grep -m1 -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}')
+          if [ -z "$UDID" ]; then
+            echo "::error::no available simulator device"
+            exit 1
+          fi
+          echo "simulator UDID $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+          xcrun simctl launch "$UDID" ai.duck.microduck | tee sim-launch.log
+          sleep 30
+          if xcrun simctl spawn "$UDID" launchctl list | grep -q ai.duck.microduck; then
+            echo "app is running"
+          else
+            echo "::error::app is not running — it crashed on open"
+            xcrun simctl spawn "$UDID" log show --last 3m --style compact > sim-syslog.log || true
+            grep -nE "Fatal|fatal|crash|abort|Abort|Exception|signal" sim-syslog.log | head -40 || true
+            ls "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | tail -5 || true
+            exit 1
+          fi
+          # The intent API answers only if the whole native stack came up:
+          # MuJoCo loaded the scene, the policies loaded, the 50 Hz loop ticks.
+          curl -sf http://127.0.0.1:8765/state | tee intent-state.json || {
+            echo "::error::intent API did not answer — the core is not ticking"
+            xcrun simctl spawn "$UDID" log show --last 3m --style compact > sim-syslog.log || true
+            exit 1
+          }
+          curl -sf http://127.0.0.1:8765/skills | tee intent-skills.json || true
+          xcrun simctl spawn "$UDID" log show --last 3m --style compact > sim-syslog.log || true
+          # Package the simulator app: unzip and `xcrun simctl install` it.
+          (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/Duck-ios-simulator.zip" "$(basename "$APP")")
+          xcrun simctl shutdown "$UDID" || true
+
+      - name: Publish smoke logs
+        if: always()
+        run: |
+          mkdir -p ci-logs/ios
+          git fetch --depth 1 origin ci-logs \
+            && git checkout FETCH_HEAD -- ci-logs || true
+          cp sim-launch.log ci-logs/ios/ 2>/dev/null || true
+          cp sim-syslog.log ci-logs/ios/ 2>/dev/null || true
+          cp intent-state.json ci-logs/ios/ 2>/dev/null || true
+          cp intent-skills.json ci-logs/ios/ 2>/dev/null || true
+          {
+            echo "run=${{ github.run_id }}"
+            echo "simsmoke=${{ steps.simsmoke.outcome }}"
+          } > ci-logs/ios/smoke.txt
+          git config user.email "actions@github.com"
+          git config user.name "ci-log-bot"
+          git add -f ci-logs || true
+          git commit -m "ci-logs: iOS smoke run ${{ github.run_id }} [skip ci]" || true
+          URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          for attempt in 1 2 3; do
+            if git push --force "$URL" HEAD:refs/heads/ci-logs; then break; fi
+            sleep 2
+          done
+
       - uses: actions/upload-artifact@v4
         id: artifact
+        if: always()
         with:
-          name: Duck-simulator
-          path: ios/build/Build/Products/Debug-iphonesimulator/Duck.app
+          name: Duck-ios-simulator
+          path: Duck-ios-simulator.zip
