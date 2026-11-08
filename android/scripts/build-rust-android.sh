@@ -64,6 +64,9 @@ for abi in arm64-v8a x86_64; do
     tail -n 200 "$LOG" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || true
     exit 1
   fi
+  # The core links the shared C++ STL (the C++ shim and mjspec.h types).
+  # Ship the NDK's runtime next to it.
+  cp "$TOOLCHAIN/sysroot/usr/lib/$TRIPLE/libc++_shared.so"     "$ROOT/android/app/src/main/jniLibs/$abi/"
 done
 
 echo "Rust Android core copied into jniLibs"
