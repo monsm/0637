@@ -48,6 +48,17 @@ DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
         return NULL;
     }
     DUCK_STAGE("makeData begin");
+    /* mj_makeData sizes every arena from the model; log what it is about to
+       allocate before calling it, so a hang or OOM is attributable. */
+    DUCK_STAGE("makeData sizes");
+    __android_log_print(ANDROID_LOG_INFO, "duck-rust",
+                        "mujoco model: nq=%d nv=%d nu=%d nbody=%d ngeom=%d "
+                        "nmesh=%d nmeshvert=%d nmeshface=%d nmeshgraph=%d "
+                        "nflexvert=%d neq=%d nkey=%d",
+                        m->nq, m->nv, m->nu, m->nbody, m->ngeom, m->nmesh,
+                        m->nmeshvert, m->nmeshface, m->nmeshgraph,
+                        m->nflexvert, m->neq, m->nkey);
+    DUCK_STAGE("makeData call");
     mjData* d = mj_makeData(m);
     DUCK_STAGE("makeData end");
     if (!d) {
