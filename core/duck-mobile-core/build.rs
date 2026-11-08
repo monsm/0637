@@ -22,12 +22,16 @@ fn mujoco_libs(libdir: &str) -> Vec<String> {
     libs
 }
 
-/// A static MuJoCo archive does not absorb its own dependencies (tinyxml2,
-/// miniz, lodepng, qhull), so those have to be named explicitly.
+/// A static archive only pulls members that define referenced symbols, and
+/// MuJoCo's mesh decoders (stl/obj) register themselves from constructors —
+/// nothing references their objects, so they would be dropped and scene
+/// loading fails with "no decoder found". Pull the whole archive.
 fn link_mujoco(libdir: &str) {
+    println!("cargo:rustc-link-arg=-Wl,--whole-archive");
     for lib in mujoco_libs(libdir) {
         println!("cargo:rustc-link-lib=static={lib}");
     }
+    println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
 }
 
 /// The NDK's per-target sysroot library directory, where `libc++_static.a`
@@ -83,6 +87,16 @@ fn main() {
             // 16 KB page-size devices (Android 15+ kernels) refuse to load
             // 4 KB-aligned ELF segments.
             println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
+            // Link the API-level libc.so stub first: without it, -lc finds
+            // libc.a (bionic's static libc, needed only for static
+            // executables) in the per-triple directory, and its scudo malloc
+            // divides by zero at startup. The device's libc is dynamic.
+            if let Some(dir) = ndk_sysroot_lib_dir() {
+                let api = "28"; // matches minSdk and cargo ndk --platform
+                println!(
+                    "cargo:rustc-link-search=native={dir}/{api}"
+                );
+            }
             // The NDK has no libdl.so, so rustc's -ldl resolves to libdl.a —
             // bionic's static-executable shim, whose malloc/newlocale/errno/
             // atexit definitions have globals that are never initialised in a
