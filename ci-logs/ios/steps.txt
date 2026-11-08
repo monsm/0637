@@ -1,0 +1,11 @@
+checkout=success
+upstream=success
+toolchain=success
+cachendk=success
+cacherust=success
+ort=success
+mujoco=failure
+stage=skipped
+rustcore=skipped
+xcodegen=skipped
+xcodebuild=skipped
