@@ -31,14 +31,25 @@ DuckMj* duck_mj_load(const char* xml_path, char* error, int error_size) {
     }
 }
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#define DUCK_STAGE(name) __android_log_print(ANDROID_LOG_INFO, "duck-rust", "mujoco %s", name)
+#else
+#define DUCK_STAGE(name) ((void)0)
+#endif
+
 DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
     char err[1000] = {0};
+    DUCK_STAGE("loadXML begin");
     mjModel* m = mj_loadXML(xml_path, NULL, err, sizeof(err));
+    DUCK_STAGE("loadXML end");
     if (!m) {
         if (error && error_size > 0) snprintf(error, error_size, "%s", err[0] ? err : "mj_loadXML failed");
         return NULL;
     }
+    DUCK_STAGE("makeData begin");
     mjData* d = mj_makeData(m);
+    DUCK_STAGE("makeData end");
     if (!d) {
         mj_deleteModel(m);
         if (error && error_size > 0) snprintf(error, error_size, "mj_makeData failed");
