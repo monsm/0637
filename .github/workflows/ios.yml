@@ -234,6 +234,7 @@ jobs:
           cp sim-syslog.log ci-logs/ios/ 2>/dev/null || true
           cp intent-state.json ci-logs/ios/ 2>/dev/null || true
           cp intent-skills.json ci-logs/ios/ 2>/dev/null || true
+          cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
           {
             echo "run=${{ github.run_id }}"
             echo "simsmoke=${{ steps.simsmoke.outcome }}"
