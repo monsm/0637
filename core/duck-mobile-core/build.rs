@@ -87,6 +87,19 @@ fn main() {
             // init_array entries before libc++'s own initialisers, which
             // crashed in a static constructor; the shared runtime also gives
             // the process a single C++ runtime.
+            // The NDK ships no libdl.so, so `-ldl` (which rustc emits for
+            // Android) resolves to libdl.a — bionic's *static-linking* shim.
+            // That archive defines stale copies of __cxa_atexit,
+            // __cxa_guard_acquire, abort and __errno which then override the
+            // real libc/libc++ implementations, and static constructors
+            // crash at dlopen. A linker script makes -ldl resolve to libc,
+            // where dlopen lives since API 24.
+            if let Some(out) = env::var_os("OUT_DIR") {
+                let out = std::path::PathBuf::from(out);
+                if std::fs::write(out.join("libdl.so"), "INPUT(-lc)\n").is_ok() {
+                    println!("cargo:rustc-link-search=native={}", out.display());
+                }
+            }
             if let Some(dir) = ndk_sysroot_lib_dir() {
                 println!("cargo:rustc-link-search=native={dir}");
             }

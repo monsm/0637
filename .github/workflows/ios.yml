@@ -182,6 +182,8 @@ jobs:
             tail -20 sim-boot.log sim-bootstatus.log 2>/dev/null || true
             exit 1
           fi
+          echo "--- control experiment: can this simulator install any app? ---"
+          bash ios/scripts/control-app.sh "$UDID" || true
           xcrun simctl install "$UDID" "$APP" || {
             echo "::error::simctl install failed — dumping bundle diagnostics"
             ls -la "$APP"
