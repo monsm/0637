@@ -103,7 +103,7 @@ for abi in arm64-v8a x86_64; do
   # for cached builds too: the archives are in the cached build tree.
   mkdir -p "$OUT/$abi/lib"
   echo "mujoco" > "$OUT/$abi/lib/libs.txt"
-  for dep in lodepng miniz tinyxml2 qhull_r; do
+  for dep in lodepng miniz tinyxml2 qhullstatic_r; do
     found="$(find "$BUILD" -name "lib$dep.a" -print -quit)"
     if [ -z "$found" ]; then
       echo "::warning::lib$dep.a not found under $BUILD"

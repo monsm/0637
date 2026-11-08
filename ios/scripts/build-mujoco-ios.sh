@@ -121,7 +121,7 @@ build() {
   # for cached builds too: the archives are in the cached build tree.
   mkdir -p "$out/lib"
   echo "mujoco" > "$out/lib/libs.txt"
-  for dep in lodepng miniz tinyxml2 qhull_r; do
+  for dep in lodepng miniz tinyxml2 qhullstatic_r; do
     dep_found="$(find "$build" -name "lib$dep.a" -print -quit)"
     if [ -z "$dep_found" ]; then
       echo "::warning::lib$dep.a not found under $build"
