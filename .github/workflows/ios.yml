@@ -162,19 +162,13 @@ jobs:
         run: |
           set -uo pipefail
           APP="ios/build/Build/Products/Debug-iphonesimulator/Duck.app"
-          if [ ! -d "$APP" ]; then
-            echo "::error::app bundle missing at $APP"
-            exit 1
-          fi
           UDID="$SIM_UDID"
+          if [ ! -d "$APP" ]; then
+            echo "::error::app bundle missing at $APP"; exit 1
+          fi
           echo "simulator UDID $UDID"
-          # The pre-boot step started the device; wait until it is booted
-          # (data migration can take several minutes on a fresh runner).
           for i in $(seq 1 90); do
-            if xcrun simctl list devices | grep "$UDID" | grep -q Booted; then
-              echo "simulator booted after ${i}0s"
-              break
-            fi
+            xcrun simctl list devices | grep "$UDID" | grep -q Booted && break
             sleep 10
           done
           if ! xcrun simctl list devices | grep "$UDID" | grep -q Booted; then
@@ -182,73 +176,42 @@ jobs:
             tail -20 sim-boot.log sim-bootstatus.log 2>/dev/null || true
             exit 1
           fi
-          echo "--- control experiment: can this simulator install any app? ---"
-          xcrun simctl list runtimes | sed -n '1,12p'
-          bash ios/scripts/control-app.sh "$UDID" || true
-          echo "--- re-sign our app with an explicit identifier and retry ---"
-          /usr/bin/codesign --force --sign - --identifier ai.duck.microduck "$APP" || true
-          /usr/bin/codesign -dv "$APP" 2>&1 | head -10 || true
-          if xcrun simctl install "$UDID" "$APP"; then
-            echo "INSTALL-OK-AFTER-RESIGN"
-          else
-            echo "INSTALL-FAILED-AFTER-RESIGN"
-          fi
+          # CI builds carry an ad-hoc signature; install that build as-is.
           xcrun simctl install "$UDID" "$APP" || {
-            echo "::error::simctl install failed — dumping bundle diagnostics"
+            echo "::error::simctl install failed"
             ls -la "$APP"
             plutil -p "$APP/Info.plist" | head -30 || true
             /usr/bin/codesign -dv "$APP" 2>&1 || true
             exit 1
           }
-          # Stream the simulator log in the background: the app's NSLog
-          # startup trail (duck: ...) lands here.
-          xcrun simctl spawn "$UDID" log stream --style compact             > sim-console.log 2>&1 &
+          xcrun simctl spawn "$UDID" log stream --style compact > sim-console.log 2>&1 &
           STREAM_PID=$!
           xcrun simctl launch "$UDID" ai.duck.microduck | tee sim-launch.log
-          sleep 45
-          kill "$STREAM_PID" 2>/dev/null || true
-          grep -E "duck:|dyld|abort|Fatal" sim-console.log | head -40 || true
-          if xcrun simctl spawn "$UDID" launchctl list | grep -q ai.duck.microduck; then
-            echo "app is running"
-          else
-            echo "::error::app is not running — it crashed on open"
-            xcrun simctl io "$UDID" screenshot sim-screenshot.png || true
-            exit 1
-          fi
-          sleep 30
-          if xcrun simctl spawn "$UDID" launchctl list | grep -q ai.duck.microduck; then
-            echo "app is running"
-          else
-            echo "::error::app is not running — it crashed on open"
-            xcrun simctl spawn "$UDID" log show --last 3m --style compact > sim-syslog.log || true
-            grep -nE "Fatal|fatal|crash|abort|Abort|Exception|signal" sim-syslog.log | head -40 || true
-            ls "$HOME/Library/Logs/DiagnosticReports" 2>/dev/null | tail -5 || true
-            exit 1
-          fi
-          # The intent API answers only if the whole native stack came up:
-          # MuJoCo loaded the scene, the policies loaded, the 50 Hz loop ticks.
-          # Loading takes a while on a simulator, so poll.
+          # The intent API answers only once MuJoCo loaded the scene, the
+          # policies loaded and the 50 Hz loop is ticking. Poll it: that is
+          # the real liveness check (launchctl reports the app as gone when
+          # the simulator suspends it).
           STATE=""
-          for i in $(seq 1 40); do
+          for i in $(seq 1 60); do
             STATE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state || true)
             [ -n "$STATE" ] && break
             sleep 3
           done
+          kill "$STREAM_PID" 2>/dev/null || true
+          grep -E "duck:|dyld|abort|Fatal" sim-console.log | head -40 || true
           if [ -z "$STATE" ]; then
             echo "::error::intent API did not answer — the core is not ticking"
             xcrun simctl io "$UDID" screenshot sim-screenshot.png || true
-            xcrun simctl spawn "$UDID" log show --last 5m --style compact \
-              --predicate 'process == "Duck"' > sim-syslog.log || true
-            xcrun simctl spawn "$UDID" log show --last 5m --style compact > sim-syslog-all.log || true
-            for f in sim-syslog.log sim-syslog-all.log; do
+            xcrun simctl spawn "$UDID" log show --last 5m --style compact               --predicate 'process == "Duck"' > sim-syslog.log || true
+            for f in sim-console.log sim-syslog.log; do
               tail -c 1500000 "$f" > "$f.tail" && mv "$f.tail" "$f"
             done
-            tail -80 sim-syslog.log || true
+            tail -60 sim-syslog.log || true
             exit 1
           fi
           echo "$STATE" | tee intent-state.json
           curl -sf --max-time 5 http://127.0.0.1:8765/skills | tee intent-skills.json || true
-          # Package the simulator app: unzip and `xcrun simctl install` it.
+          xcrun simctl io "$UDID" screenshot sim-screenshot.png || true
           (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/Duck-ios-simulator.zip" "$(basename "$APP")")
           xcrun simctl shutdown "$UDID" || true
 
@@ -258,6 +221,7 @@ jobs:
           mkdir -p ci-logs/ios
           git fetch --depth 1 origin ci-logs \
             && git checkout FETCH_HEAD -- ci-logs || true
+          rm -f ci-logs/ios/intent-state.json ci-logs/ios/intent-skills.json
           cp sim-launch.log ci-logs/ios/ 2>/dev/null || true
           for f in sim-syslog.log sim-syslog-all.log; do
             tail -c 1500000 "$f" > "$f.tail" && mv "$f.tail" "$f" 2>/dev/null || true
