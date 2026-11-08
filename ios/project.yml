@@ -62,7 +62,6 @@ targets:
       # the install with "Missing bundle ID".
       - library: Frameworks/libduck_mobile_core.dylib
         embed: true
-        codeSign: true
       - framework: third_party/onnxruntime.xcframework
         embed: true
         codeSign: true
