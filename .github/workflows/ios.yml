@@ -23,6 +23,22 @@ jobs:
       - uses: actions/checkout@v4
         id: checkout
 
+      - name: Pre-boot simulator in the background
+        id: preboot
+        run: |
+          # The runner image's iOS runtime has never been booted, so the first
+          # boot runs data migration that can take minutes. Start it now and
+          # let it overlap the MuJoCo/Rust/Xcode build.
+          UDID=$(xcrun simctl list devices available | grep -m1 -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}')
+          if [ -z "$UDID" ]; then
+            echo "::error::no available simulator device"
+            exit 1
+          fi
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          nohup xcrun simctl boot "$UDID" > sim-boot.log 2>&1 &
+          nohup xcrun simctl bootstatus "$UDID" -b > sim-bootstatus.log 2>&1 &
+          echo "pre-booting $UDID in the background"
+
       - name: Fetch upstream sources and policies
         id: upstream
         run: |
@@ -148,15 +164,22 @@ jobs:
             echo "::error::app bundle missing at $APP"
             exit 1
           fi
-          # Use a pre-created simulator from the runner image; no name guessing.
-          UDID=$(xcrun simctl list devices available | grep -m1 -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}')
-          if [ -z "$UDID" ]; then
-            echo "::error::no available simulator device"
+          UDID="$SIM_UDID"
+          echo "simulator UDID $UDID"
+          # The pre-boot step started the device; wait until it is booted
+          # (data migration can take several minutes on a fresh runner).
+          for i in $(seq 1 90); do
+            if xcrun simctl list devices | grep "$UDID" | grep -q Booted; then
+              echo "simulator booted after ${i}0s"
+              break
+            fi
+            sleep 10
+          done
+          if ! xcrun simctl list devices | grep "$UDID" | grep -q Booted; then
+            echo "::error::simulator did not finish booting"
+            tail -20 sim-boot.log sim-bootstatus.log 2>/dev/null || true
             exit 1
           fi
-          echo "simulator UDID $UDID"
-          xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl launch "$UDID" ai.duck.microduck | tee sim-launch.log
           sleep 30
