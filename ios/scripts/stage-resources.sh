@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SRC="$ROOT/upstream/microduck_rl/src/mjlab_microduck/robot/microduck"
-DST="$ROOT/ios/DuckApp/Resources"
+DST="$ROOT/ios/DuckApp/DuckResources"
 
 if [ ! -d "$SRC" ]; then
   echo "error: missing $SRC — clone microduck_rl into upstream/ first" >&2

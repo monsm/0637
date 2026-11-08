@@ -30,9 +30,9 @@ final class DuckController: ObservableObject {
             return
         }
         let scene = resourceURL
-            .appendingPathComponent("Resources/robot/microduck/scene_backlash.xml")
+            .appendingPathComponent("DuckResources/robot/microduck/scene_backlash.xml")
             .path
-        let policies = resourceURL.appendingPathComponent("Resources/policies").path
+        let policies = resourceURL.appendingPathComponent("DuckResources/policies").path
         policyDirectory = policies
 
         var error = [CChar](repeating: 0, count: 1024)

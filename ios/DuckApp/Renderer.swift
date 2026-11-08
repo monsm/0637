@@ -131,7 +131,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard let url = bundle.url(
             forResource: name,
             withExtension: "stl",
-            subdirectory: "Resources/robot/microduck/assets"
+            subdirectory: "DuckResources/robot/microduck/assets"
         ) else {
             return nil
         }
@@ -156,7 +156,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     /// library when the source is absent.
     private static func makeLibrary(_ device: MTLDevice) -> MTLLibrary? {
         let candidates = [
-            Bundle.main.url(forResource: "Shaders", withExtension: "metal", subdirectory: "Resources"),
+            Bundle.main.url(forResource: "Shaders", withExtension: "metal", subdirectory: "DuckResources"),
             Bundle.main.url(forResource: "Shaders", withExtension: "metal"),
         ]
         for case let url? in candidates {
