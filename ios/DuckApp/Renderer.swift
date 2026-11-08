@@ -41,7 +41,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     init?(controller: DuckController, view: MTKView) {
         guard let device = MTLCreateSystemDefaultDevice(),
               let queue = device.makeCommandQueue(),
-              let library = device.makeDefaultLibrary(),
+              let library = Renderer.makeLibrary(device),
               let vertexFunction = library.makeFunction(name: "duck_vertex"),
               let fragmentFunction = library.makeFunction(name: "duck_fragment") else {
             return nil
@@ -148,6 +148,19 @@ final class Renderer: NSObject, MTKViewDelegate {
         let mesh = Mesh(buffer: buffer, vertices: vertices.count / 6)
         meshes[name] = mesh
         return mesh
+    }
+
+    /// Compile Shaders.metal at runtime. Shipping the source as a resource
+    /// avoids a root-level default.metallib, which Xcode 26 refuses to code
+    /// sign ("code object is not signed at all"). Falls back to the compiled
+    /// library when the source is absent.
+    private static func makeLibrary(_ device: MTLDevice) -> MTLLibrary? {
+        if let url = Bundle.main.url(forResource: "Shaders", withExtension: "metal"),
+           let source = try? String(contentsOf: url, encoding: .utf8),
+           let library = try? device.makeLibrary(source: source, options: nil) {
+            return library
+        }
+        return device.makeDefaultLibrary()
     }
 
     private static func makeFloor(device: MTLDevice) -> Mesh {
