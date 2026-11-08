@@ -133,12 +133,11 @@ jobs:
           } > ci-logs/android/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
-          git add ci-logs || true
+          git add -f ci-logs || true
           git commit -m "ci-logs: Android run ${{ github.run_id }} [skip ci]" || true
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           for attempt in 1 2 3; do
-            git pull --rebase "$URL" main > /dev/null 2>&1 || true
-            if git push "$URL" HEAD:main; then break; fi
+            if git push --force "$URL" HEAD:refs/heads/ci-logs; then break; fi
             sleep 2
           done
 
