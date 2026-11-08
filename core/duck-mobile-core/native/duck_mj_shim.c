@@ -25,7 +25,7 @@ static void duck_run_atexit(void) {
     }
 }
 
-int __cxa_atexit(duck_atexit_fn fn, void* arg, void* dso) {
+__attribute__((weak)) int __cxa_atexit(duck_atexit_fn fn, void* arg, void* dso) {
     (void)dso;
     if (g_atexit_count >= DUCK_ATEXIT_MAX) {
         return -1;
