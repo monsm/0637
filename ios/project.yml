@@ -91,14 +91,3 @@ targets:
             fi
           done
           echo "warning: no simulator slice in $XCFWK"
-          # Sign last, after every nested component is in place. Recent
-          # CoreSimulator refuses to install a completely unsigned bundle
-          # (reported as "Missing bundle ID"); CI builds with
-          # CODE_SIGNING_ALLOWED=NO, so ad-hoc sign here. Xcode 26 treats the
-          # compiled Metal library as nested code and --deep needs it signed.
-          if [ -f "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/default.metallib" ]; then
-            /usr/bin/codesign --force --sign - --timestamp=none \
-              "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/default.metallib" || true
-          fi
-          /usr/bin/codesign --force --deep --sign - --timestamp=none \
-            "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}"

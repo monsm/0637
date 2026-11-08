@@ -43,6 +43,10 @@ for abi in arm64-v8a x86_64; do
     tail -n 200 "$LOG" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || true
     exit 1
   fi
+  # The core links libc++_shared.so; ship the runtime next to it.
+  TRIPLE=$([ "$abi" = "arm64-v8a" ] && echo aarch64-linux-android || echo x86_64-linux-android)
+  cp "$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/$TRIPLE/libc++_shared.so" \
+    "$ROOT/android/app/src/main/jniLibs/$abi/"
 done
 
 echo "Rust Android core copied into jniLibs"
