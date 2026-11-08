@@ -47,7 +47,7 @@ done
 adb logcat -d > android-logcat.log || true
 if [ -z "$STATE" ]; then
   echo "::error::intent API did not answer — the core is not ticking"
-  grep -nE "FATAL|AndroidRuntime|signal |onnx|mujoco|policy" android-logcat.log | tail -40 || true
+  grep -nE "duck-rust|FATAL|AndroidRuntime|signal |onnx|mujoco|policy" android-logcat.log | tail -40 || true
   exit 1
 fi
 echo "$STATE" | tee intent-state.json

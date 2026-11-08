@@ -72,6 +72,18 @@ pub unsafe extern "C" fn duck_core_new(
     error: *mut c_char,
     error_size: c_int,
 ) -> *mut DuckCore {
+    // A panic inside this extern "C" function aborts the process; on Android
+    // route the message to logcat so CI can see the reason.
+    #[cfg(target_os = "android")]
+    std::panic::set_hook(Box::new(|info| {
+        extern "C" {
+            fn duck_android_log_error(message: *const c_char);
+        }
+        let message = CString::new(format!("rust panic at {:?}: {info}", info.location()))
+            .unwrap_or_else(|_| CString::new("rust panic").expect("static"));
+        unsafe { duck_android_log_error(message.as_ptr()) };
+    }));
+
     let result = (|| -> Result<DuckCore, String> {
         let scene = c_string(scene_path)?;
         let policies = PathBuf::from(c_string(policies_dir)?);
