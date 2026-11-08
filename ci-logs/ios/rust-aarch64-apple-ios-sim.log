@@ -1,0 +1,9 @@
+    Updating crates.io index
+error: failed to select a version for `duck-control`.
+    ... required by package `duck-mobile-core v0.1.0 (/Users/runner/work/0637/0637/core/duck-mobile-core)`
+versions that meet the requirements `*` (locked to 0.18.9) are: 0.18.9
+
+package `duck-mobile-core` depends on `duck-control` with feature `onnx-dynamic` but `duck-control` does not have that feature.
+
+
+failed to select a version for `duck-control` which could resolve this conflict
