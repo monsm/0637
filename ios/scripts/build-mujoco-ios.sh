@@ -16,7 +16,9 @@ build() {
   local out="$2"
   local build="$out/build"
 
-  cmake -S "$SRC" -B "$build" -G Ninja \
+  local log="$build-cmake.log"
+  mkdir -p "$(dirname "$log")"
+  if ! cmake -S "$SRC" -B "$build" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_SYSTEM_NAME=iOS \
     -DCMAKE_OSX_SYSROOT="$sysroot" \
@@ -26,9 +28,20 @@ build() {
     -DMUJOCO_BUILD_TESTS=OFF \
     -DMUJOCO_BUILD_SIMULATE=OFF \
     -DMUJOCO_BUILD_PYTHON=OFF \
-    -DMUJOCO_BUILD_CSHARP=OFF
+    -DMUJOCO_BUILD_CSHARP=OFF \
+    >"$log" 2>&1; then
+    echo "::error::cmake configure failed — see step summary"
+    tail -n 200 "$log" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$log"
+    exit 1
+  fi
 
-  cmake --build "$build" --target mujoco -j"$(sysctl -n hw.ncpu)"
+  local blog="$build-build.log"
+  if ! cmake --build "$build" --target mujoco -j"$(sysctl -n hw.ncpu)" \
+    >"$blog" 2>&1; then
+    echo "::error::cmake build failed — see step summary"
+    tail -n 200 "$blog" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$blog"
+    exit 1
+  fi
 
   mkdir -p "$out/lib" "$out/include/mujoco"
   local library

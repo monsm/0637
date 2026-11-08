@@ -15,7 +15,9 @@ fi
 
 for abi in arm64-v8a x86_64; do
   BUILD="$OUT/build-$abi"
-  cmake -S "$SRC" -B "$BUILD" -G Ninja \
+  local_log="$OUT/cmake-$abi.log"
+  mkdir -p "$OUT"
+  if ! cmake -S "$SRC" -B "$BUILD" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="$abi" \
     -DANDROID_PLATFORM=android-26 \
@@ -25,9 +27,20 @@ for abi in arm64-v8a x86_64; do
     -DMUJOCO_BUILD_TESTS=OFF \
     -DMUJOCO_BUILD_SIMULATE=OFF \
     -DMUJOCO_BUILD_PYTHON=OFF \
-    -DMUJOCO_BUILD_CSHARP=OFF
+    -DMUJOCO_BUILD_CSHARP=OFF \
+    >"$local_log" 2>&1; then
+    echo "::error::cmake configure failed for $abi — see step summary"
+    tail -n 200 "$local_log" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$local_log"
+    exit 1
+  fi
 
-  cmake --build "$BUILD" --target mujoco -j"$(nproc)"
+  build_log="$OUT/build-$abi.log"
+  if ! cmake --build "$BUILD" --target mujoco -j"$(nproc)" \
+    >"$build_log" 2>&1; then
+    echo "::error::cmake build failed for $abi — see step summary"
+    tail -n 200 "$build_log" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$build_log"
+    exit 1
+  fi
 
   mkdir -p "$OUT/$abi/lib" "$OUT/$abi/include/mujoco"
   LIBRARY="$(find "$BUILD" -name 'libmujoco.a' -print -quit)"

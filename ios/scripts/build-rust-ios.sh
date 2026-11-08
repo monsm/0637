@@ -18,14 +18,21 @@ export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-install_name,@rpath/libduck_mo
 
 rustup target add "$TARGET" >/dev/null 2>&1 || true
 
-cargo build \
+LOG="$ROOT/ios/third_party/rust-$TARGET.log"
+mkdir -p "$(dirname "$LOG")"
+if ! cargo build \
   --manifest-path "$ROOT/core/Cargo.toml" \
   -p duck-mobile-core \
   --lib \
   --release \
   --no-default-features \
   --features mujoco,onnx-static \
-  --target "$TARGET"
+  --target "$TARGET" \
+  >"$LOG" 2>&1; then
+  echo "::error::cargo build failed — see step summary"
+  tail -n 200 "$LOG" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$LOG"
+  exit 1
+fi
 
 mkdir -p "$ROOT/ios/Frameworks"
 cp "$ROOT/core/target/$TARGET/release/libduck_mobile_core.dylib" "$ROOT/ios/Frameworks/"

@@ -14,7 +14,8 @@ fi
 for abi in arm64-v8a x86_64; do
   export MUJOCO_INCLUDE_DIR="$ROOT/android/third_party/mujoco/$abi/include"
   export MUJOCO_LIB_DIR="$ROOT/android/third_party/mujoco/$abi/lib"
-  cargo ndk \
+  LOG="$ROOT/android/third_party/rust-$abi.log"
+  if ! cargo ndk \
     -t "$abi" \
     -o "$ROOT/android/app/src/main/jniLibs" \
     build \
@@ -22,7 +23,12 @@ for abi in arm64-v8a x86_64; do
     -p duck-mobile-core \
     --release \
     --no-default-features \
-    --features mujoco,onnx-dynamic
+    --features mujoco,onnx-dynamic \
+    >"$LOG" 2>&1; then
+    echo "::error::cargo ndk build failed for $abi — see step summary"
+    tail -n 200 "$LOG" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$LOG"
+    exit 1
+  fi
 done
 
 echo "Rust Android core copied into jniLibs"
