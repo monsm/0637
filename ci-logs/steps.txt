@@ -1,0 +1,15 @@
+checkout=success
+java=success
+setupandroid=failure
+sdk=skipped
+env=skipped
+rusttoolchain=skipped
+upstream=skipped
+cachendk=skipped
+cacherust=skipped
+mujoco=skipped
+ort=skipped
+stage=skipped
+rustcore=skipped
+gradlesetup=skipped
+apk=skipped
