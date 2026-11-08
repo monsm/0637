@@ -13,6 +13,10 @@ struct DuckMj {
     mjData* d;
 };
 
+// Internal MuJoCo entry point (engine_io.c); not in the public headers but
+// exported by the archive, used here only to split the makeData stages.
+extern "C" void mj_makeRawData(mjData** dest, const mjModel* m);
+
 DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size);
 
 DuckMj* duck_mj_load(const char* xml_path, char* error, int error_size) {
