@@ -100,7 +100,12 @@ jobs:
         id: apk
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
-          gradle -p android assembleDebug --no-daemon --stacktrace
+          if ! gradle -p android assembleDebug --no-daemon --stacktrace \
+            > android-gradle.log 2>&1; then
+            echo "::error::gradle failed — see ci-logs"
+            tail -n 200 android-gradle.log >> "$GITHUB_STEP_SUMMARY" || true
+            exit 1
+          fi
 
       - name: Publish failure logs
         if: failure()
@@ -109,6 +114,7 @@ jobs:
           find android/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/android/ \; 2>/dev/null || true
           cp sdk-packages.log ci-logs/android/ 2>/dev/null || true
+          cp android-gradle.log ci-logs/android/ 2>/dev/null || true
           {
             echo "checkout=${{ steps.checkout.outcome }}"
             echo "java=${{ steps.java.outcome }}"

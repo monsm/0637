@@ -82,7 +82,9 @@ jobs:
       - name: Build simulator app
         id: xcodebuild
         run: |
-          xcodebuild \
+          set -o pipefail
+          mkdir -p ios/build
+          if ! xcodebuild \
             -project ios/Duck.xcodeproj \
             -scheme Duck \
             -configuration Debug \
@@ -90,7 +92,11 @@ jobs:
             -arch arm64 \
             -derivedDataPath ios/build \
             CODE_SIGNING_ALLOWED=NO \
-            build
+            build > ios/build/xcodebuild.log 2>&1; then
+            echo "::error::xcodebuild failed — see ci-logs"
+            tail -n 200 ios/build/xcodebuild.log >> "$GITHUB_STEP_SUMMARY" || true
+            exit 1
+          fi
 
       - name: Publish failure logs
         if: failure()
@@ -98,6 +104,7 @@ jobs:
           mkdir -p ci-logs/ios
           find ios/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/ios/ \; 2>/dev/null || true
+          cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
           {
             echo "checkout=${{ steps.checkout.outcome }}"
             echo "upstream=${{ steps.upstream.outcome }}"
