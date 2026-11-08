@@ -8,11 +8,6 @@ NDK="${ANDROID_NDK_HOME:-${ANDROID_HOME:-$HOME/Android/Sdk}/ndk/27.2.12479018}"
 SRC="$ROOT/android/third_party/mujoco-src"
 OUT="$ROOT/android/third_party/mujoco"
 
-# bionic doesn't define _POSIX_C_SOURCE, which MuJoCo's localtime_r platform
-# check requires; defining it is a no-op on bionic (POSIX is always exposed).
-export CFLAGS="-D_POSIX_C_SOURCE=200809L ${CFLAGS:-}"
-export CXXFLAGS="-D_POSIX_C_SOURCE=200809L ${CXXFLAGS:-}"
-
 if [ ! -d "$SRC" ]; then
   git clone --depth 1 --branch "$VERSION" \
     https://github.com/google-deepmind/mujoco.git "$SRC"
@@ -32,6 +27,24 @@ replacement = (
 )
 if needle not in text:
     raise SystemExit(f"static-library patch point not found in {path}")
+open(path, "w").write(text.replace(needle, replacement, 1))
+PY
+fi
+
+# bionic doesn't define _POSIX_C_SOURCE, which MuJoCo's localtime_r platform
+# check requires; localtime_r itself is available on Android, so add it to the
+# POSIX branch directly (flag-based fixes get overridden by the NDK toolchain).
+ERRMEM="$SRC/src/engine/engine_util_errmem.c"
+if ! grep -q "DUCK_ANDROID_LOCALTIME" "$ERRMEM"; then
+  python3 - "$ERRMEM" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = ("#if defined(_POSIX_C_SOURCE) || defined(__APPLE__) || "
+          "defined(__STDC_VERSION_TIME_H__) || defined(__EMSCRIPTEN__)")
+replacement = needle + " || defined(__ANDROID__)  // DUCK_ANDROID_LOCALTIME"
+if needle not in text:
+    raise SystemExit(f"localtime patch point not found in {path}")
 open(path, "w").write(text.replace(needle, replacement, 1))
 PY
 fi
