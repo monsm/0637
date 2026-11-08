@@ -67,6 +67,10 @@ build() {
     return 0
   fi
 
+  # A restored cache may hold a pre-patch (shared/dylib) configure. Start clean
+  # so the patched CMakeLists and flags actually take effect.
+  rm -rf "$build"
+
   local name
   name="$(basename "$out")"
   local log="$out/$name-cmake.log"

@@ -42,6 +42,9 @@ for abi in arm64-v8a x86_64; do
     continue
   fi
   BUILD="$OUT/build-$abi"
+  # A restored cache may hold a pre-patch (shared/.so) configure. Start clean
+  # so the patched CMakeLists and flags actually take effect.
+  rm -rf "$BUILD"
   local_log="$OUT/cmake-$abi.log"
   mkdir -p "$OUT"
   if ! cmake -S "$SRC" -B "$BUILD" -G Ninja \
