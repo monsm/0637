@@ -23,6 +23,8 @@ work/ort-ios/
 work/mujoco-lib/
 work/*.zip
 work/*.exe
+__pycache__/
+*.pyc
 
 # IDE / OS
 .DS_Store
