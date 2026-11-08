@@ -148,12 +148,10 @@
 仓库：`github.com/monsm/0637`（已推送）。所有 Android/iOS 构建都走 GitHub CI，
 本地不做移动端构建。
 
-| 轮 | commit | 结果 | 修复 |
-|---|---|---|---|
-| 1 | abc9512 | iOS cancelled（`macos-14` runner 已下线）、Android 14s 失败 | runner 标签改 `macos-latest` / `ubuntu-24.04`；Swift 版本改 5.0（5.9 不是合法值） |
-| 2 | 8889612 | iOS 59s 失败在 MuJoCo iOS；Android 12s 早期失败 | 加 `::error` + step summary 公开诊断；SDK_ROOT 回退 `ANDROID_HOME` |
 | 3 | 2a38ef4 | iOS：MuJoCo **cmake configure** 失败（summary 匿名不可见）；Android 结果未显示 | 失败日志改为 **commit 回仓库**（`ci-logs/`，`[skip ci]` 防循环） |
-| 4 | 2a38ef4 之后 | 进行中 | `ci-logs/` 通道上线，等 CI 写回 |
+| 4 | 5868bcc | 被 946b8a3 的并发取消覆盖 | — |
+| 5 | 946b8a3 | iOS：MuJoCo iOS cmake 失败根因 = qhull 在 iOS 下是 MACOSX_BUNDLE 可执行文件、install() 无 BUNDLE DESTINATION（配置期报错）；Android 被后续推送并发取消 | `-DCMAKE_SKIP_INSTALL_RULES=ON`（我们从不 install，只拷贝 libmujoco.a）；Android 未跑到 |
+| 6 | 66ac28e | 进行中 | 效率改造生效：paths 过滤、并发取消、三层缓存、skip-if-built；失败日志照旧 commit 回 `ci-logs/` |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。

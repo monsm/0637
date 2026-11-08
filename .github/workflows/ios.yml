@@ -21,8 +21,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+        id: checkout
 
       - name: Fetch upstream sources and policies
+        id: upstream
         run: |
           git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
           git clone --depth 1 https://github.com/pollen-robotics/microduck.git upstream/microduck
@@ -34,40 +36,49 @@ jobs:
           done
 
       - name: Toolchain
+        id: toolchain
         run: |
           brew install xcodegen cmake ninja
           rustup target add aarch64-apple-ios-sim
 
       - name: Cache native deps
+        id: cachendk
         uses: actions/cache@v4
         with:
           path: ios/third_party
           key: ios-native-mujoco3.10.0-ort1.24.2-v1
 
       - name: Cache Rust
+        id: cacherust
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
           prefix-key: duck-core-ios
 
       - name: ONNX Runtime iOS
+        id: ort
         run: bash ios/scripts/fetch-ort-ios.sh
 
       - name: MuJoCo iOS
+        id: mujoco
         run: bash ios/scripts/build-mujoco-ios.sh
 
       - name: Stage resources
+        id: stage
         run: bash ios/scripts/stage-resources.sh
 
       - name: Rust core
+        id: rustcore
         run: bash ios/scripts/build-rust-ios.sh aarch64-apple-ios-sim
 
       - name: Generate Xcode project
+        id: xcodegen
         run: |
           cd ios
           xcodegen generate
 
       - name: Build simulator app
+        id: xcodebuild
         run: |
           xcodebuild \
             -project ios/Duck.xcodeproj \
@@ -85,8 +96,19 @@ jobs:
           mkdir -p ci-logs
           find ios/third_party android/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/ \; 2>/dev/null || true
-          cp ios/third_party/rust-*.log ci-logs/ 2>/dev/null || true
-          ls -la ci-logs || true
+          {
+            echo "checkout=${{ steps.checkout.outcome }}"
+            echo "upstream=${{ steps.upstream.outcome }}"
+            echo "toolchain=${{ steps.toolchain.outcome }}"
+            echo "cachendk=${{ steps.cachendk.outcome }}"
+            echo "cacherust=${{ steps.cacherust.outcome }}"
+            echo "ort=${{ steps.ort.outcome }}"
+            echo "mujoco=${{ steps.mujoco.outcome }}"
+            echo "stage=${{ steps.stage.outcome }}"
+            echo "rustcore=${{ steps.rustcore.outcome }}"
+            echo "xcodegen=${{ steps.xcodegen.outcome }}"
+            echo "xcodebuild=${{ steps.xcodebuild.outcome }}"
+          } > ci-logs/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
           git add ci-logs || true
@@ -94,6 +116,7 @@ jobs:
           git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:main || true
 
       - uses: actions/upload-artifact@v4
+        id: artifact
         with:
           name: Duck-simulator
           path: ios/build/Build/Products/Debug-iphonesimulator/Duck.app

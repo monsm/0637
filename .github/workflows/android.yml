@@ -21,18 +21,23 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        id: checkout
 
       - uses: actions/setup-java@v4
+        id: java
         with:
           distribution: temurin
           java-version: '17'
 
       - uses: android-actions/setup-android@v3
+        id: setupandroid
 
       - name: Android SDK packages
+        id: sdk
         run: bash android/scripts/install-sdk.sh
 
       - name: Environment
+        id: env
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
@@ -40,23 +45,13 @@ jobs:
           echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
 
       - name: Rust targets and cargo-ndk
+        id: rusttoolchain
         run: |
           rustup target add aarch64-linux-android x86_64-linux-android
           cargo install cargo-ndk --locked
 
-      - name: Cache native deps
-        uses: actions/cache@v4
-        with:
-          path: android/third_party
-          key: mcpnjs-dhqmow-3.10.9-v1
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: core
-          prefix-key: duck-core-android
-
       - name: Fetch upstream sources and policies
+        id: upstream
         run: |
           git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
           git clone --depth 1 https://github.com/pollen-robotics/microduck.git upstream/microduck
@@ -67,23 +62,43 @@ jobs:
               "https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/$f"
           done
 
+      - name: Cache native deps
+        id: cachendk
+        uses: actions/cache@v4
+        with:
+          path: android/third_party
+          key: mcpnjs-dhqmow-3.10.9-v1
+
+      - name: Cache Rust
+        id: cacherust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-android
+
       - name: MuJoCo Android
+        id: mujoco
         run: bash android/scripts/build-mujoco-android.sh
 
       - name: ONNX Runtime Android
+        id: ort
         run: bash android/scripts/fetch-ort-android.sh
 
       - name: Stage assets
+        id: stage
         run: bash android/scripts/stage-resources.sh
 
       - name: Rust core
+        id: rustcore
         run: bash android/scripts/build-rust-android.sh
 
       - uses: gradle/actions/setup-gradle@v4
+        id: gradlesetup
         with:
           gradle-version: '8.9'
 
       - name: Build APK
+        id: apk
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           gradle -p android assembleDebug --no-daemon --stacktrace
@@ -95,7 +110,23 @@ jobs:
           find ios/third_party android/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/ \; 2>/dev/null || true
           cp sdk-packages.log ci-logs/ 2>/dev/null || true
-          ls -la ci-logs || true
+          {
+            echo "checkout=${{ steps.checkout.outcome }}"
+            echo "java=${{ steps.java.outcome }}"
+            echo "setupandroid=${{ steps.setupandroid.outcome }}"
+            echo "sdk=${{ steps.sdk.outcome }}"
+            echo "env=${{ steps.env.outcome }}"
+            echo "rusttoolchain=${{ steps.rusttoolchain.outcome }}"
+            echo "upstream=${{ steps.upstream.outcome }}"
+            echo "cachendk=${{ steps.cachendk.outcome }}"
+            echo "cacherust=${{ steps.cacherust.outcome }}"
+            echo "mujoco=${{ steps.mujoco.outcome }}"
+            echo "ort=${{ steps.ort.outcome }}"
+            echo "stage=${{ steps.stage.outcome }}"
+            echo "rustcore=${{ steps.rustcore.outcome }}"
+            echo "gradlesetup=${{ steps.gradlesetup.outcome }}"
+            echo "apk=${{ steps.apk.outcome }}"
+          } > ci-logs/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
           git add ci-logs || true
@@ -103,6 +134,7 @@ jobs:
           git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:main || true
 
       - uses: actions/upload-artifact@v4
+        id: artifact
         with:
           name: Duck-android
           path: android/app/build/outputs/apk/debug/app-debug.apk
