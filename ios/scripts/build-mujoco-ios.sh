@@ -11,6 +11,27 @@ if [ ! -d "$SRC" ]; then
     https://github.com/google-deepmind/mujoco.git "$SRC"
 fi
 
+# MuJoCo adds -mmacosx-version-min=11 whenever APPLE is true; clang rejects
+# that flag on iOS targets (-mios-simulator-version-min conflict). We never
+# deploy to macOS from this tree, so drop it for the iOS build.
+MACOS_CMAKE="$SRC/cmake/MujocoMacOS.cmake"
+if ! grep -q "DUCK_IOS_NO_MACOS_MIN" "$MACOS_CMAKE"; then
+  python3 - "$MACOS_CMAKE" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = "function(enforce_mujoco_macosx_min_version)\n  if(APPLE)"
+replacement = (
+    "function(enforce_mujoco_macosx_min_version)\n"
+    "  # DUCK_IOS_NO_MACOS_MIN: -mmacosx-version-min conflicts with iOS targets\n"
+    "  if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL \"iOS\")"
+)
+if needle not in text:
+    raise SystemExit(f"patch point not found in {path}")
+open(path, "w").write(text.replace(needle, replacement, 1))
+PY
+fi
+
 build() {
   local sysroot="$1"
   local out="$2"
