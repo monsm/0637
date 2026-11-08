@@ -36,61 +36,102 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.viewinterop.AndroidView
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
-    private lateinit var core: DuckCore
+    private var core: DuckCore? = null
     private lateinit var input: DuckInput
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val root = AssetStager.stage(this)
-        core = DuckCore(
-            File(root, "robot/microduck/scene_backlash.xml").path,
-            File(root, "policies").path,
-        )
-        core.startIntentServer(8765)
         input = DuckInput()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
-                DuckScreen(core, input)
+                DuckScreen(
+                    coreProvider = { core },
+                    onCoreCreated = { created ->
+                        core = created
+                        created.startIntentServer(8765)
+                    },
+                    input = input,
+                )
             }
         }
     }
 
     override fun onDestroy() {
-        core.close()
+        core?.close()
+        core = null
         super.onDestroy()
     }
 }
 
 @Composable
-private fun DuckScreen(core: DuckCore, input: DuckInput) {
+@Composable
+private fun DuckScreen(
+    coreProvider: () -> DuckCore?,
+    onCoreCreated: (DuckCore) -> Unit,
+    input: DuckInput,
+) {
+    val context = LocalContext.current
+    var core by remember { mutableStateOf(coreProvider()) }
+    var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf(DoubleArray(0)) }
     var skills by remember { mutableStateOf(emptyList<String>()) }
 
+    // MuJoCo scene + ONNX policy loading takes seconds; doing it on the main
+    // thread froze the UI (Choreographer: Skipped 40 frames) and stalled the
+    // loader. Create the core on a worker thread.
+    LaunchedEffect(Unit) {
+        if (core != null) return@LaunchedEffect
+        val created = withContext(Dispatchers.IO) {
+            runCatching {
+                val root = AssetStager.stage(context)
+                DuckCore(
+                    File(root, "robot/microduck/scene_backlash.xml").path,
+                    File(root, "policies").path,
+                )
+            }
+        }
+        created.onSuccess { if (it.ready) { onCoreCreated(it); core = it } else { error = "core failed" } }
+            .onFailure { error = it.message }
+    }
+
     LaunchedEffect(core) {
-        skills = (0 until core.skillCount()).mapNotNull { core.skillName(it) }
+        val active = core ?: return@LaunchedEffect
+        skills = (0 until active.skillCount()).mapNotNull { active.skillName(it) }
         while (true) {
-            status = core.status()
+            status = active.status()
             delay(100)
         }
     }
 
     Box(Modifier.fillMaxSize().background(Color(0xFF0E131A))) {
-        AndroidView(
-            factory = { context ->
-                GLSurfaceView(context).apply {
-                    setEGLContextClientVersion(3)
-                    setRenderer(DuckRenderer(context, core, input))
-                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-        )
+        val active = core
+        if (active != null) {
+            AndroidView(
+                factory = { ctx ->
+                    GLSurfaceView(ctx).apply {
+                        setEGLContextClientVersion(3)
+                        setRenderer(DuckRenderer(ctx, active, input))
+                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Text(
+                error ?: "Loading MuJoCo + policies…",
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+            )
+        }
 
         StatusPanel(status, Modifier.align(Alignment.TopStart).padding(16.dp))
 
@@ -99,7 +140,7 @@ private fun DuckScreen(core: DuckCore, input: DuckInput) {
             input.wz = x * 1.0
         }
 
-        Controls(core, skills, Modifier.align(Alignment.BottomEnd).padding(24.dp))
+        active?.let { Controls(it, skills, Modifier.align(Alignment.BottomEnd).padding(24.dp)) }
     }
 }
 
