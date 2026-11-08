@@ -2,6 +2,7 @@
 //!
 //! This file only marshals; every call lands on the same C ABI the iOS app
 //! uses, so both platforms run the identical core.
+#![allow(unsafe_op_in_unsafe_fn)]
 
 #![allow(non_snake_case)]
 
@@ -61,7 +62,7 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeNew(
     let Ok(policies) = CString::new(policies) else {
         return 0;
     };
-    let mut error = [0i8; 1024];
+    let mut error = [0 as c_char; 1024];
     let core = unsafe {
         duck_core_new(
             scene.as_ptr(),
