@@ -151,7 +151,9 @@
 | 3 | 2a38ef4 | iOS：MuJoCo **cmake configure** 失败（summary 匿名不可见）；Android 结果未显示 | 失败日志改为 **commit 回仓库**（`ci-logs/`，`[skip ci]` 防循环） |
 | 4 | 5868bcc | 被 946b8a3 的并发取消覆盖 | — |
 | 6 | 66ac28e | iOS `CMAKE_SKIP_INSTALL_RULES=ON` 没压住 qhull bundle 错误；Android 30s 失败且无注解（失败步在 install-sdk 之前，无日志可拷） | iOS 改 `-DCMAKE_MACOSX_BUNDLE=OFF`（iOS 下可执行文件默认 bundle，这才是根因）；两个 workflow 每个步骤加 `id`，失败时把**全部步骤 outcome** 写进 `ci-logs/steps.txt` |
-| 7 | （本次推送） | 进行中 | 预期：iOS 越过 MuJoCo 配置进入编译；Android 定位到具体失败步骤 |
+| 7 | 847ba60 | 配置通过！编译失败：MuJoCo 给 APPLE 加 `-mmacosx-version-min=11`，iOS 下与 `-mios-simulator-version-min` 冲突；Android `setupandroid=failure`（setup-android@v3 在 ubuntu-24.04 挂了） | 删掉 setup-android action（用 runner 预装 SDK + 自举 cmdline-tools）；iOS 开始补丁 MujocoMacOS.cmake |
+| 8 | 5d57314 | 补丁只改了函数，但 CMakeLists 还直接把 `${MUJOCO_MACOS_*}` 加到 mujoco target → 仍残留 `-mmacosx-version-min` | 改为补文件顶层 `if(APPLE)` → iOS 走 else()，两组 flag 与 `-Werror=availability` 全空 |
+| 9 | （本次推送） | 进行中 | 预期 iOS 进入 MuJoCo 编译；Android 已越过 setup 阶段 |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。
