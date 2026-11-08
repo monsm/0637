@@ -33,10 +33,11 @@ DuckMj* duck_mj_load(const char* xml_path, char* error, int error_size) {
 
 #if defined(__ANDROID__)
 #include <android/log.h>
-#define DUCK_STAGE(name) __android_log_print(ANDROID_LOG_INFO, "duck-rust", "mujoco %s", name)
+#define DUCK_LOG(...) __android_log_print(ANDROID_LOG_INFO, "duck-rust", __VA_ARGS__)
 #else
-#define DUCK_STAGE(name) ((void)0)
+#define DUCK_LOG(...) ((void)0)
 #endif
+#define DUCK_STAGE(name) DUCK_LOG("mujoco %s", name)
 
 DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
     char err[1000] = {0};
@@ -51,7 +52,7 @@ DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
     /* mj_makeData sizes every arena from the model; log what it is about to
        allocate before calling it, so a hang or OOM is attributable. */
     DUCK_STAGE("makeData sizes");
-    __android_log_print(ANDROID_LOG_INFO, "duck-rust",
+    DUCK_LOG(
                         "mujoco model: nq=%d nv=%d nu=%d nbody=%d ngeom=%d "
                         "nmesh=%d nmeshvert=%d nmeshface=%d nmeshgraph=%d "
                         "nflexvert=%d neq=%d nkey=%d",
