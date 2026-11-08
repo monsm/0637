@@ -82,28 +82,19 @@ fn main() {
             // 16 KB page-size devices (Android 15+ kernels) refuse to load
             // 4 KB-aligned ELF segments.
             println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
-            // Shared libc++: the APK ships libc++_shared.so copied from the
-            // NDK. A static C++ runtime inside a dlopen'ed library gets its
-            // init_array entries before libc++'s own initialisers, which
-            // crashed in a static constructor; the shared runtime also gives
-            // the process a single C++ runtime.
-            // The NDK ships no libdl.so, so `-ldl` (which rustc emits for
-            // Android) resolves to libdl.a — bionic's *static-linking* shim.
-            // That archive defines stale copies of __cxa_atexit,
-            // __cxa_guard_acquire, abort and __errno which then override the
-            // real libc/libc++ implementations, and static constructors
-            // crash at dlopen. A linker script makes -ldl resolve to libc,
-            // where dlopen lives since API 24.
-            if let Some(out) = env::var_os("OUT_DIR") {
-                let out = std::path::PathBuf::from(out);
-                if std::fs::write(out.join("libdl.so"), "INPUT(-lc)\n").is_ok() {
-                    println!("cargo:rustc-link-search=native={}", out.display());
-                }
-            }
+            // Static C++ runtime, self-contained in the .so. The C++ ABI
+            // (__cxa_atexit, __cxa_guard_*) must be defined *before* the
+            // linker scans -ldl, otherwise bionic's libdl.a — the static
+            // executable shim — supplies stale copies and static constructors
+            // crash at dlopen. native/duck_mj_shim.c defines the dl entry
+            // points against the linker facade for the same reason.
             if let Some(dir) = ndk_sysroot_lib_dir() {
                 println!("cargo:rustc-link-search=native={dir}");
+                if std::path::Path::new(&dir).join("libc++abi.a").exists() {
+                    println!("cargo:rustc-link-lib=static=c++abi");
+                }
             }
-            println!("cargo:rustc-link-lib=dylib=c++_shared");
+            println!("cargo:rustc-link-lib=static=c++_static");
             // Without --no-undefined a shared library links happily with
             // unresolved symbols and only fails at dlopen time on the device.
             println!("cargo:rustc-link-arg=-Wl,--no-undefined");

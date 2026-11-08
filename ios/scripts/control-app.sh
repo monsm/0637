@@ -7,7 +7,7 @@ set -uo pipefail
 UDID="${1:?simulator udid required}"
 WORK="$(mktemp -d)"
 mkdir -p "$WORK/App"
-cat > "$WORK/App/main.swift" <<'SWIFT'
+cat > "$WORK/App/AppDelegate.swift" <<'SWIFT'
 import UIKit
 
 @main final class AppDelegate: UIResponder, UIApplicationDelegate {
