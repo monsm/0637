@@ -14,9 +14,9 @@
 [13/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/userprintf_r.c.o
 [14/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/user_r.c.o
 [15/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/accessors_r.c.o
-[16/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/rboxlib_r.c.o
-[17/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/userprintf_rbox_r.c.o
-[18/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/io_r.c.o
+[16/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/io_r.c.o
+[17/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/rboxlib_r.c.o
+[18/111] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/userprintf_rbox_r.c.o
 [19/111] Building CXX object _deps/tinyxml2-build/CMakeFiles/tinyxml2.dir/tinyxml2.cpp.o
 [20/111] Building C object _deps/ccd-build/src/CMakeFiles/ccd.dir/ccd.c.o
 [21/111] Building C object _deps/ccd-build/src/CMakeFiles/ccd.dir/mpr.c.o
@@ -83,7 +83,8 @@ In file included from /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/bu
   591 |     static MZ_FORCEINLINE const char* zError(int err)
       |                                       ^~~~~~
 19 warnings generated.
-[26/111] Building C object _deps/miniz-build/CMakeFiles/miniz.dir/miniz_zip.c.o
+[26/111] Building CXX object CMakeFiles/lodepng.dir/_deps/lodepng-src/lodepng.cpp.o
+[27/111] Building C object _deps/miniz-build/CMakeFiles/miniz.dir/miniz_zip.c.o
 In file included from /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/build/_deps/miniz-src/miniz_zip.c:27:
 /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/build/_deps/miniz-src/miniz.h:502:31: warning: unused function 'deflateInit' [-Wunused-function]
   502 |     static MZ_FORCEINLINE int deflateInit(mz_streamp pStream, int level)
@@ -143,7 +144,6 @@ In file included from /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/bu
   591 |     static MZ_FORCEINLINE const char* zError(int err)
       |                                       ^~~~~~
 19 warnings generated.
-[27/111] Building CXX object CMakeFiles/lodepng.dir/_deps/lodepng-src/lodepng.cpp.o
 [28/111] Building C object _deps/miniz-build/CMakeFiles/miniz.dir/miniz_tinfl.c.o
 In file included from /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/build/_deps/miniz-src/miniz_tinfl.c:27:
 /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/build/_deps/miniz-src/miniz.h:502:31: warning: unused function 'deflateInit' [-Wunused-function]
@@ -266,34 +266,34 @@ In file included from /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/bu
 19 warnings generated.
 [30/111] Building CXX object _deps/tinyobjloader-build/CMakeFiles/tinyobjloader.dir/tiny_obj_loader.cc.o
 [31/111] Linking CXX static library lib/liblodepng.a
-[32/111] Building CXX object CMakeFiles/mujoco.dir/plugin/stl_decoder/stl_decoder.cc.o
-[33/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_callback.c.o
-[34/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_box.c.o
-[35/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_convex.c.o
-[36/111] Building CXX object CMakeFiles/mujoco.dir/plugin/obj_decoder/obj_decoder.cc.o
-[37/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_gjk.c.o
-[38/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_primitive.c.o
-[39/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_driver.c.o
-[40/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_sdf.c.o
+[32/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_callback.c.o
+[33/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_box.c.o
+[34/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_convex.c.o
+[35/111] Building CXX object CMakeFiles/mujoco.dir/plugin/stl_decoder/stl_decoder.cc.o
+[36/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_driver.c.o
+[37/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_primitive.c.o
+[38/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_gjk.c.o
+[39/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_sdf.c.o
+[40/111] Building CXX object CMakeFiles/mujoco.dir/plugin/obj_decoder/obj_decoder.cc.o
 [41/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_util.c.o
 [42/111] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_crossplatform.cc.o
-[43/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_constraint.c.o
-[44/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_smooth.c.o
+[43/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_smooth.c.o
+[44/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_constraint.c.o
 [45/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_derivative_fd.c.o
 [46/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_derivative.c.o
 [47/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_inverse.c.o
 [48/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_init.c.o
 [49/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_forward.c.o
-[50/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_island.c.o
-[51/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_memory.c.o
+[50/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_memory.c.o
+[51/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_island.c.o
 [52/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_name.c.o
 [53/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_passive.c.o
 [54/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_print.c.o
 [55/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_ray.c.o
-[56/111] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_plugin.cc.o
-[57/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_sensor.c.o
-[58/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_sleep.c.o
-[59/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_setconst.c.o
+[56/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_sensor.c.o
+[57/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_setconst.c.o
+[58/111] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_plugin.cc.o
+[59/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_sleep.c.o
 [60/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_support.c.o
 [61/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_solver.c.o
 [62/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_blas.c.o
@@ -301,12 +301,12 @@ In file included from /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/bu
 [64/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_misc.c.o
 [65/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_solve.c.o
 [66/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_sparse.c.o
-[67/111] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_thread.cc.o
-[68/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_io.c.o
-[69/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_spatial.c.o
-[70/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_init.c.o
-[71/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_interact.c.o
-[72/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_visualize.c.o
+[67/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_spatial.c.o
+[68/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_init.c.o
+[69/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_interact.c.o
+[70/111] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_thread.cc.o
+[71/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_visualize.c.o
+[72/111] Building C object CMakeFiles/mujoco.dir/src/engine/engine_io.c.o
 [73/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_cache.cc.o
 [74/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_api.cc.o
 [75/111] Building C object CMakeFiles/mujoco.dir/src/user/user_init.c.o
@@ -314,34 +314,34 @@ In file included from /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/bu
 [77/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_flexcomp.cc.o
 [78/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_mesh.cc.o
 [79/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_resolver.cc.o
-[80/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_model.cc.o
-[81/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_resource.cc.o
+[80/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_resource.cc.o
+[81/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_model.cc.o
 [82/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_objects.cc.o
 [83/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_threadpool.cc.o
-[84/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_util.cc.o
-[85/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_vfs.cc.o
+[84/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_vfs.cc.o
+[85/111] Building CXX object CMakeFiles/mujoco.dir/src/user/user_util.cc.o
 [86/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_api.cc.o
 [87/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_base.cc.o
 [88/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_global.cc.o
 [89/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_numeric_format.cc.o
 [90/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml.cc.o
 [91/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_native_writer.cc.o
-[92/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_native_reader.cc.o
-[93/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_urdf.cc.o
+[92/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_urdf.cc.o
+[93/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_native_reader.cc.o
 [94/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/mjz/mjz_decoder.cc.o
 [95/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/glad/glad.c.o
 [96/111] Building CXX object CMakeFiles/mujoco.dir/src/render/classic/glad/loader.cc.o
 [97/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_util.cc.o
-[98/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/mjz/mjz_encoder.cc.o
-[99/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_gl2.c.o
-[100/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_gl3.c.o
+[98/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_gl2.c.o
+[99/111] Building CXX object CMakeFiles/mujoco.dir/src/xml/mjz/mjz_encoder.cc.o
+[100/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_context.c.o
 [101/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_util.c.o
-[102/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_context.c.o
+[102/111] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_gl3.c.o
 [103/111] Linking CXX static library lib/libtinyxml2.a
 [104/111] Linking C static library lib/libqhullstatic_r.a
 [105/111] Building C object CMakeFiles/mujoco.dir/src/ui/ui_main.c.o
-[106/111] Linking C static library lib/libccd.a
-[107/111] Linking CXX static library lib/libtinyobjloader.a
+[106/111] Linking CXX static library lib/libtinyobjloader.a
+[107/111] Linking C static library lib/libccd.a
 [108/111] Linking C static library lib/libminiz.a
 [109/111] Linking CXX shared library lib/libmujoco.3.10.0.dylib
 ld: warning: ignoring duplicate libraries: 'lib/libtinyobjloader.a'
