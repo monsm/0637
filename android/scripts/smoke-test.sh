@@ -12,7 +12,8 @@ APK="android/app/build/outputs/apk/debug/app-debug.apk"
 # fail with "Can't find service: activity" until then.
 adb wait-for-device
 for _ in $(seq 1 60); do
-  [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '')" = "1" ] && break
+  [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '
+')" = "1" ] && break
   sleep 5
 done
 
@@ -54,7 +55,7 @@ echo "app alive with pid $PID"
 
 adb reverse tcp:8765 tcp:8765
 STATE=""
-for _ in $(seq 1 60); do
+for _ in $(seq 1 120); do
   STATE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
   [ -n "$STATE" ] && break
   sleep 5
@@ -64,6 +65,7 @@ adb logcat -d > android-logcat.log || true
 if [ -z "$STATE" ]; then
   echo "::error::intent API did not answer — the core is not ticking"
   grep -nE "duck-rust|FATAL|AndroidRuntime|signal |onnx|mujoco|policy" android-logcat.log | tail -40 || true
+  grep -nE "ai.duck.microduck" android-logcat.log | grep -viE "zygote|ActivityManager|WindowManager|SplashScreen|AppsFilter|MediaProvider|Avrcp" | tail -20 || true
   exit 1
 fi
 echo "$STATE" | tee intent-state.json
