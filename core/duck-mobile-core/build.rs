@@ -41,11 +41,17 @@ fn link_mujoco(libdir: &str, apple: bool) {
         }
         return;
     }
+    // link-arg flags land at the end of the link line, after rustc's static
+    // group, so a bare --whole-archive would not apply to the archives.
+    // Name the archive between the flags instead.
+    let mujoco_path = format!("{libdir}/libmujoco.a");
     println!("cargo:rustc-link-arg=-Wl,--whole-archive");
-    for lib in libs {
+    println!("cargo:rustc-link-arg=-Wl,{mujoco_path}");
+    println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
+    // Dependencies stay on-demand.
+    for lib in libs.into_iter().skip(1) {
         println!("cargo:rustc-link-lib=static={lib}");
     }
-    println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
 }
 
 /// The NDK's per-target sysroot library directory, where `libc++_static.a`
