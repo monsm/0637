@@ -56,6 +56,7 @@ fn main() {
     println!("cargo:rerun-if-changed=native/duck_mj_shim.h");
     println!("cargo:rerun-if-env-changed=MUJOCO_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=MUJOCO_LIB_DIR");
+    println!("cargo:rerun-if-env-changed=DUCK_LIBDL_STUB_DIR");
 
     if env::var_os("CARGO_FEATURE_MUJOCO").is_none() {
         return;

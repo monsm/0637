@@ -35,6 +35,9 @@ for abi in arm64-v8a x86_64; do
     "$TOOLCHAIN/bin/llvm-ar" x "$TOOLCHAIN/sysroot/usr/lib/$TRIPLE/libdl.a"
     "$TOOLCHAIN/bin/llvm-ar" rcs libdl.a $(ls | grep libdl_static)
   )
+  echo "libdl stub for $abi:"
+  "$TOOLCHAIN/bin/llvm-ar" t "$STUB/libdl.a"
+  ls -la "$STUB"
   export DUCK_LIBDL_STUB_DIR="$STUB"
   LOG="$ROOT/android/third_party/rust-$abi.log"
   # --lib only: the package's sim binaries are desktop tools and drag in
@@ -46,6 +49,7 @@ for abi in arm64-v8a x86_64; do
     --platform 28 \
     -o "$ROOT/android/app/src/main/jniLibs" \
     build \
+    -v \
     -p duck-mobile-core \
     --lib \
     --release \
