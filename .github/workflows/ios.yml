@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
@@ -55,6 +58,20 @@ jobs:
             -derivedDataPath ios/build \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      - name: Publish failure logs
+        if: failure()
+        run: |
+          mkdir -p ci-logs
+          find ios/third_party android/third_party -maxdepth 3 -name '*.log' \
+            -exec cp {} ci-logs/ \; 2>/dev/null || true
+          cp ios/third_party/rust-*.log ci-logs/ 2>/dev/null || true
+          ls -la ci-logs || true
+          git config user.email "actions@github.com"
+          git config user.name "ci-log-bot"
+          git add ci-logs || true
+          git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
+          git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:main || true
 
       - uses: actions/upload-artifact@v4
         with:
