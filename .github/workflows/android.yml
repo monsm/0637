@@ -104,6 +104,7 @@ jobs:
           cp core/target/aarch64-linux-android/release/libduck_mobile_core.so unstripped/ 2>/dev/null || true
           cp core/target/x86_64-linux-android/release/libduck_mobile_core.so unstripped/ 2>/dev/null || true
           cp -r core/target/android-libdl-stub unstripped/ 2>/dev/null || true
+          cp android/third_party/link-*.map unstripped/ 2>/dev/null || true
           ls -la unstripped
 
       - uses: gradle/actions/setup-gradle@v4

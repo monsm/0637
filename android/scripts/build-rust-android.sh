@@ -39,6 +39,7 @@ for abi in arm64-v8a x86_64; do
   "$TOOLCHAIN/bin/llvm-ar" t "$STUB/libdl.a"
   ls -la "$STUB"
   export DUCK_LIBDL_STUB_DIR="$STUB"
+  export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-Map=$ROOT/android/third_party/link-$abi.map"
   LOG="$ROOT/android/third_party/rust-$abi.log"
   # --lib only: the package's sim binaries are desktop tools and drag in
   # link requirements the app does not need.

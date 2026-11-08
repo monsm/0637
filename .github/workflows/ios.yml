@@ -226,6 +226,9 @@ jobs:
             xcrun simctl spawn "$UDID" log show --last 5m --style compact \
               --predicate 'process == "Duck"' > sim-syslog.log || true
             xcrun simctl spawn "$UDID" log show --last 5m --style compact > sim-syslog-all.log || true
+            for f in sim-syslog.log sim-syslog-all.log; do
+              tail -c 1500000 "$f" > "$f.tail" && mv "$f.tail" "$f"
+            done
             tail -80 sim-syslog.log || true
             exit 1
           fi
@@ -242,9 +245,11 @@ jobs:
           git fetch --depth 1 origin ci-logs \
             && git checkout FETCH_HEAD -- ci-logs || true
           cp sim-launch.log ci-logs/ios/ 2>/dev/null || true
-          # The unified log can be hundreds of MB; keep only the tail.
-          tail -c 1500000 sim-syslog.log > ci-logs/ios/sim-syslog.log 2>/dev/null || true
-          tail -c 1500000 sim-syslog-all.log > ci-logs/ios/sim-syslog-all.log 2>/dev/null || true
+          for f in sim-syslog.log sim-syslog-all.log; do
+            tail -c 1500000 "$f" > "$f.tail" && mv "$f.tail" "$f" 2>/dev/null || true
+          done
+          cp sim-syslog.log ci-logs/ios/ 2>/dev/null || true
+          cp sim-syslog-all.log ci-logs/ios/ 2>/dev/null || true
           cp intent-state.json ci-logs/ios/ 2>/dev/null || true
           cp intent-skills.json ci-logs/ios/ 2>/dev/null || true
           cp sim-screenshot.png ci-logs/ios/ 2>/dev/null || true
@@ -277,4 +282,15 @@ jobs:
         with:
           name: Duck-ios-simulator
           path: Duck-ios-simulator.zip
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Duck-ios-smoke-logs
+          path: |
+            sim-screenshot.png
+            sim-syslog.log
+            sim-syslog-all.log
+            sim-launch.log
           if-no-files-found: ignore

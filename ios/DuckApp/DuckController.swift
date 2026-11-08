@@ -34,6 +34,9 @@ final class DuckController: ObservableObject {
             .path
         let policies = resourceURL.appendingPathComponent("DuckResources/policies").path
         policyDirectory = policies
+        // Startup trail in the unified log, so CI can tell where it stopped.
+        NSLog("duck: scene=%@", scene)
+        NSLog("duck: policies=%@", policies)
 
         var error = [CChar](repeating: 0, count: 1024)
         core = scene.withCString { scenePtr in
@@ -50,12 +53,15 @@ final class DuckController: ObservableObject {
             errorMessage = error.withUnsafeBufferPointer {
                 String(cString: $0.baseAddress!)
             }
+            NSLog("duck: duck_core_new failed: %@", errorMessage ?? "unknown")
             return
         }
 
         ready = true
+        NSLog("duck: core created")
         if let core {
-            _ = duck_core_start_intent_server(core, 8765)
+            let port = duck_core_start_intent_server(core, 8765)
+            NSLog("duck: intent server -> %d", port)
         }
         let timer = Timer(timeInterval: 0.02, repeats: true) { [weak self] _ in
             self?.tick()
