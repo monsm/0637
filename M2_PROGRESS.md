@@ -160,6 +160,10 @@
 | 13 | 55a6d35 / af69f10 | Android：jni.rs `c_char` 未导入（E0425）→ 修；链接时找不到 `libc++_static.a` → build.rs 加 NDK per-triple lib 搜索路径；iOS：runner 排队慢 + 连续推送把运行取消了几轮，日志停在补丁前 | 批量修复，一次推送 |
 | 14 | 9af3a72 | 两个平台都在 **Rust core** 失败：`build.rs` 里 `env::consts::OS.as_str()` 是不稳定 API（`str_as_str`，E0658）——runner 的 rustc 比本地 1.99.1 旧；之前的 `c++_static` 报错是**旧日志**（Android 的 force-push 用 main 上残留的旧 `ci-logs/` 覆盖了 iOS 刚发的日志） | `core/rust-toolchain.toml` 钉死 1.99.1；删掉 main 上的旧 `ci-logs/`；发布日志步骤先 fetch `ci-logs` 分支再叠加，平台间不再互相覆盖 |
 | 15 | 本地预检后推送 | 本地 `cargo check` 复现并修掉下一个 iOS 失败：`onnx-static = []` 让 ort 连 `std` 都没有（Session API 全变 `!`），且上游 `pickup.rs` 无条件用 `ensure_runtime` | `onnx-static = ["ort/std"]`（链接由 ort-sys 的 `ORT_IOS_XCFWK_LOCATION` 处理）；`ensure_runtime` 在静态路径下为 no-op；Android 的 c++ 改 `-static-libstdc++`（NDK clang 自解析，不再猜 NDK 路径）；SDK 不再下第二个 NDK（用 runner 预装的 27.3） |
+| 16 | 2ed5b82 | 两个平台 E0463：`rustup target add` 在工作区根目录跑，而钉版本在 `core/rust-toolchain.toml` → 目标 std 装进了 runner 默认工具链；且旧日志覆盖新日志（overlay 顺序错了） | `--toolchain 1.99.1` 显式安装；发布步骤先 overlay 后拷贝；失败日志同时 tail 到 job log（step summary API 取不到） |
+| 17 | ccc40e4 | iOS：rustup 按当前目录选工具链，cargo 在工作区根目录跑 → 用了 runner 默认工具链（无 ios-sim std）；Android：`-nodefaultlibs` 下 `-static-libstdc++` 无效 + MuJoCo 静态库不带 tinyxml2/miniz/lodepng/qhull；桌面 sim 二进制被一起链接 | iOS 脚本 `cd core/` + `RUSTUP_TOOLCHAIN`；Android 显式 `-l static=c++_static` + NDK sysroot 搜索路径 + `--lib`；MuJoCo 脚本输出依赖归档 + `libs.txt` 链接顺序，build.rs 按清单链接 |
+| 18 | bd39ff0 | **Android Rust 两个 ABI 全部链接通过**，Gradle 首次编译失败：没有 `gradle.properties`（AndroidX 未启用）；iOS：`-nodefaultlibs` 连 SDK 都不设置 → `libc++` 找不到 | `android/gradle.properties`（useAndroidX）；iOS 显式 `-isysroot`（按 target 选 iphonesimulator/iphoneos）；`ORT_CXX_STDLIB=c++`（ort-sys 自己加 `-l`） |
+| 19 | 448743c | **Android 全绿，APK 产物 47.9 MB**；iOS 链接差 qhull：归档真名是 `libqhullstatic_r.a` | 允许清单改为 `qhullstatic_r` |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。
