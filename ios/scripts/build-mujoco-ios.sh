@@ -16,6 +16,12 @@ build() {
   local out="$2"
   local build="$out/build"
 
+  # Cached from a previous run — nothing to do.
+  if [ -f "$out/lib/libmujoco.a" ]; then
+    echo "MuJoCo cached at $out — skipping build"
+    return 0
+  fi
+
   local log="$build-cmake.log"
   mkdir -p "$(dirname "$log")"
   if ! cmake -S "$SRC" -B "$build" -G Ninja \

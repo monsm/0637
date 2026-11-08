@@ -2,10 +2,18 @@ name: iOS
 
 on:
   push:
+    paths:
+      - "ios/**"
+      - "core/**"
+      - ".github/workflows/ios.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -29,6 +37,18 @@ jobs:
         run: |
           brew install xcodegen cmake ninja
           rustup target add aarch64-apple-ios-sim
+
+      - name: Cache native deps
+        uses: actions/cache@v4
+        with:
+          path: ios/third_party
+          key: ios-native-mujoco3.10.0-ort1.24.2-v1
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-ios
 
       - name: ONNX Runtime iOS
         run: bash ios/scripts/fetch-ort-ios.sh

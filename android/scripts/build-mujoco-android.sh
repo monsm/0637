@@ -14,6 +14,10 @@ if [ ! -d "$SRC" ]; then
 fi
 
 for abi in arm64-v8a x86_64; do
+  if [ -f "$OUT/$abi/lib/libmujoco.a" ]; then
+    echo "MuJoCo cached for $abi — skipping build"
+    continue
+  fi
   BUILD="$OUT/build-$abi"
   local_log="$OUT/cmake-$abi.log"
   mkdir -p "$OUT"

@@ -2,10 +2,18 @@ name: Android
 
 on:
   push:
+    paths:
+      - "android/**"
+      - "core/**"
+      - ".github/workflows/android.yml"
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -35,6 +43,18 @@ jobs:
         run: |
           rustup target add aarch64-linux-android x86_64-linux-android
           cargo install cargo-ndk --locked
+
+      - name: Cache native deps
+        uses: actions/cache@v4
+        with:
+          path: android/third_party
+          key: mcpnjs-dhqmow-3.10.9-v1
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-android
 
       - name: Fetch upstream sources and policies
         run: |
