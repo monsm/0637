@@ -116,20 +116,31 @@ build() {
 
   # A static MuJoCo archive does not absorb its own dependencies: copy the
   # ones it needs next to it and record the link order, dependents first.
-  # The allowlist matters — qhull also builds libqhull.a and libqhullstatic.a,
-  # which would collide with the renamed libqhull_r.a MuJoCo links. This runs
+  # Each dependency may ship under several archive names depending on how its
+  # CMake reacts to BUILD_SHARED_LIBS=OFF; take the first that exists. The
+  # allowlist matters — qhull also builds libqhull.a and libqhullstatic.a,
+  # which would collide with the renamed qhullstatic_r MuJoCo links. This runs
   # for cached builds too: the archives are in the cached build tree.
+  collect_dep() {
+    local lib_dir="$1" build="$2" logical="$3"; shift 3
+    for name in "$@"; do
+      local dep_found
+      dep_found="$(find "$build" -name "lib$name.a" -print -quit)"
+      if [ -n "$dep_found" ]; then
+        cp "$dep_found" "$lib_dir/"
+        echo "$name" >> "$lib_dir/libs.txt"
+        return 0
+      fi
+    done
+    echo "::warning::no archive for $logical (tried: lib${*}.a) under $build"
+  }
   mkdir -p "$out/lib"
   echo "mujoco" > "$out/lib/libs.txt"
-  for dep in lodepng miniz tinyxml2 qhullstatic_r; do
-    dep_found="$(find "$build" -name "lib$dep.a" -print -quit)"
-    if [ -z "$dep_found" ]; then
-      echo "::warning::lib$dep.a not found under $build"
-      continue
-    fi
-    cp "$dep_found" "$out/lib/"
-    echo "$dep" >> "$out/lib/libs.txt"
-  done
+  collect_dep "$out/lib" "$build" lodepng lodepng
+  collect_dep "$out/lib" "$build" miniz miniz
+  collect_dep "$out/lib" "$build" tinyxml2 tinyxml2
+  collect_dep "$out/lib" "$build" qhull qhullstatic_r qhull_r
+  collect_dep "$out/lib" "$build" ccd ccd ccd_static
   echo "MuJoCo link order: $(tr '\n' ' ' < "$out/lib/libs.txt")"
 }
 
