@@ -20,6 +20,22 @@ cd "$ROOT/core"
 for abi in arm64-v8a x86_64; do
   export MUJOCO_INCLUDE_DIR="$ROOT/android/third_party/mujoco/$abi/include"
   export MUJOCO_LIB_DIR="$ROOT/android/third_party/mujoco/$abi/lib"
+  TRIPLE=$([ "$abi" = "arm64-v8a" ] && echo aarch64-linux-android || echo x86_64-linux-android)
+  # The NDK's libdl.a is bionic's static-executable shim: besides the dl
+  # entry points it carries malloc/locale/errno/atexit objects whose globals
+  # are never initialised in a shared library (scudo divides by zero on the
+  # first malloc). Rebuild the archive with only the dl member and put it
+  # first on the search path.
+  TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
+  STUB="$ROOT/core/target/android-libdl-stub/$abi"
+  mkdir -p "$STUB"
+  rm -f "$STUB"/*.o "$STUB/libdl.a"
+  (
+    cd "$STUB"
+    "$TOOLCHAIN/bin/llvm-ar" x "$TOOLCHAIN/sysroot/usr/lib/$TRIPLE/libdl.a"
+    "$TOOLCHAIN/bin/llvm-ar" rcs libdl.a $(ls | grep libdl_static)
+  )
+  export DUCK_LIBDL_STUB_DIR="$STUB"
   LOG="$ROOT/android/third_party/rust-$abi.log"
   # --lib only: the package's sim binaries are desktop tools and drag in
   # link requirements the app does not need.

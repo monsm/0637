@@ -82,15 +82,16 @@ fn main() {
             // 16 KB page-size devices (Android 15+ kernels) refuse to load
             // 4 KB-aligned ELF segments.
             println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
-            // Link libc early. rustc puts -ldl *before* -lc, and the NDK has
-            // no libdl.so, so -ldl resolves to libdl.a — bionic's static
-            // executable shim, whose malloc/newlocale/__errno/__cxa_atexit
-            // definitions have globals that are never initialised in a
-            // shared library (scudo divides by zero on the first malloc).
-            // With libc on the link line first, those symbols are already
-            // resolved when -ldl is scanned, so only the harmless dl
-            // entry points are pulled from the archive.
-            println!("cargo:rustc-link-lib=dylib=c");
+            // The NDK has no libdl.so, so rustc's -ldl resolves to libdl.a —
+            // bionic's static-executable shim, whose malloc/newlocale/errno/
+            // atexit definitions have globals that are never initialised in a
+            // shared library. The Android build script rebuilds that archive
+            // with only the dl member; put it first on the search path.
+            if let Ok(stub) = env::var("DUCK_LIBDL_STUB_DIR") {
+                if !stub.is_empty() {
+                    println!("cargo:rustc-link-search=native={stub}");
+                }
+            }
             // Static C++ runtime plus the C++ ABI, self-contained in the .so.
             if let Some(dir) = ndk_sysroot_lib_dir() {
                 println!("cargo:rustc-link-search=native={dir}");
