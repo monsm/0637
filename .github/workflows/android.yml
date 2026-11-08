@@ -1,0 +1,75 @@
+name: Android
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "platform-tools" "platforms;android-35" \
+            "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+          sudo apt-get update
+          sudo apt-get install -y ninja-build cmake
+
+      - name: Environment
+        run: |
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Rust targets and cargo-ndk
+        run: |
+          rustup target add aarch64-linux-android x86_64-linux-android
+          cargo install cargo-ndk --locked
+
+      - name: Fetch upstream sources and policies
+        run: |
+          git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
+          git clone --depth 1 https://github.com/pollen-robotics/microduck.git upstream/microduck
+          mkdir -p policies
+          for f in velstand.onnx alpha_sitstand.onnx alpha_ground_pick.onnx \
+                   roulade.onnx ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
+            curl -L --fail -o "policies/$f" \
+              "https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/$f"
+          done
+
+      - name: MuJoCo Android
+        run: bash android/scripts/build-mujoco-android.sh
+
+      - name: ONNX Runtime Android
+        run: bash android/scripts/fetch-ort-android.sh
+
+      - name: Stage assets
+        run: bash android/scripts/stage-resources.sh
+
+      - name: Rust core
+        run: bash android/scripts/build-rust-android.sh
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build APK
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+          gradle -p android assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Duck-android
+          path: android/app/build/outputs/apk/debug/app-debug.apk

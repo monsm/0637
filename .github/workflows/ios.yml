@@ -1,0 +1,62 @@
+name: iOS
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upstream sources and policies
+        run: |
+          git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
+          git clone --depth 1 https://github.com/pollen-robotics/microduck.git upstream/microduck
+          mkdir -p policies
+          for f in velstand.onnx alpha_sitstand.onnx alpha_ground_pick.onnx \
+                   roulade.onnx ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
+            curl -L --fail -o "policies/$f" \
+              "https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/$f"
+          done
+
+      - name: Toolchain
+        run: |
+          brew install xcodegen cmake ninja
+          rustup target add aarch64-apple-ios-sim
+
+      - name: ONNX Runtime iOS
+        run: bash ios/scripts/fetch-ort-ios.sh
+
+      - name: MuJoCo iOS
+        run: bash ios/scripts/build-mujoco-ios.sh
+
+      - name: Stage resources
+        run: bash ios/scripts/stage-resources.sh
+
+      - name: Rust core
+        run: bash ios/scripts/build-rust-ios.sh aarch64-apple-ios-sim
+
+      - name: Generate Xcode project
+        run: |
+          cd ios
+          xcodegen generate
+
+      - name: Build simulator app
+        run: |
+          xcodebuild \
+            -project ios/Duck.xcodeproj \
+            -scheme Duck \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -arch arm64 \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Duck-simulator
+          path: ios/build/Build/Products/Debug-iphonesimulator/Duck.app

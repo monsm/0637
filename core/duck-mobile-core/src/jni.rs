@@ -1,0 +1,393 @@
+//! JNI for the Android shell.
+//!
+//! This file only marshals; every call lands on the same C ABI the iOS app
+//! uses, so both platforms run the identical core.
+
+#![allow(non_snake_case)]
+
+use std::ffi::{CStr, CString};
+
+use jni::objects::{JClass, JString};
+use jni::sys::{jdouble, jdoubleArray, jint, jlong};
+use jni::JNIEnv;
+
+use crate::ffi::{
+    duck_core_body_count, duck_core_body_pose, duck_core_free, duck_core_geom_count,
+    duck_core_geom_info, duck_core_ground_pick, duck_core_mesh_name, duck_core_new,
+    duck_core_push, duck_core_reload_policies, duck_core_render_qpos, duck_core_set_body,
+    duck_core_set_head, duck_core_set_twist, duck_core_sit_toggle, duck_core_skill_count,
+    duck_core_skill_name, duck_core_start_intent_server, duck_core_status, duck_core_tick,
+    duck_core_trigger_skill, DuckCore, DuckStatus,
+};
+
+fn java_string(env: &mut JNIEnv, value: &JString) -> Option<String> {
+    env.get_string(value).ok().map(|text| text.into())
+}
+
+fn double_array(env: &mut JNIEnv, values: &[f64]) -> jdoubleArray {
+    let Ok(array) = env.new_double_array(values.len() as i32) else {
+        return std::ptr::null_mut();
+    };
+    if env.set_double_array_region(&array, 0, values).is_err() {
+        return std::ptr::null_mut();
+    }
+    array.into_raw()
+}
+
+fn empty_array(env: &mut JNIEnv) -> jdoubleArray {
+    double_array(env, &[])
+}
+
+unsafe fn core(handle: jlong) -> Option<&'static mut DuckCore> {
+    let pointer = handle as *mut DuckCore;
+    pointer.as_mut()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeNew(
+    mut env: JNIEnv,
+    _class: JClass,
+    scene: JString,
+    policies: JString,
+) -> jlong {
+    let (Some(scene), Some(policies)) =
+        (java_string(&mut env, &scene), java_string(&mut env, &policies))
+    else {
+        return 0;
+    };
+    let Ok(scene) = CString::new(scene) else {
+        return 0;
+    };
+    let Ok(policies) = CString::new(policies) else {
+        return 0;
+    };
+    let mut error = [0i8; 1024];
+    let core = unsafe {
+        duck_core_new(
+            scene.as_ptr(),
+            policies.as_ptr(),
+            error.as_mut_ptr(),
+            error.len() as i32,
+        )
+    };
+    core as jlong
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeFree(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) {
+    unsafe { duck_core_free(handle as *mut DuckCore) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeTick(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jint {
+    unsafe { duck_core_tick(handle as *mut DuckCore) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetTwist(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    vx: jdouble,
+    vy: jdouble,
+    wz: jdouble,
+) {
+    unsafe { duck_core_set_twist(handle as *mut DuckCore, vx, vy, wz) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetHead(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    neck: jdouble,
+    head: jdouble,
+    yaw: jdouble,
+    roll: jdouble,
+) {
+    unsafe { duck_core_set_head(handle as *mut DuckCore, neck, head, yaw, roll) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetBody(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    z: jdouble,
+    roll: jdouble,
+    pitch: jdouble,
+) {
+    unsafe { duck_core_set_body(handle as *mut DuckCore, z, roll, pitch) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSkill(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    name: JString,
+) -> jint {
+    let Some(name) = java_string(&mut env, &name) else {
+        return 0;
+    };
+    let Ok(name) = CString::new(name) else {
+        return 0;
+    };
+    unsafe { duck_core_trigger_skill(handle as *mut DuckCore, name.as_ptr()) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSit(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jint {
+    unsafe { duck_core_sit_toggle(handle as *mut DuckCore) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeGroundPick(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jint {
+    unsafe { duck_core_ground_pick(handle as *mut DuckCore) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativePush(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    vx: jdouble,
+    vy: jdouble,
+    vz: jdouble,
+) -> jint {
+    unsafe { duck_core_push(handle as *mut DuckCore, vx, vy, vz) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeStartIntentServer(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    port: jint,
+) -> jint {
+    unsafe { duck_core_start_intent_server(handle as *mut DuckCore, port) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeReload(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    directory: JString,
+) -> jint {
+    let Some(directory) = java_string(&mut env, &directory) else {
+        return -1;
+    };
+    let Ok(directory) = CString::new(directory) else {
+        return -1;
+    };
+    unsafe { duck_core_reload_policies(handle as *mut DuckCore, directory.as_ptr()) as jint }
+}
+
+/// [bringup, fallen, gain, trunk x/y/z, gravity x/y/z]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeStatus(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jdoubleArray {
+    let mut status = DuckStatus {
+        bringup: 0,
+        fallen: 0,
+        gain: 0,
+        label: [0; 64],
+        trunk: [0.0; 3],
+        gravity: [0.0; 3],
+    };
+    if unsafe { duck_core_status(handle as *mut DuckCore, &mut status) } != 0 {
+        return empty_array(&mut env);
+    }
+    let values = [
+        status.bringup as f64,
+        status.fallen as f64,
+        status.gain as f64,
+        status.trunk[0],
+        status.trunk[1],
+        status.trunk[2],
+        status.gravity[0],
+        status.gravity[1],
+        status.gravity[2],
+    ];
+    double_array(&mut env, &values)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeRenderQpos(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jdoubleArray {
+    let Some(core) = (unsafe { core(handle) }) else {
+        return empty_array(&mut env);
+    };
+    let count = unsafe { duck_core_render_qpos(core, std::ptr::null_mut(), 0) } as usize;
+    let mut values = vec![0.0f64; count];
+    unsafe { duck_core_render_qpos(core, values.as_mut_ptr(), count as i32) };
+    double_array(&mut env, &values)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeBodyCount(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jint {
+    unsafe { duck_core_body_count(handle as *mut DuckCore) as jint }
+}
+
+/// [x, y, z, qw, qx, qy, qz]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeBodyPose(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    body: jint,
+) -> jdoubleArray {
+    let mut position = [0.0f64; 3];
+    let mut rotation = [0.0f64; 4];
+    if unsafe {
+        duck_core_body_pose(
+            handle as *mut DuckCore,
+            body,
+            position.as_mut_ptr(),
+            rotation.as_mut_ptr(),
+        )
+    } != 0
+    {
+        return empty_array(&mut env);
+    }
+    let values = [
+        position[0],
+        position[1],
+        position[2],
+        rotation[0],
+        rotation[1],
+        rotation[2],
+        rotation[3],
+    ];
+    double_array(&mut env, &values)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeGeomCount(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jint {
+    unsafe { duck_core_geom_count(handle as *mut DuckCore) as jint }
+}
+
+/// [body, type, mesh, group, pos x/y/z, quat w/x/y/z, rgba r/g/b/a]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeGeomInfo(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    geom: jint,
+) -> jdoubleArray {
+    let mut body = 0i32;
+    let mut geom_type = 0i32;
+    let mut mesh = -1i32;
+    let mut group = 0i32;
+    let mut position = [0.0f64; 3];
+    let mut rotation = [0.0f64; 4];
+    let mut rgba = [0.0f32; 4];
+    if unsafe {
+        duck_core_geom_info(
+            handle as *mut DuckCore,
+            geom,
+            &mut body,
+            &mut geom_type,
+            &mut mesh,
+            &mut group,
+            position.as_mut_ptr(),
+            rotation.as_mut_ptr(),
+            rgba.as_mut_ptr(),
+        )
+    } != 0
+    {
+        return empty_array(&mut env);
+    }
+    let values = [
+        body as f64,
+        geom_type as f64,
+        mesh as f64,
+        group as f64,
+        position[0],
+        position[1],
+        position[2],
+        rotation[0],
+        rotation[1],
+        rotation[2],
+        rotation[3],
+        rgba[0] as f64,
+        rgba[1] as f64,
+        rgba[2] as f64,
+        rgba[3] as f64,
+    ];
+    double_array(&mut env, &values)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSkillCount(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jint {
+    unsafe { duck_core_skill_count(handle as *mut DuckCore) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSkillName(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    index: jint,
+) -> jni::sys::jstring {
+    let pointer = unsafe { duck_core_skill_name(handle as *mut DuckCore, index) };
+    if pointer.is_null() {
+        return std::ptr::null_mut();
+    }
+    let name = unsafe { CStr::from_ptr(pointer) }.to_string_lossy().into_owned();
+    env.new_string(name)
+        .map(|string| string.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMeshName(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    mesh: jint,
+) -> jni::sys::jstring {
+    let pointer = unsafe { duck_core_mesh_name(handle as *mut DuckCore, mesh) };
+    if pointer.is_null() {
+        return std::ptr::null_mut();
+    }
+    let name = unsafe { CStr::from_ptr(pointer) }.to_string_lossy().into_owned();
+    env.new_string(name)
+        .map(|string| string.into_raw())
+        .unwrap_or(std::ptr::null_mut())
+}

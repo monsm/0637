@@ -1,0 +1,651 @@
+//! C ABI for the iOS app (SwiftUI/Metal) and any other shell.
+//!
+//! One `DuckCore` owns the runtime; the shell calls `duck_core_tick` at 50 Hz,
+//! reads `duck_core_status` for the UI and the body/geom accessors for the
+//! renderer. All pointers are borrowed for the call only.
+#![allow(unsafe_op_in_unsafe_fn)]
+
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_double, c_float, c_int};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use serde_json::json;
+
+use duck_control::policy::Policy;
+use duck_control::safety::SafetyConfig;
+
+use crate::control::Tuning;
+use crate::intent::{Intent, IntentQueue};
+use crate::mujoco::MujocoIo;
+use crate::runtime::{BringupState, DuckRuntime, TickReport};
+
+#[repr(C)]
+pub struct DuckStatus {
+    /// 0 limp, 1 homing, 2 ready.
+    pub bringup: c_int,
+    pub fallen: c_int,
+    pub gain: c_int,
+    pub label: [c_char; 64],
+    pub trunk: [c_double; 3],
+    pub gravity: [c_double; 3],
+}
+
+pub struct DuckCore {
+    runtime: DuckRuntime<MujocoIo>,
+    skills: Vec<CString>,
+    meshes: Vec<CString>,
+    last: Option<TickReport>,
+    label: String,
+    intents: Arc<IntentQueue>,
+    server_started: bool,
+}
+
+unsafe fn write_error(buffer: *mut c_char, size: c_int, message: &str) {
+    if buffer.is_null() || size <= 0 {
+        return;
+    }
+    let bytes = message.as_bytes();
+    let count = bytes.len().min(size as usize - 1);
+    for (index, byte) in bytes.iter().take(count).enumerate() {
+        *buffer.add(index) = *byte as c_char;
+    }
+    *buffer.add(count) = 0;
+}
+
+unsafe fn c_string(pointer: *const c_char) -> Result<String, String> {
+    if pointer.is_null() {
+        return Err("null string".to_owned());
+    }
+    CStr::from_ptr(pointer)
+        .to_str()
+        .map(str::to_owned)
+        .map_err(|error| error.to_string())
+}
+
+/// Create the core. `scene_path` is the bundled `scene_backlash.xml`;
+/// `policies_dir` holds the official `.onnx` files and `manifest.json`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_new(
+    scene_path: *const c_char,
+    policies_dir: *const c_char,
+    error: *mut c_char,
+    error_size: c_int,
+) -> *mut DuckCore {
+    let result = (|| -> Result<DuckCore, String> {
+        let scene = c_string(scene_path)?;
+        let policies = PathBuf::from(c_string(policies_dir)?);
+        let bundle = crate::manifest::load(&policies)?;
+
+        let policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
+        let body = MujocoIo::load(&scene)?;
+        let tuning = bundle.tuning();
+        let mut runtime = DuckRuntime::new(
+            body,
+            policy,
+            tuning,
+            bundle.skill_tuning,
+            SafetyConfig::default(),
+        );
+        runtime.enable().map_err(|error| error.to_string())?;
+
+        let skills = runtime
+            .skill_names()
+            .into_iter()
+            .map(|name| CString::new(name).unwrap_or_default())
+            .collect();
+        let meshes = (0..runtime.io().mesh_count())
+            .map(|mesh| {
+                CString::new(runtime.io().mesh_name(mesh).unwrap_or_default()).unwrap_or_default()
+            })
+            .collect();
+        let intents = Arc::new(IntentQueue::new());
+        intents.set_skills(runtime.skill_names());
+
+        Ok(DuckCore {
+            runtime,
+            skills,
+            meshes,
+            last: None,
+            label: "idle".to_owned(),
+            intents,
+            server_started: false,
+        })
+    })();
+
+    match result {
+        Ok(core) => Box::into_raw(Box::new(core)),
+        Err(message) => {
+            write_error(error, error_size, &message);
+            std::ptr::null_mut()
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_free(core: *mut DuckCore) {
+    if !core.is_null() {
+        drop(Box::from_raw(core));
+    }
+}
+
+/// Reload the policy set from `policies_dir` (manifest + ONNX). The body and
+/// bring-up state stay; call it while the duck is standing.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_reload_policies(
+    core: *mut DuckCore,
+    policies_dir: *const c_char,
+) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let Ok(dir) = c_string(policies_dir) else {
+        return -1;
+    };
+    let Ok(bundle) = crate::manifest::load(Path::new(&dir)) else {
+        return -1;
+    };
+    let Ok(policy) = Policy::load(&bundle.paths, 0.05) else {
+        return -1;
+    };
+    let tuning = bundle.tuning();
+    let core = &mut *core;
+    core.runtime
+        .replace_policy(policy, tuning, bundle.skill_tuning);
+    let names = core.runtime.skill_names();
+    core.skills = names
+        .iter()
+        .map(|name| CString::new(name.clone()).unwrap_or_default())
+        .collect();
+    core.intents.set_skills(names);
+    core.label = "policy reloaded".to_owned();
+    0
+}
+
+/// Start the local intent API on `0.0.0.0:port`. Idempotent.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_start_intent_server(
+    core: *mut DuckCore,
+    port: c_int,
+) -> c_int {
+    if core.is_null() || port <= 0 || port > 65535 {
+        return -1;
+    }
+    let core = &mut *core;
+    if core.server_started {
+        return 0;
+    }
+    match crate::intent::start(port as u16, core.intents.clone()) {
+        Ok(()) => {
+            core.server_started = true;
+            publish_state(core);
+            0
+        }
+        Err(_) => -1,
+    }
+}
+
+fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<(), String> {
+    let bundle = crate::manifest::load(Path::new(dir))?;
+    let policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
+    let tuning = bundle.tuning();
+    core.runtime
+        .replace_policy(policy, tuning, bundle.skill_tuning);
+    let names = core.runtime.skill_names();
+    core.skills = names
+        .iter()
+        .map(|name| CString::new(name.clone()).unwrap_or_default())
+        .collect();
+    core.intents.set_skills(names);
+    Ok(())
+}
+
+fn apply_intent(core: &mut DuckCore, intent: Intent) {
+    match intent {
+        Intent::Twist(twist) => core.runtime.set_twist(twist),
+        Intent::Head(head) => core.runtime.set_head(head),
+        Intent::Body(z, roll, pitch) => core.runtime.set_body(z, roll, pitch),
+        Intent::Skill(name) => {
+            if let Err(error) = core.runtime.trigger_skill(&name) {
+                core.label = format!("skill refused: {error}");
+            }
+        }
+        Intent::Sit => {
+            if let Err(error) = core.runtime.sit_toggle() {
+                core.label = format!("sit refused: {error}");
+            }
+        }
+        Intent::GroundPick => {
+            if let Err(error) = core.runtime.start_ground_pick() {
+                core.label = format!("ground pick refused: {error}");
+            }
+        }
+        Intent::Push(velocity) => {
+            let _ = core.runtime.push(velocity);
+        }
+        Intent::Reload(dir) => {
+            if let Err(error) = reload_policies(core, &dir) {
+                core.label = format!("reload failed: {error}");
+            }
+        }
+    }
+}
+
+fn bringup_code(state: BringupState) -> c_int {
+    match state {
+        BringupState::Limp => 0,
+        BringupState::Homing => 1,
+        BringupState::Ready => 2,
+    }
+}
+
+fn publish_state(core: &DuckCore) {
+    let trunk = core.runtime.io().trunk();
+    let gravity = core.runtime.io().gravity();
+    core.intents.set_state(json!({
+        "label": core.label,
+        "bringup": bringup_code(core.runtime.bringup()),
+        "fallen": core.runtime.fallen(),
+        "gain": core.last.as_ref().map_or(200, |report| report.gain),
+        "trunk": trunk,
+        "gravity": gravity,
+    }));
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_enable(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    match (*core).runtime.enable() {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_disable(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    match (*core).runtime.disable() {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+/// One 50 Hz tick. Returns 0 on success, -1 if the body read failed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let core = &mut *core;
+    for intent in core.intents.drain() {
+        apply_intent(core, intent);
+    }
+    match core.runtime.tick() {
+        Ok(report) => {
+            core.label = report.label.clone();
+            core.last = Some(report);
+            publish_state(core);
+            0
+        }
+        Err(_) => -1,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_set_twist(
+    core: *mut DuckCore,
+    vx: c_double,
+    vy: c_double,
+    wz: c_double,
+) {
+    if !core.is_null() {
+        (*core).runtime.set_twist([vx, vy, wz]);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_set_head(
+    core: *mut DuckCore,
+    neck: c_double,
+    head: c_double,
+    yaw: c_double,
+    roll: c_double,
+) {
+    if !core.is_null() {
+        (*core).runtime.set_head([neck, head, yaw, roll]);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_set_body(
+    core: *mut DuckCore,
+    z: c_double,
+    roll: c_double,
+    pitch: c_double,
+) {
+    if !core.is_null() {
+        (*core).runtime.set_body(z, roll, pitch);
+    }
+}
+
+/// A phone shake or shove: an external trunk velocity impulse.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_push(
+    core: *mut DuckCore,
+    vx: c_double,
+    vy: c_double,
+    vz: c_double,
+) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    match (*core).runtime.push([vx, vy, vz]) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+/// 1 if a skill started or a running chain was refreshed, 0 if refused.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_trigger_skill(
+    core: *mut DuckCore,
+    name: *const c_char,
+) -> c_int {
+    if core.is_null() {
+        return 0;
+    }
+    let Ok(name) = c_string(name) else {
+        return 0;
+    };
+    match (*core).runtime.trigger_skill(&name) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_sit_toggle(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    match (*core).runtime.sit_toggle() {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_ground_pick(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    match (*core).runtime.start_ground_pick() {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_skill_count(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        0
+    } else {
+        (*core).skills.len() as c_int
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_skill_name(core: *mut DuckCore, index: c_int) -> *const c_char {
+    if core.is_null() || index < 0 {
+        return std::ptr::null();
+    }
+    let core = &*core;
+    core.skills
+        .get(index as usize)
+        .map_or(std::ptr::null(), |name| name.as_ptr())
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_status(core: *mut DuckCore, out: *mut DuckStatus) -> c_int {
+    if core.is_null() || out.is_null() {
+        return -1;
+    }
+    let core = &*core;
+    let out = &mut *out;
+    out.bringup = match core.runtime.bringup() {
+        BringupState::Limp => 0,
+        BringupState::Homing => 1,
+        BringupState::Ready => 2,
+    };
+    out.fallen = core.runtime.fallen() as c_int;
+    out.gain = core.last.as_ref().map_or(200, |report| report.gain as c_int);
+    out.label = [0; 64];
+    let label = core.label.as_bytes();
+    let count = label.len().min(63);
+    for (index, byte) in label.iter().take(count).enumerate() {
+        out.label[index] = *byte as c_char;
+    }
+    out.trunk = core.runtime.io().trunk();
+    out.gravity = core.runtime.io().gravity();
+    0
+}
+
+/// Copy the renderer qpos (7 trunk + 14 joints) into `out`. Returns the count,
+/// or the required count when `capacity` is too small.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_render_qpos(
+    core: *mut DuckCore,
+    out: *mut c_double,
+    capacity: c_int,
+) -> c_int {
+    if core.is_null() {
+        return 0;
+    }
+    let qpos = (*core).runtime.io().render_qpos();
+    let count = qpos.len();
+    if !out.is_null() && capacity >= 0 {
+        let copy = count.min(capacity as usize);
+        for (index, value) in qpos.iter().take(copy).enumerate() {
+            *out.add(index) = *value;
+        }
+    }
+    count as c_int
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_body_count(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        0
+    } else {
+        (*core).runtime.io().body_count() as c_int
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_body_pose(
+    core: *mut DuckCore,
+    body: c_int,
+    pos: *mut c_double,
+    quat: *mut c_double,
+) -> c_int {
+    if core.is_null() || body < 0 || pos.is_null() || quat.is_null() {
+        return -1;
+    }
+    let (position, rotation) = (*core).runtime.io().body_pose(body as usize);
+    for (index, value) in position.iter().enumerate() {
+        *pos.add(index) = *value;
+    }
+    for (index, value) in rotation.iter().enumerate() {
+        *quat.add(index) = *value;
+    }
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_geom_count(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        0
+    } else {
+        (*core).runtime.io().geom_count() as c_int
+    }
+}
+
+/// One geom, for the renderer. `mesh` is -1 for non-mesh geoms.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_geom_info(
+    core: *mut DuckCore,
+    geom: c_int,
+    body: *mut c_int,
+    geom_type: *mut c_int,
+    mesh: *mut c_int,
+    group: *mut c_int,
+    pos: *mut c_double,
+    quat: *mut c_double,
+    rgba: *mut c_float,
+) -> c_int {
+    if core.is_null() || geom < 0 {
+        return -1;
+    }
+    let Some(info) = (*core).runtime.io().geom_info(geom as usize) else {
+        return -1;
+    };
+    if !body.is_null() {
+        *body = info.body as c_int;
+    }
+    if !geom_type.is_null() {
+        *geom_type = info.geom_type;
+    }
+    if !mesh.is_null() {
+        *mesh = info.mesh;
+    }
+    if !group.is_null() {
+        *group = info.group;
+    }
+    if !pos.is_null() {
+        for (index, value) in info.pos.iter().enumerate() {
+            *pos.add(index) = *value;
+        }
+    }
+    if !quat.is_null() {
+        for (index, value) in info.quat.iter().enumerate() {
+            *quat.add(index) = *value;
+        }
+    }
+    if !rgba.is_null() {
+        for (index, value) in info.rgba.iter().enumerate() {
+            *rgba.add(index) = *value;
+        }
+    }
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_mesh_name(
+    core: *mut DuckCore,
+    mesh: c_int,
+) -> *const c_char {
+    if core.is_null() || mesh < 0 {
+        return std::ptr::null();
+    }
+    let core = &*core;
+    core.meshes
+        .get(mesh as usize)
+        .map_or(std::ptr::null(), |name| name.as_ptr())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+
+    fn new_core() -> *mut DuckCore {
+        let scene = CString::new(
+            r"D:\AI\Duck\upstream\microduck_rl\src\mjlab_microduck\robot\microduck\scene_backlash.xml",
+        )
+        .unwrap();
+        let policies = CString::new(r"D:\AI\Duck\policies").unwrap();
+        let mut error = [0 as c_char; 1024];
+        let core = unsafe {
+            duck_core_new(
+                scene.as_ptr(),
+                policies.as_ptr(),
+                error.as_mut_ptr(),
+                error.len() as c_int,
+            )
+        };
+        if core.is_null() {
+            let message = unsafe { CStr::from_ptr(error.as_ptr()) }.to_string_lossy();
+            panic!("duck_core_new failed: {message}");
+        }
+        core
+    }
+
+    #[test]
+    fn ffi_creates_ticks_and_exposes_render_data() {
+        let core = new_core();
+
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let mut status = DuckStatus {
+            bringup: 0,
+            fallen: 0,
+            gain: 0,
+            label: [0; 64],
+            trunk: [0.0; 3],
+            gravity: [0.0; 3],
+        };
+        assert_eq!(unsafe { duck_core_status(core, &mut status) }, 0);
+        assert_eq!(status.bringup, 2, "already at home -> Ready");
+        assert!(unsafe { duck_core_body_count(core) } > 0);
+        assert!(unsafe { duck_core_geom_count(core) } > 0);
+        assert!(unsafe { duck_core_skill_count(core) } >= 3);
+
+        let count = unsafe { duck_core_render_qpos(core, std::ptr::null_mut(), 0) };
+        assert_eq!(count, 22, "7 trunk + 15 wire joints");
+        let mut qpos = vec![0.0f64; count as usize];
+        assert_eq!(
+            unsafe { duck_core_render_qpos(core, qpos.as_mut_ptr(), count) },
+            count
+        );
+
+        unsafe { duck_core_free(core) };
+    }
+
+    #[test]
+    fn intent_server_drives_the_core() {
+        let core = new_core();
+        let port = 19000 + (std::process::id() % 1000) as i32;
+        assert_eq!(unsafe { duck_core_start_intent_server(core, port) }, 0);
+
+        let body = r#"{"vx":0.4,"vy":0.0,"wz":0.0}"#;
+        let request = format!(
+            "POST /twist HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let mut stream = TcpStream::connect(("127.0.0.1", port as u16)).expect("connect");
+        stream.write_all(request.as_bytes()).expect("write");
+        let mut response = String::new();
+        stream.read_to_string(&mut response).expect("read");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(response.contains(r#""ok":true"#), "{response}");
+
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let mut stream = TcpStream::connect(("127.0.0.1", port as u16)).expect("connect");
+        stream
+            .write_all(b"GET /state HTTP/1.1\r\nHost: x\r\n\r\n")
+            .expect("write");
+        let mut response = String::new();
+        stream.read_to_string(&mut response).expect("read");
+        assert!(response.contains(r#""bringup":2"#), "{response}");
+        assert!(response.contains("\"trunk\""), "{response}");
+
+        unsafe { duck_core_free(core) };
+    }
+}

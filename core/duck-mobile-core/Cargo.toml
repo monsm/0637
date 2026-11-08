@@ -1,0 +1,42 @@
+[package]
+name = "duck-mobile-core"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[lib]
+name = "duck_mobile_core"
+# staticlib for iOS/Android; cdylib for the simulator/desktop embedding; rlib
+# for Rust tests and the desktop harness binaries.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+# Official control core: observation layout, ONNX policy runtime, safety, fall,
+# pickup. `default-features = false` drops the Dynamixel bus (rustypot/serialport)
+# so the same code compiles for iOS/Android.
+duck-control = { path = "../../upstream/microduck/duck-control", default-features = false }
+# Official skill config types used by robotd's control.rs.
+robotd-params = { path = "../../upstream/microduck/robotd-params" }
+serde_json = "1"
+tracing = "0.1"
+
+[features]
+# Desktop builds dlopen ONNX Runtime (ORT_DYLIB_PATH). iOS builds link the
+# static XCFramework (ORT_IOS_XCFWK_LOCATION) and must disable defaults.
+default = ["onnx-dynamic"]
+onnx-dynamic = ["duck-control/onnx-dynamic"]
+onnx-static = ["duck-control/onnx-static"]
+# The in-process MuJoCo body. Desktop tests need MUJOCO_INCLUDE_DIR and
+# MUJOCO_LIB_DIR; iOS CI supplies a static MuJoCo 3.10 library.
+mujoco = []
+
+[build-dependencies]
+cc = "1"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+
+[[bin]]
+name = "sim_inproc"
+path = "src/bin/sim_inproc.rs"
+required-features = ["mujoco"]

@@ -1,0 +1,171 @@
+package ai.duck.microduck
+
+import java.io.File
+
+/**
+ * Kotlin wrapper over the Rust core. Every call lands on the same C ABI the
+ * iOS app uses; the native library is `libduck_mobile_core.so`.
+ */
+class DuckCore(
+    scenePath: String,
+    private val policiesPath: String,
+) : AutoCloseable {
+    private var handle: Long = nativeNew(scenePath, policiesPath)
+    private val lock = Any()
+
+    val ready: Boolean get() = handle != 0L
+
+    fun tick(): Int = synchronized(lock) {
+        if (handle != 0L) nativeTick(handle) else -1
+    }
+
+    fun setTwist(vx: Double, vy: Double, wz: Double) = synchronized(lock) {
+        if (handle != 0L) nativeSetTwist(handle, vx, vy, wz)
+    }
+
+    fun setHead(neck: Double, head: Double, yaw: Double, roll: Double) = synchronized(lock) {
+        if (handle != 0L) nativeSetHead(handle, neck, head, yaw, roll)
+    }
+
+    fun setBody(z: Double, roll: Double, pitch: Double) = synchronized(lock) {
+        if (handle != 0L) nativeSetBody(handle, z, roll, pitch)
+    }
+
+    fun skill(name: String): Int = synchronized(lock) {
+        if (handle != 0L) nativeSkill(handle, name) else 0
+    }
+
+    fun sit(): Int = synchronized(lock) {
+        if (handle != 0L) nativeSit(handle) else -1
+    }
+
+    fun groundPick(): Int = synchronized(lock) {
+        if (handle != 0L) nativeGroundPick(handle) else -1
+    }
+
+    fun push(vx: Double, vy: Double, vz: Double): Int = synchronized(lock) {
+        if (handle != 0L) nativePush(handle, vx, vy, vz) else -1
+    }
+
+    fun startIntentServer(port: Int): Int = synchronized(lock) {
+        if (handle != 0L) nativeStartIntentServer(handle, port) else -1
+    }
+
+    fun reload(directory: String? = null): Int = synchronized(lock) {
+        val target = directory ?: policiesPath
+        if (handle != 0L) nativeReload(handle, target) else -1
+    }
+
+    /** [bringup, fallen, gain, trunk x/y/z, gravity x/y/z] */
+    fun status(): DoubleArray = synchronized(lock) {
+        if (handle != 0L) nativeStatus(handle) ?: DoubleArray(0) else DoubleArray(0)
+    }
+
+    /** 7 trunk + 15 wire joints. */
+    fun renderQpos(): DoubleArray = synchronized(lock) {
+        if (handle != 0L) nativeRenderQpos(handle) ?: DoubleArray(0) else DoubleArray(0)
+    }
+
+    fun bodyCount(): Int = synchronized(lock) {
+        if (handle != 0L) nativeBodyCount(handle) else 0
+    }
+
+    /** [x, y, z, qw, qx, qy, qz] */
+    fun bodyPose(body: Int): DoubleArray? = synchronized(lock) {
+        if (handle != 0L) nativeBodyPose(handle, body) else null
+    }
+
+    fun geomCount(): Int = synchronized(lock) {
+        if (handle != 0L) nativeGeomCount(handle) else 0
+    }
+
+    /** [body, type, mesh, group, pos x/y/z, quat w/x/y/z, rgba r/g/b/a] */
+    fun geomInfo(geom: Int): DoubleArray? = synchronized(lock) {
+        if (handle != 0L) nativeGeomInfo(handle, geom) else null
+    }
+
+    fun skillCount(): Int = synchronized(lock) {
+        if (handle != 0L) nativeSkillCount(handle) else 0
+    }
+
+    fun skillName(index: Int): String? = synchronized(lock) {
+        if (handle != 0L) nativeSkillName(handle, index) else null
+    }
+
+    fun meshName(mesh: Int): String? = synchronized(lock) {
+        if (handle != 0L) nativeMeshName(handle, mesh) else null
+    }
+
+    override fun close() {
+        synchronized(lock) {
+            if (handle != 0L) {
+                nativeFree(handle)
+                handle = 0L
+            }
+        }
+    }
+
+    companion object {
+        init {
+            // ONNX Runtime is loaded dynamically by the Rust core; preload the
+            // bundled lib so a bare dlopen("libonnxruntime.so") finds it.
+            runCatching { System.loadLibrary("onnxruntime") }
+            System.loadLibrary("duck_mobile_core")
+        }
+
+        @JvmStatic private external fun nativeNew(scene: String, policies: String): Long
+        @JvmStatic private external fun nativeFree(handle: Long)
+        @JvmStatic private external fun nativeTick(handle: Long): Int
+        @JvmStatic private external fun nativeSetTwist(handle: Long, vx: Double, vy: Double, wz: Double)
+        @JvmStatic private external fun nativeSetHead(handle: Long, neck: Double, head: Double, yaw: Double, roll: Double)
+        @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
+        @JvmStatic private external fun nativeSkill(handle: Long, name: String): Int
+        @JvmStatic private external fun nativeSit(handle: Long): Int
+        @JvmStatic private external fun nativeGroundPick(handle: Long): Int
+        @JvmStatic private external fun nativePush(handle: Long, vx: Double, vy: Double, vz: Double): Int
+        @JvmStatic private external fun nativeStartIntentServer(handle: Long, port: Int): Int
+        @JvmStatic private external fun nativeReload(handle: Long, directory: String): Int
+        @JvmStatic private external fun nativeStatus(handle: Long): DoubleArray?
+        @JvmStatic private external fun nativeRenderQpos(handle: Long): DoubleArray?
+        @JvmStatic private external fun nativeBodyCount(handle: Long): Int
+        @JvmStatic private external fun nativeBodyPose(handle: Long, body: Int): DoubleArray?
+        @JvmStatic private external fun nativeGeomCount(handle: Long): Int
+        @JvmStatic private external fun nativeGeomInfo(handle: Long, geom: Int): DoubleArray?
+        @JvmStatic private external fun nativeSkillCount(handle: Long): Int
+        @JvmStatic private external fun nativeSkillName(handle: Long, index: Int): String?
+        @JvmStatic private external fun nativeMeshName(handle: Long, mesh: Int): String?
+    }
+}
+
+/** Staging the APK assets into a real directory MuJoCo can read. */
+object AssetStager {
+    fun stage(context: android.content.Context): File {
+        val root = File(context.filesDir, "duck")
+        val marker = File(root, "robot/microduck/scene_backlash.xml")
+        if (marker.exists()) return root
+        copy(context, "robot", File(root, "robot"))
+        copy(context, "policies", File(root, "policies"))
+        return root
+    }
+
+    private fun copy(context: android.content.Context, assetPath: String, target: File) {
+        val children = context.assets.list(assetPath).orEmpty()
+        if (children.isEmpty()) {
+            target.parentFile?.mkdirs()
+            context.assets.open(assetPath).use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+            return
+        }
+        target.mkdirs()
+        for (child in children) {
+            copy(context, "$assetPath/$child", File(target, child))
+        }
+    }
+}
+
+/** The joystick's latest command, read by the GL tick. */
+class DuckInput {
+    @Volatile var vx: Double = 0.0
+    @Volatile var wz: Double = 0.0
+}

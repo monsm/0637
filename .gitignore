@@ -1,0 +1,31 @@
+# Rust / native build output
+core/target/
+ios/Frameworks/
+ios/third_party/
+android/third_party/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/jniLibs/
+android/app/src/main/assets/
+ios/DuckApp/Resources/
+
+# Fetched upstream sources and policies (CI downloads them)
+upstream/
+policies/
+
+# Python workspace
+work/.venv/
+work/traces/
+work/android/
+work/ort-ios/
+work/mujoco-lib/
+work/*.zip
+work/*.exe
+
+# IDE / OS
+.DS_Store
+*.iml
+.idea/
+*.xcuserstate
