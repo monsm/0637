@@ -200,7 +200,21 @@ jobs:
             /usr/bin/codesign -dv "$APP" 2>&1 || true
             exit 1
           }
+          # Stream the simulator log in the background: the app's NSLog
+          # startup trail (duck: ...) lands here.
+          xcrun simctl spawn "$UDID" log stream --style compact             > sim-console.log 2>&1 &
+          STREAM_PID=$!
           xcrun simctl launch "$UDID" ai.duck.microduck | tee sim-launch.log
+          sleep 45
+          kill "$STREAM_PID" 2>/dev/null || true
+          grep -E "duck:|dyld|abort|Fatal" sim-console.log | head -40 || true
+          if xcrun simctl spawn "$UDID" launchctl list | grep -q ai.duck.microduck; then
+            echo "app is running"
+          else
+            echo "::error::app is not running — it crashed on open"
+            xcrun simctl io "$UDID" screenshot sim-screenshot.png || true
+            exit 1
+          fi
           sleep 30
           if xcrun simctl spawn "$UDID" launchctl list | grep -q ai.duck.microduck; then
             echo "app is running"
@@ -253,6 +267,10 @@ jobs:
           cp intent-state.json ci-logs/ios/ 2>/dev/null || true
           cp intent-skills.json ci-logs/ios/ 2>/dev/null || true
           cp sim-screenshot.png ci-logs/ios/ 2>/dev/null || true
+          for f in sim-console.log; do
+            tail -c 1500000 "$f" > "$f.tail" && mv "$f.tail" "$f" 2>/dev/null || true
+          done
+          cp sim-console.log ci-logs/ios/ 2>/dev/null || true
           cp sim-syslog-all.log ci-logs/ios/ 2>/dev/null || true
           cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
           {
@@ -292,5 +310,6 @@ jobs:
             sim-screenshot.png
             sim-syslog.log
             sim-syslog-all.log
+            sim-console.log
             sim-launch.log
           if-no-files-found: ignore

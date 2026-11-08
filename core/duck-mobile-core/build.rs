@@ -32,7 +32,10 @@ fn link_mujoco(libdir: &str, apple: bool) {
         // ld64 dropped -all_load/-noall_load pairs; force_load targets one
         // archive and keeps the dependency archives on-demand.
         let mujoco_path = format!("{libdir}/libmujoco.a");
-        println!("cargo:rustc-link-arg=-Wl,-force_load,{mujoco_path}");
+        // ld64 wants the archive path as its own argument; a comma form is
+        // silently ignored.
+        println!("cargo:rustc-link-arg=-Wl,-force_load");
+        println!("cargo:rustc-link-arg=-Wl,{mujoco_path}");
         for lib in libs.into_iter().skip(1) {
             println!("cargo:rustc-link-lib=static={lib}");
         }
