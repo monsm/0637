@@ -61,7 +61,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-xbMZCt/CMakeLists.txt:4 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-cqdCRq/CMakeLists.txt:4 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -74,7 +74,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-xbMZCt/CMakeLists.txt:4 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-cqdCRq/CMakeLists.txt:4 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -88,7 +88,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-xbMZCt/CMakeLists.txt:4 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-cqdCRq/CMakeLists.txt:4 (project)
 
 
 -- Detecting C compiler ABI info - done
@@ -105,7 +105,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DQzDmS/CMakeLists.txt:4 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mtNk1j/CMakeLists.txt:4 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -118,7 +118,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DQzDmS/CMakeLists.txt:4 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mtNk1j/CMakeLists.txt:4 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -132,7 +132,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DQzDmS/CMakeLists.txt:4 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mtNk1j/CMakeLists.txt:4 (project)
 
 
 -- Detecting CXX compiler ABI info - done
@@ -149,7 +149,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HM0frt/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-7vwJ9L/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -162,7 +162,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HM0frt/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-7vwJ9L/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -176,7 +176,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HM0frt/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-7vwJ9L/CMakeLists.txt:5 (project)
 
 
 -- Performing Test CAN_BUILD_AVX - Failed
@@ -190,7 +190,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wGERG6/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zI5W4D/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -203,7 +203,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wGERG6/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zI5W4D/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -217,7 +217,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wGERG6/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zI5W4D/CMakeLists.txt:5 (project)
 
 
 -- Performing Test SUPPORTS_LLD - Success
@@ -231,7 +231,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-vWH3ys/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-oyD8ne/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -244,7 +244,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-vWH3ys/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-oyD8ne/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -258,7 +258,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-vWH3ys/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-oyD8ne/CMakeLists.txt:5 (project)
 
 
 -- Performing Test SUPPORTS_GC_SECTIONS - Success
@@ -309,7 +309,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-LC0bDI/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HNmwaW/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -322,7 +322,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-LC0bDI/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HNmwaW/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -336,7 +336,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-LC0bDI/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-HNmwaW/CMakeLists.txt:3 (project)
 
 
 -- Looking for sys/types.h - found
@@ -350,7 +350,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Paj61O/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-we1p0Y/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -363,7 +363,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Paj61O/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-we1p0Y/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -377,7 +377,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Paj61O/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-we1p0Y/CMakeLists.txt:3 (project)
 
 
 -- Looking for inttypes.h - found
@@ -391,7 +391,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zpWGj2/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-BImMGg/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -404,7 +404,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zpWGj2/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-BImMGg/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -418,7 +418,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-zpWGj2/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-BImMGg/CMakeLists.txt:3 (project)
 
 
 -- Looking for stddef.h - found
@@ -432,7 +432,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-3xdiZ5/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DLvpNK/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -445,7 +445,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-3xdiZ5/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DLvpNK/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -459,7 +459,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-3xdiZ5/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-DLvpNK/CMakeLists.txt:3 (project)
 
 
 -- Looking for stdint.h - found
@@ -473,7 +473,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Vk6w45/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-1dvu3J/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -486,7 +486,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Vk6w45/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-1dvu3J/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -500,7 +500,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Vk6w45/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-1dvu3J/CMakeLists.txt:3 (project)
 
 
 -- Check size of off_t - done
@@ -514,7 +514,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-F77Ru6/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-T35PW9/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -527,7 +527,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-F77Ru6/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-T35PW9/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -541,7 +541,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-F77Ru6/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-T35PW9/CMakeLists.txt:3 (project)
 
 
 -- Looking for fseeko - found
@@ -555,7 +555,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RfytQo/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-yb5SFR/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -568,7 +568,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RfytQo/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-yb5SFR/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -582,7 +582,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RfytQo/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-yb5SFR/CMakeLists.txt:3 (project)
 
 
 -- Looking for ftello - found
@@ -596,7 +596,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-u5xTII/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wTg96x/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -609,7 +609,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-u5xTII/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wTg96x/CMakeLists.txt:3 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -623,7 +623,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-u5xTII/CMakeLists.txt:3 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-wTg96x/CMakeLists.txt:3 (project)
 
 
 -- Looking for PRIdMAX - found
@@ -736,7 +736,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-9MOulf/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Jr8aFI/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -749,7 +749,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-9MOulf/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Jr8aFI/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -763,7 +763,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-9MOulf/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Jr8aFI/CMakeLists.txt:5 (project)
 
 
 -- Performing Test COMPILER_SUPPORTS_VISIBILITY - Success
@@ -794,7 +794,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KWUxJ8/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-nYu32B/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -807,7 +807,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KWUxJ8/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-nYu32B/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -821,7 +821,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-KWUxJ8/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-nYu32B/CMakeLists.txt:5 (project)
 
 
 -- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY - Success
@@ -835,7 +835,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RORj7b/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-XD3TYf/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -848,7 +848,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RORj7b/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-XD3TYf/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -862,7 +862,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-RORj7b/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-XD3TYf/CMakeLists.txt:5 (project)
 
 
 -- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY - Success
@@ -876,7 +876,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Xvkgmx/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Nkdob9/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -889,7 +889,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Xvkgmx/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Nkdob9/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -903,7 +903,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-CXX.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCXXInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Xvkgmx/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Nkdob9/CMakeLists.txt:5 (project)
 
 
 -- Performing Test COMPILER_HAS_DEPRECATED_ATTR - Success
@@ -929,7 +929,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mA4GA7/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-1xPLNv/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -942,7 +942,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mA4GA7/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-1xPLNv/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -956,7 +956,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-mA4GA7/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-1xPLNv/CMakeLists.txt:5 (project)
 
 
 -- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
@@ -970,7 +970,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-0AIl8B/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-dP2HIX/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -983,7 +983,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-0AIl8B/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-dP2HIX/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -997,7 +997,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-0AIl8B/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-dP2HIX/CMakeLists.txt:5 (project)
 
 
 -- Looking for pthread_create in pthreads - not found
@@ -1011,7 +1011,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Bw7TLp/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-WkH1zy/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -1024,7 +1024,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Bw7TLp/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-WkH1zy/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -1038,7 +1038,7 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-Bw7TLp/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-WkH1zy/CMakeLists.txt:5 (project)
 
 
 -- Looking for pthread_create in pthread - not found
@@ -1052,7 +1052,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
   to work with policies introduced by <max> or earlier.
 Call Stack (most recent call first):
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-tChgHG/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-QeqiiU/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android-legacy.toolchain.cmake:35 (cmake_minimum_required):
@@ -1065,7 +1065,7 @@ CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/
 Call Stack (most recent call first):
   /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/android.toolchain.cmake:55 (include)
   /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/3.31.6/CMakeSystem.cmake:6 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-tChgHG/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-QeqiiU/CMakeLists.txt:5 (project)
 
 
 CMake Deprecation Warning at /usr/local/lib/android/sdk/ndk/27.2.12479018/build/cmake/flags.cmake:18 (cmake_minimum_required):
@@ -1079,12 +1079,12 @@ Call Stack (most recent call first):
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang.cmake:23 (include)
   /usr/local/share/cmake-3.31/Modules/Platform/Android-Clang-C.cmake:1 (include)
   /usr/local/share/cmake-3.31/Modules/CMakeCInformation.cmake:48 (include)
-  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-tChgHG/CMakeLists.txt:5 (project)
+  /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/CMakeFiles/CMakeScratch/TryCompile-QeqiiU/CMakeLists.txt:5 (project)
 
 
 -- Check if compiler accepts -pthread - yes
 -- Found Threads: TRUE
--- Configuring done (14.3s)
+-- Configuring done (13.9s)
 -- Generating done (0.1s)
 CMake Warning:
   Manually-specified variables were not used by the project:
