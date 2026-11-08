@@ -164,6 +164,9 @@
 | 17 | ccc40e4 | iOS：rustup 按当前目录选工具链，cargo 在工作区根目录跑 → 用了 runner 默认工具链（无 ios-sim std）；Android：`-nodefaultlibs` 下 `-static-libstdc++` 无效 + MuJoCo 静态库不带 tinyxml2/miniz/lodepng/qhull；桌面 sim 二进制被一起链接 | iOS 脚本 `cd core/` + `RUSTUP_TOOLCHAIN`；Android 显式 `-l static=c++_static` + NDK sysroot 搜索路径 + `--lib`；MuJoCo 脚本输出依赖归档 + `libs.txt` 链接顺序，build.rs 按清单链接 |
 | 18 | bd39ff0 | **Android Rust 两个 ABI 全部链接通过**，Gradle 首次编译失败：没有 `gradle.properties`（AndroidX 未启用）；iOS：`-nodefaultlibs` 连 SDK 都不设置 → `libc++` 找不到 | `android/gradle.properties`（useAndroidX）；iOS 显式 `-isysroot`（按 target 选 iphonesimulator/iphoneos）；`ORT_CXX_STDLIB=c++`（ort-sys 自己加 `-l`） |
 | 19 | 448743c | **Android 全绿，APK 产物 47.9 MB**；iOS 链接差 qhull：归档真名是 `libqhullstatic_r.a` | 允许清单改为 `qhullstatic_r` |
+| 20 | 9af3a72→a2d0aa8 | 安卓 APK 在设备/模拟器上**打开闪退**（用户报告）。logcat：`UnsatisfiedLinkError: dlopen failed: cannot locate symbol __gxx_personality_v0`——共享库默认允许未定义符号，链接不报错、运行时才炸；修后又暴露 `pthread_atfork`（cargo-ndk 默认 API 21） | 补 `c++abi`；链接加 `--no-undefined`；`--platform 28`；冒烟脚本独立成文件（action 内联脚本被 shell 弄坏） |
+| 21 | d805192 | app 能启动但 dlopen 时在**静态构造函数**里 SIGSEGV（空指针）。tombstone 调用链 `dlopen → call_constructors → libduck_mobile_core.so` | 改用 `libc++_shared`（并把 NDK 的 .so 拷进 APK）；仍崩 → 上传 **未 strip 的 .so** 做符号化（AGP 打包会 strip，地址不变） |
+| 22 | 22e9db8→ | iOS：`simctl install` 报 "Missing bundle ID"。诊断打印出 plist 完整、`codesign -dv` 显示 `Identifier=Duck, Info.plist=not bound`（linker-signed）→ 手动签名无效；改让 Xcode CodeSign 阶段签名后又卡在 `default.metallib`（Xcode 26 视其为未签名嵌套代码）| 着色器改为**运行时编译**（Shaders.metal 作为资源随包，不再产生根目录 metallib）；`CODE_SIGN_IDENTITY=-` 让 Xcode 自己签 |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。
