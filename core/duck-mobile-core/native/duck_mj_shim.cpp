@@ -60,6 +60,23 @@ DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
                         m->nmeshvert, m->nmeshface, m->nmeshgraph,
                         m->nflexvert, m->neq, m->nkey);
     DUCK_STAGE("makeData call");
+    /* Bisect the hang: allocate a throwaway data for a minimal model first.
+       If this returns, the deadlock is size/arena specific. */
+    {
+        char tiny_xml[] = "<mujoco><worldbody><body><freejoint/>"
+                          "<geom size=\"0.1\"/></body></worldbody></mujoco>";
+        char tiny_err[512] = {0};
+        mjModel* tm = mj_loadXML(tiny_xml, NULL, tiny_err, sizeof(tiny_err));
+        if (tm) {
+            DUCK_STAGE("tiny makeData call");
+            mjData* td = mj_makeData(tm);
+            DUCK_STAGE("tiny makeData end");
+            if (td) mj_deleteData(td);
+            mj_deleteModel(tm);
+        } else {
+            DUCK_LOG("tiny model failed: %s", tiny_err);
+        }
+    }
     mjData* d = mj_makeData(m);
     DUCK_STAGE("makeData end");
     if (!d) {
