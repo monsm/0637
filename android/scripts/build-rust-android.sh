@@ -43,11 +43,11 @@ for abi in arm64-v8a x86_64; do
   LOG="$ROOT/android/third_party/rust-$abi.log"
   # --lib only: the package's sim binaries are desktop tools and drag in
   # link requirements the app does not need.
-  # --platform must match minSdk (28): the default API 21 stubs lack libc
-  # symbols that libc++abi references (pthread_atfork).
+  # --platform must match minSdk (29): the default API 21 stubs lack libc
+  # symbols that libc++abi references (pthread_atfork), and API 28 lacks ELF
   if ! cargo ndk \
     -t "$abi" \
-    --platform 28 \
+    --platform 29 \
     -o "$ROOT/android/app/src/main/jniLibs" \
     build \
     -v \

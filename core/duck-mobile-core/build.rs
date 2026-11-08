@@ -92,7 +92,9 @@ fn main() {
             // executables) in the per-triple directory, and its scudo malloc
             // divides by zero at startup. The device's libc is dynamic.
             if let Some(dir) = ndk_sysroot_lib_dir() {
-                let api = "28"; // matches minSdk and cargo ndk --platform
+                // 29 is the first API level whose libc.so exports the ELF
+                // TLS entry points (__tls_get_addr) that libc++_static needs.
+                let api = "29"; // matches minSdk and cargo ndk --platform
                 println!(
                     "cargo:rustc-link-search=native={dir}/{api}"
                 );
