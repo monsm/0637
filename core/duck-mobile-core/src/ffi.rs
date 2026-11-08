@@ -76,7 +76,7 @@ pub unsafe extern "C" fn duck_core_new(
     // route the message to logcat so CI can see the reason.
     #[cfg(target_os = "android")]
     std::panic::set_hook(Box::new(|info| {
-        extern "C" {
+        unsafe extern "C" {
             fn duck_android_log_error(message: *const c_char);
         }
         let message = CString::new(format!("rust panic at {:?}: {info}", info.location()))
