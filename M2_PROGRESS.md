@@ -150,8 +150,8 @@
 
 | 3 | 2a38ef4 | iOS：MuJoCo **cmake configure** 失败（summary 匿名不可见）；Android 结果未显示 | 失败日志改为 **commit 回仓库**（`ci-logs/`，`[skip ci]` 防循环） |
 | 4 | 5868bcc | 被 946b8a3 的并发取消覆盖 | — |
-| 5 | 946b8a3 | iOS：MuJoCo iOS cmake 失败根因 = qhull 在 iOS 下是 MACOSX_BUNDLE 可执行文件、install() 无 BUNDLE DESTINATION（配置期报错）；Android 被后续推送并发取消 | `-DCMAKE_SKIP_INSTALL_RULES=ON`（我们从不 install，只拷贝 libmujoco.a）；Android 未跑到 |
-| 6 | 66ac28e | 进行中 | 效率改造生效：paths 过滤、并发取消、三层缓存、skip-if-built；失败日志照旧 commit 回 `ci-logs/` |
+| 6 | 66ac28e | iOS `CMAKE_SKIP_INSTALL_RULES=ON` 没压住 qhull bundle 错误；Android 30s 失败且无注解（失败步在 install-sdk 之前，无日志可拷） | iOS 改 `-DCMAKE_MACOSX_BUNDLE=OFF`（iOS 下可执行文件默认 bundle，这才是根因）；两个 workflow 每个步骤加 `id`，失败时把**全部步骤 outcome** 写进 `ci-logs/steps.txt` |
+| 7 | （本次推送） | 进行中 | 预期：iOS 越过 MuJoCo 配置进入编译；Android 定位到具体失败步骤 |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。

@@ -29,9 +29,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
-        id: setupandroid
-
       - name: Android SDK packages
         id: sdk
         run: bash android/scripts/install-sdk.sh
@@ -113,7 +110,6 @@ jobs:
           {
             echo "checkout=${{ steps.checkout.outcome }}"
             echo "java=${{ steps.java.outcome }}"
-            echo "setupandroid=${{ steps.setupandroid.outcome }}"
             echo "sdk=${{ steps.sdk.outcome }}"
             echo "env=${{ steps.env.outcome }}"
             echo "rusttoolchain=${{ steps.rusttoolchain.outcome }}"
