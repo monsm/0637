@@ -93,11 +93,6 @@ This warning is for project developers.  Use -Wno-author to suppress it.
 -- To build and install qhull, enter "make" and "make install"
 -- To smoketest qhull, enter "ctest"
 -- 
-CMake Error at /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/build/_deps/qhull-src/CMakeLists.txt:709 (install):
-  install TARGETS given no BUNDLE DESTINATION for MACOSX_BUNDLE executable
-  target "qhull".
-
-
 -- mujoco::FindOrFetch: Using FetchContent to retrieve `qhull` - Done
 -- mujoco::FindOrFetch: checking for targets in package `tinyxml2`
 -- mujoco::FindOrFetch: checking for targets in package `tinyxml2` - target `tinyxml2` not defined.
@@ -191,4 +186,13 @@ CMake Warning in CMakeLists.txt:
   been specified
 
 
--- Configuring incomplete, errors occurred!
+-- Configuring done (28.7s)
+-- Generating done (0.1s)
+CMake Warning (unused-cli):
+  Manually-specified variables were not used by the project:
+
+    MUJOCO_BUILD_CSHARP
+    MUJOCO_BUILD_PYTHON
+
+
+-- Build files have been written to: /Users/runner/work/0637/0637/ios/third_party/mujoco-sim/build
