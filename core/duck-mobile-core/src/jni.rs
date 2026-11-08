@@ -7,6 +7,7 @@
 #![allow(non_snake_case)]
 
 use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 
 use jni::objects::{JClass, JString};
 use jni::sys::{jdouble, jdoubleArray, jint, jlong};
