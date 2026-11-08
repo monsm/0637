@@ -17,7 +17,7 @@ fi
 # mujoco target, so patch the variable definitions: iOS takes the empty else()
 # branch instead.
 MACOS_CMAKE="$SRC/cmake/MujocoMacOS.cmake"
-if ! grep -q "DUCK_IOS_NO_MACOS_MIN" "$MACOS_CMAKE"; then
+if ! grep -q "DUCK_IOS_NO_MACOS_MIN_VARS" "$MACOS_CMAKE"; then
   if ! python3 - "$MACOS_CMAKE" >"$SRC/patch.log" 2>&1 <<'PY'
 import sys
 path = sys.argv[1]
@@ -25,7 +25,7 @@ text = open(path).read()
 needle = "if(APPLE)\n  # Target the oldest version of macOS"
 replacement = (
     "if(APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL \"iOS\")\n"
-    "  # DUCK_IOS_NO_MACOS_MIN: -mmacosx-version-min conflicts with iOS targets\n"
+    "  # DUCK_IOS_NO_MACOS_MIN_VARS: -mmacosx-version-min conflicts with iOS targets\n"
     "  # Target the oldest version of macOS"
 )
 if needle not in text:

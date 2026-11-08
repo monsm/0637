@@ -46,7 +46,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ios/third_party
-          key: ios-native-mujoco3.10.0-ort1.24.2-v1
+          key: ios-bkiicy-vbedbj9.18.9-zka6.50.6-q6
 
       - name: Cache Rust
         id: cacherust
