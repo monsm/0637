@@ -1,0 +1,137 @@
+diff --git a/duck-control/Cargo.toml b/duck-control/Cargo.toml
+index b53d572..99719ee 100644
+--- a/duck-control/Cargo.toml
++++ b/duck-control/Cargo.toml
+@@ -29,20 +29,31 @@ tracing.workspace = true
+ libloading = "0.8"
+ # Identify unchanged networks when a different slot is hot-swapped.
+ sha2 = "0.11.0"
+-ort = { version = "=2.0.0-rc.11", default-features = false, features = ["load-dynamic"] }
++ort = { version = "=2.0.0-rc.11", default-features = false }
+ 
+ # 1.7.0 is a floor, not a preference: it adds fast sync read (protocol 2.0 instruction
+ # 0x8A), which `bus` enables and the tick budget depends on. 1.6.0 was the previous floor
+ # for the same kind of reason — it de-stuffs protocol 2.0 status packets whose payload
+ # contains `FF FF FD`, and before it such a read came back oversized and every fixed-size
+ # sync read in `bus` decoded garbage. A present current of -1 is enough to trigger that.
+-rustypot = "1.8.0"
++rustypot = { version = "1.8.0", optional = true }
+ # `default-features = false` drops serialport's `libudev` feature, which exists only for
+ # enumerating ports (`available_ports`). We open one by path from the params file and never
+ # enumerate — and libudev-sys needs a pkg-config sysroot that the board's cross-build does
+ # not have, so leaving it on breaks the aarch64 build outright. rustypot disables it for the
+ # same reason; this crate has to as well, or cargo's feature unification turns it back on.
+-serialport = { version = "4.8", default-features = false }
++serialport = { version = "4.8", default-features = false, optional = true }
++
++[features]
++# Mobile builds use a simulator/custom RobotIo and have no Dynamixel bus. The
++# control core (obs/policy/safety/fall) is pure and compiles without these.
++default = ["hardware", "onnx-dynamic"]
++hardware = ["dep:rustypot", "dep:serialport"]
++# Desktop/board: dlopen the ONNX Runtime shared library.
++onnx-dynamic = ["ort/load-dynamic"]
++# iOS/static: link libonnxruntime.a from an XCFramework
++# (ORT_IOS_XCFWK_LOCATION), with no dylib probe.
++onnx-static = []
+ 
+ [dev-dependencies]
+ serde_json.workspace = true
+diff --git a/duck-control/src/io.rs b/duck-control/src/io.rs
+index c250752..ce2012e 100644
+--- a/duck-control/src/io.rs
++++ b/duck-control/src/io.rs
+@@ -117,6 +117,13 @@ pub trait RobotIo {
+     fn read(&mut self) -> Result<Sensors>;
+     fn write(&mut self, targets: &JointTargets) -> Result<()>;
+ 
++    /// An external velocity impulse on the body, for a simulated disturbance
++    /// (a phone shake, a shove). It is not a motor command; backends without a
++    /// body ignore it.
++    fn push(&mut self, _velocity: [f64; 3]) -> Result<()> {
++        Ok(())
++    }
++
+     /// Whether [`Sensors::velocities`] from this backend is a measurement.
+     ///
+     /// [`Sensors`] is fixed-size arrays, so a backend with nothing to report has no way to say
+diff --git a/duck-control/src/lib.rs b/duck-control/src/lib.rs
+index 900e3ff..71fd75f 100644
+--- a/duck-control/src/lib.rs
++++ b/duck-control/src/lib.rs
+@@ -7,6 +7,7 @@
+ //! The control path it holds — model, bus, [`io::RobotIo`], observations, policy, safety — is
+ //! designed in `docs/design/robotd-design.md` §2.
+ 
++#[cfg(feature = "hardware")]
+ pub mod bus;
+ pub mod fall;
+ pub mod imu;
+diff --git a/duck-control/src/policy.rs b/duck-control/src/policy.rs
+index 17a5a97..d6465da 100644
+--- a/duck-control/src/policy.rs
++++ b/duck-control/src/policy.rs
+@@ -14,6 +14,7 @@
+ //! updater rolls the release back instead of leaving a robot that cannot walk.
+ 
+ use std::path::{Path, PathBuf};
++#[cfg(feature = "onnx-dynamic")]
+ use std::sync::OnceLock;
+ 
+ use ort::session::Session;
+@@ -93,6 +94,7 @@ impl PolicyError {
+ }
+ 
+ /// Where `ort` will look for the runtime, replicating its own logic.
++#[cfg(feature = "onnx-dynamic")]
+ fn dylib_name() -> String {
+     match std::env::var("ORT_DYLIB_PATH") {
+         Ok(path) if !path.is_empty() => path,
+@@ -124,6 +126,7 @@ fn dylib_name() -> String {
+ /// the probe passed, and `ort` panicked in `setup_api` on its own version check
+ /// (`expected version >= '1.23.x', but got '1.20.1'`). The probe proves the file loads;
+ /// nothing more. [`catching_ort_panics`] covers the rest, including panics we have not seen.
++#[cfg(feature = "onnx-dynamic")]
+ pub(crate) fn ensure_runtime() -> Result<(), PolicyError> {
+     static PROBE: OnceLock<Result<(), String>> = OnceLock::new();
+     let outcome = PROBE.get_or_init(|| {
+@@ -258,6 +261,7 @@ impl Policy {
+     /// `stand` is optional: without it the walking policy runs at every velocity, which is
+     /// what a single-policy bundle does.
+     pub fn load(paths: &PolicyPaths, standing_threshold: f64) -> Result<Self, PolicyError> {
++        #[cfg(feature = "onnx-dynamic")]
+         ensure_runtime()?;
+ 
+         // Everything below calls into `ort`, and `ort` panics on failures it considers
+@@ -450,6 +454,7 @@ impl Policy {
+ /// spend — so the IPC caller runs it on its own runtime, and the loop only ever calls it in its
+ /// preamble, before the first tick is due.
+ pub fn validate(path: &Path) -> Result<(), PolicyError> {
++    #[cfg(feature = "onnx-dynamic")]
+     ensure_runtime()?;
+     catching_ort_panics(|| open(path).map(drop))
+ }
+diff --git a/duck-control/src/safety.rs b/duck-control/src/safety.rs
+index 9330f3a..c0d5a31 100644
+--- a/duck-control/src/safety.rs
++++ b/duck-control/src/safety.rs
+@@ -179,6 +179,19 @@ impl<T: RobotIo> Safety<T> {
+         self.io.read()
+     }
+ 
++    /// Read-only access to the body backend, for diagnostics and rendering.
++    ///
++    /// The write handle stays owned by safety: this cannot command a motor.
++    pub fn io(&self) -> &T {
++        &self.io
++    }
++
++    /// A simulated disturbance (a phone shake, a shove), passed through to the
++    /// body backend. It is not a joint target and never reaches a motor.
++    pub fn push(&mut self, velocity: [f64; 3]) -> Result<(), IoError> {
++        self.io.push(velocity)
++    }
++
+     /// Bus reads that are not part of the tick, passed through rather than exposing the IO.
+     ///
+     /// Safety owns the only `RobotIo` handle — that is what makes "nothing commands a motor

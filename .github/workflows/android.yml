@@ -51,7 +51,9 @@ jobs:
         id: upstream
         run: |
           git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
-          git clone --depth 1 https://github.com/pollen-robotics/microduck.git upstream/microduck
+          git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
+          git -C upstream/microduck checkout da34a22
+          git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
           mkdir -p policies
           for f in velstand.onnx alpha_sitstand.onnx alpha_ground_pick.onnx \
                    roulade.onnx ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
