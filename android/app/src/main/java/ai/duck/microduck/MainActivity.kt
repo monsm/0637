@@ -73,7 +73,6 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-@Composable
 private fun DuckScreen(
     coreProvider: () -> DuckCore?,
     onCoreCreated: (DuckCore) -> Unit,
