@@ -11,6 +11,24 @@ if [ ! -d "$SRC" ]; then
     https://github.com/google-deepmind/mujoco.git "$SRC"
 fi
 
+# MuJoCo hardcodes `add_library(mujoco SHARED ...)`; the mobile core links the
+# library in, so build a static archive instead of a dylib.
+if ! grep -q "DUCK_STATIC_MUJOCO" "$SRC/CMakeLists.txt"; then
+  python3 - "$SRC/CMakeLists.txt" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = "add_library(mujoco SHARED ${MUJOCO_RESOURCE_FILES})"
+replacement = (
+    "# DUCK_STATIC_MUJOCO: link into the mobile core instead of a dylib\n"
+    "add_library(mujoco STATIC ${MUJOCO_RESOURCE_FILES})"
+)
+if needle not in text:
+    raise SystemExit(f"static-library patch point not found in {path}")
+open(path, "w").write(text.replace(needle, replacement, 1))
+PY
+fi
+
 # MuJoCo adds -mmacosx-version-min=11 whenever APPLE is true; clang rejects
 # that flag on iOS targets (-mios-simulator-version-min conflict). The flags
 # are used both by enforce_mujoco_macosx_min_version() and directly by the

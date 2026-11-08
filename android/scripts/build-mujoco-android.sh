@@ -18,6 +18,24 @@ if [ ! -d "$SRC" ]; then
     https://github.com/google-deepmind/mujoco.git "$SRC"
 fi
 
+# MuJoCo hardcodes `add_library(mujoco SHARED ...)`; the mobile core links the
+# library in, so build a static archive instead of a .so.
+if ! grep -q "DUCK_STATIC_MUJOCO" "$SRC/CMakeLists.txt"; then
+  python3 - "$SRC/CMakeLists.txt" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path).read()
+needle = "add_library(mujoco SHARED ${MUJOCO_RESOURCE_FILES})"
+replacement = (
+    "# DUCK_STATIC_MUJOCO: link into the mobile core instead of a .so\n"
+    "add_library(mujoco STATIC ${MUJOCO_RESOURCE_FILES})"
+)
+if needle not in text:
+    raise SystemExit(f"static-library patch point not found in {path}")
+open(path, "w").write(text.replace(needle, replacement, 1))
+PY
+fi
+
 for abi in arm64-v8a x86_64; do
   if [ -f "$OUT/$abi/lib/libmujoco.a" ]; then
     echo "MuJoCo cached for $abi — skipping build"
