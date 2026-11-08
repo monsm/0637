@@ -77,7 +77,15 @@ DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
             DUCK_LOG("tiny model failed: %s", tiny_err);
         }
     }
-    mjData* d = mj_makeData(m);
+    mjData* d = NULL;
+    DUCK_STAGE("makeRawData call");
+    mj_makeRawData(&d, m);
+    DUCK_STAGE("makeRawData end");
+    if (d) {
+        DUCK_STAGE("resetData call");
+        mj_resetData(m, d);
+        DUCK_STAGE("resetData end");
+    }
     DUCK_STAGE("makeData end");
     if (!d) {
         mj_deleteModel(m);
