@@ -153,7 +153,8 @@
 | 6 | 66ac28e | iOS `CMAKE_SKIP_INSTALL_RULES=ON` 没压住 qhull bundle 错误；Android 30s 失败且无注解（失败步在 install-sdk 之前，无日志可拷） | iOS 改 `-DCMAKE_MACOSX_BUNDLE=OFF`（iOS 下可执行文件默认 bundle，这才是根因）；两个 workflow 每个步骤加 `id`，失败时把**全部步骤 outcome** 写进 `ci-logs/steps.txt` |
 | 7 | 847ba60 | 配置通过！编译失败：MuJoCo 给 APPLE 加 `-mmacosx-version-min=11`，iOS 下与 `-mios-simulator-version-min` 冲突；Android `setupandroid=failure`（setup-android@v3 在 ubuntu-24.04 挂了） | 删掉 setup-android action（用 runner 预装 SDK + 自举 cmdline-tools）；iOS 开始补丁 MujocoMacOS.cmake |
 | 8 | 5d57314 | 补丁只改了函数，但 CMakeLists 还直接把 `${MUJOCO_MACOS_*}` 加到 mujoco target → 仍残留 `-mmacosx-version-min` | 改为补文件顶层 `if(APPLE)` → iOS 走 else()，两组 flag 与 `-Werror=availability` 全空 |
-| 9 | （本次推送） | 进行中 | 预期 iOS 进入 MuJoCo 编译；Android 已越过 setup 阶段 |
+| 9 | 43a6dc4 | iOS：MuJoCo 配置/编译到 109/111 后链接的是 **shared dylib**，脚本找不到 `libmujoco.a`；Android：`aligned_alloc` 已被 API 28 修好，但 `localtime_r` 检测仍报错（缓存里的 CMakeCache 是旧 flags，env CFLAGS 未生效） | MuJoCo CMakeLists 把 `add_library(mujoco SHARED)` 写死 → 打补丁改 **STATIC**；Android 需要重建时先删构建目录，保证 `_POSIX_C_SOURCE` 进入 cache |
+| 10 | 6ce1a62 + 75606eb | 进行中 | 干净重建：STATIC 静态库 + Android POSIX 宏生效。若越过 MuJoCo，下一风险点是 Rust 链接（iOS: ort 静态 + muJoCo + c++）与 Swift/Xcode、Kotlin/Gradle 首次编译 |
 
 注：push 用的凭据走 Windows 凭据管理器（`wincred` helper，repo 级配置）；
 `gh.exe` helper 路径已失效，与本项目无关。
