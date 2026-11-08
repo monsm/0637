@@ -8,6 +8,11 @@ NDK="${ANDROID_NDK_HOME:-${ANDROID_HOME:-$HOME/Android/Sdk}/ndk/27.2.12479018}"
 SRC="$ROOT/android/third_party/mujoco-src"
 OUT="$ROOT/android/third_party/mujoco"
 
+# bionic doesn't define _POSIX_C_SOURCE, which MuJoCo's localtime_r platform
+# check requires; defining it is a no-op on bionic (POSIX is always exposed).
+export CFLAGS="-D_POSIX_C_SOURCE=200809L ${CFLAGS:-}"
+export CXXFLAGS="-D_POSIX_C_SOURCE=200809L ${CXXFLAGS:-}"
+
 if [ ! -d "$SRC" ]; then
   git clone --depth 1 --branch "$VERSION" \
     https://github.com/google-deepmind/mujoco.git "$SRC"
@@ -24,9 +29,10 @@ for abi in arm64-v8a x86_64; do
   if ! cmake -S "$SRC" -B "$BUILD" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI="$abi" \
-    -DANDROID_PLATFORM=android-26 \
+    -DANDROID_PLATFORM=android-28 \
     -DANDROID_STL=c++_static \
     -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_SHARED_LIBS=OFF \
     -DMUJOCO_BUILD_EXAMPLES=OFF \
     -DMUJOCO_BUILD_TESTS=OFF \
     -DMUJOCO_BUILD_SIMULATE=OFF \
