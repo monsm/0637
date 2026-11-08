@@ -49,7 +49,9 @@ build() {
     return 0
   fi
 
-  local log="$build-cmake.log"
+  local name
+  name="$(basename "$out")"
+  local log="$out/$name-cmake.log"
   mkdir -p "$(dirname "$log")"
   if ! cmake -S "$SRC" -B "$build" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
@@ -71,7 +73,7 @@ build() {
     exit 1
   fi
 
-  local blog="$build-build.log"
+  local blog="$out/$name-build.log"
   if ! cmake --build "$build" --target mujoco -j"$(sysctl -n hw.ncpu)" \
     >"$blog" 2>&1; then
     echo "::error::cmake build failed — see step summary"
