@@ -79,6 +79,9 @@ fn main() {
     match target_os.as_str() {
         "android" => {
             link_mujoco(&libdir);
+            // 16 KB page-size devices (Android 15+ kernels) refuse to load
+            // 4 KB-aligned ELF segments.
+            println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
             // Static libc++ keeps the APK free of an extra bundled
             // libc++_shared.so for this library itself (ORT's AAR still ships
             // one for libonnxruntime.so).
