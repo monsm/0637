@@ -31,6 +31,26 @@ fn main() {
             // libc++_shared.so dependency.
             println!("cargo:rustc-link-lib=static=mujoco");
             println!("cargo:rustc-link-lib=static=c++_static");
+            // rustc doesn't know the NDK sysroot's per-triple lib dir where
+            // libc++_static.a lives.
+            let ndk = env::var("ANDROID_NDK_HOME")
+                .or_else(|_| env::var("ANDROID_NDK_ROOT"))
+                .or_else(|_| {
+                    env::var("ANDROID_HOME")
+                        .map(|home| format!("{home}/ndk/27.2.12479018"))
+                })
+                .unwrap_or_default();
+            if !ndk.is_empty() {
+                let host = match env::consts::OS.as_str() {
+                    "macos" => "darwin-x86_64",
+                    "windows" => "windows-x86_64",
+                    _ => "linux-x86_64",
+                };
+                let triple = env::var("TARGET").unwrap_or_default();
+                println!(
+                    "cargo:rustc-link-search=native={ndk}/toolchains/llvm/prebuilt/{host}/sysroot/usr/lib/{triple}"
+                );
+            }
         }
         "ios" | "macos" => {
             // CI supplies a MuJoCo 3.10 static library built for the target.
