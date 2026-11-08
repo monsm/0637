@@ -65,6 +65,36 @@ unsafe fn c_string(pointer: *const c_char) -> Result<String, String> {
 
 /// Create the core. `scene_path` is the bundled `scene_backlash.xml`;
 /// `policies_dir` holds the official `.onnx` files and `manifest.json`.
+/// One line per load stage in logcat, so a slow or stuck startup is visible.
+fn stage(name: &str) {
+    #[cfg(target_os = "android")]
+    {
+        unsafe extern "C" {
+            fn __android_log_print(
+                prio: c_int,
+                tag: *const c_char,
+                text: *const c_char,
+                ...
+            ) -> c_int;
+        }
+        const ANDROID_LOG_INFO: c_int = 4;
+        if let (Ok(tag), Ok(text)) = (CString::new("duck-rust"), CString::new(format!("stage {name}"))) {
+            unsafe {
+                __android_log_print(
+                    ANDROID_LOG_INFO,
+                    tag.as_ptr(),
+                    text.as_ptr(),
+                    std::ptr::null::<c_char>(),
+                )
+            };
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = name;
+    }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_new(
     scene_path: *const c_char,
@@ -118,12 +148,17 @@ pub unsafe extern "C" fn duck_core_new(
     }
 
     let result = std::panic::catch_unwind(|| -> Result<DuckCore, String> {
+        stage("start");
         let scene = c_string(scene_path)?;
         let policies = PathBuf::from(c_string(policies_dir)?);
+        stage("manifest");
         let bundle = crate::manifest::load(&policies)?;
 
+        stage("policy");
         let policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
+        stage("mujoco");
         let body = MujocoIo::load(&scene)?;
+        stage("runtime");
         let tuning = bundle.tuning();
         let mut runtime = DuckRuntime::new(
             body,
@@ -132,7 +167,9 @@ pub unsafe extern "C" fn duck_core_new(
             bundle.skill_tuning,
             SafetyConfig::default(),
         );
+        stage("enable");
         runtime.enable().map_err(|error| error.to_string())?;
+        stage("ready");
 
         let skills = runtime
             .skill_names()

@@ -65,6 +65,8 @@ adb logcat -d > android-logcat.log || true
 if [ -z "$STATE" ]; then
   echo "::error::intent API did not answer — the core is not ticking"
   grep -nE "duck-rust|FATAL|AndroidRuntime|signal |onnx|mujoco|policy" android-logcat.log | tail -40 || true
+  echo "--- core stages ---"
+  grep -E "duck-rust" android-logcat.log | tail -20 || true
   grep -nE "ai.duck.microduck" android-logcat.log | grep -viE "zygote|ActivityManager|WindowManager|SplashScreen|AppsFilter|MediaProvider|Avrcp" | tail -20 || true
   exit 1
 fi
