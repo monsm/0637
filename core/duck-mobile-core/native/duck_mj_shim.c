@@ -6,34 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__ANDROID__) && defined(__ANDROID_API__) && __ANDROID_API__ >= 24
-/* Bionic's libdl.a is the *static executable* shim; linking it into a shared
-   library also pulls stale copies of __cxa_atexit, __cxa_guard_* and __errno
-   that override the real libc/libc++ runtime (static constructors then crash
-   at dlopen). Defining the dl entry points here against the linker facade
-   keeps those archive members from ever being pulled. */
-extern void* __loader_dlopen(const char* filename, int flags, const void* caller_addr);
-extern void* __loader_dlsym(void* handle, const char* symbol, const void* caller_addr);
-extern int __loader_dlclose(void* handle);
-extern char* __loader_dlerror(void);
-
-void* dlopen(const char* filename, int flags) {
-    return __loader_dlopen(filename, flags, __builtin_return_address(0));
-}
-
-void* dlsym(void* handle, const char* symbol) {
-    return __loader_dlsym(handle, symbol, __builtin_return_address(0));
-}
-
-int dlclose(void* handle) {
-    return __loader_dlclose(handle);
-}
-
-char* dlerror(void) {
-    return __loader_dlerror();
-}
-#endif
-
 struct DuckMj {
     mjModel* m;
     mjData* d;
