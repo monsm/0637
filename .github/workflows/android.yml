@@ -47,7 +47,9 @@ jobs:
         id: rusttoolchain
         run: |
           rustup toolchain install 1.99.1 --profile minimal
-          rustup target add aarch64-linux-android x86_64-linux-android
+          # Target std must go into the pinned toolchain: core/rust-toolchain.toml
+          # selects it for the build, and targets are per-toolchain.
+          rustup target add --toolchain 1.99.1 aarch64-linux-android x86_64-linux-android
           cargo install cargo-ndk --locked
 
       - name: Fetch upstream sources and policies

@@ -16,7 +16,7 @@ export ORT_IOS_XCFWK_LOCATION="$ROOT/ios/third_party/onnxruntime.xcframework"
 export ORT_CXX_STDLIB=libc++
 export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-install_name,@rpath/libduck_mobile_core.dylib"
 
-rustup target add "$TARGET" >/dev/null 2>&1 || true
+rustup target add --toolchain 1.99.1 "$TARGET" >/dev/null 2>&1 || true
 
 LOG="$ROOT/ios/third_party/rust-$TARGET.log"
 mkdir -p "$(dirname "$LOG")"

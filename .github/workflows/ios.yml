@@ -42,7 +42,9 @@ jobs:
         run: |
           brew install xcodegen cmake ninja
           rustup toolchain install 1.99.1 --profile minimal
-          rustup target add aarch64-apple-ios-sim
+          # Target std must go into the pinned toolchain: core/rust-toolchain.toml
+          # selects it for the build, and targets are per-toolchain.
+          rustup target add --toolchain 1.99.1 aarch64-apple-ios-sim
 
       - name: Cache native deps
         id: cachendk
