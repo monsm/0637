@@ -82,12 +82,21 @@ fn main() {
             // 16 KB page-size devices (Android 15+ kernels) refuse to load
             // 4 KB-aligned ELF segments.
             println!("cargo:rustc-link-arg=-Wl,-z,max-page-size=16384");
-            // Static C++ runtime, self-contained in the .so. The C++ ABI
-            // (__cxa_atexit, __cxa_guard_*) must be defined *before* the
-            // linker scans -ldl, otherwise bionic's libdl.a — the static
-            // executable shim — supplies stale copies and static constructors
-            // crash at dlopen. native/duck_mj_shim.c defines the dl entry
-            // points against the linker facade for the same reason.
+            // The NDK has no libdl.so, so rustc's -ldl (which comes before
+            // -lc on the link line) resolves to libdl.a — bionic's *static
+            // executable* shim. It defines malloc/newlocale/__errno/abort/
+            // __cxa_atexit with globals that are never initialised in a
+            // shared library, and scudo then divides by zero on the first
+            // malloc. Shadow it with a linker script; the device's libc.so
+            // exports the dl entry points at runtime (API 24+), and a shared
+            // library may keep them undefined.
+            if let Some(out) = env::var_os("OUT_DIR") {
+                let out = std::path::PathBuf::from(out);
+                if std::fs::write(out.join("libdl.so"), "INPUT(-lc)\n").is_ok() {
+                    println!("cargo:rustc-link-search=native={}", out.display());
+                }
+            }
+            // Static C++ runtime plus the C++ ABI, self-contained in the .so.
             if let Some(dir) = ndk_sysroot_lib_dir() {
                 println!("cargo:rustc-link-search=native={dir}");
                 if std::path::Path::new(&dir).join("libc++abi.a").exists() {
@@ -95,9 +104,6 @@ fn main() {
                 }
             }
             println!("cargo:rustc-link-lib=static=c++_static");
-            // Without --no-undefined a shared library links happily with
-            // unresolved symbols and only fails at dlopen time on the device.
-            println!("cargo:rustc-link-arg=-Wl,--no-undefined");
         }
         "ios" | "macos" => {
             link_mujoco(&libdir);

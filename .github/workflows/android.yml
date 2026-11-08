@@ -186,6 +186,27 @@ jobs:
           done
           exit $status
 
+      - name: Check no bionic static-libc stubs leaked in
+        id: stubs
+        run: |
+          NM="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          status=0
+          # libdl.a (the static-executable shim) defines these with globals
+          # that are never initialised in a shared library; if any of them is
+          # defined in our .so, the shim was pulled in and the app will crash
+          # in malloc/newlocale at startup.
+          HOSTILE='malloc|free|calloc|realloc|newlocale|setlocale|strtod|__errno|abort|__cxa_atexit|__cxa_guard_acquire|getauxval'
+          for so in android/app/src/main/jniLibs/*/libduck_mobile_core.so; do
+            bad=$("$NM" -D --defined-only "$so" | awk '{print $3}' | grep -xE "$HOSTILE" || true)
+            if [ -n "$bad" ]; then
+              echo "::error::$so defines bionic static-libc symbols: $(echo $bad)"
+              status=1
+            else
+              echo "$so: clean"
+            fi
+          done
+          exit $status
+
       - name: Emulator smoke test
         id: emulator
         uses: reactivecircus/android-emulator-runner@v2

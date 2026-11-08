@@ -6,39 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__ANDROID__)
-/* bionic's libdl.a is the *static executable* shim. Its __cxa_atexit reads
-   __libc_shared_globals()->atexit, which is never initialised in a shared
-   library, so every C++ static constructor crashed at dlopen. Defining the
-   symbol here keeps that archive member from being pulled at all; the
-   registered destructors run at process exit. */
-typedef void (*duck_atexit_fn)(void*);
-#define DUCK_ATEXIT_MAX 256
-static duck_atexit_fn g_atexit_fns[DUCK_ATEXIT_MAX];
-static void* g_atexit_args[DUCK_ATEXIT_MAX];
-static int g_atexit_count = 0;
-
-static void duck_run_atexit(void) {
-    while (g_atexit_count > 0) {
-        int i = --g_atexit_count;
-        g_atexit_fns[i](g_atexit_args[i]);
-    }
-}
-
-__attribute__((weak)) int __cxa_atexit(duck_atexit_fn fn, void* arg, void* dso) {
-    (void)dso;
-    if (g_atexit_count >= DUCK_ATEXIT_MAX) {
-        return -1;
-    }
-    g_atexit_fns[g_atexit_count] = fn;
-    g_atexit_args[g_atexit_count] = arg;
-    if (g_atexit_count++ == 0) {
-        atexit(duck_run_atexit);
-    }
-    return 0;
-}
-#endif
-
 struct DuckMj {
     mjModel* m;
     mjData* d;
