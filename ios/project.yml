@@ -65,11 +65,6 @@ targets:
           IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
           /usr/bin/codesign --force --sign "$IDENTITY" --timestamp=none \
             "${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}/libduck_mobile_core.dylib"
-          # CI builds pass CODE_SIGNING_ALLOWED=NO; recent CoreSimulator
-          # versions refuse to install a completely unsigned bundle with a
-          # misleading "Missing bundle ID" — ad-hoc sign the finished app.
-          /usr/bin/codesign --force --sign - --timestamp=none \
-            "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}"
       - name: Embed ONNX Runtime
         basedOnDependencyAnalysis: false
         script: |
@@ -96,3 +91,14 @@ targets:
             fi
           done
           echo "warning: no simulator slice in $XCFWK"
+          # Sign last, after every nested component is in place. Recent
+          # CoreSimulator refuses to install a completely unsigned bundle
+          # (reported as "Missing bundle ID"); CI builds with
+          # CODE_SIGNING_ALLOWED=NO, so ad-hoc sign here. Xcode 26 treats the
+          # compiled Metal library as nested code and --deep needs it signed.
+          if [ -f "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/default.metallib" ]; then
+            /usr/bin/codesign --force --sign - --timestamp=none \
+              "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}/default.metallib" || true
+          fi
+          /usr/bin/codesign --force --deep --sign - --timestamp=none \
+            "${BUILT_PRODUCTS_DIR}/${WRAPPER_NAME}"

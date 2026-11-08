@@ -239,5 +239,13 @@ jobs:
         id: artifact
         if: always()
         with:
+          name: Duck-ios-app
+          path: ios/build/Build/Products/Debug-iphonesimulator/Duck.app
+
+      - uses: actions/upload-artifact@v4
+        id: artifactzip
+        if: always()
+        with:
           name: Duck-ios-simulator
           path: Duck-ios-simulator.zip
+          if-no-files-found: ignore
