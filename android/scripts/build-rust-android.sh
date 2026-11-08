@@ -11,6 +11,10 @@ if ! command -v cargo-ndk >/dev/null 2>&1; then
   cargo install cargo-ndk --locked
 fi
 
+# cargo-ndk runs `cargo metadata` in the current directory, so it must run
+# inside the Cargo workspace root (`core/`).
+cd "$ROOT/core"
+
 for abi in arm64-v8a x86_64; do
   export MUJOCO_INCLUDE_DIR="$ROOT/android/third_party/mujoco/$abi/include"
   export MUJOCO_LIB_DIR="$ROOT/android/third_party/mujoco/$abi/lib"
@@ -19,7 +23,6 @@ for abi in arm64-v8a x86_64; do
     -t "$abi" \
     -o "$ROOT/android/app/src/main/jniLibs" \
     build \
-    --manifest-path "$ROOT/core/Cargo.toml" \
     -p duck-mobile-core \
     --release \
     --no-default-features \
