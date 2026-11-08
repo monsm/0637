@@ -105,7 +105,8 @@ jobs:
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
           if ! gradle -p android assembleDebug --no-daemon --stacktrace \
             > android-gradle.log 2>&1; then
-            echo "::error::gradle failed — see ci-logs"
+            echo "::error::gradle failed"
+            tail -n 120 android-gradle.log || true
             tail -n 200 android-gradle.log >> "$GITHUB_STEP_SUMMARY" || true
             exit 1
           fi
@@ -114,11 +115,17 @@ jobs:
         if: failure()
         run: |
           mkdir -p ci-logs/android
+          # Overlay the previous logs FIRST: this run's copies must win over
+          # what is already on the branch, not the other way round.
+          git fetch --depth 1 origin ci-logs \
+            && git checkout FETCH_HEAD -- ci-logs || true
           find android/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/android/ \; 2>/dev/null || true
           cp sdk-packages.log ci-logs/android/ 2>/dev/null || true
           cp android-gradle.log ci-logs/android/ 2>/dev/null || true
           {
+            echo "run=${{ github.run_id }}"
+            echo "sha=${{ github.sha }}"
             echo "checkout=${{ steps.checkout.outcome }}"
             echo "java=${{ steps.java.outcome }}"
             echo "sdk=${{ steps.sdk.outcome }}"
@@ -136,10 +143,6 @@ jobs:
           } > ci-logs/android/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
-          # Overlay onto the existing ci-logs branch so the other platform's
-          # logs survive this force-push.
-          git fetch --depth 1 origin ci-logs \
-            && git checkout FETCH_HEAD -- ci-logs || true
           git add -f ci-logs || true
           git commit -m "ci-logs: Android run ${{ github.run_id }} [skip ci]" || true
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"

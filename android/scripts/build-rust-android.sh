@@ -28,8 +28,11 @@ for abi in arm64-v8a x86_64; do
     --no-default-features \
     --features mujoco,onnx-dynamic \
     >"$LOG" 2>&1; then
-    echo "::error::cargo ndk build failed for $abi — see step summary"
-    tail -n 200 "$LOG" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || cat "$LOG"
+    echo "::error::cargo ndk build failed for $abi"
+    # Print the tail to the job log too: the step summary is not reachable
+    # from the API, the job log is.
+    tail -n 120 "$LOG" || cat "$LOG"
+    tail -n 200 "$LOG" >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || true
     exit 1
   fi
 done

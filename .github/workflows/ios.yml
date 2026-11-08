@@ -94,7 +94,8 @@ jobs:
             -derivedDataPath ios/build \
             CODE_SIGNING_ALLOWED=NO \
             build > ios/build/xcodebuild.log 2>&1; then
-            echo "::error::xcodebuild failed — see ci-logs"
+            echo "::error::xcodebuild failed"
+            tail -n 120 ios/build/xcodebuild.log || true
             tail -n 200 ios/build/xcodebuild.log >> "$GITHUB_STEP_SUMMARY" || true
             exit 1
           fi
@@ -103,10 +104,16 @@ jobs:
         if: failure()
         run: |
           mkdir -p ci-logs/ios
+          # Overlay the previous logs FIRST: this run's copies must win over
+          # what is already on the branch, not the other way round.
+          git fetch --depth 1 origin ci-logs \
+            && git checkout FETCH_HEAD -- ci-logs || true
           find ios/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/ios/ \; 2>/dev/null || true
           cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
           {
+            echo "run=${{ github.run_id }}"
+            echo "sha=${{ github.sha }}"
             echo "checkout=${{ steps.checkout.outcome }}"
             echo "upstream=${{ steps.upstream.outcome }}"
             echo "toolchain=${{ steps.toolchain.outcome }}"
@@ -121,10 +128,6 @@ jobs:
           } > ci-logs/ios/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
-          # Overlay onto the existing ci-logs branch so the other platform's
-          # logs survive this force-push.
-          git fetch --depth 1 origin ci-logs \
-            && git checkout FETCH_HEAD -- ci-logs || true
           git add -f ci-logs || true
           git commit -m "ci-logs: iOS run ${{ github.run_id }} [skip ci]" || true
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
