@@ -27,20 +27,22 @@ fn mujoco_libs(libdir: &str) -> Vec<String> {
 /// nothing references their objects, so they would be dropped and scene
 /// loading fails with "no decoder found". Pull the whole archive.
 fn link_mujoco(libdir: &str, apple: bool) {
-    // Whole-archive is spelled differently on each linker family.
+    let libs = mujoco_libs(libdir);
     if apple {
-        println!("cargo:rustc-link-arg=-Wl,-all_load");
-    } else {
-        println!("cargo:rustc-link-arg=-Wl,--whole-archive");
+        // ld64 dropped -all_load/-noall_load pairs; force_load targets one
+        // archive and keeps the dependency archives on-demand.
+        let mujoco_path = format!("{libdir}/libmujoco.a");
+        println!("cargo:rustc-link-arg=-Wl,-force_load,{mujoco_path}");
+        for lib in libs.into_iter().skip(1) {
+            println!("cargo:rustc-link-lib=static={lib}");
+        }
+        return;
     }
-    for lib in mujoco_libs(libdir) {
+    println!("cargo:rustc-link-arg=-Wl,--whole-archive");
+    for lib in libs {
         println!("cargo:rustc-link-lib=static={lib}");
     }
-    if apple {
-        println!("cargo:rustc-link-arg=-Wl,-noall_load");
-    } else {
-        println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
-    }
+    println!("cargo:rustc-link-arg=-Wl,--no-whole-archive");
 }
 
 /// The NDK's per-target sysroot library directory, where `libc++_static.a`
