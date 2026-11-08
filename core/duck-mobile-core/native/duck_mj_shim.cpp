@@ -50,6 +50,7 @@ DuckMj* duck_mj_load_impl(const char* xml_path, char* error, int error_size) {
     DUCK_STAGE("loadXML end");
     if (!m) {
         if (error && error_size > 0) snprintf(error, error_size, "%s", err[0] ? err : "mj_loadXML failed");
+        DUCK_LOG("loadXML failed: %s", err[0] ? err : "(no message)");
         return NULL;
     }
     DUCK_STAGE("makeData begin");
