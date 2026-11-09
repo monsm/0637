@@ -16,11 +16,15 @@ if [ ! -d "$ROOT/policies" ]; then
 fi
 
 rm -rf "$DST"
-mkdir -p "$DST/robot/microduck/assets" "$DST/policies"
+mkdir -p "$DST/robot/microduck/assets" "$DST/policies" "$DST/models"
 cp "$SRC"/*.xml "$DST/robot/microduck/"
 cp "$SRC"/assets/*.stl "$DST/robot/microduck/assets/"
 cp "$ROOT"/policies/*.onnx "$DST/policies/"
 [ -f "$ROOT/policies/manifest.json" ] && cp "$ROOT/policies/manifest.json" "$DST/policies/"
+# The pickup classifier is the one model that is not a policy: robotd ships it
+# with duck-control, not with the policy set.
+PICKUP="$ROOT/upstream/microduck/duck-control/models/pickup_detector.onnx"
+[ -f "$PICKUP" ] && cp "$PICKUP" "$DST/models/pickup_detector.onnx"
 
 echo "staged Android assets"
 du -sh "$DST"

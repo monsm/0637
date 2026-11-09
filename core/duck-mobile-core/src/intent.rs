@@ -18,12 +18,18 @@
 //! No authentication: it binds to the local network for a phone or a desktop
 //! agent. Treat it as a development API, not an internet-facing service.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
+
+/// How long a one-shot route waits for the tick to decide. The loop runs at
+/// 50 Hz, so a live duck answers in 20 ms; the margin is for a slow frame, and
+/// the timeout is what a backgrounded app looks like.
+const ACTION_TIMEOUT: Duration = Duration::from_millis(300);
 
 #[derive(Debug, Clone)]
 pub enum Intent {
@@ -35,7 +41,13 @@ pub enum Intent {
     Sit,
     GroundPick,
     Push([f64; 3]),
+    /// Beak opening, 0..1. The mouth is not part of any policy: on the robot
+    /// it is a client's intent (or the idle yawn), written by the loop.
+    Mouth(f64),
     Reload(String),
+    /// A hand on the duck: hold the trunk at `offset` from where it was picked
+    /// up (`active: false` lets go).
+    Carry([f64; 3], bool),
     /// Time machine: freeze the duck.
     Pause(bool),
     /// Time machine: advance exactly this many 20 ms ticks while paused.
@@ -54,12 +66,30 @@ pub enum Intent {
     DropBranch(String),
     /// Drive one branch, or the original when empty.
     SelectBranch(String),
+    /// Play one of the duck's sounds: greet, chirp, coo, peck, inquire, alarm.
+    Sound(String),
     /// A phone sensor reading (camera, microphone, depth, IMU).
     Sensor(crate::sensors::Reading),
 }
 
+/// An intent with the ticket its client is waiting on.
+#[derive(Debug, Clone)]
+pub struct QueuedIntent {
+    pub id: u64,
+    pub intent: Intent,
+}
+
+struct Commands {
+    items: VecDeque<QueuedIntent>,
+    /// The core's answers, by ticket. Bounded: a route that gave up waiting
+    /// must not grow this map without end.
+    answers: HashMap<u64, Value>,
+    next_id: u64,
+}
+
 pub struct IntentQueue {
-    commands: Mutex<VecDeque<Intent>>,
+    commands: Mutex<Commands>,
+    answered: Condvar,
     state: Mutex<Value>,
     skills: Mutex<Vec<String>>,
     fingerprint: Mutex<String>,
@@ -80,7 +110,12 @@ impl Default for IntentQueue {
 impl IntentQueue {
     pub fn new() -> Self {
         Self {
-            commands: Mutex::new(VecDeque::new()),
+            commands: Mutex::new(Commands {
+                items: VecDeque::new(),
+                answers: HashMap::new(),
+                next_id: 0,
+            }),
+            answered: Condvar::new(),
             state: Mutex::new(json!({
                 "label": "idle",
                 "bringup": 0,
@@ -102,16 +137,76 @@ impl IntentQueue {
         }
     }
 
-    pub fn push(&self, intent: Intent) {
-        self.commands.lock().expect("intent queue").push_back(intent);
+    /// Enqueue an intent; the id is the ticket the core answers.
+    pub fn push(&self, intent: Intent) -> u64 {
+        let mut commands = self.commands.lock().expect("intent queue");
+        commands.next_id += 1;
+        let id = commands.next_id;
+        commands.items.push_back(QueuedIntent { id, intent });
+        id
     }
 
-    pub fn drain(&self) -> Vec<Intent> {
+    pub fn drain(&self) -> Vec<QueuedIntent> {
         self.commands
             .lock()
             .expect("intent queue")
+            .items
             .drain(..)
             .collect()
+    }
+
+    /// The core's answer to one queued intent.
+    pub fn answer(&self, id: u64, result: Value) {
+        let mut commands = self.commands.lock().expect("intent answers");
+        commands.answers.insert(id, result);
+        while commands.answers.len() > 256 {
+            let Some(oldest) = commands.answers.keys().min().copied() else {
+                break;
+            };
+            commands.answers.remove(&oldest);
+        }
+        drop(commands);
+        self.answered.notify_all();
+    }
+
+    /// Wait for the tick that applies `id`. `None` means no tick ran in time —
+    /// the duck may be backgrounded, not broken.
+    pub fn await_result(&self, id: u64, timeout: Duration) -> Option<Value> {
+        let deadline = Instant::now() + timeout;
+        let mut commands = self.commands.lock().expect("intent answers");
+        loop {
+            if let Some(result) = commands.answers.remove(&id) {
+                return Some(result);
+            }
+            let now = Instant::now();
+            if now >= deadline {
+                return None;
+            }
+            let (guard, _) = self
+                .answered
+                .wait_timeout(commands, deadline - now)
+                .expect("intent answers");
+            commands = guard;
+        }
+    }
+
+    /// Enqueue, then answer with what the duck actually did.
+    ///
+    /// One-shot actions are answered after the next tick has decided, so a
+    /// refusal ("a scripted move is already running") reaches the client
+    /// instead of an `ok` that meant nothing more than "the queue took it".
+    /// Control streams (`/twist`, `/head`, `/body`) stay fire-and-forget: a
+    /// 50 Hz stream cannot wait half a tick for every sample, and a twist has
+    /// no decision to report.
+    pub fn request(&self, intent: Intent) -> Value {
+        let id = self.push(intent);
+        self.await_result(id, ACTION_TIMEOUT).unwrap_or_else(|| {
+            json!({
+                "ok": false,
+                "pending": true,
+                "error": "the duck did not answer within 300 ms; is the app running?",
+            })
+        })
     }
 
     pub fn set_state(&self, state: Value) {
@@ -266,57 +361,42 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
                 .as_str()
                 .map(str::to_owned)
                 .unwrap_or_else(|| "branch".to_owned());
-            queue.push(Intent::Fork(label.clone()));
-            Ok(json!({ "ok": true, "label": label }).to_string())
+            Ok(queue.request(Intent::Fork(label)).to_string())
         }
         ("POST", "/branch/drop") => match value["label"].as_str() {
-            Some(label) => {
-                queue.push(Intent::DropBranch(label.to_owned()));
-                Ok(json!({ "ok": true }).to_string())
-            }
+            Some(label) => Ok(queue
+                .request(Intent::DropBranch(label.to_owned()))
+                .to_string()),
             None => Err("missing label"),
         },
         ("POST", "/branch/select") => {
             let label = value["label"].as_str().unwrap_or("").to_owned();
-            queue.push(Intent::SelectBranch(label));
-            Ok(json!({ "ok": true }).to_string())
+            Ok(queue.request(Intent::SelectBranch(label)).to_string())
         }
         ("POST", "/time") => {
             let paused = value["paused"].as_bool();
             let speed = value["speed"].as_f64();
             match (paused, speed) {
                 (Some(paused), _) => {
-                    queue.push(Intent::Pause(paused));
-                    Ok(json!({ "ok": true, "paused": paused }).to_string())
+                    Ok(queue.request(Intent::Pause(paused)).to_string())
                 }
                 (None, Some(speed)) => {
-                    queue.push(Intent::Speed(speed));
-                    Ok(json!({ "ok": true, "speed": speed }).to_string())
+                    Ok(queue.request(Intent::Speed(speed)).to_string())
                 }
                 _ => Err("send {paused:true|false} or {speed:0.05..4}"),
             }
         }
         ("POST", "/step") => {
             let ticks = value["ticks"].as_u64().unwrap_or(1).clamp(1, 500) as u32;
-            queue.push(Intent::Step(ticks));
-            Ok(json!({ "ok": true, "ticks": ticks }).to_string())
+            Ok(queue.request(Intent::Step(ticks)).to_string())
         }
-        ("POST", "/checkpoint") => {
-            queue.push(Intent::Checkpoint);
-            Ok(json!({ "ok": true }).to_string())
-        }
+        ("POST", "/checkpoint") => Ok(queue.request(Intent::Checkpoint).to_string()),
         ("POST", "/restore") => match value["tick"].as_u64() {
-            Some(tick) => {
-                queue.push(Intent::Restore(tick));
-                Ok(json!({ "ok": true, "tick": tick }).to_string())
-            }
+            Some(tick) => Ok(queue.request(Intent::Restore(tick)).to_string()),
             None => Err("missing tick"),
         },
         ("POST", "/seek") => match value["ticks"].as_u64() {
-            Some(ticks) => {
-                queue.push(Intent::Seek(ticks));
-                Ok(json!({ "ok": true, "back": ticks }).to_string())
-            }
+            Some(ticks) => Ok(queue.request(Intent::Seek(ticks)).to_string()),
             None => Err("missing ticks"),
         },
         ("POST", "/twist") => {
@@ -350,19 +430,20 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Ok(json!({ "ok": true }).to_string())
         }
         ("POST", "/skill") => match value["name"].as_str() {
-            Some(name) => {
-                queue.push(Intent::Skill(name.to_owned()));
-                Ok(json!({ "ok": true }).to_string())
-            }
+            Some(name) => Ok(queue.request(Intent::Skill(name.to_owned())).to_string()),
             None => Err("missing name"),
         },
-        ("POST", "/sit") => {
-            queue.push(Intent::Sit);
-            Ok(json!({ "ok": true }).to_string())
-        }
-        ("POST", "/ground_pick") => {
-            queue.push(Intent::GroundPick);
-            Ok(json!({ "ok": true }).to_string())
+        ("POST", "/sit") => Ok(queue.request(Intent::Sit).to_string()),
+        ("POST", "/ground_pick") => Ok(queue.request(Intent::GroundPick).to_string()),
+        // The voice, by tag: `robotctl quack` is a chirp, and the others are
+        // the duck's own vocabulary.
+        ("POST", "/sound") => match value["tag"].as_str() {
+            Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
+            None => Err("missing tag"),
+        },
+        ("POST", "/mouth") => {
+            let open = value["open"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0);
+            Ok(queue.request(Intent::Mouth(open)).to_string())
         }
         ("POST", "/push") => {
             queue.push(Intent::Push([
@@ -373,12 +454,21 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Ok(json!({ "ok": true }).to_string())
         }
         ("POST", "/reload") => match value["dir"].as_str() {
-            Some(dir) => {
-                queue.push(Intent::Reload(dir.to_owned()));
-                Ok(json!({ "ok": true }).to_string())
-            }
+            Some(dir) => Ok(queue.request(Intent::Reload(dir.to_owned())).to_string()),
             None => Err("missing dir"),
         },
+        // A hand on the duck, for the shell's grab gesture and for an agent
+        // that wants to pick the robot up. `dx/dy/dz` are metres from where it
+        // was grabbed; `active:false` sets it down.
+        ("POST", "/carry") => {
+            let offset = [
+                value["dx"].as_f64().unwrap_or(0.0),
+                value["dy"].as_f64().unwrap_or(0.0),
+                value["dz"].as_f64().unwrap_or(0.0),
+            ];
+            let active = value["active"].as_bool().unwrap_or(true);
+            Ok(queue.request(Intent::Carry(offset, active)).to_string())
+        }
         _ => return respond(&mut stream, 404, "Not Found", "{\"ok\":false,\"error\":\"not found\"}"),
     };
 
@@ -444,7 +534,7 @@ mod tests {
 
         let intents = queue.drain();
         assert_eq!(intents.len(), 1);
-        match &intents[0] {
+        match &intents[0].intent {
             Intent::Twist(twist) => assert_eq!(*twist, [0.4, 0.0, 0.2]),
             other => panic!("unexpected intent: {other:?}"),
         }
@@ -463,5 +553,51 @@ mod tests {
         start_listener(listener, queue);
         let response = request(port, "GET", "/nope", "");
         assert!(response.starts_with("HTTP/1.1 404"), "{response}");
+    }
+
+    /// A one-shot route answers with the tick's verdict, not "the queue took
+    /// it": a client that asks for a skill while another is running must learn
+    /// that it was refused.
+    #[test]
+    fn a_one_shot_route_answers_with_what_the_tick_decided() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        start_listener(listener, queue.clone());
+
+        // The duck's side of the conversation: take the request, answer it.
+        let worker = {
+            let queue = queue.clone();
+            std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while Instant::now() < deadline {
+                    let queued = queue.drain();
+                    for item in queued {
+                        let answer = match item.intent {
+                            Intent::Skill(name) => {
+                                json!({ "ok": false, "error": format!("no such skill: {name}") })
+                            }
+                            _ => json!({ "ok": true }),
+                        };
+                        queue.answer(item.id, answer);
+                    }
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            })
+        };
+
+        let response = request(port, "POST", "/skill", r#"{"name":"fly"}"#);
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("no such skill"), "{response}");
+        let _ = worker.join();
+    }
+
+    /// A route whose tick never runs says so instead of pretending success.
+    #[test]
+    fn a_silent_core_is_reported_as_pending() {
+        let queue = IntentQueue::new();
+        let result = queue.request(Intent::Sit);
+        assert_eq!(result["ok"], json!(false));
+        assert_eq!(result["pending"], json!(true));
     }
 }

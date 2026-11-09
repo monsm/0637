@@ -89,6 +89,8 @@ double duck_mj_external_torque(DuckMj* h, int dof);
 double duck_mj_actuator_torque(DuckMj* h, int dof);
 void duck_mj_set_ctrl(DuckMj* h, int actuator, double value);
 void duck_mj_set_trunk_velocity(DuckMj* h, double vx, double vy, double vz);
+/* A hand's force on the trunk, world frame, in newtons. Held until cleared. */
+void duck_mj_set_trunk_force(DuckMj* h, double fx, double fy, double fz);
 void duck_mj_set_const(DuckMj* h);
 void duck_mj_reset(DuckMj* h);
 void duck_mj_reset_keyframe(DuckMj* h, int key);

@@ -21,6 +21,17 @@ final class DuckController: ObservableObject {
     /// Shown in the status panel; the UI test reads it to verify the buttons.
     @Published var label = "idle"
     @Published var joystick = CGPoint.zero
+    /// A hand is holding the duck: drags move the body, not the gait.
+    @Published var carrying = false
+    /// The pickup classifier says a hand has it.
+    @Published var pickedUp = false
+    /// The orientation filter has converged; before that the duck holds still.
+    @Published var imuReady = false
+    @Published var mouth: Double = 0
+    /// The scene has a mouth joint. The official walking scene does not, so
+    /// the sheet does not claim a beak the duck cannot move.
+    @Published var hasMouth = false
+    @Published var volts: Double = 0
     @Published var trunk = SIMD3<Float>(0, 0, 0.12)
     @Published var gravity = SIMD3<Float>(0, 0, -1)
     /// The time machine, as the shell shows it.
@@ -44,6 +55,8 @@ final class DuckController: ObservableObject {
     private var policyDirectory = ""
     private let motion = CMMotionManager()
     private var lastPush = Date.distantPast
+    /// The duck's own voice: the core decides when, this owns the speaker.
+    let voice = Voice()
 
     /// The renderer's triangle soups, built on the worker queue before the
     /// first frame, keyed by MuJoCo mesh id.
@@ -113,8 +126,17 @@ final class DuckController: ObservableObject {
             self.meshVertices = meshes
             self.ready = true
             NSLog("duck: core created")
+            // The pickup classifier: the duck pauses its policy in a hand for
+            // the same reason the physical one does.
+            let pickup = resourceURL
+                .appendingPathComponent("DuckResources/models/pickup_detector.onnx").path
+            let pickupLoaded = pickup.withCString { pointer in
+                duck_core_load_pickup(created, pointer)
+            }
+            NSLog("duck: pickup detector -> %d", pickupLoaded)
             let port = duck_core_start_intent_server(created, 8765)
             NSLog("duck: intent server -> %d", port)
+            self.voice.start(core: created)
             self.startTimer()
             self.startMotion()
             self.refreshDetails()
@@ -376,6 +398,11 @@ final class DuckController: ObservableObject {
                     guard let base = raw.baseAddress else { return "" }
                     return String(cString: base.assumingMemoryBound(to: CChar.self))
                 }
+                imuReady = status.imu_ready != 0
+                pickedUp = status.picked_up != 0
+                mouth = status.mouth
+                volts = status.volts
+                hasMouth = status.has_mouth != 0
             }
             lastStatus = Date()
             refreshClock()
@@ -387,11 +414,36 @@ final class DuckController: ObservableObject {
         _ = duck_core_sit_toggle(core)
     }
 
+    /// Pick the duck up where it stands. The hand's anchor is where the trunk
+    /// is at this instant; `carry(dx:dy:dz:)` moves it from there.
+    func grab() {
+        guard let core else { return }
+        carrying = true
+        joystick = .zero
+        duck_core_carry(core, 0, 0, 0, 1)
+    }
+
+    /// Set it down. The duck drops the last few centimetres, lands, and the
+    /// policy takes it back — through the pickup classifier, not a flag.
+    func release() {
+        guard let core else { return }
+        carrying = false
+        duck_core_carry(core, 0, 0, 0, 0)
+    }
+
+    func carry(dx: Double, dy: Double, dz: Double) {
+        guard let core, carrying else { return }
+        duck_core_carry(core, dx, dy, dz, 1)
+    }
+
     func groundPick() {
         guard let core else { return }
         _ = duck_core_ground_pick(core)
     }
 
+    /// One verb from the skill ring. `sit`, `stand` and `ground_pick` are the
+    /// loop's own; the rest are manifest skills, and the core refuses an
+    /// unknown name rather than pretending it started.
     func trigger(_ name: String) {
         guard let core else { return }
         name.withCString { _ = duck_core_trigger_skill(core, $0) }

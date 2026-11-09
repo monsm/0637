@@ -189,10 +189,36 @@ esac
 # roller-mode policy and the manifest's mode filter keeps it out.
 SKILLS=$(api GET /skills || true)
 echo "$SKILLS" | tee "$OUT/skills.json" > /dev/null
-for name in roulade kick_left kick_right; do
+# The three one-shots, plus the loop's own verbs. `/skills` is what a client
+# discovers, so `sit`, `stand` and `ground_pick` have to be on it: a verb the
+# list does not name is one nobody can find.
+for name in roulade kick_left kick_right sit stand ground_pick; do
   state_has "$SKILLS" "\"$name\""
   check $? "skill listed: $name" "$SKILLS"
 done
+
+# An action route answers with the tick's verdict. A skill that does not exist
+# is refused in words, not accepted and dropped.
+REFUSED=$(api POST /skill '{"name":"fly"}' || true)
+echo "$REFUSED" | tee "$OUT/skill-refused.json" > /dev/null
+printf '%s' "$REFUSED" | grep -q '"ok":false'
+check $? "an unknown skill is refused, not accepted" "$(printf '%s' "$REFUSED" | head -c 120)"
+printf '%s' "$REFUSED" | grep -q 'no such skill'
+check $? "the refusal names the reason" "$(printf '%s' "$REFUSED" | head -c 120)"
+
+# The duck's own proprioception, which /state never published before: the
+# measured joints, the commanded targets and the IMU.
+PROPRIO=$(api GET /state || true)
+printf '%s' "$PROPRIO" | grep -q '"proprioception"'
+check $? "state publishes the duck's proprioception" ""
+printf '%s' "$PROPRIO" | grep -q '"positions"'
+check $? "measured joint positions are published" ""
+printf '%s' "$PROPRIO" | grep -q '"targets"'
+check $? "commanded joint targets are published" ""
+printf '%s' "$PROPRIO" | grep -q '"imu_ready":true'
+check $? "the IMU reports warm once the loop is driving" ""
+printf '%s' "$PROPRIO" | grep -q '"mouth"'
+check $? "the beak is published" ""
 
 # ---------------------------------------------------------------- provenance
 # The build proves which scene, meshes and policies it is running.
@@ -269,6 +295,67 @@ api POST /head '{"neck":0.2,"head":0.1,"yaw":0.3,"roll":0.0}' > /dev/null
 check $? "head command accepted" ""
 api POST /body '{"z":0.0,"roll":0.05,"pitch":0.05}' > /dev/null
 check $? "body command accepted" ""
+
+# ---------------------------------------------------------------- voice
+# The duck's voice is the robot's own synth, compiled into the core. A sound
+# request is answered by the tick, and the sound is rendered to PCM — not a
+# sample file, so there is nothing to ship and nothing to go missing.
+echo "--- voice ---"
+SOUND=$(api POST /sound '{"tag":"chirp"}' || true)
+echo "$SOUND" | tee "$OUT/sound.json" > /dev/null
+printf '%s' "$SOUND" | grep -q '"ok":true'
+check $? "the duck can be asked to chirp" "$(printf '%s' "$SOUND" | head -c 100)"
+BOGUS=$(api POST /sound '{"tag":"bark"}' || true)
+printf '%s' "$BOGUS" | grep -q '"ok":false'
+check $? "an unknown sound is refused" "$(printf '%s' "$BOGUS" | head -c 100)"
+VOICE=$(api POST /mcp '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"duck_sound","arguments":{"tag":"greet"}}}' || true)
+printf '%s' "$VOICE" | grep -q '"ok":true'
+check $? "MCP duck_sound plays the voice" "$(printf '%s' "$VOICE" | head -c 120)"
+
+# ---------------------------------------------------------------- beak
+# The real duck has a mouth servo (34) and no policy drives it. The official
+# walking scene drops the joint entirely — the same scene the training stack
+# and `duck-sim` run — so the honest answer here is a refusal that names why,
+# not an `ok` for a joint that does not exist. `/state` says which it is.
+echo "--- beak ---"
+BEAK=$(api POST /mouth '{"open":1.0}' || true)
+echo "$BEAK" | tee "$OUT/beak.json" > /dev/null
+HAS_MOUTH=$(api GET /state | python3 -c "
+import json,sys
+print(json.load(sys.stdin)['proprioception'].get('has_mouth'))
+" 2>/dev/null || echo "")
+if [ "$HAS_MOUTH" = "True" ]; then
+  printf '%s' "$BEAK" | grep -q '"ok":true'
+  check $? "the beak takes an intent" "$(printf '%s' "$BEAK" | head -c 100)"
+else
+  printf '%s' "$BEAK" | grep -q 'no mouth joint'
+  check $? "a beak intent is refused when the scene has no mouth" "$(printf '%s' "$BEAK" | head -c 120)"
+fi
+printf '%s' "$HAS_MOUTH" | grep -qE 'True|False'
+check $? "the scene says whether it has a beak" "has_mouth=$HAS_MOUTH"
+
+# ---------------------------------------------------------------- carry
+# A hand on the duck is an external force on the trunk, not a joint target.
+# Carrying it must lift the body and leave the policy in charge of nothing.
+echo "--- carry ---"
+TRUNK_FLOOR=$(api GET /state | field trunk)
+CARRY=$(api POST /carry '{"dx":0.0,"dy":0.0,"dz":0.25,"active":true}' || true)
+echo "$CARRY" | tee "$OUT/carry.json" > /dev/null
+printf '%s' "$CARRY" | grep -q '"ok":true'
+check $? "the duck can be picked up" "$(printf '%s' "$CARRY" | head -c 100)"
+sleep 1.2
+TRUNK_HELD=$(api GET /state | field trunk)
+python3 - "$TRUNK_FLOOR" "$TRUNK_HELD" <<'PY' > "$OUT/carry-lift.txt" 2>&1
+import sys
+floor = [float(v) for v in sys.argv[1].split()]
+held = [float(v) for v in sys.argv[2].split()]
+print(f"z {floor[2]:.4f} -> {held[2]:.4f}")
+raise SystemExit(0 if held[2] > floor[2] + 0.03 else 1)
+PY
+check $? "picking it up lifts the body" "$(tail -1 "$OUT/carry-lift.txt")"
+api POST /carry '{"dx":0.0,"dy":0.0,"dz":0.0,"active":false}' > /dev/null
+check $? "the duck can be set down" ""
+sleep 2
 
 # ---------------------------------------------------------------- push
 echo "--- external push ---"

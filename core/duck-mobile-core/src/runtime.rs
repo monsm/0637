@@ -35,6 +35,10 @@ const LIMP_FALL_MAX: Duration = Duration::from_millis(1500);
 const LIMP_FALL_POSE: Duration = Duration::from_millis(600);
 const LIMP_FALL_STILL_RATE: f64 = 1.0;
 const GAIN_POSE: u16 = 160;
+/// `Imu::ready()` upstream: 25 fused quaternion samples. One is decoded per
+/// 50 Hz tick, so the real duck's gate is half a second — and ours must be the
+/// same half second, not a perfect IMU from tick one.
+const IMU_WARMUP_SAMPLES: u64 = 25;
 /// After a limp-fall, drive zero command for this long so velstand can get up.
 /// `SafetyConfig::default().deadman`.
 const DEADMAN: Duration = Duration::from_millis(500);
@@ -221,6 +225,20 @@ impl Bringup {
         }
         Some(target)
     }
+
+    /// A homing ramp that starts and ends at the same pose (the duck boots at
+    /// home). It has nothing to travel, so it can finish the moment the IMU is
+    /// ready rather than holding home statically for two seconds — a biped
+    /// held on position actuators for that long falls.
+    fn homing_is_static(&self) -> bool {
+        match self {
+            Self::Homing { from, to, .. } => from
+                .iter()
+                .zip(to.iter())
+                .all(|(start, end)| (start - end).abs() < 0.1),
+            _ => false,
+        }
+    }
 }
 
 /// One tick's report, for the app layer to render and for tests to assert on.
@@ -231,6 +249,22 @@ pub struct TickReport {
     pub gain: u16,
     pub fallen: bool,
     pub bringup: BringupState,
+    /// What the servos and the IMU actually read this tick — the duck's
+    /// proprioception, not the commands. `/state` has never published it, and a
+    /// client that cannot see the joints cannot tell walking from falling.
+    pub sensors: Sensors,
+    /// False for the first moments after power-on: the real board's filter
+    /// reports a default quaternion until it has fused 25 samples.
+    pub imu_ready: bool,
+    /// Somebody is holding the duck; the policy is paused at the hold pose.
+    pub picked_up: bool,
+    /// The pickup classifier's latest p(held), when it is running.
+    pub p_held: Option<f32>,
+    /// Pack voltage as the servos see it, once a second. `None` before the
+    /// first slow read.
+    pub volts: Option<f64>,
+    /// Beak opening the loop commanded, 0..1 (the idle yawn included).
+    pub mouth: f64,
 }
 
 /// Watching a limping robot for the moment it stops moving.
@@ -307,6 +341,16 @@ pub struct Checkpoint {
     pub last_head_tick: u64,
     pub lease_twist: [f64; 3],
     pub lease_until: Option<u64>,
+    /// Samples the orientation filter had fused at this tick. Rewinding to a
+    /// tick before the filter converged must bring the gate back with it.
+    #[serde(default)]
+    pub imu_samples: u64,
+    /// The pack voltage reported at this tick, if it had been read.
+    #[serde(default)]
+    pub volts: Option<f64>,
+    /// The client's beak intent.
+    #[serde(default)]
+    pub mouth: f64,
 }
 
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
@@ -342,6 +386,29 @@ pub struct DuckRuntime<T: RobotIo> {
     sim_origin: Instant,
     /// The last tick's report, kept so a single step can publish it.
     last: Option<TickReport>,
+    /// Fused orientation samples since power-on. The real IMU's SFLP filter
+    /// reports a default quaternion until it has produced 25 of them, so a
+    /// policy started sooner would be reading an orientation that is not a
+    /// measurement.
+    imu_samples: u64,
+    /// `robotd`'s pickup watch: pause the walking networks while held.
+    pickup: Option<crate::pickup::Watch>,
+    /// Where the detector loads from, so a fork can build its own watch.
+    pickup_model: Option<std::path::PathBuf>,
+    /// A hand on the duck: (anchor at grab, offset). The force is applied to
+    /// the body, never to a joint.
+    carry: Option<([f64; 3], [f64; 3])>,
+    /// The client's beak intent, 0..1, exactly `robotd`'s `Snapshot::mouth`.
+    mouth: f64,
+    /// The duck's voice. `robotd` quacks once as the loop comes up, chirps on
+    /// the mode cue and pecks before the servos go quiet; the same here.
+    voice: crate::voice::Voice,
+    /// Sounds the shell has not played yet, oldest first: (tag, PCM at
+    /// [`crate::synth::SR`]). The core renders; the platform owns the speaker.
+    sounds: std::collections::VecDeque<String>,
+    /// The slow-sensor voltage, refreshed once a second as `robotd` does.
+    volts: Option<f64>,
+    slow_ticks: u32,
     dt: Duration,
 }
 
@@ -374,8 +441,125 @@ impl<T: RobotIo> DuckRuntime<T> {
             clock: SimClock::default(),
             sim_origin: Instant::now(),
             last: None,
+            imu_samples: 0,
+            pickup: None,
+            pickup_model: None,
+            carry: None,
+            mouth: 0.0,
+            voice: crate::voice::Voice::new(0xD0C),
+            sounds: std::collections::VecDeque::new(),
+            volts: None,
+            slow_ticks: 0,
             dt: Duration::from_millis(20),
         }
+    }
+
+    /// Load the pickup classifier. A watch that will not load leaves the duck
+    /// walking, exactly as `robotd` treats a missing model: a convenience, not
+    /// a health verdict.
+    pub fn load_pickup(&mut self, model: &std::path::Path) -> Result<(), String> {
+        let params = crate::params::PickupParams {
+            enabled: true,
+            model: Some(model.to_path_buf()),
+            ..Default::default()
+        };
+        let watch = crate::pickup::Watch::build(&params)
+            .ok_or_else(|| format!("pickup detector {} did not load", model.display()))?;
+        self.pickup = Some(watch);
+        self.pickup_model = Some(model.to_path_buf());
+        Ok(())
+    }
+
+    /// Whether the orientation filter has converged. Until it has, the loop
+    /// holds the robot rather than driving it on a default quaternion.
+    pub fn imu_ready(&self) -> bool {
+        self.imu_samples >= IMU_WARMUP_SAMPLES
+    }
+
+    pub fn imu_samples(&self) -> u64 {
+        self.imu_samples
+    }
+
+    /// Somebody is holding the duck: a spring toward `anchor + offset`.
+    ///
+    /// `active` starts a new hold at where the trunk is now; the offset is
+    /// measured from that point, so a finger drag maps one-to-one onto the
+    /// duck however long it is held.
+    pub fn set_carry(&mut self, offset: [f64; 3], active: bool) {
+        if !active {
+            self.carry = None;
+            return;
+        }
+        match &mut self.carry {
+            Some((_, held)) => *held = offset,
+            None => {
+                let anchor = self.safety.io().trunk_position().unwrap_or([0.0; 3]);
+                self.carry = Some((anchor, offset));
+            }
+        }
+    }
+
+    /// Ask for a sound by tag. Unknown tags are dropped rather than invented.
+    pub fn queue_sound(&mut self, tag: &str) {
+        if crate::voice::TAGS.contains(&tag) {
+            self.sounds.push_back(tag.to_owned());
+        }
+    }
+
+    /// The next tag the shell should play, if any.
+    pub fn take_sound(&mut self) -> Option<String> {
+        self.sounds.pop_front()
+    }
+
+    /// Render a tag to PCM, for a platform that wants the samples rather than
+    /// the tag. `None` for an unknown tag.
+    pub fn render_sound(&mut self, tag: &str) -> Option<Vec<f32>> {
+        self.render_tag(tag)
+    }
+
+    pub fn voice_seed(&self) -> u32 {
+        self.voice.seed()
+    }
+
+    /// The voice's personality traits, for a client that wants to know whose
+    /// voice it is listening to.
+    pub fn voice_personality(&self) -> crate::personality::Personality {
+        self.voice.personality()
+    }
+
+    /// Render a sound without queueing it, for the shell's own speaker: the
+    /// core owns the synth so the PCM is the duck's, not a sample.
+    pub fn render_tag(&mut self, tag: &str) -> Option<Vec<f32>> {
+        self.voice.render(tag).map(|(_, pcm)| pcm)
+    }
+
+    /// The beak, 0..1. The idle yawn opens it further, never less.
+    ///
+    /// Refused when the body has no mouth servo: the official walking scene
+    /// drops the joint (no policy drives it), so an accepted intent there
+    /// would be a lie. The physical duck's beak is servo 34.
+    pub fn set_mouth(&mut self, open: f64) -> Result<(), &'static str> {
+        if !self.safety.has_mouth() {
+            return Err("this scene has no mouth joint");
+        }
+        self.mouth = if open.is_finite() { open.clamp(0.0, 1.0) } else { 0.0 };
+        Ok(())
+    }
+
+    pub fn has_mouth(&self) -> bool {
+        self.safety.has_mouth()
+    }
+
+    pub fn carrying(&self) -> bool {
+        self.carry.is_some()
+    }
+
+    pub fn picked_up(&self) -> bool {
+        self.pickup.as_ref().is_some_and(|watch| watch.paused())
+    }
+
+    pub fn p_held(&self) -> Option<f32> {
+        self.pickup.as_ref().and_then(|watch| watch.p_held())
     }
 
     /// Torque on and ramp to home, exactly as `robotd init` does. Reads the pose first, so
@@ -394,11 +578,16 @@ impl<T: RobotIo> DuckRuntime<T> {
             .iter()
             .zip(DEFAULT_POSITION.iter())
             .all(|(current, home)| (current - home).abs() < 0.1);
-        if at_home {
+        if at_home && self.imu_ready() {
             self.bringup = Bringup::Ready;
             self.controller.reset();
             tracing::info!("bring-up: already at home; the policy has the robot");
         } else {
+            // The IMU's own gate: the real duck ramps for two seconds while the
+            // filter converges, so by the time the policy could drive it is
+            // warm. The app's duck is already at home and has no ramp to spend
+            // that time on, so it holds the home pose until the sampler has the
+            // same 25 fused readings.
             self.bringup = Bringup::Homing {
                 from: sensors.positions,
                 since: TickTime::of(&self.clock),
@@ -406,6 +595,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             };
         }
         self.enabled = true;
+        // `robotd`'s greet: one quack as the loop comes up. On a headless board
+        // it is the audible "robotd is running"; here it is the duck waking.
+        self.queue_sound("greet");
         self.twist_fresh = false;
         self.command.twist = [0.0; 3];
         self.twist_ema = [0.0; 3];
@@ -417,6 +609,8 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     /// Torque off and forget the seat/move state.
     pub fn disable(&mut self) -> Result<(), RuntimeError> {
+        // The low "tock" the robot gives before its servos go quiet.
+        self.queue_sound("peck");
         self.safety.set_torque(false)?;
         self.enabled = false;
         self.bringup = Bringup::Limp;
@@ -427,6 +621,12 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.body_active = false;
         self.fall.reset();
         self.limp_fall = LimpFall::Idle;
+        // Torque off means the duck is on its own: a hand still holding the
+        // trunk would be carrying a limp robot around.
+        self.carry = None;
+        if let Some(watch) = self.pickup.as_mut() {
+            let _ = watch.tick(false, None, self.dt);
+        }
         Ok(())
     }
 
@@ -541,6 +741,11 @@ impl<T: RobotIo> DuckRuntime<T> {
             skills,
             self.safety.config(),
         );
+        // Each branch scores its own future; a shared classifier's window would
+        // mix two timelines.
+        if let Some(model) = &self.pickup_model {
+            let _ = fork.load_pickup(model);
+        }
         let checkpoint = self.checkpoint()?;
         if !fork.restore(&checkpoint) {
             return None;
@@ -627,6 +832,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_head_tick: self.last_head_command.0,
             lease_twist: self.api_lease.twist,
             lease_until: self.api_lease.until.map(|until| until.0),
+            imu_samples: self.imu_samples,
+            volts: self.volts,
+            mouth: self.mouth,
         })
     }
 
@@ -690,6 +898,14 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.last_head_command = TickTime(checkpoint.last_head_tick);
         self.api_lease.twist = checkpoint.lease_twist;
         self.api_lease.until = checkpoint.lease_until.map(TickTime);
+        self.imu_samples = checkpoint.imu_samples;
+        self.volts = checkpoint.volts;
+        self.mouth = checkpoint.mouth;
+        // The pickup window is a second of history from a future this duck no
+        // longer had. Forget it rather than score rows against a replay.
+        if let Some(watch) = self.pickup.as_mut() {
+            let _ = watch.tick(false, None, self.dt);
+        }
         true
     }
 
@@ -720,8 +936,32 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.clock.advance(1);
         let now = TickTime::of(&self.clock);
         let sensors: Sensors = self.safety.read()?;
+        // One fused sample per tick, exactly as `Imu::decode` counts them.
+        self.imu_samples = self.imu_samples.saturating_add(1);
         self.safety.observe(&sensors, self.dt);
         let hold = sensors.positions;
+
+        // Pack voltage is a slow read on the robot (about once a second, a
+        // transaction of its own), and it is the only battery measurement the
+        // duck has. Do it on the same cadence rather than every tick.
+        self.slow_ticks = self.slow_ticks.wrapping_add(1);
+        if self.slow_ticks % 50 == 0 {
+            if let Ok(slow) = self.safety.slow_sensors() {
+                self.volts = Some(slow.volts);
+            }
+        }
+
+        // A hand on the duck is an external force on the trunk, refreshed once
+        // per tick and cleared the moment it lets go.
+        match self.carry {
+            Some((anchor, offset)) => self.safety.io_mut().carry(Some(anchor), offset),
+            None => self.safety.io_mut().carry(None, [0.0; 3]),
+        }
+
+        // The IMU's own gate: the real board reports a default quaternion
+        // until its filter has fused 25 samples, and `robotd` will not drive
+        // on it. Before that the duck stands held at home.
+        let warm = self.imu_ready();
 
         let mut report = TickReport {
             label: "held".to_owned(),
@@ -729,6 +969,12 @@ impl<T: RobotIo> DuckRuntime<T> {
             gain: 200,
             fallen: self.safety.fallen(),
             bringup: self.bringup.state(),
+            sensors,
+            imu_ready: self.imu_ready(),
+            picked_up: self.picked_up(),
+            p_held: self.p_held(),
+            volts: self.volts,
+            mouth: 0.0,
         };
 
         match self.bringup {
@@ -739,11 +985,19 @@ impl<T: RobotIo> DuckRuntime<T> {
                 report.label = "limp".to_owned();
                 report.gain = 0;
                 report.targets = hold;
+                if let Some(watch) = self.pickup.as_mut() {
+                    watch.commanded(&hold);
+                }
                 return Ok(report);
             }
             Bringup::Homing { to, .. } => {
                 let target = self.bringup.homing_target(now).unwrap_or(to);
-                let done = self.bringup.homing_target(now).is_none();
+                // The ramp is over when it reaches home *and* the filter has
+                // converged. Homing from home (the app's boot) has no travel,
+                // so it finishes as soon as the IMU is warm.
+                let done = warm
+                    && (self.bringup.homing_target(now).is_none()
+                        || self.bringup.homing_is_static());
                 self.safety.apply(target, hold, 200)?;
                 report.label = if done { "ready" } else { "homing" }.to_owned();
                 report.targets = target;
@@ -752,6 +1006,9 @@ impl<T: RobotIo> DuckRuntime<T> {
                     self.bringup = Bringup::Ready;
                     self.controller.reset();
                     tracing::info!("bring-up: at home pose; the policy has the robot");
+                }
+                if let Some(watch) = self.pickup.as_mut() {
+                    watch.commanded(&target);
                 }
                 return Ok(report);
             }
@@ -770,7 +1027,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         // hand it to the policy. Read from the fall predictor, not the `fallen`
         // verdict: a verdict that waits for the robot to be down cannot make
         // it soft before it lands.
-        let was_driving = self.enabled && matches!(self.bringup, Bringup::Ready);
+        let was_driving = self.enabled && matches!(self.bringup, Bringup::Ready) && warm;
 
         // Abandoned mid-sequence: something else took the robot.
         if !matches!(self.limp_fall, LimpFall::Idle) && !was_driving {
@@ -825,6 +1082,33 @@ impl<T: RobotIo> DuckRuntime<T> {
             }
         }
 
+        // Pick-up detection, robotd's: pause the walking networks while somebody
+        // holds the robot and hand it back when it is on the floor. Only the
+        // policy's own ticks are watched — a skill, a sit, the limp-fall or a
+        // disable owns the robot outright, and the watch lets go of any pause.
+        let mut pickup_paused = false;
+        // Read the loop's own facts before the watch borrows itself mutably.
+        let dt = self.dt;
+        let ready = self.enabled && matches!(self.bringup, Bringup::Ready);
+        let settled = matches!(self.limp_fall, LimpFall::Idle);
+        let free = !self.controller.busy() && !self.controller.is_sitting();
+        if let Some(watch) = self.pickup.as_mut() {
+            let watching = ready && settled && warm && free;
+            match watch.tick(watching, Some(&sensors), dt) {
+                Some(crate::pickup::Edge::Pause) => {
+                    tracing::warn!(p_held = ?watch.p_held(), "picked up - pausing the policy")
+                }
+                Some(crate::pickup::Edge::Resume) if watching => {
+                    tracing::warn!(p_held = ?watch.p_held(), "put down - handing back to the policy")
+                }
+                Some(crate::pickup::Edge::Resume) => {
+                    tracing::warn!("pickup pause released: something else has the robot")
+                }
+                None => {}
+            }
+            pickup_paused = watch.paused();
+        }
+
         // The whole sequence owns the targets: the controller is not stepped.
         match self.limp_fall {
             LimpFall::Idle => {}
@@ -850,6 +1134,19 @@ impl<T: RobotIo> DuckRuntime<T> {
                 report.gain = GAIN_POSE;
                 return Ok(report);
             }
+        }
+
+        // The orientation is still a default, not a measurement: hold the pose,
+        // do not drive. `robotd` gates its whole driving branch on this.
+        if !warm {
+            self.safety.apply(hold, hold, 200)?;
+            report.label = "held".to_owned();
+            report.targets = hold;
+            report.gain = 200;
+            if let Some(watch) = self.pickup.as_mut() {
+                watch.commanded(&hold);
+            }
+            return Ok(report);
         }
 
         let mut command = self.command;
@@ -889,6 +1186,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         // (the policy's head block), exactly as on the real robot.
         let still = self.idle_params.enabled_in(robotd_params::Mode::Walk)
             && was_driving
+            && !pickup_paused
             && matches!(self.limp_fall, LimpFall::Idle)
             && command.twist.iter().all(|value| value.abs() < 1e-3)
             && self.last_head_command.elapsed(now) >= self.idle_head.after()
@@ -911,30 +1209,61 @@ impl<T: RobotIo> DuckRuntime<T> {
             command.body.z += idle.body_z;
         }
 
-        match self
-            .controller
-            .step(
-                &sensors,
-                &command,
-                self.body_active,
-                self.dt.as_secs_f64(),
-                1.0,
-            )
-        {
-            Ok(step) => {
-                self.safety.apply(step.targets, hold, step.gain)?;
-                report.label = step.label.to_string();
-                report.targets = step.targets;
-                report.gain = step.gain;
+        let mut targets = hold;
+        let mut gain = 200;
+        if pickup_paused {
+            // Held in a hand: ramp from the policy's last target to the pause
+            // pose and stay there. The ramp start is the policy's own target,
+            // so letting go does not snap.
+            targets = self.pickup.as_ref().map(|watch| watch.target()).unwrap_or(hold);
+            report.label = "held".to_owned();
+        } else {
+            match self
+                .controller
+                .step(
+                    &sensors,
+                    &command,
+                    self.body_active,
+                    self.dt.as_secs_f64(),
+                    1.0,
+                )
+            {
+                Ok(step) => {
+                    targets = step.targets;
+                    gain = step.gain;
+                    report.label = step.label.to_string();
+                }
+                Err(error) => {
+                    report.label = "held".to_owned();
+                    tracing::warn!(%error, "inference failed; holding the pose");
+                }
             }
-            Err(error) => {
-                self.safety.apply(hold, hold, 200)?;
-                report.label = "held".to_owned();
-                report.gain = 200;
-                tracing::warn!(%error, "inference failed; holding the pose");
-            }
+            // The mouth is not part of any policy — every alpha network skips
+            // it — so the idle yawn is the whole of mouth control, exactly as
+            // it is on the robot. Only while driving: a held or homing duck
+            // keeps the mouth its hold pose gave it.
+            targets[duck_control::model::MOUTH_INDEX] =
+                duck_control::model::mouth_target(self.mouth.max(idle.mouth));
+        }
+        // One write per tick: the body steps inside `apply`, so a second call
+        // would advance the physics twice as fast.
+        self.safety.apply(targets, hold, gain)?;
+        report.targets = targets;
+        report.gain = gain;
+        report.mouth = if pickup_paused {
+            0.0
+        } else {
+            self.mouth.max(idle.mouth)
+        };
+        if let Some(watch) = self.pickup.as_mut() {
+            // The next feature row pairs its reading with this command.
+            watch.commanded(&report.targets);
         }
         report.fallen = self.safety.fallen();
+        report.picked_up = pickup_paused;
+        report.p_held = self.p_held();
+        report.imu_ready = self.imu_ready();
+        report.volts = self.volts;
         Ok(report)
     }
 }

@@ -27,6 +27,7 @@ struct InstrumentSheet: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(Copy.thisDuck)
+                .accessibilityIdentifier("sheet-title")
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
             Spacer()
             Button(Copy.language.rawValue) {
@@ -136,6 +137,14 @@ struct InstrumentSheet: View {
             row(Copy.trunkZ, String(format: "%.4f m", controller.trunk.z))
             row(Copy.gravityZ, String(format: "%.4f", controller.gravity.z))
             row(Copy.branches, "\(controller.branchCount)")
+            row(Copy.imu, controller.imuReady ? Copy.yes : Copy.no)
+            row(Copy.held, controller.pickedUp ? Copy.yes : Copy.no)
+            if controller.hasMouth {
+                row(Copy.mouth, String(format: "%.2f", controller.mouth))
+            }
+            if controller.volts > 0 {
+                row(Copy.battery, String(format: "%.2f V", controller.volts))
+            }
         }
         .padding(14)
         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))

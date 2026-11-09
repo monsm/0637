@@ -10,12 +10,13 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 use jni::objects::{JClass, JString};
-use jni::sys::{jdouble, jdoubleArray, jint, jlong};
+use jni::sys::{jboolean, jdouble, jdoubleArray, jfloatArray, jint, jlong, jstring};
 use jni::JNIEnv;
 
 use crate::ffi::{
-    duck_core_body_count, duck_core_body_pose, duck_core_free, duck_core_geom_count,
-    duck_core_geom_info, duck_core_ground_pick, duck_core_mesh_name, duck_core_mesh_soup,
+    duck_core_body_count, duck_core_next_sound, duck_core_render_sound, duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
+    duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_load_pickup,
+    duck_core_mesh_name, duck_core_mesh_soup,
     duck_core_fork, duck_core_new, duck_core_paused, duck_core_seek, duck_core_set_paused,
     duck_core_set_speed, duck_core_speed, duck_core_step,
     duck_core_push, duck_core_reload_policies, duck_core_render_qpos, duck_core_set_body,
@@ -40,6 +41,13 @@ fn double_array(env: &mut JNIEnv, values: &[f64]) -> jdoubleArray {
 
 fn empty_array(env: &mut JNIEnv) -> jdoubleArray {
     double_array(env, &[])
+}
+
+fn empty_floats(env: &mut JNIEnv) -> jfloatArray {
+    match env.new_float_array(0) {
+        Ok(array) => array.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
 }
 
 unsafe fn core(handle: jlong) -> Option<&'static mut DuckCore> {
@@ -133,6 +141,113 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetBody(
 }
 
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeCarry(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    dx: jdouble,
+    dy: jdouble,
+    dz: jdouble,
+    active: jboolean,
+) {
+    unsafe {
+        duck_core_carry(
+            handle as *mut DuckCore,
+            dx,
+            dy,
+            dz,
+            if active { 1 } else { 0 },
+        )
+    };
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeLoadPickup(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    path: JString,
+) -> jint {
+    let Some(path) = java_string(&mut env, &path) else {
+        return -1;
+    };
+    let Ok(path) = CString::new(path) else {
+        return -1;
+    };
+    unsafe { duck_core_load_pickup(handle as *mut DuckCore, path.as_ptr()) as jint }
+}
+
+/// The next sound the duck wants, as a tag; `null` when none is queued.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeNextSound(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jstring {
+    let pointer = unsafe { duck_core_next_sound(handle as *mut DuckCore) };
+    if pointer.is_null() {
+        return std::ptr::null_mut();
+    }
+    let tag = unsafe { CStr::from_ptr(pointer) };
+    match env.new_string(tag.to_string_lossy()) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// One sound as mono f32 PCM. Returns the samples, or an empty array.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeRenderSound(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    tag: JString,
+) -> jfloatArray {
+    let Some(tag) = java_string(&mut env, &tag) else {
+        return empty_floats(&mut env);
+    };
+    let Ok(tag) = CString::new(tag) else {
+        return empty_floats(&mut env);
+    };
+    let count = unsafe {
+        duck_core_render_sound(handle as *mut DuckCore, tag.as_ptr(), std::ptr::null_mut(), 0)
+    };
+    if count <= 0 {
+        return empty_floats(&mut env);
+    }
+    let mut samples = vec![0.0f32; count as usize];
+    let written = unsafe {
+        duck_core_render_sound(
+            handle as *mut DuckCore,
+            tag.as_ptr(),
+            samples.as_mut_ptr(),
+            count,
+        )
+    };
+    if written <= 0 {
+        return empty_floats(&mut env);
+    }
+    let Ok(array) = env.new_float_array(written) else {
+        return empty_floats(&mut env);
+    };
+    if env
+        .set_float_array_region(&array, 0, &samples[..written as usize])
+        .is_err()
+    {
+        return empty_floats(&mut env);
+    }
+    array.into_raw()
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeVoiceRate(
+    _env: JNIEnv,
+    _class: JClass,
+) -> jint {
+    unsafe { duck_core_voice_rate() as jint }
+}
+
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSkill(
     mut env: JNIEnv,
     _class: JClass,
@@ -218,6 +333,12 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeStatus(
         label: [0; 64],
         trunk: [0.0; 3],
         gravity: [0.0; 3],
+        imu_ready: 0,
+        picked_up: 0,
+        p_held: 0.0,
+        mouth: 0.0,
+        volts: 0.0,
+        has_mouth: 0,
     };
     if unsafe { duck_core_status(handle as *mut DuckCore, &mut status) } != 0 {
         return empty_array(&mut env);
@@ -232,6 +353,12 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeStatus(
         status.gravity[0],
         status.gravity[1],
         status.gravity[2],
+        status.imu_ready as f64,
+        status.picked_up as f64,
+        status.p_held,
+        status.mouth,
+        status.volts,
+        status.has_mouth as f64,
     ];
     double_array(&mut env, &values)
 }

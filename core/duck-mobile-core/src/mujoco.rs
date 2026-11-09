@@ -91,6 +91,7 @@ unsafe extern "C" {
     fn duck_mj_actuator_torque(handle: *mut DuckMj, dof: c_int) -> c_double;
     fn duck_mj_set_ctrl(handle: *mut DuckMj, actuator: c_int, value: c_double);
     fn duck_mj_set_trunk_velocity(handle: *mut DuckMj, vx: c_double, vy: c_double, vz: c_double);
+    fn duck_mj_set_trunk_force(handle: *mut DuckMj, fx: c_double, fy: c_double, fz: c_double);
     fn duck_mj_set_const(handle: *mut DuckMj);
     fn duck_mj_reset(handle: *mut DuckMj);
     fn duck_mj_forward(handle: *mut DuckMj);
@@ -132,6 +133,15 @@ const WIRE_NAMES: [&str; NUM_JOINTS] = [
 const TRUNK_JOINT: &str = "trunk_base_freejoint";
 const HOME_TRUNK_Z: f64 = 0.125;
 const STEPS_PER_TICK: usize = 4;
+
+/// The hand that carries the duck: a spring-damper on the trunk.
+///
+/// Stiff enough to hold 0.77 kg against gravity with a few millimetres of sag
+/// (mg/k ≈ 2 cm at 350 N/m is too soft; 800 N/m sags 9 mm), damped at critical
+/// for that mass, and capped well above the weight so a drag still feels direct.
+const CARRY_STIFFNESS: f64 = 800.0;
+const CARRY_DAMPING: f64 = 50.0;
+const CARRY_MAX_FORCE: f64 = 60.0;
 
 /// One renderable geom, as the app's Metal renderer needs it.
 #[derive(Debug, Clone, Copy)]
@@ -822,8 +832,15 @@ impl RobotIo for MujocoIo {
         true
     }
 
-    fn push(&mut self, velocity: [f64; 3]) -> Result<()> {
-        unsafe {
+    fn has_mouth(&self) -> bool {
+        self.wire_actuator[duck_control::model::MOUTH_INDEX].is_some()
+    }
+
+    fn trunk_position(&self) -> Option<[f64; 3]> {
+        Some(self.trunk())
+    }
+
+    fn push(&mut self, velocity: [f64; 3]) -> Result<()> {        unsafe {
             duck_mj_set_trunk_velocity(
                 self.handle,
                 velocity[0],
@@ -832,6 +849,44 @@ impl RobotIo for MujocoIo {
             );
         }
         Ok(())
+    }
+
+    /// A hand holding the duck: a spring-damper toward `anchor + offset`.
+    ///
+    /// This is an external force (MuJoCo's `xfrc_applied`), not a joint target,
+    /// so the servos still see only what the loop writes. A carry is a real
+    /// manipulation — the pickup classifier reads the same gyro, joints and
+    /// currents it would read if a person lifted the physical duck, which is
+    /// what makes the pause testable rather than scripted.
+    fn carry(&mut self, anchor: Option<[f64; 3]>, offset: [f64; 3]) {
+        let Some(anchor) = anchor else {
+            unsafe { duck_mj_set_trunk_force(self.handle, 0.0, 0.0, 0.0) };
+            return;
+        };
+        let target = [
+            anchor[0] + offset[0],
+            anchor[1] + offset[1],
+            (anchor[2] + offset[2]).max(0.045),
+        ];
+        let qpos = unsafe { slice::from_raw_parts(duck_mj_qpos(self.handle), self.nq) };
+        let qvel = unsafe { slice::from_raw_parts(duck_mj_qvel(self.handle), self.nv) };
+        let mut force = [0.0; 3];
+        for axis in 0..3 {
+            let position = qpos[self.trunk_qpos + axis];
+            let velocity = qvel[self.trunk_dof + axis];
+            force[axis] = CARRY_STIFFNESS * (target[axis] - position)
+                - CARRY_DAMPING * velocity;
+        }
+        // A hand is strong but not a rigid weld; with the duck's 0.77 kg, 60 N is
+        // already far past any acceleration a person would impart.
+        let magnitude = force.iter().map(|value| value * value).sum::<f64>().sqrt();
+        if magnitude > CARRY_MAX_FORCE {
+            let scale = CARRY_MAX_FORCE / magnitude;
+            for value in &mut force {
+                *value *= scale;
+            }
+        }
+        unsafe { duck_mj_set_trunk_force(self.handle, force[0], force[1], force[2]) };
     }
 
     fn measures_load(&self) -> bool {
@@ -890,9 +945,21 @@ impl RobotIo for MujocoIo {
     }
 
     fn slow_sensors(&mut self) -> Result<SlowSensors> {
+        // The servos see the pack through their own load: the BAM model already
+        // computes that terminal voltage (`vin - drop x |torque|`, floored at
+        // the M6's minimum), so report it rather than a nominal 7.4 V. A
+        // walking duck reads a sagging pack, standing still does not — which is
+        // what the real robot's battery percentage does.
+        let volts = match &self.bam {
+            Some(bam) => bam.model.vin_effective(&bam.previous_torque),
+            None => 7.4,
+        };
+        // No thermal model exists in the training stack, so the case
+        // temperature is ambient. Inventing a rise from current would be a
+        // number nobody could calibrate against the real duck.
         Ok(SlowSensors {
-            volts: 7.4,
-            temps_c: [32.0; NUM_JOINTS],
+            volts,
+            temps_c: [25.0; NUM_JOINTS],
         })
     }
 }

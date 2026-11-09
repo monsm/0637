@@ -73,7 +73,31 @@ if [ -z "$STATE" ]; then
   exit 1
 fi
 echo "$STATE" | tee intent-state.json
-curl -sf --max-time 5 http://127.0.0.1:8765/skills | tee intent-skills.json || true
+SKILLS=$(curl -sf --max-time 5 http://127.0.0.1:8765/skills || true)
+echo "$SKILLS" | tee intent-skills.json > /dev/null
+# The verbs a client can discover: the manifest's one-shots and the loop's
+# own. A verb `/skills` does not name is one nobody can find.
+for name in sit stand ground_pick; do
+  if ! echo "$SKILLS" | grep -q "\"$name\""; then
+    echo "::error::/skills does not list $name"
+    exit 1
+  fi
+done
+# The duck's own senses reach the API, not just its commands.
+for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"'; do
+  if ! echo "$STATE" | grep -q "$needle"; then
+    echo "::error::/state does not publish $needle"
+    exit 1
+  fi
+done
+# A one-shot answers with the tick's verdict: an unknown skill is refused in
+# words rather than accepted and dropped.
+REFUSED=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"name":"fly"}' http://127.0.0.1:8765/skill || true)
+echo "$REFUSED" | tee intent-skill-refused.json > /dev/null
+if ! echo "$REFUSED" | grep -q '"ok":false'; then
+  echo "::error::an unknown skill was accepted: $REFUSED"
+  exit 1
+fi
 
 # The build proves which scene, meshes and policies it is running.
 FINGERPRINT=$(curl -sf --max-time 5 http://127.0.0.1:8765/fingerprint || true)
@@ -83,6 +107,19 @@ if ! echo "$FINGERPRINT" | grep -qE '"fingerprint":"[0-9a-f]{64}"'; then
   exit 1
 fi
 echo "fingerprint: $(echo "$FINGERPRINT" | grep -oE '"fingerprint":"[0-9a-f]{64}"')"
+
+# The voice is the robot's own synth in the core: a sound request is answered
+# by the tick, and an unknown tag is refused rather than silently dropped.
+SOUND=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"tag":"chirp"}' http://127.0.0.1:8765/sound || true)
+echo "$SOUND" | tee intent-sound.json > /dev/null
+if ! echo "$SOUND" | grep -q '"ok":true'; then
+  echo "::error::the duck cannot be asked to chirp: $SOUND"
+  exit 1
+fi
+if curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"tag":"bark"}' http://127.0.0.1:8765/sound | grep -q '"ok":true'; then
+  echo "::error::an unknown sound was accepted"
+  exit 1
+fi
 
 # Drive the duck through its own intent API, the way an external agent
 # would: the API holds the duck for a lease, so keep the twist coming.

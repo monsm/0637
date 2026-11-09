@@ -78,8 +78,10 @@ final class DuckUITests: XCTestCase {
         let time = app.buttons["duck-time"]
         XCTAssertTrue(time.waitForExistence(timeout: 10), "the time button is missing")
         time.tap()
+        // The sheet's own title, by identifier: the visible text changes with
+        // the language, and the test must not depend on which one is saved.
         XCTAssertTrue(
-            app.staticTexts["This duck"].waitForExistence(timeout: 10),
+            app.staticTexts["sheet-title"].waitForExistence(timeout: 10),
             "the instrument sheet did not open"
         )
         let freeze = app.buttons["time-pause.fill"]

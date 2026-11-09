@@ -42,6 +42,10 @@ enum Copy {
     static var viewfinder: String { pick("VIEWFINDER", "取景器") }
     static var sit: String { pick("sit", "坐下") }
     static var pickUp: String { pick("pick", "抓取") }
+    static var grab: String { pick("Hold", "拎起") }
+    static var putDown: String { pick("Drop", "放下") }
+    static var held: String { pick("in a hand", "在手里") }
+    static var quack: String { pick("Quack", "叫一声") }
 
     // Instrument sheet
     static var thisDuck: String { pick("This duck", "这只鸭子") }
@@ -57,6 +61,9 @@ enum Copy {
     static var fallen: String { pick("fallen", "已摔倒") }
     static var trunkZ: String { pick("trunk z", "躯干高度") }
     static var gravityZ: String { pick("gravity z", "重力 z") }
+    static var imu: String { pick("IMU warm", "IMU 预热") }
+    static var mouth: String { pick("beak", "嘴") }
+    static var battery: String { pick("pack", "电池") }
     static var branches: String { pick("branches", "分叉数") }
     static var yes: String { pick("yes", "是") }
     static var no: String { pick("no", "否") }

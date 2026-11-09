@@ -77,6 +77,26 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_sound",
+            "description": "Make the duck's voice: greet, chirp, coo, peck, inquire or alarm. Rendered by the robot's own synth, so it sounds like the duck and not like a sample.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "tag": { "type": "string" } },
+                "required": ["tag"],
+                "additionalProperties": false
+            }
+        },
+        {
+            "name": "duck_mouth",
+            "description": "Open or close the beak, 0..1. The mouth is not part of any policy; the idle yawn only ever opens it further.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "open": { "type": "number" } },
+                "required": ["open"],
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "duck_sensors",
             "description": "The phone's latest camera, microphone, depth and IMU readings, tagged with the mode they were taken in. None of them is part of the duck's own observation.",
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
@@ -185,28 +205,23 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
                 number(arguments, "vy").clamp(-0.4, 0.4),
                 number(arguments, "wz").clamp(-1.5, 1.5),
             ]));
-            Ok(json!({ "ok": true }))
+            Ok(json!({ "ok": true, "stream": true }))
         }
         "duck_stop" => {
             queue.push(crate::intent::Intent::Twist([0.0; 3]));
-            Ok(json!({ "ok": true }))
+            Ok(json!({ "ok": true, "stream": true }))
         }
         "duck_skill" => {
             let skill = arguments
                 .get("name")
                 .and_then(Value::as_str)
                 .ok_or("missing name")?;
-            queue.push(crate::intent::Intent::Skill(skill.to_owned()));
-            Ok(json!({ "ok": true, "skill": skill }))
+            // The tool answers what the duck did, not what the queue took: a
+            // refusal is the useful half of a skill call.
+            Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
         }
-        "duck_sit" => {
-            queue.push(crate::intent::Intent::Sit);
-            Ok(json!({ "ok": true }))
-        }
-        "duck_ground_pick" => {
-            queue.push(crate::intent::Intent::GroundPick);
-            Ok(json!({ "ok": true }))
-        }
+        "duck_sit" => Ok(queue.request(crate::intent::Intent::Sit)),
+        "duck_ground_pick" => Ok(queue.request(crate::intent::Intent::GroundPick)),
         "duck_head" => {
             queue.push(crate::intent::Intent::Head([
                 number(arguments, "neck"),
@@ -214,7 +229,18 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
                 number(arguments, "yaw"),
                 number(arguments, "roll"),
             ]));
-            Ok(json!({ "ok": true }))
+            Ok(json!({ "ok": true, "stream": true }))
+        }
+        "duck_sound" => {
+            let tag = arguments
+                .get("tag")
+                .and_then(Value::as_str)
+                .ok_or("missing tag")?;
+            Ok(queue.request(crate::intent::Intent::Sound(tag.to_owned())))
+        }
+        "duck_mouth" => {
+            let open = number(arguments, "open").clamp(0.0, 1.0);
+            Ok(queue.request(crate::intent::Intent::Mouth(open)))
         }
         "duck_sensors" => Ok(serde_json::from_str(&queue.sensors_json()).unwrap_or(json!({}))),
         "duck_provenance" => {
@@ -226,16 +252,14 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
                 .get("paused")
                 .and_then(Value::as_bool)
                 .ok_or("missing paused")?;
-            queue.push(crate::intent::Intent::Pause(paused));
-            Ok(json!({ "ok": true, "paused": paused }))
+            Ok(queue.request(crate::intent::Intent::Pause(paused)))
         }
         "duck_fork" => {
             let label = arguments
                 .get("label")
                 .and_then(Value::as_str)
                 .ok_or("missing label")?;
-            queue.push(crate::intent::Intent::Fork(label.to_owned()));
-            Ok(json!({ "ok": true, "label": label }))
+            Ok(queue.request(crate::intent::Intent::Fork(label.to_owned())))
         }
         other => Err(format!("unknown tool: {other}")),
     }
@@ -275,7 +299,7 @@ mod tests {
         assert!(response.contains("ok\\\":true"), "{response}");
         let intents = queue.drain();
         assert_eq!(intents.len(), 1);
-        match &intents[0] {
+        match &intents[0].intent {
             crate::intent::Intent::Twist(twist) => assert_eq!(twist[0], 0.6),
             other => panic!("unexpected intent: {other:?}"),
         }

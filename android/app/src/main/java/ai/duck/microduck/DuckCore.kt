@@ -59,6 +59,26 @@ class DuckCore(
         if (handle != 0L) nativeSetBody(handle, z, roll, pitch)
     }
 
+    /** A hand on the duck: metres from where it was grabbed; [active] false lets go. */
+    fun carry(dx: Double, dy: Double, dz: Double, active: Boolean) = synchronized(lock) {
+        if (handle != 0L) nativeCarry(handle, dx, dy, dz, active)
+    }
+
+    /** The next sound the duck wants, or null. The platform owns the speaker. */
+    fun nextSound(): String? = synchronized(lock) {
+        if (handle != 0L) nativeNextSound(handle) else null
+    }
+
+    /** One sound as mono f32 PCM at [voiceRate]. */
+    fun renderSound(tag: String): FloatArray = synchronized(lock) {
+        if (handle != 0L) nativeRenderSound(handle, tag) ?: FloatArray(0) else FloatArray(0)
+    }
+
+    /** The pickup classifier `robotd` scores. Returns 0 when it loaded. */
+    fun loadPickup(path: String): Int = synchronized(lock) {
+        if (handle != 0L) nativeLoadPickup(handle, path) else -1
+    }
+
     fun skill(name: String): Int = synchronized(lock) {
         if (handle != 0L) nativeSkill(handle, name) else 0
     }
@@ -84,7 +104,10 @@ class DuckCore(
         if (handle != 0L) nativeReload(handle, target) else -1
     }
 
-    /** [bringup, fallen, gain, trunk x/y/z, gravity x/y/z] */
+    /**
+     * [bringup, fallen, gain, trunk x/y/z, gravity x/y/z, imu_ready, picked_up,
+     * p_held, mouth, volts]
+     */
     fun status(): DoubleArray = synchronized(lock) {
         if (handle != 0L) nativeStatus(handle) ?: DoubleArray(0) else DoubleArray(0)
     }
@@ -139,6 +162,9 @@ class DuckCore(
     }
 
     companion object {
+        /** The voice's sample rate: the robot synth's native 48 kHz. */
+        fun voiceRate(): Int = nativeVoiceRate()
+
         init {
             // ONNX Runtime is loaded dynamically by the Rust core; preload the
             // bundled lib so a bare dlopen("libonnxruntime.so") finds it.
@@ -159,6 +185,11 @@ class DuckCore(
         @JvmStatic private external fun nativeSetTwist(handle: Long, vx: Double, vy: Double, wz: Double)
         @JvmStatic private external fun nativeSetHead(handle: Long, neck: Double, head: Double, yaw: Double, roll: Double)
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
+        @JvmStatic private external fun nativeCarry(handle: Long, dx: Double, dy: Double, dz: Double, active: Boolean)
+        @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
+        @JvmStatic private external fun nativeNextSound(handle: Long): String?
+        @JvmStatic private external fun nativeRenderSound(handle: Long, tag: String): FloatArray?
+        @JvmStatic private external fun nativeVoiceRate(): Int
         @JvmStatic private external fun nativeSkill(handle: Long, name: String): Int
         @JvmStatic private external fun nativeSit(handle: Long): Int
         @JvmStatic private external fun nativeGroundPick(handle: Long): Int
@@ -183,9 +214,14 @@ object AssetStager {
     fun stage(context: android.content.Context): File {
         val root = File(context.filesDir, "duck")
         val marker = File(root, "robot/microduck/scene_backlash.xml")
-        if (marker.exists()) return root
+        val pickup = File(root, "models/pickup_detector.onnx")
+        if (marker.exists() && pickup.exists()) return root
         copy(context, "robot", File(root, "robot"))
         copy(context, "policies", File(root, "policies"))
+        // The pickup classifier ships beside the policies but is not one.
+        if (!context.assets.list("models").isNullOrEmpty()) {
+            copy(context, "models", File(root, "models"))
+        }
         return root
     }
 

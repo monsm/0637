@@ -47,6 +47,7 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
     private var core: DuckCore? = null
     private var loop: DuckLoop? = null
+    private var voice: Voice? = null
     private lateinit var input: DuckInput
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,14 +62,20 @@ class MainActivity : ComponentActivity() {
                         core = created
                         created.startIntentServer(8765)
                         loop = DuckLoop(created, input).also { it.start() }
+                        // The duck's own voice: the core decides when it
+                        // quacks, this owns the speaker.
+                        voice = Voice(created).also { it.start() }
                     },
                     input = input,
+                    onQuack = { voice?.play("chirp") },
                 )
             }
         }
     }
 
     override fun onDestroy() {
+        voice?.stop()
+        voice = null
         loop?.stop()
         loop = null
         core?.close()
@@ -82,6 +89,7 @@ private fun DuckScreen(
     coreProvider: () -> DuckCore?,
     onCoreCreated: (DuckCore) -> Unit,
     input: DuckInput,
+    onQuack: () -> Unit,
 ) {
     val context = LocalContext.current
     var core by remember { mutableStateOf(coreProvider()) }
@@ -97,10 +105,17 @@ private fun DuckScreen(
         val created = withContext(Dispatchers.IO) {
             runCatching {
                 val root = AssetStager.stage(context)
-                DuckCore(
+                val core = DuckCore(
                     File(root, "robot/microduck/scene_backlash.xml").path,
                     File(root, "policies").path,
                 )
+                // The pickup classifier: the duck pauses its policy in a hand
+                // for the same reason the physical one does.
+                val pickup = File(root, "models/pickup_detector.onnx")
+                if (pickup.exists()) {
+                    core.loadPickup(pickup.path)
+                }
+                core
             }
         }
         created.onSuccess { if (it.ready) { onCoreCreated(it); core = it } else { error = "core failed" } }
@@ -131,7 +146,13 @@ private fun DuckScreen(
             )
             // The fused shell owns the chrome: live duck, instrument sheet,
             // viewfinder.
-            Shell(active, skills, input, Modifier.fillMaxSize())
+            Shell(
+                core = active,
+                skills = skills,
+                input = input,
+                quack = onQuack,
+                modifier = Modifier.fillMaxSize(),
+            )
         } else {
             Text(
                 error ?: "Loading MuJoCo + policies…",

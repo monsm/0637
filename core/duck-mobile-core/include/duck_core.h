@@ -15,6 +15,13 @@ typedef struct DuckStatus {
     char label[64];
     double trunk[3];
     double gravity[3];
+    /* The loop's own state, as `robotd` publishes it. */
+    int imu_ready;   /* 0 until the orientation filter has converged */
+    int picked_up;   /* 1 while the pickup classifier says a hand holds it */
+    double p_held;   /* the classifier's latest score, 0 when not running */
+    double mouth;    /* beak opening commanded, 0..1 */
+    double volts;    /* pack voltage, 0 when not read yet */
+    int has_mouth;   /* 1 when the scene has a mouth joint to move */
 } DuckStatus;
 
 DuckCore* duck_core_new(const char* scene_path, const char* policies_dir,
@@ -31,7 +38,12 @@ void duck_core_set_twist(DuckCore* core, double vx, double vy, double wz);
 void duck_core_set_head(DuckCore* core, double neck, double head,
                         double yaw, double roll);
 void duck_core_set_body(DuckCore* core, double z, double roll, double pitch);
+/* A hand on the trunk: metres from where it was grabbed; active 0 lets go. */
+void duck_core_carry(DuckCore* core, double dx, double dy, double dz, int active);
 int duck_core_push(DuckCore* core, double vx, double vy, double vz);
+
+/* The pickup classifier (`pickup_detector.onnx`). 0 on success. */
+int duck_core_load_pickup(DuckCore* core, const char* model_path);
 
 int duck_core_trigger_skill(DuckCore* core, const char* name);
 int duck_core_sit_toggle(DuckCore* core);
@@ -66,6 +78,13 @@ int duck_core_paused(DuckCore* core);
 double duck_core_speed(DuckCore* core);
 unsigned long long duck_core_tick_index(DuckCore* core);
 unsigned long long duck_core_oldest_tick(DuckCore* core);
+
+/* The voice: a tag to play (NULL when nothing is queued), the PCM for a tag
+   at `duck_core_voice_rate()` (48000), and the rate itself. The duck's voice
+   is the robot's own synth, so a platform renders rather than ships samples. */
+const char* duck_core_next_sound(DuckCore* core);
+int duck_core_render_sound(DuckCore* core, const char* tag, float* out, int capacity);
+int duck_core_voice_rate(void);
 
 /* One hash over the scene, meshes, policies and manifest. */
 const char* duck_core_fingerprint(DuckCore* core);

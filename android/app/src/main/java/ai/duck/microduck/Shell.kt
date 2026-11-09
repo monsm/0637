@@ -20,6 +20,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,7 +33,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.abs
+import kotlinx.coroutines.delay
 
 /**
  * The fused shell, the same shape as the iOS one: a live duck first, an
@@ -50,37 +51,52 @@ fun Shell(
     core: DuckCore?,
     skills: List<String>,
     input: DuckInput,
+    quack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var surface by remember { mutableStateOf(Surface.Live) }
     var showRing by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
+    var carrying by remember { mutableStateOf(false) }
     // Flipping this re-renders every Copy string in the shell.
     var languageTick by remember { mutableStateOf(0) }
 
     val _unused = languageTick
     Box(modifier.fillMaxSize()) {
         // Driving: a drag on the scene becomes the twist the real pad sends.
+        // While the duck is held, the same drag moves the hand — a carry is an
+        // external force, and the pickup classifier decides what the policy
+        // does about it.
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(core) {
-                    if (core == null) return@pointerInput
-                    var centre = Offset.Zero
+                .pointerInput(core, carrying) {
+                    val duck = core ?: return@pointerInput
+                    var start = Offset.Zero
                     detectDragGestures(
-                        onDragStart = { centre = it },
+                        onDragStart = { start = it },
                         onDrag = { change, _ ->
                             change.consume()
                             val width = size.width.toFloat().coerceAtLeast(1f)
                             val height = size.height.toFloat().coerceAtLeast(1f)
+                            if (carrying) {
+                                val dx = (change.position.x - start.x) / (width * 0.5f)
+                                val dy = (change.position.y - start.y) / (height * 0.5f)
+                                duck.carry(dx * 0.35, 0.0, -dy * 0.30, true)
+                                return@detectDragGestures
+                            }
                             val dx = (change.position.x - width * 0.5f) / (width * 0.5f)
                             val dy = (change.position.y - height * 0.52f) / (height * 0.5f)
-                            val forward = maxOf(0f, -dy)
-                            input.vx = deadzone(forward) * 0.4
-                            input.wz = -deadzone(dx) * 1.0
+                            val forward = -dy
+                            input.vx = deadzone(forward.toFloat()).toDouble() * 0.4
+                            input.wz = -deadzone(dx.toFloat()).toDouble() * 1.0
                         },
-                        onDragEnd = { input.vx = 0.0; input.wz = 0.0 },
-                        onDragCancel = { input.vx = 0.0; input.wz = 0.0 },
+                        onDragEnd = {
+                            if (!carrying) { input.vx = 0.0; input.wz = 0.0 }
+                        },
+                        onDragCancel = {
+                            if (!carrying) { input.vx = 0.0; input.wz = 0.0 }
+                        },
                     )
                 },
         )
@@ -101,7 +117,12 @@ fun Shell(
             Column {
                 Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold)
                 Text(
-                    core?.let { if (it.paused()) Copy.freeze else Copy.live } ?: Copy.waking,
+                    when {
+                        core == null -> Copy.waking
+                        carrying -> Copy.held
+                        core.paused() -> Copy.freeze
+                        else -> Copy.live
+                    },
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 12.sp,
                 )
@@ -128,6 +149,13 @@ fun Shell(
         ) {
             RoundChip(Copy.time) { showSheet = true }
             RoundChip(Copy.skills) { showRing = true }
+            core?.let { duck ->
+                RoundChip(Copy.quack) { quack?.invoke() }
+                RoundChip(if (carrying) Copy.putDown else Copy.grab) {
+                    carrying = !carrying
+                    if (carrying) duck.carry(0.0, 0.0, 0.0, true) else duck.carry(0.0, 0.0, 0.0, false)
+                }
+            }
         }
 
         if (showRing && core != null) {
@@ -259,12 +287,34 @@ private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var paused by remember { mutableStateOf(core.paused()) }
     var speed by remember { mutableStateOf(core.speed()) }
-    var tick by remember { mutableStateOf(0L) }
     var branches by remember { mutableStateOf(0) }
+    // The duck's own state, sampled while the sheet is up: /state publishes the
+    // same numbers for a client, so what the sheet shows is what the API says.
+    var status by remember { mutableStateOf(core.status()) }
+    LaunchedEffect(core) {
+        while (true) {
+            status = core.status()
+            delay(200)
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(Copy.thisDuck, color = Color.White, fontWeight = FontWeight.SemiBold)
+            if (status.size >= 14) {
+                Text(
+                    buildString {
+                        append(Copy.bringup(status[0].toInt()))
+                        append(" · ")
+                        append(if (status[9] > 0.5) "IMU warm" else "IMU warming")
+                        append(" · beak ${"%.2f".format(status[11])}")
+                        if (status[10] > 0.5) append(" · in a hand")
+                        if (status[13] > 0.0) append(" · pack ${"%.2f".format(status[13])} V")
+                    },
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 11.sp,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(if (paused) Copy.resume else Copy.freeze) {
                     paused = !paused

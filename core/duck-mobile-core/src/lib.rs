@@ -20,6 +20,8 @@ pub mod intent;
 pub mod io;
 pub mod manifest;
 pub mod mcp;
+pub mod params;
+pub mod pickup;
 pub mod provenance;
 #[cfg(feature = "mujoco")]
 pub mod ffi;
@@ -27,6 +29,45 @@ pub mod ffi;
 pub mod mujoco;
 pub mod runtime;
 pub mod sensors;
+pub mod voice;
+
+// The robot's voice synth, compiled verbatim. `sounds/` is a crate of pure
+// Rust modules that address each other as `crate::rng`, `crate::synth`, …,
+// so they have to sit at *this* crate's root to link unchanged. Reusing the
+// files (rather than copying the recipes) is what makes the digital duck's
+// quack the same quack.
+#[path = "../../../upstream/microduck/sounds/src/rng.rs"]
+pub mod rng;
+#[path = "../../../upstream/microduck/sounds/src/personality.rs"]
+pub mod personality;
+#[path = "../../../upstream/microduck/sounds/src/synth.rs"]
+pub mod synth;
+#[path = "../../../upstream/microduck/sounds/src/voices.rs"]
+pub mod voices;
+
+/// Every voice tag and its recipe — `sounds/src/lib.rs`'s table, which the
+/// verbatim `voices.rs` addresses as `crate::TAGS` from its own tests.
+pub type Recipe = fn(&personality::Personality, u32) -> Vec<f32>;
+
+pub const TAGS: [(&str, Recipe); 7] = [
+    ("alarm", voices::alarm),
+    ("greet", voices::greet),
+    ("inquire", voices::inquire),
+    ("peck", voices::peck),
+    ("chirp", voices::chirp),
+    ("coo", voices::coo),
+    ("wheee", voices::wheee),
+];
+
+/// How many variants each tag gets, from `sounds::variant_count`: more
+/// variants directly means a more organic-feeling duck.
+pub fn variant_count(tag: &str) -> u32 {
+    match tag {
+        "greet" | "chirp" => 12,
+        "wheee" => 6,
+        _ => 10,
+    }
+}
 
 #[cfg(all(target_os = "android", feature = "mujoco"))]
 pub mod jni;

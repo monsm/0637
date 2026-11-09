@@ -302,6 +302,16 @@ void duck_mj_set_trunk_velocity(DuckMj* h, double vx, double vy, double vz) {
     h->d->qvel[dof + 2] = vz;
 }
 
+/* xfrc_applied is world-frame force on a body. The hand is modelled as a
+   spring outside; this only carries the number into the physics. */
+void duck_mj_set_trunk_force(DuckMj* h, double fx, double fy, double fz) {
+    int body = mj_name2id(h->m, mjOBJ_BODY, "trunk_base");
+    if (body < 0) return;
+    h->d->xfrc_applied[body * 6 + 0] = fx;
+    h->d->xfrc_applied[body * 6 + 1] = fy;
+    h->d->xfrc_applied[body * 6 + 2] = fz;
+}
+
 void duck_mj_set_const(DuckMj* h) { mj_setConst(h->m, h->d); }
 
 void duck_mj_reset(DuckMj* h) { mj_resetData(h->m, h->d); }

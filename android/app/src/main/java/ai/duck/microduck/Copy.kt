@@ -51,6 +51,10 @@ object Copy {
     val skills get() = pick("Skills", "技能")
     val sit get() = pick("sit", "坐下")
     val pickUp get() = pick("pick", "抓取")
+    val grab get() = pick("Hold", "拎起")
+    val putDown get() = pick("Drop", "放下")
+    val held get() = pick("in a hand · drag to carry", "在手里 · 拖动搬运")
+    val quack get() = pick("Quack", "叫一声")
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
 

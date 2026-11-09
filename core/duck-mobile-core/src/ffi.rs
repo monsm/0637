@@ -55,6 +55,9 @@ pub struct DuckCore {
     selected: usize,
     /// The latest phone-sensor readings, and the mode they were taken in.
     sensors: crate::sensors::Sensors,
+    /// A refusal the client should see for longer than the tick that made it:
+    /// (tick, message). Published on `/state` until it goes stale.
+    notice: Option<(u64, String)>,
 }
 
 struct Branch {
@@ -197,8 +200,9 @@ pub unsafe extern "C" fn duck_core_new(
         stage(&format!("fingerprint {}", provenance.fingerprint));
         stage("ready");
 
-        let skills = runtime
-            .skill_names()
+        // The shell's ring shows the same verbs `/skills` publishes, so a
+        // button and an API call cannot disagree about what exists.
+        let skills = published_skills(runtime.skill_names())
             .into_iter()
             .map(|name| CString::new(name).unwrap_or_default())
             .collect();
@@ -208,7 +212,7 @@ pub unsafe extern "C" fn duck_core_new(
             })
             .collect();
         let intents = Arc::new(IntentQueue::new());
-        intents.set_skills(runtime.skill_names());
+        intents.set_skills(published_skills(runtime.skill_names()));
         intents.set_fingerprint(provenance.to_json());
 
         Ok(DuckCore {
@@ -226,6 +230,7 @@ pub unsafe extern "C" fn duck_core_new(
             branches: Vec::new(),
             selected: 0,
             sensors: crate::sensors::Sensors::default(),
+            notice: None,
         })
     });
 
@@ -275,7 +280,7 @@ pub unsafe extern "C" fn duck_core_reload_policies(
     let core = &mut *core;
     core.runtime
         .replace_policy(policy, tuning, bundle.skill_tuning);
-    let names = core.runtime.skill_names();
+    let names = published_skills(core.runtime.skill_names());
     core.skills = names
         .iter()
         .map(|name| CString::new(name.clone()).unwrap_or_default())
@@ -312,13 +317,26 @@ pub unsafe extern "C" fn duck_core_start_intent_server(
     }
 }
 
+/// The verbs a client may ask for. `robotd`'s list is the manifest's
+/// one-shots; `sit`, `stand` and `ground_pick` are the loop's own verbs, and a
+/// client cannot discover what `/skills` never names. `/skill` accepts all
+/// three, so the list and the route agree.
+fn published_skills(mut names: Vec<String>) -> Vec<String> {
+    for builtin in ["sit", "stand", "ground_pick"] {
+        if !names.iter().any(|name| name == builtin) {
+            names.push(builtin.to_owned());
+        }
+    }
+    names
+}
+
 fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<(), String> {
     let bundle = crate::manifest::load(Path::new(dir))?;
     let policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
     let tuning = bundle.tuning();
     core.runtime
         .replace_policy(policy, tuning, bundle.skill_tuning);
-    let names = core.runtime.skill_names();
+    let names = published_skills(core.runtime.skill_names());
     core.skills = names
         .iter()
         .map(|name| CString::new(name.clone()).unwrap_or_default())
@@ -347,36 +365,103 @@ fn checkpoint_now(core: &mut DuckCore) {
     }
 }
 
-fn apply_intent(core: &mut DuckCore, intent: Intent) {
+/// Record a refusal where the shell and the next `/state` can see it, and
+/// answer the client that asked. A refusal that lives only for the tick that
+/// produced it is invisible to both.
+fn refuse(core: &mut DuckCore, message: String) -> serde_json::Value {
+    core.label = message.clone();
+    core.notice = Some((core.runtime.clock().tick, message.clone()));
+    json!({ "ok": false, "error": message })
+}
+
+fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
     match intent {
-        Intent::Twist(twist) => core.runtime.set_api_twist(twist),
-        Intent::Head(head) => core.runtime.set_head(head),
-        Intent::Body(z, roll, pitch) => core.runtime.set_body(z, roll, pitch),
-        Intent::BodyRelease => core.runtime.release_body(),
+        Intent::Twist(twist) => {
+            core.runtime.set_api_twist(twist);
+            json!({ "ok": true, "twist": twist })
+        }
+        Intent::Head(head) => {
+            core.runtime.set_head(head);
+            json!({ "ok": true })
+        }
+        Intent::Body(z, roll, pitch) => {
+            core.runtime.set_body(z, roll, pitch);
+            json!({ "ok": true })
+        }
+        Intent::BodyRelease => {
+            core.runtime.release_body();
+            json!({ "ok": true })
+        }
         Intent::Skill(name) => {
-            if let Err(error) = core.runtime.trigger_skill(&name) {
-                core.label = format!("skill refused: {error}");
+            // The ring and `/skills` name the same verbs. `sit`/`stand` are
+            // idempotent here even though the pad's A button toggles: a client
+            // asking for `stand` while standing has already succeeded.
+            let result = match name.as_str() {
+                "sit" | "stand" => {
+                    let sitting = core.runtime.is_sitting();
+                    if (name == "sit") == sitting {
+                        Ok(json!({ "ok": true, "skill": name, "already": true }))
+                    } else {
+                        core.runtime
+                            .sit_toggle()
+                            .map(|did| json!({ "ok": true, "skill": name, "did": did }))
+                            .map_err(str::to_owned)
+                    }
+                }
+                "ground_pick" => core
+                    .runtime
+                    .start_ground_pick()
+                    .map(|()| json!({ "ok": true, "skill": name }))
+                    .map_err(str::to_owned),
+                _ => core
+                    .runtime
+                    .trigger_skill(&name)
+                    .map(|started| {
+                        json!({ "ok": true, "skill": name, "chained": !started })
+                    })
+                    .map_err(str::to_owned),
+            };
+            match result {
+                Ok(value) => value,
+                Err(error) => refuse(core, format!("skill refused: {error}")),
             }
         }
-        Intent::Sit => {
-            if let Err(error) = core.runtime.sit_toggle() {
-                core.label = format!("sit refused: {error}");
+        Intent::Sit => match core.runtime.sit_toggle() {
+            Ok(did) => json!({ "ok": true, "did": did }),
+            Err(error) => refuse(core, format!("sit refused: {error}")),
+        },
+        Intent::GroundPick => match core.runtime.start_ground_pick() {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => refuse(core, format!("ground pick refused: {error}")),
+        },
+        Intent::Sound(tag) => {
+            if crate::voice::TAGS.contains(&tag.as_str()) {
+                core.runtime.queue_sound(&tag);
+                json!({ "ok": true, "tag": tag })
+            } else {
+                refuse(core, format!("no such sound: {tag}"))
             }
         }
-        Intent::GroundPick => {
-            if let Err(error) = core.runtime.start_ground_pick() {
-                core.label = format!("ground pick refused: {error}");
-            }
-        }
+        Intent::Mouth(open) => match core.runtime.set_mouth(open) {
+            Ok(()) => json!({ "ok": true, "open": open }),
+            Err(reason) => refuse(core, format!("beak refused: {reason}")),
+        },
         Intent::Push(velocity) => {
             let _ = core.runtime.push(velocity);
+            json!({ "ok": true })
         }
-        Intent::Reload(dir) => {
-            if let Err(error) = reload_policies(core, &dir) {
-                core.label = format!("reload failed: {error}");
-            }
+        Intent::Carry(offset, active) => {
+            core.runtime.set_carry(offset, active);
+            json!({ "ok": true, "carrying": active })
         }
-        Intent::Pause(paused) => core.runtime.set_paused(paused),
+        Intent::Reload(dir) => match reload_policies(core, &dir) {
+            Ok(()) => json!({ "ok": true }),
+            Err(error) => refuse(core, format!("reload failed: {error}")),
+        },
+        Intent::Pause(paused) => {
+            core.runtime.set_paused(paused);
+            json!({ "ok": true, "paused": paused })
+        }
         Intent::Step(ticks) => {
             // Advance exactly the requested ticks while frozen; the shell's
             // timer keeps calling tick(), which respects the pause.
@@ -390,20 +475,31 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
                 core.last = Some(report);
             }
             publish_state(core);
+            json!({ "ok": true, "ticks": ticks, "tick": core.runtime.clock().tick })
         }
-        Intent::Speed(speed) => core.runtime.set_speed(speed),
-        Intent::Checkpoint => checkpoint_now(core),
+        Intent::Speed(speed) => {
+            core.runtime.set_speed(speed);
+            json!({ "ok": true, "speed": core.runtime.clock().speed })
+        }
+        Intent::Checkpoint => {
+            checkpoint_now(core);
+            json!({ "ok": true, "tick": core.runtime.clock().tick })
+        }
         Intent::Restore(tick) => {
-            if let Some(checkpoint) = core
+            let found = core
                 .timeline
                 .iter()
                 .rev()
                 .find(|checkpoint| checkpoint.tick == tick)
-                .cloned()
-            {
-                core.pending_restore = Some(checkpoint);
-            } else {
-                core.label = format!("no checkpoint at tick {tick}");
+                .cloned();
+            match found {
+                Some(checkpoint) => {
+                    core.pending_restore = Some(checkpoint);
+                    // The restore lands on the next tick, which replaces this
+                    // one; the tick number is the answer, not a guess.
+                    json!({ "ok": true, "pending": true, "tick": tick })
+                }
+                None => refuse(core, format!("no checkpoint at tick {tick}")),
             }
         }
         Intent::Sensor(reading) => {
@@ -422,23 +518,26 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
                 "depth" => core.sensors.depth = Some(reading),
                 _ => {}
             }
+            json!({ "ok": true })
         }
-        Intent::Fork(label) => {
-            let Some(fork) = core.runtime.fork() else {
-                core.label = "fork refused: the body cannot be cloned".to_owned();
-                return;
-            };
-            core.branches.push(Branch {
-                label,
-                tick: fork.clock().tick,
-                runtime: fork,
-            });
-        }
+        Intent::Fork(label) => match core.runtime.fork() {
+            Some(fork) => {
+                let tick = fork.clock().tick;
+                core.branches.push(Branch {
+                    label: label.clone(),
+                    tick,
+                    runtime: fork,
+                });
+                json!({ "ok": true, "label": label, "tick": tick })
+            }
+            None => refuse(core, "fork refused: the body cannot be cloned".to_owned()),
+        },
         Intent::DropBranch(label) => {
             core.branches.retain(|branch| branch.label != label);
             if core.selected > core.branches.len() {
                 core.selected = 0;
             }
+            json!({ "ok": true, "label": label })
         }
         Intent::SelectBranch(label) => {
             let index = core
@@ -447,20 +546,24 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
                 .position(|branch| branch.label == label)
                 .map_or(0, |index| index + 1);
             core.selected = index;
+            json!({ "ok": true, "selected": if index == 0 { String::new() } else { label } })
         }
         Intent::Seek(ticks) => {
             let current = core.runtime.clock().tick;
             let target = current.saturating_sub(ticks);
-            if let Some(checkpoint) = core
+            let found = core
                 .timeline
                 .iter()
                 .rev()
                 .find(|checkpoint| checkpoint.tick <= target)
-                .cloned()
-            {
-                core.pending_restore = Some(checkpoint);
-            } else {
-                core.label = format!("nothing back to tick {target}");
+                .cloned();
+            match found {
+                Some(checkpoint) => {
+                    let at = checkpoint.tick;
+                    core.pending_restore = Some(checkpoint);
+                    json!({ "ok": true, "pending": true, "back": ticks, "tick": at })
+                }
+                None => refuse(core, format!("nothing back to tick {target}")),
             }
         }
     }
@@ -515,6 +618,35 @@ fn publish_state(core: &DuckCore) {
         "oldest": checkpoints.first().copied(),
         "newest": checkpoints.last().copied(),
     }));
+    // The duck's own senses, not the shell's: measured joint positions and
+    // velocities (encoder side of the gear play, as the policy sees them),
+    // currents, the IMU, and what the loop is commanding. A client that cannot
+    // read these cannot tell a duck standing from a duck being held.
+    let proprioception = match core.last.as_ref() {
+        Some(report) => json!({
+            "names": duck_control::model::JOINT_NAMES,
+            "positions": report.sensors.positions,
+            "velocities": report.sensors.velocities,
+            "currents_ma": report.sensors.currents_ma,
+            "targets": report.targets,
+            "imu": {
+                "gyro": report.sensors.imu.gyro,
+                "gravity": report.sensors.imu.gravity,
+                "quat": report.sensors.imu.quat,
+            },
+            "imu_ready": report.imu_ready,
+            "picked_up": report.picked_up,
+            "p_held": report.p_held,
+            "mouth": report.mouth,
+            "has_mouth": core.runtime.has_mouth(),
+            "volts": report.volts,
+            "battery_percent": report.volts.map(duck_control::battery_percent),
+        }),
+        None => json!({
+            "names": duck_control::model::JOINT_NAMES,
+            "imu_ready": false,
+        }),
+    };
     core.intents.set_state(json!({
         "label": core.label,
         "bringup": bringup_code(core.runtime.bringup()),
@@ -525,6 +657,13 @@ fn publish_state(core: &DuckCore) {
         "tick": clock.tick,
         "paused": clock.paused,
         "speed": clock.speed,
+        "carrying": core.runtime.carrying(),
+        "notice": core
+            .notice
+            .as_ref()
+            .filter(|(tick, _)| clock.tick.saturating_sub(*tick) < 100)
+            .map(|(_, message)| message.clone()),
+        "proprioception": proprioception,
     }));
 }
 
@@ -557,8 +696,11 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         return -1;
     }
     let core = &mut *core;
-    for intent in core.intents.drain() {
-        apply_intent(core, intent);
+    for queued in core.intents.drain() {
+        let result = apply_intent(core, queued.intent);
+        // The client that sent a one-shot is waiting on this; a stream may not
+        // be waiting at all, and the queue keeps the answer bounded.
+        core.intents.answer(queued.id, result);
     }
     // The phone's IMU is an external disturbance, not a sense: a shake is a
     // shove, exactly as a hand on the real duck would be. It is one impulse —
@@ -653,6 +795,105 @@ pub unsafe extern "C" fn duck_core_set_body(
     }
 }
 
+/// Load the pickup classifier — the same `pickup_detector.onnx` `robotd`
+/// scores. Refuses loudly rather than silently walking without it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_load_pickup(
+    core: *mut DuckCore,
+    model_path: *const c_char,
+) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let Ok(path) = c_string(model_path) else {
+        return -1;
+    };
+    let core = &mut *core;
+    match core
+        .runtime
+        .load_pickup(std::path::Path::new(&path))
+    {
+        Ok(()) => 0,
+        Err(error) => {
+            core.label = error;
+            -1
+        }
+    }
+}
+
+/// A hand on the trunk: `offset` metres from where it was grabbed, world
+/// frame. `active: 0` lets go. An external force, never a joint target.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_carry(
+    core: *mut DuckCore,
+    dx: c_double,
+    dy: c_double,
+    dz: c_double,
+    active: c_int,
+) {
+    if !core.is_null() {
+        (*core).runtime.set_carry([dx, dy, dz], active != 0);
+    }
+}
+
+/// The next sound the duck wants played, as a tag the platform looks up.
+/// `NULL` when nothing is queued. The tag is a static string; the shell owns
+/// the speaker and the PCM.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_next_sound(core: *mut DuckCore) -> *const c_char {
+    if core.is_null() {
+        return std::ptr::null();
+    }
+    let core = &mut *core;
+    let Some(tag) = core.runtime.take_sound() else {
+        return std::ptr::null();
+    };
+    // `c"..."` is a NUL-terminated static, so the pointer stays valid for as
+    // long as the caller holds it and nothing is allocated per sound.
+    let tag: &'static std::ffi::CStr = match tag.as_str() {
+        "greet" => c"greet",
+        "chirp" => c"chirp",
+        "coo" => c"coo",
+        "peck" => c"peck",
+        "inquire" => c"inquire",
+        "alarm" => c"alarm",
+        _ => return std::ptr::null(),
+    };
+    tag.as_ptr()
+}
+
+/// Render one sound to mono f32 PCM at `duck_core_voice_rate()`. Returns the
+/// sample count; fills `out` when non-null and large enough. The duck's voice
+/// is a synth, not a sample bank: this is how a platform gets the audio.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_render_sound(
+    core: *mut DuckCore,
+    tag: *const c_char,
+    out: *mut f32,
+    capacity: c_int,
+) -> c_int {
+    if core.is_null() {
+        return 0;
+    }
+    let Ok(tag) = c_string(tag) else {
+        return 0;
+    };
+    let core = &mut *core;
+    let Some(pcm) = core.runtime.render_sound(&tag) else {
+        return 0;
+    };
+    if !out.is_null() && capacity as usize >= pcm.len() {
+        std::ptr::copy_nonoverlapping(pcm.as_ptr(), out, pcm.len());
+    }
+    pcm.len() as c_int
+}
+
+/// The voice's sample rate (48 kHz, the synth's native rate).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_voice_rate() -> c_int {
+    crate::synth::SR as c_int
+}
+
 /// A phone shake or shove: an external trunk velocity impulse.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_push(
@@ -682,9 +923,28 @@ pub unsafe extern "C" fn duck_core_trigger_skill(
     let Ok(name) = c_string(name) else {
         return 0;
     };
-    match (*core).runtime.trigger_skill(&name) {
-        Ok(_) => 1,
-        Err(_) => 0,
+    // The shell's ring and `/skill` name the same verbs, so the C entry point
+    // accepts them too: `sit` and `stand` are idempotent, `ground_pick` is the
+    // loop's own, and anything else is a manifest skill.
+    let core = &mut *core;
+    let result = match name.as_str() {
+        "sit" | "stand" => {
+            let sitting = core.runtime.is_sitting();
+            if (name == "sit") == sitting {
+                Ok(true)
+            } else {
+                core.runtime.sit_toggle().map(|_| true)
+            }
+        }
+        "ground_pick" => core.runtime.start_ground_pick().map(|()| true),
+        _ => core.runtime.trigger_skill(&name),
+    };
+    match result {
+        Ok(started) => i32::from(started),
+        Err(error) => {
+            core.label = format!("skill refused: {error}");
+            0
+        }
     }
 }
 
@@ -752,6 +1012,13 @@ pub unsafe extern "C" fn duck_core_status(core: *mut DuckCore, out: *mut DuckSta
     }
     out.trunk = core.runtime.io().trunk();
     out.gravity = core.runtime.io().gravity();
+    let report = core.last.as_ref();
+    out.imu_ready = core.runtime.imu_ready() as c_int;
+    out.picked_up = core.runtime.picked_up() as c_int;
+    out.p_held = report.and_then(|report| report.p_held).map_or(0.0, f64::from);
+    out.mouth = report.map_or(0.0, |report| report.mouth);
+    out.volts = report.and_then(|report| report.volts).unwrap_or(0.0);
+    out.has_mouth = core.runtime.has_mouth() as c_int;
     0
 }
 

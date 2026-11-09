@@ -249,6 +249,8 @@ jobs:
           cp intent-state.json ci-logs/android/ 2>/dev/null || true
           cp intent-state-walking.json ci-logs/android/ 2>/dev/null || true
           cp intent-skills.json ci-logs/android/ 2>/dev/null || true
+          cp intent-sound.json ci-logs/android/ 2>/dev/null || true
+          cp intent-skill-refused.json ci-logs/android/ 2>/dev/null || true
           cp android-screen.png ci-logs/android/ 2>/dev/null || true
           cp android-screen-2.png ci-logs/android/ 2>/dev/null || true
           echo "run=${{ github.run_id }}" > ci-logs/android/smoke.txt
@@ -276,6 +278,8 @@ jobs:
             intent-state.json
             intent-state-walking.json
             intent-skills.json
+            intent-sound.json
+            intent-skill-refused.json
             android-screen.png
             android-screen-2.png
             unstripped/

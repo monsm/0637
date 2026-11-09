@@ -86,23 +86,38 @@ struct ContentView: View {
     /// Tap in front of the duck to walk there, either side to turn. The tap is
     /// turned into the twist the real pad would send, and released when the
     /// finger lifts — the duck stops when you stop asking.
+    ///
+    /// While the duck is held, the same drag moves the hand instead: sideways
+    /// across the room, up and down off the floor. The gait never sees it —
+    /// a hand is an external force, and the pickup classifier decides what the
+    /// policy does about it.
     private func driveGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { gesture in
                 guard controller.ready else { return }
+                if controller.carrying {
+                    let dx = (gesture.location.x - gesture.startLocation.x) / (size.width * 0.5)
+                    let dy = (gesture.location.y - gesture.startLocation.y) / (size.height * 0.5)
+                    controller.carry(dx: Double(dx) * 0.35, dy: 0, dz: Double(-dy) * 0.30)
+                    return
+                }
                 let center = CGPoint(x: size.width * 0.5, y: size.height * 0.52)
                 let dx = (gesture.location.x - center.x) / (size.width * 0.5)
                 let dy = (gesture.location.y - center.y) / (size.height * 0.5)
-                // Forward is up the screen: the duck walks away from you.
-                let forward = max(0, -dy)
-                let turn = dx
+                // Forward is up the screen: the duck walks away from you. Drag
+                // below the centre to walk backwards, the pad's stick does.
+                let forward = -dy
                 controller.joystick = CGPoint(
-                    x: abs(turn) > 0.08 ? turn : 0,
-                    y: forward > 0.08 ? -forward : 0
+                    x: abs(dx) > 0.08 ? dx : 0,
+                    y: abs(forward) > 0.08 ? -forward : 0
                 )
             }
             .onEnded { _ in
-                controller.joystick = .zero
+                // A held duck stays in the hand where the drag left it; the
+                // walk command is what must stop with the finger.
+                if !controller.carrying {
+                    controller.joystick = .zero
+                }
             }
     }
 
@@ -147,6 +162,11 @@ struct ContentView: View {
                     Text(Copy.fell)
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(.orange)
+                }
+                if controller.pickedUp && !controller.carrying {
+                    Text(Copy.held)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.cyan)
                 }
             }
             Spacer()
@@ -226,9 +246,50 @@ struct ContentView: View {
             .accessibilityLabel(Copy.skills)
             .accessibilityIdentifier("duck-skills")
 
+            // The duck's own voice: `robotctl quack` is a chirp.
+            Button {
+                controller.voice.play("chirp")
+            } label: {
+                Label(Copy.quack, systemImage: "waveform")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 18))
+                    .frame(width: 46, height: 46)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.quack)
+            .accessibilityIdentifier("duck-quack")
+
+            Button {
+                if controller.carrying {
+                    controller.release()
+                } else {
+                    controller.grab()
+                }
+            } label: {
+                Label(
+                    controller.carrying ? Copy.putDown : Copy.grab,
+                    systemImage: controller.carrying ? "hand.raised.slash.fill" : "hand.draw.fill"
+                )
+                .labelStyle(.iconOnly)
+                .font(.system(size: 18))
+                .frame(width: 46, height: 46)
+                .background(
+                    controller.carrying
+                        ? AnyShapeStyle(Color.white.opacity(0.32))
+                        : AnyShapeStyle(.ultraThinMaterial),
+                    in: Circle()
+                )
+                .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(controller.carrying ? Copy.putDown : Copy.grab)
+            .accessibilityIdentifier("duck-grab")
+
             Spacer()
 
-            Text(Copy.tapHint)
+            Text(controller.carrying ? Copy.held : Copy.tapHint)
                 .font(.system(size: 10, design: .rounded))
                 .foregroundStyle(.secondary)
                 .opacity(controller.ready ? 1 : 0)
@@ -252,7 +313,9 @@ struct ContentView: View {
     }
 }
 
-/// The ring of skills: the duck's own one-shots, arranged around a hold.
+/// The ring of skills: every verb `/skills` publishes — the manifest's
+/// one-shots and the loop's own `sit` / `stand` / `ground_pick` — arranged
+/// around a hold.
 struct SkillRing: View {
     let names: [String]
     let onPick: (String) -> Void
@@ -285,22 +348,15 @@ struct SkillRing: View {
                         y: radius * sin(angle - .pi / 2)
                     )
                 }
-                VStack(spacing: 6) {
-                    Text(Copy.sit)
-                        .accessibilityIdentifier("ring-sit")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .onTapGesture { onPick("sit") }
-                    Text(Copy.pickUp)
-                        .accessibilityIdentifier("ring-ground_pick")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .onTapGesture { onPick("ground_pick") }
-                }
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 54, height: 54)
+                    .overlay(
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.secondary)
+                    )
+                    .onTapGesture(perform: onClose)
             }
             .transition(.scale.combined(with: .opacity))
         }
