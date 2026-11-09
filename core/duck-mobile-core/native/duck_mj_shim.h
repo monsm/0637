@@ -36,6 +36,15 @@ int duck_mj_geom_type(const DuckMj* h, int geom);
 int duck_mj_geom_bodyid(const DuckMj* h, int geom);
 int duck_mj_geom_meshid(const DuckMj* h, int geom);
 int duck_mj_geom_group(const DuckMj* h, int geom);
+/* Resolved colour: the material's rgba when the geom has one. */
+void duck_mj_geom_colour(const DuckMj* h, int geom, float* out);
+/* MuJoCo's own mesh data, after the compiler's mesh frame. */
+const float* duck_mj_mesh_vert(const DuckMj* h);
+const int* duck_mj_mesh_vertadr(const DuckMj* h);
+const int* duck_mj_mesh_vertnum(const DuckMj* h);
+const int* duck_mj_mesh_face(const DuckMj* h);
+const int* duck_mj_mesh_faceadr(const DuckMj* h);
+const int* duck_mj_mesh_facenum(const DuckMj* h);
 
 int duck_mj_joint_id(const DuckMj* h, const char* name);
 int duck_mj_body_id(const DuckMj* h, const char* name);
