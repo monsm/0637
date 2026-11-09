@@ -23,6 +23,26 @@ class DuckCore(
         if (handle != 0L) nativeSpeed(handle) else 1.0
     }
 
+    fun setPaused(value: Boolean) = synchronized(lock) {
+        if (handle != 0L) nativeSetPaused(handle, value)
+    }
+
+    fun setSpeed(value: Double) = synchronized(lock) {
+        if (handle != 0L) nativeSetSpeed(handle, value)
+    }
+
+    fun step(ticks: Int = 1) = synchronized(lock) {
+        if (handle != 0L) nativeStep(handle, ticks)
+    }
+
+    fun seek(backTicks: Int) = synchronized(lock) {
+        if (handle != 0L) nativeSeek(handle, backTicks)
+    }
+
+    fun fork(label: String? = null) = synchronized(lock) {
+        if (handle != 0L) nativeFork(handle, label)
+    }
+
     fun tick(): Int = synchronized(lock) {
         if (handle != 0L) nativeTick(handle) else -1
     }
@@ -131,6 +151,11 @@ class DuckCore(
         @JvmStatic private external fun nativeTick(handle: Long): Int
         @JvmStatic private external fun nativePaused(handle: Long): Boolean
         @JvmStatic private external fun nativeSpeed(handle: Long): Double
+        @JvmStatic private external fun nativeSetPaused(handle: Long, paused: Boolean)
+        @JvmStatic private external fun nativeSetSpeed(handle: Long, speed: Double)
+        @JvmStatic private external fun nativeStep(handle: Long, ticks: Int)
+        @JvmStatic private external fun nativeSeek(handle: Long, backTicks: Int)
+        @JvmStatic private external fun nativeFork(handle: Long, label: String?)
         @JvmStatic private external fun nativeSetTwist(handle: Long, vx: Double, vy: Double, wz: Double)
         @JvmStatic private external fun nativeSetHead(handle: Long, neck: Double, head: Double, yaw: Double, roll: Double)
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
