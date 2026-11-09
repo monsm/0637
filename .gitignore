@@ -34,3 +34,7 @@ __pycache__/
 
 # Local copies of CI artifacts
 dist/
+
+# Scratch space: extracted artifacts and source clones
+work/ipa-inspect-*/
+work/mujoco-grep/
