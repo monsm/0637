@@ -159,6 +159,11 @@ pub struct MujocoIo {
     wire_actuator: [Option<usize>; NUM_JOINTS],
     wire_qpos: [Option<usize>; NUM_JOINTS],
     wire_dof: [Option<usize>; NUM_JOINTS],
+    /// The passive backlash hinge in series with each servo. The encoder
+    /// reads the OUTPUT side of the gear play, i.e. servo + backlash; the
+    /// training env's BacklashEncoderBamActuator reads exactly that sum.
+    wire_backlash_qpos: [Option<usize>; NUM_JOINTS],
+    wire_backlash_dof: [Option<usize>; NUM_JOINTS],
     actuator_qpos: Vec<usize>,
     actuator_dof: Vec<usize>,
     actuator_wire: Vec<Option<usize>>,
@@ -222,6 +227,8 @@ impl MujocoIo {
         let mut wire_actuator = [None; NUM_JOINTS];
         let mut wire_qpos = [None; NUM_JOINTS];
         let mut wire_dof = [None; NUM_JOINTS];
+        let mut wire_backlash_qpos = [None; NUM_JOINTS];
+        let mut wire_backlash_dof = [None; NUM_JOINTS];
         let mut actuator_qpos = vec![0usize; nu];
 
         for actuator in 0..nu {
@@ -263,6 +270,16 @@ impl MujocoIo {
             wire_actuator[wire] = Some(actuator);
             wire_qpos[wire] = Some(unsafe { duck_mj_jnt_qposadr(handle, joint) } as usize);
             wire_dof[wire] = Some(unsafe { duck_mj_jnt_dofadr(handle, joint) } as usize);
+            let backlash_name = format!("passive_{}_backlash", WIRE_NAMES[wire]);
+            if let Ok(name) = std::ffi::CString::new(backlash_name) {
+                let backlash = unsafe { duck_mj_joint_id(handle, name.as_ptr()) };
+                if backlash >= 0 {
+                    wire_backlash_qpos[wire] =
+                        Some(unsafe { duck_mj_jnt_qposadr(handle, backlash) } as usize);
+                    wire_backlash_dof[wire] =
+                        Some(unsafe { duck_mj_jnt_dofadr(handle, backlash) } as usize);
+                }
+            }
         }
 
         let mut io = Self {
@@ -275,6 +292,8 @@ impl MujocoIo {
             wire_actuator,
             wire_qpos,
             wire_dof,
+            wire_backlash_qpos,
+            wire_backlash_dof,
             actuator_qpos,
             actuator_dof,
             actuator_wire,
@@ -354,7 +373,15 @@ impl MujocoIo {
         if self.bam.is_some() {
             let qpos = unsafe { slice::from_raw_parts(duck_mj_qpos(self.handle), self.nq) };
             let q_target: Vec<f64> = (0..self.nu)
-                .map(|actuator| qpos[self.actuator_qpos[actuator]])
+                .map(|actuator| {
+                    let mut value = qpos[self.actuator_qpos[actuator]];
+                    if let Some(wire) = self.actuator_wire[actuator] {
+                        if let Some(address) = self.wire_backlash_qpos[wire] {
+                            value += qpos[address];
+                        }
+                    }
+                    value
+                })
                 .collect();
             if let Some(bam) = &mut self.bam {
                 bam.q_target = q_target;
@@ -602,8 +629,18 @@ impl RobotIo for MujocoIo {
         let mut currents = [0.0; NUM_JOINTS];
         for wire in 0..NUM_JOINTS {
             if let Some(actuator) = self.wire_actuator[wire] {
-                positions[wire] = qpos[self.wire_qpos[wire].expect("actuator has qpos")];
-                velocities[wire] = qvel[self.wire_dof[wire].expect("actuator has dof")];
+                // The encoder sits on the output side of the gear play, so it
+                // reads servo + backlash. The training env's
+                // BacklashEncoderBamActuator and joint_pos_rel_backlash use
+                // exactly this sum; the motor-side angle alone is up to a
+                // degree away from the pose the policy was trained to see.
+                let servo = self.wire_qpos[wire].expect("actuator has qpos");
+                let backlash = self.wire_backlash_qpos[wire];
+                positions[wire] = qpos[servo] + backlash.map_or(0.0, |address| qpos[address]);
+                let servo_dof = self.wire_dof[wire].expect("actuator has dof");
+                let backlash_dof = self.wire_backlash_dof[wire];
+                velocities[wire] =
+                    qvel[servo_dof] + backlash_dof.map_or(0.0, |address| qvel[address]);
                 currents[wire] = force[actuator].abs() * 100.0;
             }
         }
@@ -756,7 +793,15 @@ impl MujocoIo {
                 let qpos = unsafe { slice::from_raw_parts(duck_mj_qpos(self.handle), self.nq) };
                 let qvel = unsafe { slice::from_raw_parts(duck_mj_qvel(self.handle), self.nv) };
                 for actuator in 0..self.nu {
-                    let q = qpos[self.actuator_qpos[actuator]];
+                    // Same encoder semantics as the observation: position
+                    // through the backlash play, velocity motor-side (the
+                    // training stack leaves cmd.vel untouched).
+                    let mut q = qpos[self.actuator_qpos[actuator]];
+                    if let Some(wire) = self.actuator_wire[actuator] {
+                        if let Some(address) = self.wire_backlash_qpos[wire] {
+                            q += qpos[address];
+                        }
+                    }
                     let dq = qvel[self.actuator_dof[actuator]];
                     let volts = bam.model.voltage(bam.q_target[actuator], q, dq, vin);
                     let torque = if self.torque_on {
