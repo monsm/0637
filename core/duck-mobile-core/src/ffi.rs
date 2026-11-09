@@ -650,9 +650,26 @@ fn publish_state(core: &DuckCore) {
             "volts": report.volts,
             "battery_percent": report.volts.map(duck_control::battery_percent),
         }),
+        // The same shape before the first tick as after it: a client that
+        // parses the state should not have to care whether a tick has run yet.
         None => json!({
             "names": duck_control::model::JOINT_NAMES,
+            "positions": [0.0; duck_control::model::NUM_JOINTS],
+            "velocities": [0.0; duck_control::model::NUM_JOINTS],
+            "currents_ma": [0.0; duck_control::model::NUM_JOINTS],
+            "targets": [0.0; duck_control::model::NUM_JOINTS],
+            "imu": {
+                "gyro": [0.0, 0.0, 0.0],
+                "gravity": [0.0, 0.0, -1.0],
+                "quat": [1.0, 0.0, 0.0, 0.0],
+            },
             "imu_ready": false,
+            "picked_up": false,
+            "p_held": null,
+            "mouth": 0.0,
+            "has_mouth": false,
+            "volts": null,
+            "battery_percent": null,
         }),
     };
     core.intents.set_state(json!({
