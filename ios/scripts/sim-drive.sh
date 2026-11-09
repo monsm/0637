@@ -281,8 +281,8 @@ for i in 1 2 3; do
 done
 for i in 1 2 3; do
   python3 "$ROOT/scripts/check-frame.py" "$OUT/frame-$i.png" \
-    --region 0.3,0.3,0.7,0.7 --region-lit 0.02 >> "$OUT/frame-check.log" 2>&1
-  check $? "frame $i: 3D viewport is lit" "$(tail -1 "$OUT/frame-check.log")"
+    --region 0.3,0.3,0.7,0.7 --region-lit 0.02     --expect-colour 255,103,31,90,120     --expect-colour 217,217,214,60,300 >> "$OUT/frame-check.log" 2>&1
+  check $? "frame $i: lit viewport with the duck's materials" "$(tail -1 "$OUT/frame-check.log")"
 done
 python3 "$ROOT/scripts/check-frame.py" "$OUT/frame-1.png" "$OUT/frame-2.png" \
   --min-diff 0.0002 >> "$OUT/frame-check.log" 2>&1

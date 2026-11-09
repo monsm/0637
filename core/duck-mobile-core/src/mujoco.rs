@@ -51,6 +51,12 @@ unsafe extern "C" {
     fn duck_mj_geom_meshid(handle: *const DuckMj, geom: c_int) -> c_int;
     fn duck_mj_geom_group(handle: *const DuckMj, geom: c_int) -> c_int;
     fn duck_mj_mesh_name(handle: *const DuckMj, mesh: c_int) -> *const c_char;
+    fn duck_mj_mesh_vert(handle: *const DuckMj) -> *const f32;
+    fn duck_mj_mesh_vertadr(handle: *const DuckMj) -> *const c_int;
+    fn duck_mj_mesh_vertnum(handle: *const DuckMj) -> *const c_int;
+    fn duck_mj_mesh_face(handle: *const DuckMj) -> *const c_int;
+    fn duck_mj_mesh_faceadr(handle: *const DuckMj) -> *const c_int;
+    fn duck_mj_mesh_facenum(handle: *const DuckMj) -> *const c_int;
 
     fn duck_mj_joint_id(handle: *const DuckMj, name: *const c_char) -> c_int;
     fn duck_mj_actuator_id(handle: *const DuckMj, name: *const c_char) -> c_int;
@@ -435,6 +441,80 @@ impl MujocoIo {
 
     pub fn geom_count(&self) -> usize {
         (unsafe { duck_mj_ngeom(self.handle) }) as usize
+    }
+
+    /// The mesh as a triangle soup of (px, py, pz, nx, ny, nz) per vertex.
+    ///
+    /// This is `mesh_vert`, which is the STL after the compiler's own mesh
+    /// frame — MuJoCo re-centres and re-orients every mesh when it compiles
+    /// the model. Rendering the raw STL vertices instead puts each part in
+    /// the wrong place: the duck comes apart into a pile of servos.
+    pub fn mesh_soup(&self, mesh: usize) -> Option<Vec<f32>> {
+        let count = (unsafe { duck_mj_nmesh(self.handle) }) as usize;
+        if mesh >= count {
+            return None;
+        }
+        let vertadr = unsafe { *duck_mj_mesh_vertadr(self.handle).add(mesh) } as usize;
+        let vertnum = unsafe { *duck_mj_mesh_vertnum(self.handle).add(mesh) } as usize;
+        let faceadr = unsafe { *duck_mj_mesh_faceadr(self.handle).add(mesh) } as usize;
+        let facenum = unsafe { *duck_mj_mesh_facenum(self.handle).add(mesh) } as usize;
+        if vertnum == 0 || facenum == 0 {
+            return None;
+        }
+        let verts = unsafe {
+            slice::from_raw_parts(duck_mj_mesh_vert(self.handle).add(vertadr * 3), vertnum * 3)
+        };
+        // Face indices are relative to this mesh's own vertex block.
+        let faces = unsafe {
+            slice::from_raw_parts(duck_mj_mesh_face(self.handle).add(faceadr * 3), facenum * 3)
+        };
+        let mut soup = Vec::with_capacity(facenum * 18);
+        for face in faces.chunks_exact(3) {
+            let mut points = [[0f64; 3]; 3];
+            for (corner, index) in face.iter().enumerate() {
+                let index = *index as usize;
+                if index >= vertnum {
+                    return None;
+                }
+                for axis in 0..3 {
+                    points[corner][axis] = verts[index * 3 + axis] as f64;
+                }
+            }
+            let u = [
+                points[1][0] - points[0][0],
+                points[1][1] - points[0][1],
+                points[1][2] - points[0][2],
+            ];
+            let v = [
+                points[2][0] - points[0][0],
+                points[2][1] - points[0][1],
+                points[2][2] - points[0][2],
+            ];
+            let mut normal = [
+                u[1] * v[2] - u[2] * v[1],
+                u[2] * v[0] - u[0] * v[2],
+                u[0] * v[1] - u[1] * v[0],
+            ];
+            let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+            if length > 0.0 {
+                for value in &mut normal {
+                    *value /= length;
+                }
+            } else {
+                normal = [0.0, 0.0, 1.0];
+            }
+            for point in points {
+                soup.extend_from_slice(&[
+                    point[0] as f32,
+                    point[1] as f32,
+                    point[2] as f32,
+                    normal[0] as f32,
+                    normal[1] as f32,
+                    normal[2] as f32,
+                ]);
+            }
+        }
+        Some(soup)
     }
 
     pub fn geom_info(&self, geom: usize) -> Option<GeomInfo> {

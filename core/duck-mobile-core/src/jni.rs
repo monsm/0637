@@ -15,7 +15,8 @@ use jni::JNIEnv;
 
 use crate::ffi::{
     duck_core_body_count, duck_core_body_pose, duck_core_free, duck_core_geom_count,
-    duck_core_geom_info, duck_core_ground_pick, duck_core_mesh_name, duck_core_new,
+    duck_core_geom_info, duck_core_ground_pick, duck_core_mesh_name, duck_core_mesh_soup,
+    duck_core_new,
     duck_core_push, duck_core_reload_policies, duck_core_render_qpos, duck_core_set_body,
     duck_core_set_head, duck_core_set_twist, duck_core_sit_toggle, duck_core_skill_count,
     duck_core_skill_name, duck_core_start_intent_server, duck_core_status, duck_core_tick,
@@ -392,4 +393,36 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMeshName(
     env.new_string(name)
         .map(|string| string.into_raw())
         .unwrap_or(std::ptr::null_mut())
+}
+
+/// Triangle soup (px,py,pz,nx,ny,nz per vertex, three per face) in MuJoCo's
+/// own mesh frame. Parsing the STL instead puts every part in the wrong
+/// place: the compiler re-centres and re-orients each mesh.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMeshSoup(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    mesh: jint,
+) -> jni::sys::jfloatArray {
+    let core = handle as *mut DuckCore;
+    if core.is_null() || mesh < 0 {
+        return std::ptr::null_mut();
+    }
+    let count = unsafe { duck_core_mesh_soup(core, mesh, std::ptr::null_mut(), 0) };
+    if count <= 0 {
+        return std::ptr::null_mut();
+    }
+    let mut soup = vec![0f32; count as usize];
+    let written = unsafe { duck_core_mesh_soup(core, mesh, soup.as_mut_ptr(), count) };
+    if written != count {
+        return std::ptr::null_mut();
+    }
+    let Ok(array) = env.new_float_array(soup.len() as i32) else {
+        return std::ptr::null_mut();
+    };
+    if env.set_float_array_region(array, 0, &soup).is_err() {
+        return std::ptr::null_mut();
+    }
+    array
 }

@@ -35,9 +35,10 @@ class DuckRenderer(
     private var uMvp = 0
     private var uModel = 0
     private var uColor = 0
+    private var uLight = 0
     private var aPos = 0
     private var aNormal = 0
-    private val meshes = mutableMapOf<String, Mesh>()
+    private val meshes = mutableMapOf<Int, Mesh>()
     private val instances = mutableListOf<Instance>()
     private var floor: Mesh? = null
     private var aspect = 1f
@@ -53,6 +54,7 @@ class DuckRenderer(
         uMvp = GLES30.glGetUniformLocation(program, "uMvp")
         uModel = GLES30.glGetUniformLocation(program, "uModel")
         uColor = GLES30.glGetUniformLocation(program, "uColor")
+        uLight = GLES30.glGetUniformLocation(program, "uLight")
         aPos = GLES30.glGetAttribLocation(program, "aPos")
         aNormal = GLES30.glGetAttribLocation(program, "aNormal")
         buildScene()
@@ -100,8 +102,23 @@ class DuckRenderer(
         )
         Matrix.multiplyMM(viewProjection, 0, projection, 0, view, 0)
 
+        // A headlight, like MuJoCo's own viewer: the light sits at the camera,
+        // so whatever the camera sees is lit. A fixed world light left the
+        // front of the duck almost black.
+        val headlight = floatArrayOf(
+            eye[0] - trunk[0],
+            eye[1] - trunk[1],
+            eye[2] - trunk[2],
+        )
+        val lightLength = kotlin.math.sqrt(
+            headlight[0] * headlight[0] + headlight[1] * headlight[1] + headlight[2] * headlight[2]
+        ).coerceAtLeast(1e-6f)
+        headlight[0] /= lightLength
+        headlight[1] /= lightLength
+        headlight[2] /= lightLength
+
         floor?.let {
-            draw(it, identity(), floatArrayOf(0.14f, 0.15f, 0.18f, 1f), viewProjection)
+            draw(it, identity(), floatArrayOf(0.14f, 0.15f, 0.18f, 1f), headlight, viewProjection)
         }
 
         for (instance in instances) {
@@ -119,7 +136,7 @@ class DuckRenderer(
             Matrix.multiplyMM(world, 0, body, 0, rotation, 0)
             val model = FloatArray(16)
             Matrix.multiplyMM(model, 0, world, 0, instance.local, 0)
-            draw(instance.mesh, model, instance.color, viewProjection)
+            draw(instance.mesh, model, instance.color, headlight, viewProjection)
         }
     }
 
@@ -134,8 +151,7 @@ class DuckRenderer(
             val meshId = info[2].toInt()
             val group = info[3].toInt()
             if (group != 2 || type != 7 || meshId < 0) continue
-            val name = core.meshName(meshId) ?: continue
-            val mesh = loadMesh(name) ?: continue
+            val mesh = loadMesh(meshId) ?: continue
 
             val local = identity()
             Matrix.translateM(local, 0, info[4].toFloat(), info[5].toFloat(), info[6].toFloat())
@@ -160,18 +176,17 @@ class DuckRenderer(
         Log.i("DuckRenderer", "visual geoms: ${instances.size}")
     }
 
-    private fun loadMesh(name: String): Mesh? {
-        meshes[name]?.let { return it }
-        val bytes = runCatching {
-            context.assets.open("robot/microduck/assets/$name.stl").use { it.readBytes() }
-        }.getOrNull() ?: return null
-        val floats = STLLoader.parse(bytes) ?: return null
+    /** MuJoCo's own mesh data: the STL files are in different coordinates. */
+    private fun loadMesh(meshId: Int): Mesh? {
+        meshes[meshId]?.let { return it }
+        val floats = core.meshSoup(meshId) ?: return null
+        if (floats.isEmpty()) return null
         val buffer = ByteBuffer.allocateDirect(floats.size * 4)
             .order(ByteOrder.nativeOrder())
             .asFloatBuffer()
         buffer.put(floats).position(0)
         val mesh = Mesh(buffer, floats.size / 6)
-        meshes[name] = mesh
+        meshes[meshId] = mesh
         return mesh
     }
 
@@ -197,6 +212,7 @@ class DuckRenderer(
         mesh: Mesh,
         model: FloatArray,
         color: FloatArray,
+        light: FloatArray,
         viewProjection: FloatArray,
     ) {
         val mvp = FloatArray(16)
@@ -204,6 +220,7 @@ class DuckRenderer(
         GLES30.glUniformMatrix4fv(uMvp, 1, false, mvp, 0)
         GLES30.glUniformMatrix4fv(uModel, 1, false, model, 0)
         GLES30.glUniform4fv(uColor, 1, color, 0)
+        GLES30.glUniform3f(uLight, light[0], light[1], light[2])
 
         mesh.buffer.position(0)
         GLES30.glEnableVertexAttribArray(aPos)
@@ -372,11 +389,11 @@ class DuckRenderer(
             precision mediump float;
             in vec3 vNormal;
             uniform vec4 uColor;
+            uniform vec3 uLight;
             out vec4 fragColor;
             void main() {
                 vec3 normal = normalize(vNormal);
-                vec3 light = normalize(vec3(-0.45, -0.65, 1.0));
-                float diffuse = max(dot(normal, light), 0.0);
+                float diffuse = max(dot(normal, normalize(uLight)), 0.0);
                 fragColor = vec4(uColor.rgb * (0.30 + 0.70 * diffuse), uColor.a);
             }
         """.trimIndent()

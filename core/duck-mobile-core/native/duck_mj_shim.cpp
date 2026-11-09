@@ -140,6 +140,12 @@ int duck_mj_geom_type(const DuckMj* h, int geom) { return h->m->geom_type[geom];
 int duck_mj_geom_bodyid(const DuckMj* h, int geom) { return h->m->geom_bodyid[geom]; }
 int duck_mj_geom_meshid(const DuckMj* h, int geom) { return h->m->geom_dataid[geom]; }
 int duck_mj_geom_group(const DuckMj* h, int geom) { return h->m->geom_group[geom]; }
+const float* duck_mj_mesh_vert(const DuckMj* h) { return h->m->mesh_vert; }
+const int* duck_mj_mesh_vertadr(const DuckMj* h) { return h->m->mesh_vertadr; }
+const int* duck_mj_mesh_vertnum(const DuckMj* h) { return h->m->mesh_vertnum; }
+const int* duck_mj_mesh_face(const DuckMj* h) { return h->m->mesh_face; }
+const int* duck_mj_mesh_faceadr(const DuckMj* h) { return h->m->mesh_faceadr; }
+const int* duck_mj_mesh_facenum(const DuckMj* h) { return h->m->mesh_facenum; }
 
 int duck_mj_joint_id(const DuckMj* h, const char* name) { return mj_name2id(h->m, mjOBJ_JOINT, name); }
 int duck_mj_body_id(const DuckMj* h, const char* name) { return mj_name2id(h->m, mjOBJ_BODY, name); }

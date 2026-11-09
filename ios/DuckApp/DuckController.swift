@@ -30,10 +30,9 @@ final class DuckController: ObservableObject {
     private let motion = CMMotionManager()
     private var lastPush = Date.distantPast
 
-    /// The renderer's vertex data, parsed on the worker queue before the
-    /// first frame: 38 STLs and 21.6 MB of triangles used to be read inside
-    /// makeUIView, which froze the first frame for seconds on a device.
-    private(set) var meshVertices: [String: [Float]] = [:]
+    /// The renderer's triangle soups, built on the worker queue before the
+    /// first frame, keyed by MuJoCo mesh id.
+    private(set) var meshVertices: [Int32: [Float]] = [:]
 
     init() {
         // Creating the core loads the MuJoCo scene (215k vertices) and the
@@ -106,9 +105,15 @@ final class DuckController: ObservableObject {
         }
     }
 
-    /// Every visual geom's STL, parsed once on the worker queue.
-    private static func parseMeshes(core: OpaquePointer) -> [String: [Float]] {
-        var parsed: [String: [Float]] = [:]
+    /// Every visual geom's triangle soup, taken from MuJoCo's own mesh data
+    /// on the worker queue.
+    ///
+    /// The renderer must not parse the STL files: MuJoCo re-centres and
+    /// re-orients every mesh when it compiles the model, so `mesh_vert` and
+    /// the raw file are different coordinates. Feeding the raw vertices to
+    /// the renderer spreads the parts around and the duck comes apart.
+    private static func parseMeshes(core: OpaquePointer) -> [Int32: [Float]] {
+        var parsed: [Int32: [Float]] = [:]
         let count = Int(duck_core_geom_count(core))
         for geom in 0..<count {
             var body: Int32 = 0
@@ -129,21 +134,17 @@ final class DuckController: ObservableObject {
                 }
             }
             guard result == 0, group == 2, type == 7, meshID >= 0 else { continue }
-            guard let namePointer = duck_core_mesh_name(core, meshID) else { continue }
-            let name = String(cString: namePointer)
-            if parsed[name] != nil { continue }
-            guard let url = Bundle.main.url(
-                forResource: name,
-                withExtension: "stl",
-                subdirectory: "DuckResources/robot/microduck/assets"
-            ) else {
-                continue
+            if parsed[meshID] != nil { continue }
+            let floats = Int(duck_core_mesh_soup(core, meshID, nil, 0))
+            guard floats > 0 else { continue }
+            var soup = [Float](repeating: 0, count: floats)
+            let written = soup.withUnsafeMutableBufferPointer { buffer in
+                duck_core_mesh_soup(core, meshID, buffer.baseAddress, Int32(buffer.count))
             }
-            if let vertices = STLLoader.load(url: url) {
-                parsed[name] = vertices
-            }
+            guard Int(written) == floats else { continue }
+            parsed[meshID] = soup
         }
-        NSLog("duck: parsed %d meshes off the main thread", parsed.count)
+        NSLog("duck: built %d meshes off the main thread", parsed.count)
         return parsed
     }
 

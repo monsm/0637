@@ -54,6 +54,11 @@ int duck_core_geom_info(DuckCore* core, int geom, int* body, int* geom_type,
 
 const char* duck_core_mesh_name(DuckCore* core, int mesh);
 
+/* Triangle soup (px,py,pz,nx,ny,nz per vertex) in MuJoCo's mesh frame.
+   Returns the float count; fills `out` when it is non-null and large
+   enough. Use this instead of parsing the STL files. */
+int duck_core_mesh_soup(DuckCore* core, int mesh, float* out, int capacity);
+
 #ifdef __cplusplus
 }
 #endif

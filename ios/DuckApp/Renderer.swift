@@ -61,7 +61,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private let controller: DuckController
     private let pipeline: MTLRenderPipelineState
     private let depthState: MTLDepthStencilState
-    private var meshes: [String: Mesh] = [:]
+    private var meshes: [Int32: Mesh] = [:]
     private var instances: [Instance] = []
     private let floor: Mesh
     private var aspect: Float = 1
@@ -161,9 +161,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 }
             }
             guard result == 0, group == 2, type == 7, meshID >= 0 else { continue }
-            guard let namePointer = duck_core_mesh_name(core, meshID) else { continue }
-            let name = String(cString: namePointer)
-            guard let mesh = loadMesh(named: name) else { continue }
+            guard let mesh = loadMesh(meshID: meshID) else { continue }
 
             let local = translation(SIMD3<Float>(
                 Float(position[0]), Float(position[1]), Float(position[2])
@@ -184,28 +182,25 @@ final class Renderer: NSObject, MTKViewDelegate {
         NSLog("duck: renderer: %d visual geoms", instances.count)
     }
 
-    private func loadMesh(named name: String) -> Mesh? {
-        if let cached = meshes[name] { return cached }
-        // The controller parses the STLs on its worker queue while the core
-        // is being created; parsing them here would freeze the first frame.
-        if let vertices = controller.meshVertices[name], !vertices.isEmpty {
-            return storeMesh(named: name, vertices: vertices)
+    private func loadMesh(meshID: Int32) -> Mesh? {
+        if let cached = meshes[meshID] { return cached }
+        // The controller builds every soup off the main thread while the core
+        // is created; fall back to the core if one is missing.
+        if let vertices = controller.meshVertices[meshID], !vertices.isEmpty {
+            return storeMesh(id: meshID, vertices: vertices)
         }
-        let bundle = Bundle.main
-        guard let url = bundle.url(
-            forResource: name,
-            withExtension: "stl",
-            subdirectory: "DuckResources/robot/microduck/assets"
-        ) else {
-            return nil
+        guard let core = controller.core else { return nil }
+        let floats = Int(duck_core_mesh_soup(core, meshID, nil, 0))
+        guard floats > 0 else { return nil }
+        var soup = [Float](repeating: 0, count: floats)
+        let written = soup.withUnsafeMutableBufferPointer { buffer in
+            duck_core_mesh_soup(core, meshID, buffer.baseAddress, Int32(buffer.count))
         }
-        guard let vertices = STLLoader.load(url: url), !vertices.isEmpty else {
-            return nil
-        }
-        return storeMesh(named: name, vertices: vertices)
+        guard Int(written) == floats else { return nil }
+        return storeMesh(id: meshID, vertices: soup)
     }
 
-    private func storeMesh(named name: String, vertices: [Float]) -> Mesh? {
+    private func storeMesh(id: Int32, vertices: [Float]) -> Mesh? {
         guard let buffer = device.makeBuffer(
             bytes: vertices,
             length: vertices.count * MemoryLayout<Float>.stride,
@@ -214,7 +209,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             return nil
         }
         let mesh = Mesh(buffer: buffer, vertices: vertices.count / 6)
-        meshes[name] = mesh
+        meshes[id] = mesh
         return mesh
     }
 
@@ -301,9 +296,14 @@ final class Renderer: NSObject, MTKViewDelegate {
         )
         let viewProjection = projection * viewMatrix
 
+        // A headlight, like MuJoCo's own viewer: the light travels along the
+        // camera's forward axis, so whatever the camera sees is lit. A fixed
+        // world light left the front of the duck almost black.
+        let forward = simd_normalize(focus - eye)
+
         draw(mesh: floor, model: matrix_identity_float4x4,
              color: SIMD4<Float>(0.14, 0.15, 0.18, 1),
-             viewProjection: viewProjection, encoder: encoder)
+             light: forward, viewProjection: viewProjection, encoder: encoder)
 
         var poses: [Int: (SIMD3<Float>, SIMD4<Float>)] = [:]
         for instance in instances {
@@ -313,7 +313,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             guard let (position, rotation) = poses[instance.body] else { continue }
             let model = translation(position) * quaternionMatrix(rotation) * instance.local
             draw(mesh: instance.mesh, model: model, color: instance.color,
-                 viewProjection: viewProjection, encoder: encoder)
+                 light: forward, viewProjection: viewProjection, encoder: encoder)
         }
 
         encoder.endEncoding()
@@ -340,6 +340,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         mesh: Mesh,
         model: simd_float4x4,
         color: SIMD4<Float>,
+        light: SIMD3<Float>,
         viewProjection: simd_float4x4,
         encoder: MTLRenderCommandEncoder
     ) {
@@ -348,11 +349,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             model: model,
             color: color,
             // The shader negates this and dots it with the normal, so the
-            // stored vector points the way the light travels: down. Passing
-            // +1 here (as this did) lit the scene from below and left the
-            // floor and every upward face black. Android passes
-            // (-0.45, -0.65, 1.0) straight to dot(); this matches it.
-            light: SIMD4<Float>(-0.45, -0.65, -1.0, 0)
+            // vector points the way the light travels.
+            light: SIMD4<Float>(light.x, light.y, light.z, 0)
         )
         encoder.setVertexBuffer(mesh.buffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
@@ -397,76 +395,6 @@ private func lookAt(eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) -
         SIMD4<Float>(side.z, trueUp.z, -forward.z, 0),
         SIMD4<Float>(-simd_dot(side, eye), -simd_dot(trueUp, eye), simd_dot(forward, eye), 1)
     )
-}
-
-// MARK: - STL
-
-enum STLLoader {
-    /// Flat array of (px, py, pz, nx, ny, nz) per vertex, three per triangle.
-    static func load(url: URL) -> [Float]? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        if data.count >= 84 {
-            let triangles = data.withUnsafeBytes { raw -> UInt32 in
-                guard let base = raw.baseAddress else { return 0 }
-                return base.advanced(by: 80).loadUnaligned(as: UInt32.self)
-            }
-            let expected = 84 + Int(triangles) * 50
-            if triangles > 0, expected == data.count {
-                return binary(data: data, triangles: Int(triangles))
-            }
-        }
-        return ascii(data: data)
-    }
-
-    private static func binary(data: Data, triangles: Int) -> [Float] {
-        var output = [Float]()
-        output.reserveCapacity(triangles * 18)
-        data.withUnsafeBytes { raw in
-            guard let base = raw.baseAddress else { return }
-            for triangle in 0..<triangles {
-                let start = 84 + triangle * 50 + 12
-                var points = [SIMD3<Float>]()
-                points.reserveCapacity(3)
-                for vertex in 0..<3 {
-                    let offset = start + vertex * 12
-                    let x = base.advanced(by: offset).loadUnaligned(as: Float.self)
-                    let y = base.advanced(by: offset + 4).loadUnaligned(as: Float.self)
-                    let z = base.advanced(by: offset + 8).loadUnaligned(as: Float.self)
-                    points.append(SIMD3<Float>(x, y, z))
-                }
-                appendTriangle(points, to: &output)
-            }
-        }
-        return output
-    }
-
-    private static func ascii(data: Data) -> [Float]? {
-        guard let text = String(data: data, encoding: .utf8) else { return nil }
-        var points = [SIMD3<Float>]()
-        var output = [Float]()
-        for line in text.split(separator: "\n") {
-            let parts = line.split(separator: " ")
-            guard parts.count >= 4, parts[0] == "vertex" else { continue }
-            guard let x = Float(parts[1]), let y = Float(parts[2]), let z = Float(parts[3]) else {
-                continue
-            }
-            points.append(SIMD3<Float>(x, y, z))
-            if points.count == 3 {
-                appendTriangle(points, to: &output)
-                points.removeAll(keepingCapacity: true)
-            }
-        }
-        return output.isEmpty ? nil : output
-    }
-
-    private static func appendTriangle(_ points: [SIMD3<Float>], to output: inout [Float]) {
-        let cross = simd_cross(points[1] - points[0], points[2] - points[0])
-        let length = simd_length(cross)
-        let normal = length > 0 ? cross / length : SIMD3<Float>(0, 0, 1)
-        for point in points {
-            output.append(contentsOf: [point.x, point.y, point.z, normal.x, normal.y, normal.z])
-        }
-    }
 }
 
 // MARK: - SwiftUI bridge

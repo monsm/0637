@@ -650,6 +650,33 @@ pub unsafe extern "C" fn duck_core_mesh_name(
         .map_or(std::ptr::null(), |name| name.as_ptr())
 }
 
+/// Triangle soup for a mesh: (px, py, pz, nx, ny, nz) per vertex, three per
+/// face, in MuJoCo's own mesh frame. Returns the float count and, when `out`
+/// is non-null and `capacity` is large enough, writes the soup.
+///
+/// The renderer must use this rather than parsing the STL: MuJoCo re-centres
+/// and re-orients every mesh when it compiles the model, so the raw file and
+/// `mesh_vert` are not the same coordinates.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_mesh_soup(
+    core: *mut DuckCore,
+    mesh: c_int,
+    out: *mut c_float,
+    capacity: c_int,
+) -> c_int {
+    if core.is_null() || mesh < 0 {
+        return -1;
+    }
+    let Some(soup) = (*core).runtime.io().mesh_soup(mesh as usize) else {
+        return -1;
+    };
+    let count = soup.len() as c_int;
+    if !out.is_null() && capacity >= count {
+        std::ptr::copy_nonoverlapping(soup.as_ptr(), out, soup.len());
+    }
+    count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

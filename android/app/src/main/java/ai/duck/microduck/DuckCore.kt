@@ -96,6 +96,11 @@ class DuckCore(
         if (handle != 0L) nativeMeshName(handle, mesh) else null
     }
 
+    /** Triangle soup (px,py,pz,nx,ny,nz) in MuJoCo's own mesh frame. */
+    fun meshSoup(mesh: Int): FloatArray? = synchronized(lock) {
+        if (handle != 0L) nativeMeshSoup(handle, mesh) else null
+    }
+
     override fun close() {
         synchronized(lock) {
             if (handle != 0L) {
@@ -134,6 +139,7 @@ class DuckCore(
         @JvmStatic private external fun nativeSkillCount(handle: Long): Int
         @JvmStatic private external fun nativeSkillName(handle: Long, index: Int): String?
         @JvmStatic private external fun nativeMeshName(handle: Long, mesh: Int): String?
+        @JvmStatic private external fun nativeMeshSoup(handle: Long, mesh: Int): FloatArray?
     }
 }
 

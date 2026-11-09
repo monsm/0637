@@ -145,6 +145,31 @@ def region_stats(frame, region):
     return (lit / total if total else 0.0), len(colours)
 
 
+def count_near(frame, target, tolerance, region=None):
+    """Pixels within `tolerance` of `target` RGB, optionally inside a box."""
+    width = frame["width"]
+    height = frame["height"]
+    channels = frame["channels"]
+    pixels = frame["pixels"]
+    if region:
+        left, right = int(width * region[0]), int(width * region[2])
+        top, bottom = int(height * region[1]), int(height * region[3])
+    else:
+        left, right, top, bottom = 0, width, 0, height
+    tr, tg, tb = target
+    found = 0
+    for y in range(top, bottom):
+        row = y * width
+        for x in range(left, right):
+            index = (row + x) * channels
+            r = pixels[index]
+            g = pixels[index + 1] if channels >= 3 else r
+            b = pixels[index + 2] if channels >= 3 else r
+            if abs(r - tr) <= tolerance and abs(g - tg) <= tolerance and abs(b - tb) <= tolerance:
+                found += 1
+    return found
+
+
 def check_single(frame, min_lit):
     print(
         f"{frame['path']}: {frame['width']}x{frame['height']} "
@@ -213,6 +238,7 @@ def main(argv):
     min_diff = 0.0002
     region = None
     region_lit = 0.02
+    expectations = []
     flags = []
     rest = list(argv[1:])
     while rest:
@@ -228,6 +254,15 @@ def main(argv):
                 return 2
         elif arg == "--region-lit":
             region_lit = float(rest.pop(0))
+        elif arg == "--expect-colour":
+            # r,g,b,tolerance,min_pixels - the duck's own palette: light
+            # shells and orange feet. A mis-assembled model renders grey
+            # internals and loses both.
+            parts = [int(value) for value in rest.pop(0).split(",")]
+            if len(parts) != 5:
+                print("::error::--expect-colour wants r,g,b,tolerance,min_pixels")
+                return 2
+            expectations.append(parts)
         else:
             flags.append(arg)
     paths = [arg for arg in flags if not arg.startswith("--")]
@@ -252,6 +287,20 @@ def main(argv):
                     f"::error::the 3D viewport is black (only {ratio:.4%} lit "
                     f"pixels inside {region}, want {region_lit:.4%}) - the "
                     "renderer is not drawing the scene"
+                )
+                return 1
+    for target in expectations:
+        r, g, b, tolerance, want = target
+        for frame in frames:
+            got = count_near(frame, (r, g, b), tolerance, region)
+            print(
+                f"{frame['path']}: colour ({r},{g},{b}) +/-{tolerance} "
+                f"-> {got} px (want >= {want})"
+            )
+            if got < want:
+                print(
+                    f"::error::only {got} pixels match the duck's colour "
+                    f"({r},{g},{b}) - the model is not rendering its materials"
                 )
                 return 1
     if len(frames) >= 2:
