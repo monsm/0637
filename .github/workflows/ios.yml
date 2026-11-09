@@ -323,6 +323,12 @@ jobs:
           echo "$STATE" | tee intent-state.json
           curl -sf --max-time 5 http://127.0.0.1:8765/skills | tee intent-skills.json || true
           xcrun simctl io "$UDID" screenshot sim-screenshot.png || true
+          # A black screen is the failure this app is prone to (the core load
+          # used to block the main thread). Catch it in CI instead of on the
+          # user's device.
+          if [ -f sim-screenshot.png ]; then
+            python3 scripts/check-frame.py sim-screenshot.png || exit 1
+          fi
           (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/Duck-ios-simulator.zip" "$(basename "$APP")")
           xcrun simctl shutdown "$UDID" || true
 

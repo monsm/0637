@@ -25,8 +25,21 @@ final class DuckController: ObservableObject {
     private var lastPush = Date.distantPast
 
     init() {
+        // Creating the core loads the MuJoCo scene (215k vertices) and the
+        // ONNX policies — seconds on a device. Doing that here blocked the
+        // main thread, so SwiftUI never rendered a frame and the app showed a
+        // black screen. Build it on a worker queue and publish on the main
+        // thread; the core itself is only touched from the main thread
+        // afterwards (timer and renderer).
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.createCore()
+        }
+    }
+
+    /// Runs off the main thread; hops back to publish the result.
+    private func createCore() {
         guard let resourceURL = Bundle.main.resourceURL else {
-            errorMessage = "Bundle resources not found"
+            DispatchQueue.main.async { self.errorMessage = "Bundle resources not found" }
             return
         }
         let scene = resourceURL
@@ -39,7 +52,7 @@ final class DuckController: ObservableObject {
         NSLog("duck: policies=%@", policies)
 
         var error = [CChar](repeating: 0, count: 1024)
-        core = scene.withCString { scenePtr in
+        let created = scene.withCString { scenePtr in
             policies.withCString { policyPtr in
                 error.withUnsafeMutableBufferPointer { buffer in
                     duck_core_new(
@@ -49,26 +62,34 @@ final class DuckController: ObservableObject {
                 }
             }
         }
-        guard core != nil else {
-            errorMessage = error.withUnsafeBufferPointer {
-                String(cString: $0.baseAddress!)
-            }
-            NSLog("duck: duck_core_new failed: %@", errorMessage ?? "unknown")
-            return
-        }
 
-        ready = true
-        NSLog("duck: core created")
-        if let core {
-            let port = duck_core_start_intent_server(core, 8765)
+        DispatchQueue.main.async {
+            guard let self else { return }
+            guard created != nil else {
+                self.errorMessage = error.withUnsafeBufferPointer {
+                    String(cString: $0.baseAddress!)
+                }
+                NSLog("duck: duck_core_new failed: %@", self.errorMessage ?? "unknown")
+                return
+            }
+
+            self.core = created
+            self.ready = true
+            NSLog("duck: core created")
+            let port = duck_core_start_intent_server(created, 8765)
             NSLog("duck: intent server -> %d", port)
+            self.startTimer()
+            self.startMotion()
         }
+    }
+
+    /// The 50 Hz control tick, on the main run loop.
+    private func startTimer() {
         let timer = Timer(timeInterval: 0.02, repeats: true) { [weak self] _ in
             self?.tick()
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        startMotion()
     }
 
     deinit {

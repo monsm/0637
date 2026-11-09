@@ -7,8 +7,15 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            MetalView(controller: controller)
-                .ignoresSafeArea()
+            if controller.ready {
+                MetalView(controller: controller)
+                    .ignoresSafeArea()
+            } else {
+                // The renderer reads the core's meshes when it is created,
+                // so it only exists once the core is ready.
+                Color(red: 0.055, green: 0.075, blue: 0.10)
+                    .ignoresSafeArea()
+            }
 
             VStack {
                 HStack(alignment: .top) {
@@ -40,6 +47,10 @@ struct ContentView: View {
                 Text(error)
                     .font(.caption)
                     .foregroundStyle(.red)
+            } else if !controller.ready {
+                Text("Loading MuJoCo + policies…")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             } else {
                 Text("\(controller.bringupText) · gain \(controller.gain)")
                     .font(.caption)

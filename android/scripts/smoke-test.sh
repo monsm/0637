@@ -74,4 +74,10 @@ if [ -z "$STATE" ]; then
 fi
 echo "$STATE" | tee intent-state.json
 curl -sf --max-time 5 http://127.0.0.1:8765/skills | tee intent-skills.json || true
+# A black screen is the failure this app is prone to (the core load used to
+# block the main thread). Catch it in CI instead of on the user's device.
+adb exec-out screencap -p > android-screen.png || true
+if [ -s android-screen.png ]; then
+  python3 scripts/check-frame.py android-screen.png || exit 1
+fi
 echo "smoke test passed"
