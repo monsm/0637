@@ -4,6 +4,8 @@ import SwiftUI
 /// from the live view rather than living on it.
 struct InstrumentSheet: View {
     @ObservedObject var controller: DuckController
+    /// Flipping the language re-renders the sheet's computed strings.
+    @State private var languageTick = 0
 
     var body: some View {
         ScrollView {
@@ -18,14 +20,21 @@ struct InstrumentSheet: View {
             .padding(20)
         }
         .background(Color(red: 0.055, green: 0.075, blue: 0.10))
+        .id(languageTick)
         .preferredColorScheme(.dark)
     }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text("This duck")
+            Text(Copy.thisDuck)
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
             Spacer()
+            Button(Copy.language.rawValue) {
+                Copy.language = Copy.language == .english ? .chinese : .english
+                languageTick &+= 1
+            }
+            .font(.system(size: 11, design: .rounded))
+            .buttonStyle(.bordered)
             Text(controller.label)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
@@ -37,7 +46,7 @@ struct InstrumentSheet: View {
 
     private var timeMachine: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Time machine", detail: "tick \(controller.simTick)")
+            sectionTitle(Copy.timeMachine, detail: "tick \(controller.simTick)")
 
             // The scrubber spans the checkpoints the core actually kept.
             VStack(spacing: 6) {
@@ -70,17 +79,17 @@ struct InstrumentSheet: View {
             HStack(spacing: 8) {
                 timeButton(
                     controller.paused ? "play.fill" : "pause.fill",
-                    controller.paused ? "Resume" : "Freeze"
+                    controller.paused ? Copy.resume : Copy.freeze
                 ) {
                     controller.setPaused(!controller.paused)
                 }
-                timeButton("forward.frame.fill", "Step") {
+                timeButton("forward.frame.fill", Copy.step) {
                     controller.step()
                 }
-                timeButton("gobackward.5", "Rewind") {
+                timeButton("gobackward.5", Copy.rewind) {
                     controller.rewind()
                 }
-                timeButton("arrow.triangle.branch", "Fork") {
+                timeButton("arrow.triangle.branch", Copy.fork) {
                     controller.fork()
                 }
             }
@@ -113,20 +122,20 @@ struct InstrumentSheet: View {
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("time-\(title)")
+        .accessibilityIdentifier("time-\(icon)")
     }
 
     // MARK: - Telemetry
 
     private var telemetry: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("State", detail: nil)
-            row("bring-up", controller.bringupText)
-            row("gain", "\(controller.gain)")
-            row("fallen", controller.fallen ? "yes" : "no")
-            row("trunk z", String(format: "%.4f m", controller.trunk.z))
-            row("gravity z", String(format: "%.4f", controller.gravity.z))
-            row("branches", "\(controller.branchCount)")
+            sectionTitle(Copy.state, detail: nil)
+            row(Copy.bringup, controller.bringupText)
+            row(Copy.gain, "\(controller.gain)")
+            row(Copy.fallen, controller.fallen ? Copy.yes : Copy.no)
+            row(Copy.trunkZ, String(format: "%.4f m", controller.trunk.z))
+            row(Copy.gravityZ, String(format: "%.4f", controller.gravity.z))
+            row(Copy.branches, "\(controller.branchCount)")
         }
         .padding(14)
         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
@@ -136,13 +145,13 @@ struct InstrumentSheet: View {
 
     private var sensors: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("What the phone senses", detail: controller.sensorMode)
-            Text("None of these is part of the duck's 61-D observation. The IMU is a shove, the rest is the room.")
+            sectionTitle(Copy.whatPhoneSenses, detail: controller.sensorMode)
+            Text(Copy.sensorNote)
                 .font(.system(size: 10, design: .rounded))
                 .foregroundStyle(.secondary)
-            row("camera", controller.cameraSummary)
-            row("microphone", controller.microphoneSummary)
-            row("depth", controller.depthSummary)
+            row(Copy.camera, controller.cameraSummary)
+            row(Copy.microphone, controller.microphoneSummary)
+            row(Copy.depth, controller.depthSummary)
             row("IMU", controller.imuSummary)
         }
         .padding(14)
@@ -151,7 +160,7 @@ struct InstrumentSheet: View {
 
     private var provenance: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionTitle("Provenance", detail: "SHA-256")
+            sectionTitle(Copy.provenance, detail: "SHA-256")
             Text(controller.fingerprint)
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.secondary)
@@ -165,10 +174,10 @@ struct InstrumentSheet: View {
 
     private var footer: some View {
         HStack {
-            Button("Reload AI") { controller.reloadPolicies() }
+            Button(Copy.reload) { controller.reloadPolicies() }
                 .buttonStyle(.bordered)
             Spacer()
-            Text("AI API :8765 · MCP /mcp")
+            Text(Copy.api)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(.secondary)
         }

@@ -19,6 +19,8 @@ struct ContentView: View {
     @State private var showInstrument = false
     @State private var tapTarget: CGPoint?
     @State private var lastTap = Date.distantPast
+    /// Flipping this re-renders every `Copy` string.
+    @State private var languageTick = 0
 
     enum Surface: String, CaseIterable {
         case live = "Live"
@@ -26,6 +28,7 @@ struct ContentView: View {
     }
 
     var body: some View {
+        let _ = languageTick
         GeometryReader { geometry in
             ZStack {
                 scene
@@ -127,23 +130,42 @@ struct ContentView: View {
         HStack(alignment: .top) {
             // The duck's name and what it is doing, in words rather than numbers.
             VStack(alignment: .leading, spacing: 2) {
-                Text("MicroDuck")
+                Text(Copy.name)
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
-                Text(controller.ready ? controller.label : "waking up…")
+                Text(controller.ready ? controller.label : Copy.waking)
                     .font(.system(size: 12, design: .rounded))
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("duck-label")
                 if controller.fallen {
-                    Text("it fell")
+                    Text(Copy.fell)
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(.orange)
                 }
             }
             Spacer()
-            surfaceSwitch
+            HStack(spacing: 6) {
+                languageSwitch
+                surfaceSwitch
+            }
         }
         .padding(12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var languageSwitch: some View {
+        Button {
+            Copy.language = Copy.language == .english ? .chinese : .english
+            languageTick &+= 1
+        } label: {
+            Text(Copy.language.rawValue)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.10), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Copy.languageLabel)
+        .accessibilityIdentifier("duck-language")
     }
 
     private var surfaceSwitch: some View {
@@ -152,7 +174,7 @@ struct ContentView: View {
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { surface = option }
                 } label: {
-                    Text(option.rawValue)
+                    Text(option == .live ? Copy.live : Copy.director)
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -172,31 +194,32 @@ struct ContentView: View {
             Button {
                 showInstrument = true
             } label: {
-                Label("Time", systemImage: "clock.arrow.circlepath")
+                Label(Copy.time, systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 18))
                     .frame(width: 46, height: 46)
                     .background(.ultraThinMaterial, in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Time")
+            .accessibilityLabel(Copy.time)
             .accessibilityIdentifier("duck-time")
 
             Button {
                 showRing = true
             } label: {
-                Label("Skills", systemImage: "sparkles")
+                Label(Copy.skills, systemImage: "sparkles")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 18))
                     .frame(width: 46, height: 46)
                     .background(.ultraThinMaterial, in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Skills")
+            .accessibilityLabel(Copy.skills)
+            .accessibilityIdentifier("duck-skills")
 
             Spacer()
 
-            Text("tap ahead to walk · long-press the duck")
+            Text(Copy.tapHint)
                 .font(.system(size: 10, design: .rounded))
                 .foregroundStyle(.secondary)
                 .opacity(controller.ready ? 1 : 0)
@@ -205,7 +228,7 @@ struct ContentView: View {
 
     private func failureCard(_ message: String) -> some View {
         VStack(spacing: 10) {
-            Text("MicroDuck could not start")
+            Text(Copy.couldNotStart)
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
             Text(message)
                 .font(.system(size: 12, design: .rounded))
@@ -237,7 +260,7 @@ struct SkillRing: View {
                     Button {
                         onPick(name)
                     } label: {
-                        Text(name)
+                        Text(SkillLabel.of(name))
                             .font(.system(size: 12, weight: .medium, design: .rounded))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
@@ -253,14 +276,14 @@ struct SkillRing: View {
                     )
                 }
                 VStack(spacing: 6) {
-                    Text("sit")
+                    Text(Copy.sit)
                         .accessibilityIdentifier("ring-sit")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(.ultraThinMaterial, in: Capsule())
                         .onTapGesture { onPick("sit") }
-                    Text("pick")
+                    Text(Copy.pickUp)
                         .accessibilityIdentifier("ring-ground_pick")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .padding(.horizontal, 12)
@@ -280,6 +303,7 @@ struct DirectorOverlay: View {
     let controller: DuckController
 
     var body: some View {
+        let _ = languageTick
         GeometryReader { geometry in
             let bar = geometry.size.height * 0.055
             VStack {
@@ -296,7 +320,7 @@ struct DirectorOverlay: View {
                     Circle()
                         .fill(Color.red)
                         .frame(width: 7, height: 7)
-                    Text("VIEWFINDER")
+                    Text(Copy.viewfinder)
                         .font(.system(size: 9, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.85))
                 }

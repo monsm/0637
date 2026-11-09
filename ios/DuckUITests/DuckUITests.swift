@@ -41,7 +41,7 @@ final class DuckUITests: XCTestCase {
 
     /// Open the skill ring and pick a skill by its visible name.
     private func pickSkill(_ name: String) throws {
-        let skills = app.buttons["Skills"]
+        let skills = app.buttons["duck-skills"]
         XCTAssertTrue(skills.waitForExistence(timeout: 10), "the skills button is missing")
         skills.tap()
         // The ring's entry carries a unique id: the same skill name can appear
@@ -82,14 +82,14 @@ final class DuckUITests: XCTestCase {
             app.staticTexts["This duck"].waitForExistence(timeout: 10),
             "the instrument sheet did not open"
         )
-        let freeze = app.buttons["time-Freeze"]
+        let freeze = app.buttons["time-pause.fill"]
         XCTAssertTrue(freeze.waitForExistence(timeout: 5), "the freeze button is missing")
         freeze.tap()
         XCTAssertTrue(
-            app.buttons["time-Resume"].waitForExistence(timeout: 5),
+            app.buttons["time-play.fill"].waitForExistence(timeout: 5),
             "freeze did not flip to resume"
         )
-        app.buttons["time-Resume"].tap()
+        app.buttons["time-play.fill"].tap()
 
         // Close the sheet and keep driving.
         app.swipeDown()

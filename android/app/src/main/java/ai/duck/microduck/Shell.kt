@@ -55,7 +55,10 @@ fun Shell(
     var surface by remember { mutableStateOf(Surface.Live) }
     var showRing by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
+    // Flipping this re-renders every Copy string in the shell.
+    var languageTick by remember { mutableStateOf(0) }
 
+    val _unused = languageTick
     Box(modifier.fillMaxSize()) {
         // Driving: a drag on the scene becomes the twist the real pad sends.
         Box(
@@ -96,16 +99,24 @@ fun Shell(
             verticalAlignment = Alignment.Top,
         ) {
             Column {
-                Text("MicroDuck", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold)
                 Text(
-                    core?.let { if (it.paused()) "paused" else "live" } ?: "waking up…",
+                    core?.let { if (it.paused()) Copy.freeze else Copy.live } ?: Copy.waking,
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 12.sp,
                 )
             }
             Spacer(Modifier.size(14.dp))
-            SurfaceChip("Live", surface == Surface.Live) { surface = Surface.Live }
-            SurfaceChip("Director", surface == Surface.Director) { surface = Surface.Director }
+            SurfaceChip(Copy.live, surface == Surface.Live) { surface = Surface.Live }
+            SurfaceChip(Copy.director, surface == Surface.Director) { surface = Surface.Director }
+            SurfaceChip(Copy.language.label) {
+                Copy.language = if (Copy.language == Copy.Language.English) {
+                    Copy.Language.Chinese
+                } else {
+                    Copy.Language.English
+                }
+                languageTick += 1
+            }
         }
 
         // Bottom bar: time machine and skills live one gesture away.
@@ -115,8 +126,8 @@ fun Shell(
                 .padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            RoundChip("Time") { showSheet = true }
-            RoundChip("Skills") { showRing = true }
+            RoundChip(Copy.time) { showSheet = true }
+            RoundChip(Copy.skills) { showRing = true }
         }
 
         if (showRing && core != null) {
@@ -195,7 +206,7 @@ private fun SkillRing(
                         .pointerInput(Unit) { detectTapGestures { onPick(name) } }
                         .padding(horizontal = 18.dp, vertical = 10.dp),
                 ) {
-                    Text(name, color = Color.White, fontSize = 13.sp)
+                    Text(skillLabel(name), color = Color.White, fontSize = 13.sp)
                 }
             }
             Box(
@@ -203,13 +214,13 @@ private fun SkillRing(
                     .background(Color.White.copy(alpha = 0.16f), CircleShape)
                     .pointerInput(Unit) { detectTapGestures { onPick("sit") } }
                     .padding(horizontal = 18.dp, vertical = 10.dp),
-            ) { Text("sit", color = Color.White, fontSize = 13.sp) }
+            ) { Text(Copy.sit, color = Color.White, fontSize = 13.sp) }
             Box(
                 Modifier
                     .background(Color.White.copy(alpha = 0.16f), CircleShape)
                     .pointerInput(Unit) { detectTapGestures { onPick("ground_pick") } }
                     .padding(horizontal = 18.dp, vertical = 10.dp),
-            ) { Text("pick", color = Color.White, fontSize = 13.sp) }
+            ) { Text(Copy.pickUp, color = Color.White, fontSize = 13.sp) }
         }
     }
 }
@@ -233,7 +244,7 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
             )
         }
         Text(
-            "VIEWFINDER",
+            Copy.viewfinder,
             color = Color.White.copy(alpha = 0.8f),
             fontSize = 10.sp,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp),
@@ -253,15 +264,15 @@ private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("This duck", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Text(Copy.thisDuck, color = Color.White, fontWeight = FontWeight.SemiBold)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ButtonChip(if (paused) "Resume" else "Freeze") {
+                ButtonChip(if (paused) Copy.resume else Copy.freeze) {
                     paused = !paused
                     core.setPaused(paused)
                 }
-                ButtonChip("Step") { core.step() }
-                ButtonChip("Rewind") { core.seek(200) }
-                ButtonChip("Fork") { branches += 1 }
+                ButtonChip(Copy.step) { core.step() }
+                ButtonChip(Copy.rewind) { core.seek(200) }
+                ButtonChip(Copy.fork) { branches += 1 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(0.25, 0.5, 1.0, 2.0).forEach { option ->

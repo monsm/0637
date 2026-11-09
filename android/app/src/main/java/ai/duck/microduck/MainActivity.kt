@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Copy.load(this)
         input = DuckInput()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
@@ -147,21 +148,17 @@ private fun StatusPanel(status: DoubleArray, modifier: Modifier = Modifier) {
     val bringup = status.getOrNull(0)?.toInt() ?: 0
     val fallen = (status.getOrNull(1) ?: 0.0) != 0.0
     val gain = status.getOrNull(2)?.toInt() ?: 200
-    val bringupText = when (bringup) {
-        1 -> "Homing"
-        2 -> "Ready"
-        else -> "Limp"
-    }
+    val bringupText = Copy.bringup(bringup)
     Column(
         modifier
             .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
             .padding(12.dp)
     ) {
-        Text("MicroDuck", color = Color.White, fontWeight = FontWeight.Bold)
+        Text(Copy.name, color = Color.White, fontWeight = FontWeight.Bold)
         Text("$bringupText · gain $gain", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
         Text("AI API :8765 · shake to push", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp)
         if (fallen) {
-            Text("FALLEN", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(Copy.fell, color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold, fontSize = 12.sp)
         }
     }
 }
