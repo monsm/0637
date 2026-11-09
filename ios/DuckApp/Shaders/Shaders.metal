@@ -108,9 +108,12 @@ fragment float4 duck_fragment(
     float3 ambient = environment(ambient_dir) * mix(0.35, 1.0, metalness);
     float rim = pow(1.0 - ndotv, 3.0);
 
-    float3 color = diffuse_albedo * (0.18 + 0.82 * ndotl) * 1.15
+    // The duck is a painted toy: most of what you see is diffuse. The albedo
+    // term carries the material's colour, and the ambient lift keeps the
+    // shadowed side from going black.
+    float3 color = diffuse_albedo * (0.45 + 0.75 * ndotl)
                  + specular * ndotl
-                 + ambient * diffuse_albedo * 0.55
+                 + ambient * diffuse_albedo * 0.85
                  + ambient * f0 * (0.15 + 0.85 * rim);
 
     // Soft contact shadow under the duck: the floor darkens toward the feet.

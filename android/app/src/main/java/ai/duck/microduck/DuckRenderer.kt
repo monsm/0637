@@ -459,9 +459,10 @@ class DuckRenderer(
                 vec3 ambient = environment(ambientDir) * mix(0.35, 1.0, metalness);
                 float rim = pow(1.0 - ndotv, 3.0);
 
-                vec3 color = diffuseAlbedo * (0.18 + 0.82 * ndotl) * 1.15
+                // The duck is a painted toy: most of what you see is diffuse.
+                vec3 color = diffuseAlbedo * (0.45 + 0.75 * ndotl)
                            + specular * ndotl
-                           + ambient * diffuseAlbedo * 0.55
+                           + ambient * diffuseAlbedo * 0.85
                            + ambient * f0 * (0.15 + 0.85 * rim);
 
                 if (uChecker > 0.5) {
