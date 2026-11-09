@@ -156,7 +156,8 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeCarry(
             dx,
             dy,
             dz,
-            if active { 1 } else { 0 },
+            // `jboolean` is a u8, not Rust's bool.
+            i32::from(active != 0),
         )
     };
 }
