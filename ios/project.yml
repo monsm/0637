@@ -60,6 +60,8 @@ targets:
         LD_RUNPATH_SEARCH_PATHS:
           - $(inherited)
           - "@executable_path/Frameworks"
+        # The UI test target reads the status label and taps the buttons.
+        ENABLE_TESTABILITY: YES
     dependencies:
       # Embedded and signed by Xcode's own phases instead of script phases:
       # a script-copied framework confused codesign into ignoring the app's
@@ -85,3 +87,30 @@ targets:
           test -f "${SRCROOT}/Frameworks/libduck_mobile_core.dylib" || {
             echo "error: run ios/scripts/build-rust-ios.sh first"; exit 1;
           }
+
+  # Taps the app's own controls. The Python session proves the core through
+  # the intent API; this proves the buttons are wired to that same core.
+  DuckUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: DuckUITests
+    dependencies:
+      - target: Duck
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Duck
+
+schemes:
+  Duck:
+    build:
+      targets:
+        Duck: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - DuckUITests

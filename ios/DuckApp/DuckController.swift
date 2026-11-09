@@ -17,6 +17,9 @@ final class DuckController: ObservableObject {
     @Published var bringup = 0
     @Published var fallen = false
     @Published var gain = 200
+    /// What the controller is doing right now (walk / stand / sit / skill).
+    /// Shown in the status panel; the UI test reads it to verify the buttons.
+    @Published var label = "idle"
     @Published var joystick = CGPoint.zero
     @Published var trunk = SIMD3<Float>(0, 0, 0.12)
 
@@ -212,6 +215,11 @@ final class DuckController: ObservableObject {
                     Float(status.trunk.1),
                     Float(status.trunk.2)
                 )
+                // `char label[64]` imports as a 64-tuple of CChar.
+                label = withUnsafeBytes(of: status.label) { raw in
+                    guard let base = raw.baseAddress else { return "" }
+                    return String(cString: base.assumingMemoryBound(to: CChar.self))
+                }
             }
             lastStatus = Date()
         }

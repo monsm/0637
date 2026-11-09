@@ -80,6 +80,9 @@ struct ContentView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
+                Text(controller.label)
+                    .font(.caption)
+                    .accessibilityIdentifier("duck-label")
                 Text("\(controller.bringupText) · gain \(controller.gain)")
                     .font(.caption)
                     .foregroundStyle(.secondary)

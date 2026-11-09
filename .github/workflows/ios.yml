@@ -251,6 +251,7 @@ jobs:
           find ios/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/ios/ \; 2>/dev/null || true
           cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
+          cp ios/build/xcodebuild-test.log ci-logs/ios/ 2>/dev/null || true
           cp ios/build-device/xcodebuild.log ci-logs/ios/xcodebuild-device.log 2>/dev/null || true
           {
             echo "run=${{ github.run_id }}"
@@ -305,7 +306,32 @@ jobs:
           cp sim-drive/state-initial.json intent-state.json 2>/dev/null || true
           cp sim-drive/skills.json intent-skills.json 2>/dev/null || true
           (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/Duck-ios-simulator.zip" "$(basename "$APP")")
-          xcrun simctl shutdown "$UDID" || true
+
+      - name: UI test (buttons drive the duck)
+        id: uitest
+        run: |
+          set -o pipefail
+          mkdir -p ios/build
+          # The Python session left the app running with the intent server on
+          # :8765; the UI test launches its own instance.
+          xcrun simctl terminate "$SIM_UDID" ai.duck.microduck > /dev/null 2>&1 || true
+          if ! xcodebuild test \
+            -project ios/Duck.xcodeproj \
+            -scheme Duck \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$SIM_UDID" \
+            -derivedDataPath ios/build \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=YES \
+            > ios/build/xcodebuild-test.log 2>&1; then
+            echo "::error::UI test failed"
+            tail -n 160 ios/build/xcodebuild-test.log || true
+            exit 1
+          fi
+          grep -E "Test Suite|Test Case|Executed" ios/build/xcodebuild-test.log | tail -20
+          xcrun simctl shutdown "$SIM_UDID" || true
 
       - name: MuJoCo iOS (device slice)
         id: mujocodev
@@ -403,6 +429,7 @@ jobs:
           cp sim-console.log ci-logs/ios/ 2>/dev/null || true
           cp sim-syslog-all.log ci-logs/ios/ 2>/dev/null || true
           cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
+          cp ios/build/xcodebuild-test.log ci-logs/ios/ 2>/dev/null || true
           {
             echo "run=${{ github.run_id }}"
             echo "simsmoke=${{ steps.simsmoke.outcome }}"
