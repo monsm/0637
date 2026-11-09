@@ -196,7 +196,9 @@ final class DuckController: ObservableObject {
         speedRemainder += speed
         let whole = Int(speedRemainder)
         speedRemainder -= Double(whole)
-        return max(1, min(whole, 8))
+        // Zero is a real answer at 0.5x: the next frame runs the tick. Intents
+        // still drain on that tick, so nothing waits longer than 40 ms.
+        return min(whole, 8)
     }
 
     deinit {

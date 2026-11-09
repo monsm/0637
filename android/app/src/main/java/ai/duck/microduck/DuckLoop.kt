@@ -38,7 +38,8 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
                         remainder += core.speed()
                         var whole = remainder.toInt()
                         remainder -= whole
-                        if (whole < 1) whole = 1
+                        // Zero is a real answer at 0.5x: the next frame runs
+                        // the tick, and intents drain on it.
                         while (whole-- > 0) {
                             core.tick()
                         }

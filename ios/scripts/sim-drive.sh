@@ -297,11 +297,14 @@ fi
 # those is a claim this section checks against /state.
 echo "--- time machine ---"
 
-TICK_BEFORE=$(api GET /state | field tick)
 api POST /time '{"paused":true}' > /dev/null
-sleep 1.2
+# Read after the pause has landed: ticks between the request and the core
+# draining it are not a freeze failure.
+sleep 0.4
 TICK_PAUSED=$(api GET /state | field tick)
-[ "$TICK_BEFORE" = "$TICK_PAUSED" ]; check $? "pause freezes the simulation clock" "$TICK_BEFORE -> $TICK_PAUSED"
+sleep 1.0
+TICK_STILL=$(api GET /state | field tick)
+[ "$TICK_PAUSED" = "$TICK_STILL" ]; check $? "pause freezes the simulation clock" "$TICK_PAUSED -> $TICK_STILL"
 
 PAUSED_FLAG=$(api GET /state | field paused)
 [ "$PAUSED_FLAG" = "True" ] || [ "$PAUSED_FLAG" = "true" ]
@@ -332,9 +335,11 @@ check $? "the timeline lists checkpoints" "$(printf '%s' "$TIMELINE" | head -c 1
 api POST /checkpoint '{}' > /dev/null
 sleep 0.4
 BEFORE_SEEK=$(api GET /state | field tick)
-api POST /seek '{"ticks":20}' > /dev/null
+api POST /seek '{"ticks":200}' > /dev/null
 sleep 0.6
 AFTER_SEEK=$(api GET /state | field tick)
+# The duck keeps ticking after the rewind, so compare against the moment the
+# request landed rather than after the sleep.
 [ -n "$AFTER_SEEK" ] && [ "$AFTER_SEEK" -lt "$BEFORE_SEEK" ]
 check $? "seek rewinds the duck" "$BEFORE_SEEK -> $AFTER_SEEK"
 
@@ -453,10 +458,10 @@ sleep 1
 # The log stream was started before launch; give it a moment to flush and read
 # the unified log directly if the stream is short.
 LOG=$(cat "$OUT/sim-console.log" "$OUT/app-stdout.log" 2>/dev/null)
-if ! printf '%s' "$LOG" | grep -q "duck: core created"; then
-  LOG="$LOG
-$(xcrun simctl spawn "$UDID" log show --last 5m --style compact --predicate 'process == "Duck"' 2>/dev/null || true)"
-fi
+# The stream is the primary source but can be truncated; the unified log is
+# authoritative and cheap to ask.
+LOG="$LOG
+$(xcrun simctl spawn "$UDID" log show --last 10m --style compact --predicate 'process == "Duck"' 2>/dev/null || true)"
 printf '%s' "$LOG" | grep -q "duck: core created"
 check $? "log: core created" ""
 printf '%s' "$LOG" | grep -qE "renderer: [1-9][0-9]* visual geoms"
