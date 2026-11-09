@@ -160,6 +160,17 @@ void duck_mj_set_solver(DuckMj* h, int iterations, int ls_iterations) {
 // The integration state: time, qpos, qvel, act, ctrl, warmstart, history and
 // applied forces. Restoring it makes the next step continue exactly where the
 // snapshot left off, which is what a rewind has to mean.
+DuckMj* duck_mj_clone(const DuckMj* h) {
+  if (!h) return NULL;
+  DuckMj* copy = (DuckMj*)calloc(1, sizeof(DuckMj));
+  if (!copy) return NULL;
+  copy->m = mj_copyModel(NULL, h->m);
+  if (!copy->m) { free(copy); return NULL; }
+  copy->d = mj_copyData(NULL, copy->m, h->d);
+  if (!copy->d) { mj_deleteModel(copy->m); free(copy); return NULL; }
+  return copy;
+}
+
 int duck_mj_state_size(const DuckMj* h) {
   if (!h) return 0;
   return mj_stateSize(h->m, mjSTATE_INTEGRATION);

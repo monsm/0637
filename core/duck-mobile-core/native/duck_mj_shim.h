@@ -40,6 +40,9 @@ int duck_mj_geom_group(const DuckMj* h, int geom);
 const char* duck_mj_version(void);
 /* Solver iterations the policy was trained with. */
 void duck_mj_set_solver(DuckMj* h, int iterations, int ls_iterations);
+/* A deep copy of the whole simulation, for a fork. Each copy owns its model
+   because the BAM loop writes dof friction into it every substep. */
+DuckMj* duck_mj_clone(const DuckMj* h);
 /* The whole simulation state, for the time machine: size, save, restore. */
 int duck_mj_state_size(const DuckMj* h);
 void duck_mj_state_get(const DuckMj* h, double* out);

@@ -47,6 +47,18 @@ pub struct DuckCore {
     timeline: VecDeque<crate::runtime::Checkpoint>,
     /// A restore that must land before the next tick (the tick it replaces).
     pending_restore: Option<crate::runtime::Checkpoint>,
+    /// Forks of this duck, each running on its own body. The original is the
+    /// one `runtime` points at; the rest live here so every branch can be
+    /// stepped independently.
+    branches: Vec<Branch>,
+    /// Which branch the tick drives: 0 is the original.
+    selected: usize,
+}
+
+struct Branch {
+    label: String,
+    runtime: crate::runtime::DuckRuntime<MujocoIo>,
+    tick: u64,
 }
 
 unsafe fn write_error(buffer: *mut c_char, size: c_int, message: &str) {
@@ -209,6 +221,8 @@ pub unsafe extern "C" fn duck_core_new(
             fingerprint,
             timeline: VecDeque::new(),
             pending_restore: None,
+            branches: Vec::new(),
+            selected: 0,
         })
     });
 
@@ -387,6 +401,31 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
                 core.label = format!("no checkpoint at tick {tick}");
             }
         }
+        Intent::Fork(label) => {
+            let Some(fork) = core.runtime.fork() else {
+                core.label = "fork refused: the body cannot be cloned".to_owned();
+                return;
+            };
+            core.branches.push(Branch {
+                label,
+                tick: fork.clock().tick,
+                runtime: fork,
+            });
+        }
+        Intent::DropBranch(label) => {
+            core.branches.retain(|branch| branch.label != label);
+            if core.selected > core.branches.len() {
+                core.selected = 0;
+            }
+        }
+        Intent::SelectBranch(label) => {
+            let index = core
+                .branches
+                .iter()
+                .position(|branch| branch.label == label)
+                .map_or(0, |index| index + 1);
+            core.selected = index;
+        }
         Intent::Seek(ticks) => {
             let current = core.runtime.clock().tick;
             let target = current.saturating_sub(ticks);
@@ -418,6 +457,33 @@ fn publish_state(core: &DuckCore) {
     let gravity = core.runtime.io().gravity();
     let clock = core.runtime.clock();
     let checkpoints: Vec<u64> = core.timeline.iter().map(|saved| saved.tick).collect();
+    let branches: Vec<serde_json::Value> = core
+        .branches
+        .iter()
+        .map(|branch| {
+            let clock = branch.runtime.clock();
+            json!({
+                "label": branch.label,
+                "tick": clock.tick,
+                "paused": clock.paused,
+                "trunk": branch.runtime.io().trunk(),
+                "gravity": branch.runtime.io().gravity(),
+                "label_state": branch.runtime.bringup().label(),
+            })
+        })
+        .collect();
+    let selected = if core.selected == 0 {
+        String::new()
+    } else {
+        core.branches
+            .get(core.selected - 1)
+            .map(|branch| branch.label.clone())
+            .unwrap_or_default()
+    };
+    core.intents.set_branches(json!({
+        "branches": branches,
+        "selected": selected,
+    }));
     core.intents.set_time(json!({
         "tick": clock.tick,
         "paused": clock.paused,
@@ -488,7 +554,28 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     if core.timeline.back().is_none_or(|last| last.tick < core.runtime.clock().tick) {
         checkpoint_now(core);
     }
-    match core.runtime.tick() {
+    // Every branch steps too, on its own body and its own state. A branch is
+    // a separate duck from here on: nothing that happens to one reaches the
+    // other.
+    for branch in &mut core.branches {
+        if !branch.runtime.clock().paused {
+            let _ = branch.runtime.tick();
+            branch.tick = branch.runtime.clock().tick;
+        }
+    }
+
+    let report = if core.selected == 0 {
+        core.runtime.tick()
+    } else {
+        match core.branches.get_mut(core.selected - 1) {
+            Some(branch) => branch.runtime.tick(),
+            None => {
+                core.selected = 0;
+                core.runtime.tick()
+            }
+        }
+    };
+    match report {
         Ok(report) => {
             core.label = report.label.clone();
             core.last = Some(report);

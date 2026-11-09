@@ -516,6 +516,28 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.limp_fall = LimpFall::Idle;
     }
 
+    /// A second duck at this exact instant: its own body (a deep copy of the
+    /// MuJoCo model and data), its own controller and policy sessions, and the
+    /// same checkpoint. The two then run independently — one branch's pushes,
+    /// skills and world changes never reach the other.
+    pub fn fork(&self) -> Option<Self> {
+        let body = self.safety.io().fork()?;
+        let tuning = self.controller.tuning();
+        let skills = self.controller.skill_tuning();
+        let mut fork = DuckRuntime::new(
+            body,
+            self.controller.clone_policy(),
+            tuning,
+            skills,
+            self.safety.config(),
+        );
+        let checkpoint = self.checkpoint()?;
+        if !fork.restore(&checkpoint) {
+            return None;
+        }
+        Some(fork)
+    }
+
     /// Shake/shove input: an external trunk velocity impulse.
     pub fn push(&mut self, velocity: [f64; 3]) -> Result<(), RuntimeError> {
         self.safety.push(velocity)?;

@@ -48,6 +48,12 @@ pub enum Intent {
     Restore(u64),
     /// Time machine: step back `ticks` and resume from there.
     Seek(u64),
+    /// Fork the duck at this instant; `label` names the branch.
+    Fork(String),
+    /// Drop a branch.
+    DropBranch(String),
+    /// Drive one branch, or the original when empty.
+    SelectBranch(String),
 }
 
 pub struct IntentQueue {
@@ -57,6 +63,8 @@ pub struct IntentQueue {
     fingerprint: Mutex<String>,
     /// The time machine's answers, filled by the core on the next tick.
     time: Mutex<Value>,
+    /// The forks: one entry per branch, filled by the core.
+    branches: Mutex<Value>,
 }
 
 impl Default for IntentQueue {
@@ -79,6 +87,7 @@ impl IntentQueue {
             })),
             skills: Mutex::new(Vec::new()),
             fingerprint: Mutex::new("{}".to_owned()),
+            branches: Mutex::new(json!({ "branches": [], "selected": "" })),
             time: Mutex::new(json!({
                 "tick": 0,
                 "paused": false,
@@ -130,6 +139,14 @@ impl IntentQueue {
 
     pub fn time_json(&self) -> String {
         self.time.lock().expect("intent time").to_string()
+    }
+
+    pub fn set_branches(&self, value: Value) {
+        *self.branches.lock().expect("intent branches") = value;
+    }
+
+    pub fn branches_json(&self) -> String {
+        self.branches.lock().expect("intent branches").to_string()
     }
 }
 
@@ -210,6 +227,27 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/fingerprint") => Ok(queue.fingerprint_json()),
         ("GET", "/time") => Ok(queue.time_json()),
         ("GET", "/timeline") => Ok(queue.time_json()),
+        ("GET", "/branches") => Ok(queue.branches_json()),
+        ("POST", "/fork") => {
+            let label = value["label"]
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| "branch".to_owned());
+            queue.push(Intent::Fork(label.clone()));
+            Ok(json!({ "ok": true, "label": label }).to_string())
+        }
+        ("POST", "/branch/drop") => match value["label"].as_str() {
+            Some(label) => {
+                queue.push(Intent::DropBranch(label.to_owned()));
+                Ok(json!({ "ok": true }).to_string())
+            }
+            None => Err("missing label"),
+        },
+        ("POST", "/branch/select") => {
+            let label = value["label"].as_str().unwrap_or("").to_owned();
+            queue.push(Intent::SelectBranch(label));
+            Ok(json!({ "ok": true }).to_string())
+        }
         ("POST", "/time") => {
             let paused = value["paused"].as_bool();
             let speed = value["speed"].as_f64();

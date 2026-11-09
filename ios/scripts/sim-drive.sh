@@ -351,6 +351,34 @@ esac
 api POST /time '{"paused":false}' > /dev/null
 api POST /time '{"speed":1.0}' > /dev/null
 
+# ---------------------------------------------------------------- fork
+# A branch must start as the same duck and then be independent of it.
+echo "--- fork ---"
+TRUNK_ORIGINAL=$(api GET /state | field trunk)
+api POST /fork '{"label":"a"}' > /dev/null
+sleep 0.5
+BRANCHES=$(api GET /branches || true)
+echo "$BRANCHES" | tee "$OUT/branches.json" > /dev/null
+printf '%s' "$BRANCHES" | grep -q '"label":"a"'
+check $? "fork creates a branch" "$(printf '%s' "$BRANCHES" | head -c 140)"
+
+# The branch starts where the original was: same tick, same trunk.
+printf '%s' "$BRANCHES" | grep -q '"tick"'
+check $? "the branch reports its own tick" ""
+
+api POST /branch/select '{"label":"a"}' > /dev/null
+sleep 0.5
+SELECTED=$(api GET /branches | field selected)
+[ "$SELECTED" = "a" ]; check $? "a branch can be selected" "selected=$SELECTED"
+api POST /branch/select '{"label":""}' > /dev/null
+sleep 0.3
+
+api POST /branch/drop '{"label":"a"}' > /dev/null
+sleep 0.5
+DROPPED=$(api GET /branches || true)
+printf '%s' "$DROPPED" | grep -q '"label":"a"'
+[ $? -ne 0 ]; check $? "a branch can be dropped" ""
+
 # ---------------------------------------------------------------- frames
 echo "--- frames ---"
 for i in 1 2 3; do

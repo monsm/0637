@@ -39,11 +39,38 @@ index b53d572..072887d 100644
  
  [dev-dependencies]
  serde_json.workspace = true
+diff --git a/duck-control/src/fall.rs b/duck-control/src/fall.rs
+index 19444e4..121b2b3 100644
+--- a/duck-control/src/fall.rs
++++ b/duck-control/src/fall.rs
+@@ -109,6 +109,22 @@ pub struct FallPredictor {
+ }
+ 
+ impl FallPredictor {
++    /// The debounce state a rewind has to put back.
++    pub fn state(&self) -> (u64, u64, bool) {
++        (
++            self.falling_for.as_millis() as u64,
++            self.upright_for.as_millis() as u64,
++            self.armed,
++        )
++    }
++
++    /// Restore what [`Self::state`] returned.
++    pub fn set_state(&mut self, falling_ms: u64, upright_ms: u64, armed: bool) {
++        self.falling_for = Duration::from_millis(falling_ms);
++        self.upright_for = Duration::from_millis(upright_ms);
++        self.armed = armed;
++    }
++
+     pub fn new(config: FallPredictorConfig) -> Self {
+         Self {
+             config,
 diff --git a/duck-control/src/io.rs b/duck-control/src/io.rs
-index c250752..ce2012e 100644
+index c250752..2b4b839 100644
 --- a/duck-control/src/io.rs
 +++ b/duck-control/src/io.rs
-@@ -117,6 +117,13 @@ pub trait RobotIo {
+@@ -117,6 +117,33 @@ pub trait RobotIo {
      fn read(&mut self) -> Result<Sensors>;
      fn write(&mut self, targets: &JointTargets) -> Result<()>;
  
@@ -52,6 +79,26 @@ index c250752..ce2012e 100644
 +    /// body ignore it.
 +    fn push(&mut self, _velocity: [f64; 3]) -> Result<()> {
 +        Ok(())
++    }
++
++    /// A second body at the same state, for a fork. A bus robot has one body
++    /// and cannot be cloned; a simulated one can.
++    fn fork(&self) -> Option<Self>
++    where
++        Self: Sized,
++    {
++        None
++    }
++
++    /// The body's whole state, for a checkpoint. A backend with no state to
++    /// save (a bus robot) returns nothing and cannot be rewound.
++    fn snapshot(&self) -> Option<Vec<f64>> {
++        None
++    }
++
++    /// Put back what [`Self::snapshot`] returned.
++    fn restore(&mut self, _state: &[f64]) -> bool {
++        false
 +    }
 +
      /// Whether [`Sensors::velocities`] from this backend is a measurement.
@@ -70,7 +117,7 @@ index 900e3ff..71fd75f 100644
  pub mod fall;
  pub mod imu;
 diff --git a/duck-control/src/policy.rs b/duck-control/src/policy.rs
-index 17a5a97..f660c7c 100644
+index 17a5a97..d003240 100644
 --- a/duck-control/src/policy.rs
 +++ b/duck-control/src/policy.rs
 @@ -14,6 +14,7 @@
@@ -112,6 +159,15 @@ index 17a5a97..f660c7c 100644
  /// Run the `ort` calls, turning a panic from inside them into a [`PolicyError`].
  ///
  /// `ort` treats some initialisation failures as unrecoverable and panics rather than
+@@ -203,7 +214,7 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
+ /// and this enum is how it names its choice. Asking for a network that is not loaded falls
+ /// back to walking rather than panicking, but the scheduler is expected to check `has_*`
+ /// first; the fallback exists so a race cannot kill the control thread.
+-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+ pub enum Net {
+     Walk,
+     Stand,
 @@ -258,6 +269,7 @@ impl Policy {
      /// `stand` is optional: without it the walking policy runs at every velocity, which is
      /// what a single-policy bundle does.
@@ -120,7 +176,76 @@ index 17a5a97..f660c7c 100644
          ensure_runtime()?;
  
          // Everything below calls into `ort`, and `ort` panics on failures it considers
-@@ -450,6 +462,7 @@ impl Policy {
+@@ -412,6 +424,68 @@ impl Policy {
+         }
+     }
+ 
++    /// The file behind a loaded network, for a fork that reloads the set.
++    pub fn path_of(&self, net: Net) -> Option<PathBuf> {
++        let network = match net {
++            Net::Walk => Some(&self.walk),
++            Net::Stand => self.stand.as_ref(),
++            Net::SitStand => self.sitstand.as_ref(),
++            Net::GroundPick => self.ground_pick.as_ref(),
++            Net::Skill(i) => self.skills.get(i),
++        };
++        network.map(|network| network.path.clone())
++    }
++
++    pub fn skill_paths(&self) -> Vec<PathBuf> {
++        self.skills.iter().map(|network| network.path.clone()).collect()
++    }
++
++    pub fn standing_threshold(&self) -> f64 {
++        self.standing_threshold
++    }
++
++    /// The network driving this tick, for a snapshot.
++    pub fn active_net(&self) -> Option<Net> {
++        self.active
++    }
++
++    /// Restore the driving network and its recurrent memory (see
++    /// [`Network::state_bytes`]). A digest mismatch leaves the network reset.
++    pub fn restore_state(&mut self, net: Option<Net>, bytes: &[u8]) -> bool {
++        self.reset();
++        let Some(net) = net else {
++            return bytes.is_empty();
++        };
++        let target = match net {
++            Net::Walk => Some(&mut self.walk),
++            Net::Stand => self.stand.as_mut(),
++            Net::SitStand => self.sitstand.as_mut(),
++            Net::GroundPick => self.ground_pick.as_mut(),
++            Net::Skill(i) => self.skills.get_mut(i),
++        };
++        let Some(target) = target else {
++            return false;
++        };
++        if !target.set_state_bytes(bytes) {
++            return false;
++        }
++        self.active = Some(net);
++        true
++    }
++
++    /// The recurrent memory of the network driving this tick.
++    pub fn state_bytes(&self) -> Vec<u8> {
++        let network = match self.active {
++            Some(Net::Walk) => Some(&self.walk),
++            Some(Net::Stand) => self.stand.as_ref(),
++            Some(Net::SitStand) => self.sitstand.as_ref(),
++            Some(Net::GroundPick) => self.ground_pick.as_ref(),
++            Some(Net::Skill(i)) => self.skills.get(i),
++            None => None,
++        };
++        network.and_then(Network::state_bytes).unwrap_or_default()
++    }
++
+     /// Start a new episode, including when resuming after disable or fall recovery.
+     /// A network also starts fresh whenever selection switches away and back to it.
+     pub fn reset(&mut self) {
+@@ -450,6 +524,7 @@ impl Policy {
  /// spend — so the IPC caller runs it on its own runtime, and the loop only ever calls it in its
  /// preamble, before the first tick is due.
  pub fn validate(path: &Path) -> Result<(), PolicyError> {
@@ -128,14 +253,75 @@ index 17a5a97..f660c7c 100644
      ensure_runtime()?;
      catching_ort_panics(|| open(path).map(drop))
  }
+@@ -470,6 +545,48 @@ struct LstmState {
+ }
+ 
+ impl Network {
++    /// The recurrent memory, as flat little-endian f32: the `h` block then the
++    /// `c` block. `None` for a feed-forward network, which has no memory to
++    /// save and needs none to be restored.
++    pub fn state_bytes(&self) -> Option<Vec<u8>> {
++        let state = self.state.as_ref()?;
++        let (_, h) = state.h.try_extract_tensor::<f32>().ok()?;
++        let (_, c) = state.c.try_extract_tensor::<f32>().ok()?;
++        let mut bytes = Vec::with_capacity((h.len() + c.len()) * 4);
++        for value in h.iter().chain(c.iter()) {
++            bytes.extend_from_slice(&value.to_le_bytes());
++        }
++        Some(bytes)
++    }
++
++    /// Restore what [`Self::state_bytes`] returned. A length or digest mismatch
++    /// is refused rather than half-applied: a snapshot from another build must
++    /// not silently become this one's memory.
++    pub fn set_state_bytes(&mut self, bytes: &[u8]) -> bool {
++        let Some(state) = self.state.as_mut() else {
++            return bytes.is_empty();
++        };
++        let Ok((_, h)) = state.h.try_extract_tensor_mut::<f32>() else {
++            return false;
++        };
++        let Ok((_, c)) = state.c.try_extract_tensor_mut::<f32>() else {
++            return false;
++        };
++        if bytes.len() != (h.len() + c.len()) * 4 {
++            return false;
++        }
++        let mut values = bytes.chunks_exact(4).map(|chunk| {
++            f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]])
++        });
++        for slot in h.iter_mut() {
++            *slot = values.next().unwrap_or(0.0);
++        }
++        for slot in c.iter_mut() {
++            *slot = values.next().unwrap_or(0.0);
++        }
++        true
++    }
++
+     fn reset(&mut self) {
+         if let Some(state) = &mut self.state {
+             state.h.try_extract_tensor_mut::<f32>().unwrap().1.fill(0.0);
 diff --git a/duck-control/src/safety.rs b/duck-control/src/safety.rs
-index 9330f3a..c0d5a31 100644
+index 9330f3a..2bf92f5 100644
 --- a/duck-control/src/safety.rs
 +++ b/duck-control/src/safety.rs
-@@ -179,6 +179,19 @@ impl<T: RobotIo> Safety<T> {
+@@ -179,6 +179,47 @@ impl<T: RobotIo> Safety<T> {
          self.io.read()
      }
  
++    /// The debounce state a rewind has to put back: how long gravity has been
++    /// past the threshold, and the verdict that follows from it.
++    pub fn fall_state(&self) -> (u64, bool) {
++        (self.falling_for.as_millis() as u64, self.fallen)
++    }
++
++    /// Restore what [`Self::fall_state`] returned.
++    pub fn set_fall_state(&mut self, millis: u64, fallen: bool) {
++        self.falling_for = Duration::from_millis(millis);
++        self.fallen = fallen;
++    }
++
 +    /// Read-only access to the body backend, for diagnostics and rendering.
 +    ///
 +    /// The write handle stays owned by safety: this cannot command a motor.
@@ -149,6 +335,167 @@ index 9330f3a..c0d5a31 100644
 +        self.io.push(velocity)
 +    }
 +
++    /// The safety numbers, so a fork starts with the same ones.
++    pub fn config(&self) -> SafetyConfig {
++        self.config
++    }
++
++    /// The body's state, for a checkpoint (see [`RobotIo::snapshot`]).
++    pub fn snapshot(&self) -> Option<Vec<f64>> {
++        self.io.snapshot()
++    }
++
++    /// Put a checkpoint back, through the same door that owns the only write
++    /// handle. Returns false for a backend that cannot be rewound.
++    pub fn restore(&mut self, state: &[f64]) -> bool {
++        self.io.restore(state)
++    }
++
      /// Bus reads that are not part of the tick, passed through rather than exposing the IO.
      ///
      /// Safety owns the only `RobotIo` handle — that is what makes "nothing commands a motor
+diff --git a/robotd/src/control.rs b/robotd/src/control.rs
+index 62c39c1..b0bce0a 100644
+--- a/robotd/src/control.rs
++++ b/robotd/src/control.rs
+@@ -136,8 +136,8 @@ pub struct Step {
+ }
+ 
+ /// Where the robot is in the sit↔stand cycle.
+-#[derive(Debug, Clone, Copy, PartialEq)]
+-enum Sit {
++#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
++pub enum Sit {
+     Up,
+     /// The sitstand network holds the seat (posture flag 1).
+     Sitting,
+@@ -148,20 +148,39 @@ enum Sit {
+     },
+ }
+ 
++/// Everything about the controller that a rewind has to put back.
++///
++/// The policy's recurrent memory is not here — it lives inside the ONNX
++/// session and is saved separately — but the action fed back into the
++/// observation, the low-pass anchor, the skill in flight, the seat and the
++/// network choice all are. Missing any one of them makes a restored duck look
++/// right and then diverge.
++#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
++pub struct ControllerState {
++    pub last_action: Vec<f32>,
++    pub previous: Option<Vec<f64>>,
++    pub ground_pick: Option<f64>,
++    pub active: Option<ActiveSkill>,
++    pub sit: Sit,
++    pub sit_settle: f64,
++    pub auto_rise: bool,
++    pub last_net: Option<duck_control::policy::Net>,
++}
++
+ /// A one-shot skill mid-flight.
+-#[derive(Debug, Clone, Copy)]
+-struct ActiveSkill {
++#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
++pub struct ActiveSkill {
+     /// Index into the resolved skill list, which is also [`Net::Skill`]'s index.
+-    index: usize,
++    pub index: usize,
+     /// Whether it is doing the thing or coming back from it.
+-    phase: SkillPhase,
++    pub phase: SkillPhase,
+     /// Seconds left in this phase.
+-    remaining: f64,
++    pub remaining: f64,
+     /// Seconds left during which another request still counts as the button being held.
+     /// Roulade's chaining, generalised: counted down every tick, refreshed by each request
+     /// that lands while the skill runs, and positive at the end of a window means start
+     /// another.
+-    chain: f64,
++    pub chain: f64,
+ }
+ 
+ /// Which half of a skill is running.
+@@ -169,8 +188,8 @@ struct ActiveSkill {
+ /// Most skills only ever have the first. The second exists for a policy that does not end
+ /// itself — one that holds until told otherwise — where handing straight back to walk would
+ /// give it a robot mid-pose.
+-#[derive(Debug, Clone, Copy, PartialEq)]
+-enum SkillPhase {
++#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
++pub enum SkillPhase {
+     /// Driving `command`, for `duration`.
+     Holding,
+     /// Driving `unwind`, for `unwind_s`, before handing back.
+@@ -291,6 +310,72 @@ impl Controller {
+     /// unchanged if a skill is what is driving — `active` addresses that list by index. The one
+     /// exception is a seated robot, which carries across whatever changed: the seat is a static
+     /// pose on a constant flag, and any sitstand network asked to hold it holds it.
++    pub fn tuning(&self) -> Tuning {
++        self.tuning
++    }
++
++    pub fn skill_tuning(&self) -> SkillTuning {
++        self.skills.clone()
++    }
++
++    /// A second policy with the same networks, for a fork: each branch needs
++    /// its own sessions because the recurrent memory lives inside them.
++    pub fn clone_policy(&self) -> Policy {
++        let paths = duck_control::policy::PolicyPaths {
++            walk: self.policy.path_of(duck_control::policy::Net::Walk).unwrap_or_default(),
++            stand: self.policy.path_of(duck_control::policy::Net::Stand),
++            sitstand: self.policy.path_of(duck_control::policy::Net::SitStand),
++            ground_pick: self.policy.path_of(duck_control::policy::Net::GroundPick),
++            skills: self.policy.skill_paths(),
++        };
++        Policy::load(&paths, self.policy.standing_threshold()).expect("the loaded set reloads")
++    }
++
++    /// The policy, for a checkpoint (read).
++    pub fn policy_ref(&self) -> &Policy {
++        &self.policy
++    }
++
++    /// The policy, for a checkpoint (write).
++    pub fn policy_mut(&mut self) -> &mut Policy {
++        &mut self.policy
++    }
++
++    /// The controller's own state, for a snapshot.
++    pub fn snapshot(&self) -> ControllerState {
++        ControllerState {
++            last_action: self.last_action.to_vec(),
++            previous: self.previous.map(|values| values.to_vec()),
++            ground_pick: self.ground_pick,
++            active: self.active,
++            sit: self.sit,
++            sit_settle: self.sit_settle,
++            auto_rise: self.auto_rise,
++            last_net: self.last_net,
++        }
++    }
++
++    /// Put back what [`Self::snapshot`] returned.
++    pub fn restore(&mut self, state: &ControllerState) {
++        if state.last_action.len() == ACTION_LEN {
++            self.last_action.copy_from_slice(&state.last_action);
++        }
++        self.previous = state.previous.as_ref().and_then(|values| {
++            let mut restored = [0.0; NUM_JOINTS];
++            if values.len() != NUM_JOINTS {
++                return None;
++            }
++            restored.copy_from_slice(values);
++            Some(restored)
++        });
++        self.ground_pick = state.ground_pick;
++        self.active = state.active;
++        self.sit = state.sit;
++        self.sit_settle = state.sit_settle;
++        self.auto_rise = state.auto_rise;
++        self.last_net = state.last_net;
++    }
++
+     pub fn carry_over(&mut self, from: &Controller) {
+         self.policy.carry_over(&from.policy);
+         self.last_action = from.last_action;

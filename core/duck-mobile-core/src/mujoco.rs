@@ -39,6 +39,7 @@ unsafe extern "C" {
     fn duck_mj_state_size(handle: *const DuckMj) -> c_int;
     fn duck_mj_state_get(handle: *const DuckMj, out: *mut c_double);
     fn duck_mj_state_set(handle: *mut DuckMj, input: *const c_double);
+    fn duck_mj_clone(handle: *const DuckMj) -> *mut DuckMj;
     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
     fn duck_mj_set_timestep(handle: *mut DuckMj, dt: c_double);
 
@@ -504,6 +505,45 @@ impl MujocoIo {
     /// The simulation state, for the time machine: MuJoCo's integration state
     /// plus the bookkeeping that lives on this side of the boundary (the BAM
     /// torque history, the hold pose, torque and release flags).
+    /// A deep copy of this body: its own model (the BAM loop writes friction
+    /// into it every substep, so a shared model would make branches race) and
+    /// its own data at the same state.
+    pub fn fork(&self) -> Option<Self> {
+        let handle = unsafe { duck_mj_clone(self.handle) };
+        if handle.is_null() {
+            return None;
+        }
+        let mut copy = Self {
+            handle,
+            nq: self.nq,
+            nv: self.nv,
+            nu: self.nu,
+            trunk_qpos: self.trunk_qpos,
+            trunk_dof: self.trunk_dof,
+            wire_actuator: self.wire_actuator,
+            wire_qpos: self.wire_qpos,
+            wire_dof: self.wire_dof,
+            wire_backlash_qpos: self.wire_backlash_qpos,
+            wire_backlash_dof: self.wire_backlash_dof,
+            actuator_qpos: self.actuator_qpos.clone(),
+            actuator_dof: self.actuator_dof.clone(),
+            actuator_wire: self.actuator_wire.clone(),
+            base_gain: self.base_gain.clone(),
+            held_trunk: self.held_trunk,
+            held_joints: self.held_joints,
+            kp: self.kp,
+            torque_on: self.torque_on,
+            released: self.released,
+            bam: self.bam.as_ref().map(|bam| BamState {
+                model: bam.model.clone(),
+                q_target: bam.q_target.clone(),
+                previous_torque: bam.previous_torque.clone(),
+            }),
+            steps_per_tick: self.steps_per_tick,
+        };
+        Some(copy)
+    }
+
     /// The raw handle, for the runtime's snapshot path. Borrowed for the call only.
     pub fn handle(&self) -> *mut DuckMj {
         self.handle
@@ -764,6 +804,10 @@ impl RobotIo for MujocoIo {
             }
         }
         Ok(())
+    }
+
+    fn fork(&self) -> Option<Self> {
+        MujocoIo::fork(self)
     }
 
     fn snapshot(&self) -> Option<Vec<f64>> {

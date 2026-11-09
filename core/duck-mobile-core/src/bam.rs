@@ -7,6 +7,7 @@
 
 use serde_json::Value;
 
+#[derive(Clone)]
 pub struct BamModel {
     pub kt: f64,
     pub r: f64,
