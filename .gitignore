@@ -51,3 +51,6 @@ work/audit_tmp/
 
 # Scratch patch scripts
 work/patch_*.py
+
+# Workflow agents' scratch
+work/scratch/
