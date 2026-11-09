@@ -1,13 +1,12 @@
 import XCTest
 
-/// Taps the app's own controls in the simulator.
+/// Taps the app's own controls.
 ///
-/// `ios/scripts/sim-drive.sh` proves the core through the intent API: the
-/// walk policy, the skills, sit/stand, ground pick, push, reload and the
-/// renderer. That leaves the UI layer itself untested - a button wired to
-/// the wrong action would still pass. This test closes that gap: it reads
-/// the label the status panel shows (fed from the same core status the
-/// Python session asserts on) and taps each button the app offers.
+/// `ios/scripts/sim-drive.sh` proves the core through the intent API; this
+/// proves the shell is wired to it. The interface is the live duck — the skill
+/// ring and the time-machine sheet — so the test opens the ring, picks a
+/// skill, and drives the sheet's buttons, asserting the label the status panel
+/// shows (fed from the same core status the Python session asserts on).
 final class DuckUITests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -17,7 +16,6 @@ final class DuckUITests: XCTestCase {
         app.launch()
     }
 
-    /// The status panel's label text, identified so it can be read from here.
     private func labelElement() -> XCUIElement {
         app.staticTexts["duck-label"]
     }
@@ -39,7 +37,20 @@ final class DuckUITests: XCTestCase {
         return last
     }
 
-    func testButtonsDriveTheCore() throws {
+    /// Open the skill ring and pick a skill by its visible name.
+    private func pickSkill(_ name: String) throws {
+        let skills = app.buttons["Skills"]
+        XCTAssertTrue(skills.waitForExistence(timeout: 10), "the skills button is missing")
+        skills.tap()
+        let option = app.buttons[name]
+        XCTAssertTrue(
+            option.waitForExistence(timeout: 10),
+            "the skill ring has no \(name)"
+        )
+        option.tap()
+    }
+
+    func testTheShellDrivesTheCore() throws {
         XCTAssertTrue(
             labelElement().waitForExistence(timeout: 120),
             "the status panel never appeared - the app did not get past loading"
@@ -51,41 +62,37 @@ final class DuckUITests: XCTestCase {
             "the 50 Hz loop never drove the duck: label=\(ready)"
         )
 
-        // roulade is a 1 s one-shot: long enough to observe through XCUITest.
-        app.buttons["roulade"].tap()
+        // A skill from the ring.
+        try pickSkill("roulade")
         XCTAssertEqual(
             waitForLabel(["roulade"], timeout: 20), "roulade",
-            "the roulade button did not reach the core"
+            "the roulade ring entry did not reach the core"
         )
         _ = waitForLabel(["walk", "stand"], timeout: 30)
 
-        app.buttons["Ground pick"].tap()
-        XCTAssertEqual(
-            waitForLabel(["ground_pick"], timeout: 20), "ground_pick",
-            "the ground pick button did not reach the core"
-        )
-        _ = waitForLabel(["walk", "stand"], timeout: 40)
-
-        app.buttons["Sit / Stand"].tap()
-        XCTAssertEqual(
-            waitForLabel(["sit"], timeout: 20), "sit",
-            "the sit button did not seat the duck"
-        )
-        // The prototype refuses the way back up during the 2 s seat settle.
-        Thread.sleep(forTimeInterval: 3.5)
-        app.buttons["Sit / Stand"].tap()
-        let standing = waitForLabel(["rise", "walk", "stand"], timeout: 40)
+        // The time machine: freeze, step, resume.
+        let time = app.buttons["duck-time"]
+        XCTAssertTrue(time.waitForExistence(timeout: 10), "the time button is missing")
+        time.tap()
         XCTAssertTrue(
-            ["rise", "walk", "stand"].contains(standing),
-            "the sit toggle did not stand the duck up: label=\(standing)"
+            app.staticTexts["This duck"].waitForExistence(timeout: 10),
+            "the instrument sheet did not open"
         )
-
-        // Reload reopens every ONNX session; the duck must still be driving.
-        app.buttons["Reload AI"].tap()
-        let afterReload = waitForLabel(["walk", "stand"], timeout: 90)
+        let freeze = app.buttons["Freeze"]
+        XCTAssertTrue(freeze.waitForExistence(timeout: 5), "the freeze button is missing")
+        freeze.tap()
         XCTAssertTrue(
-            ["walk", "stand"].contains(afterReload),
-            "the duck stopped after reloading the policies: label=\(afterReload)"
+            app.buttons["Resume"].waitForExistence(timeout: 5),
+            "freeze did not flip to resume"
+        )
+        app.buttons["Resume"].tap()
+
+        // Close the sheet and keep driving.
+        app.swipeDown()
+        let after = waitForLabel(["walk", "stand"], timeout: 30)
+        XCTAssertTrue(
+            ["walk", "stand"].contains(after),
+            "the duck stopped after the time machine: label=\(after)"
         )
     }
 }

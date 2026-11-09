@@ -874,6 +874,86 @@ pub unsafe extern "C" fn duck_core_mesh_name(
         .map_or(std::ptr::null(), |name| name.as_ptr())
 }
 
+/// Time-machine controls for the shell. They take effect on the next tick.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_set_paused(core: *mut DuckCore, paused: c_int) {
+    if !core.is_null() {
+        (*core).runtime.set_paused(paused != 0);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_set_speed(core: *mut DuckCore, speed: c_double) {
+    if !core.is_null() {
+        (*core).runtime.set_speed(speed);
+    }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_step(core: *mut DuckCore, ticks: c_int) {
+    if core.is_null() {
+        return;
+    }
+    let core = &mut *core;
+    let was_paused = core.runtime.clock().paused;
+    core.runtime.set_paused(false);
+    for _ in 0..ticks.clamp(1, 500) {
+        let _ = core.runtime.tick();
+    }
+    core.runtime.set_paused(was_paused);
+}
+
+/// Step back to a saved tick. Returns 0 when the rewind landed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_seek(core: *mut DuckCore, back_ticks: c_int) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let core = &mut *core;
+    let target = core
+        .runtime
+        .clock()
+        .tick
+        .saturating_sub(back_ticks.max(0) as u64);
+    let Some(checkpoint) = core
+        .timeline
+        .iter()
+        .rev()
+        .find(|checkpoint| checkpoint.tick <= target)
+        .cloned()
+    else {
+        return -1;
+    };
+    if !core.runtime.restore(&checkpoint) {
+        return -1;
+    }
+    core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
+    0
+}
+
+/// Fork the duck at this instant. Returns 0 on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_fork(core: *mut DuckCore, label: *const c_char) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let core = &mut *core;
+    let Some(fork) = core.runtime.fork() else {
+        return -1;
+    };
+    let label = if label.is_null() {
+        format!("branch-{}", core.branches.len() + 1)
+    } else {
+        CStr::from_ptr(label).to_string_lossy().into_owned()
+    };
+    core.branches.push(Branch {
+        label,
+        tick: fork.clock().tick,
+        runtime: fork,
+    });
+    0
+}
+
 /// The time machine, for a shell that drives the loop itself: whether the
 /// duck is frozen, and how many ticks one wall-clock frame should advance.
 #[unsafe(no_mangle)]

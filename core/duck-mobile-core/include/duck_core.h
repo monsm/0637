@@ -54,6 +54,13 @@ int duck_core_geom_info(DuckCore* core, int geom, int* body, int* geom_type,
 
 const char* duck_core_mesh_name(DuckCore* core, int mesh);
 
+/* Time machine controls: freeze, speed, single-step, rewind, fork. */
+void duck_core_set_paused(DuckCore* core, int paused);
+void duck_core_set_speed(DuckCore* core, double speed);
+void duck_core_step(DuckCore* core, int ticks);
+int duck_core_seek(DuckCore* core, int back_ticks);
+int duck_core_fork(DuckCore* core, const char* label);
+
 /* Time machine: frozen?, ticks per frame, and the current tick index. */
 int duck_core_paused(DuckCore* core);
 double duck_core_speed(DuckCore* core);

@@ -22,6 +22,20 @@ final class DuckController: ObservableObject {
     @Published var label = "idle"
     @Published var joystick = CGPoint.zero
     @Published var trunk = SIMD3<Float>(0, 0, 0.12)
+    @Published var gravity = SIMD3<Float>(0, 0, -1)
+    /// The time machine, as the shell shows it.
+    @Published var tick: UInt64 = 0
+    @Published var oldestTick: UInt64 = 0
+    @Published var paused = false
+    @Published var speed = 1.0
+    @Published var branchCount = 0
+    @Published var fingerprint = ""
+    /// The latest phone-sensor readings, already formatted for display.
+    @Published var sensorMode = "twin"
+    @Published var cameraSummary = "—"
+    @Published var microphoneSummary = "—"
+    @Published var depthSummary = "—"
+    @Published var imuSummary = "—"
 
     private(set) var core: OpaquePointer?
     private var timer: Timer?
@@ -102,6 +116,8 @@ final class DuckController: ObservableObject {
             NSLog("duck: intent server -> %d", port)
             self.startTimer()
             self.startMotion()
+            self.refreshDetails()
+            self.startSensorPolling()
         }
     }
 
@@ -208,6 +224,100 @@ final class DuckController: ObservableObject {
         }
     }
 
+    /// The sensor sheet reads what the core last saw. The shell polls its own
+    /// server so the phone sensors have one path in (POST /sensor) and one out.
+    private var sensorTimer: Timer?
+
+    func startSensorPolling() {
+        guard sensorTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.pollSensors()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        sensorTimer = timer
+    }
+
+    private func pollSensors() {
+        guard let url = URL(string: "http://127.0.0.1:8765/sensors") else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 1.5
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.sensorMode = json["mode"] as? String ?? "twin"
+                self.cameraSummary = Self.summary(json["camera"], keys: ["width", "height", "exposure_s"])
+                self.microphoneSummary = Self.summary(json["microphone"], keys: ["rms", "peak_hz"])
+                self.depthSummary = Self.summary(json["depth"], keys: ["rows", "cols", "min_m", "max_m"])
+                self.imuSummary = Self.summary(json["imu"], keys: ["acceleration"])
+            }
+        }.resume()
+    }
+
+    private static func summary(_ reading: Any?, keys: [String]) -> String {
+        guard let reading = reading as? [String: Any],
+              let value = reading["value"] as? [String: Any] else { return "—" }
+        let parts: [String] = keys.compactMap { key in
+            guard let raw = value[key] else { return nil }
+            if let number = raw as? NSNumber { return "\(key) \(number)" }
+            if let array = raw as? [NSNumber] {
+                return "\(key) " + array.map { String(format: "%.2f", $0.doubleValue) }.joined(separator: ",")
+            }
+            return nil
+        }
+        return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+    }
+
+    private func refreshClock() {
+        guard let core else { return }
+        tick = duck_core_tick_index(core)
+        paused = duck_core_paused(core) != 0
+        speed = duck_core_speed(core)
+    }
+
+    /// The time machine, from the shell's own buttons.
+    func setPaused(_ value: Bool) {
+        guard let core else { return }
+        duck_core_set_paused(core, value ? 1 : 0)
+        paused = value
+    }
+
+    func step() {
+        guard let core else { return }
+        duck_core_step(core, 1)
+        refreshClock()
+    }
+
+    func setSpeed(_ value: Double) {
+        guard let core else { return }
+        duck_core_set_speed(core, value)
+        speed = value
+    }
+
+    /// Step back half a second and resume from there.
+    func rewind() {
+        guard let core else { return }
+        _ = duck_core_seek(core, 25)
+        refreshClock()
+    }
+
+    func fork() {
+        guard let core else { return }
+        if duck_core_fork(core, nil) == 0 {
+            branchCount += 1
+        }
+    }
+
+    /// Load the fingerprint and the sensor summaries once the core is up.
+    func refreshDetails() {
+        guard let core else { return }
+        if let pointer = duck_core_fingerprint(core) {
+            fingerprint = String(cString: pointer)
+        }
+    }
+
     /// robotd's AxisBinding::evaluate: inside 0.1 the axis reads zero.
     private func deadzone(_ value: Float) -> Float {
         abs(value) < 0.1 ? 0 : value
@@ -244,6 +354,11 @@ final class DuckController: ObservableObject {
                     Float(status.trunk.1),
                     Float(status.trunk.2)
                 )
+                gravity = SIMD3<Float>(
+                    Float(status.gravity.0),
+                    Float(status.gravity.1),
+                    Float(status.gravity.2)
+                )
                 // `char label[64]` imports as a 64-tuple of CChar.
                 label = withUnsafeBytes(of: status.label) { raw in
                     guard let base = raw.baseAddress else { return "" }
@@ -251,6 +366,7 @@ final class DuckController: ObservableObject {
                 }
             }
             lastStatus = Date()
+            refreshClock()
         }
     }
 
