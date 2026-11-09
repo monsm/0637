@@ -170,6 +170,38 @@ def count_near(frame, target, tolerance, region=None):
     return found
 
 
+def count_neutral_bright(frame, min_value, max_spread, region=None):
+    """Pixels that read as a white/neutral shell: bright and near-grey.
+
+    Under PBR the shell is not one flat colour any more — it shades from lit
+    to shadowed — so a fixed RGB window misses it. What identifies the shell
+    is that it is bright and has almost no hue; the grey internals are darker
+    and the floor is blue.
+    """
+    width = frame["width"]
+    height = frame["height"]
+    channels = frame["channels"]
+    pixels = frame["pixels"]
+    if region:
+        left, right = int(width * region[0]), int(width * region[2])
+        top, bottom = int(height * region[1]), int(height * region[3])
+    else:
+        left, right, top, bottom = 0, width, 0, height
+    found = 0
+    for y in range(top, bottom):
+        row = y * width
+        for x in range(left, right):
+            index = (row + x) * channels
+            r = pixels[index]
+            g = pixels[index + 1] if channels >= 3 else r
+            b = pixels[index + 2] if channels >= 3 else r
+            high = max(r, g, b)
+            low = min(r, g, b)
+            if high >= min_value and (high - low) <= max_spread:
+                found += 1
+    return found
+
+
 def check_single(frame, min_lit):
     print(
         f"{frame['path']}: {frame['width']}x{frame['height']} "
@@ -239,6 +271,7 @@ def main(argv):
     region = None
     region_lit = 0.02
     expectations = []
+    shell_expectation = []
     flags = []
     rest = list(argv[1:])
     while rest:
@@ -254,6 +287,13 @@ def main(argv):
                 return 2
         elif arg == "--region-lit":
             region_lit = float(rest.pop(0))
+        elif arg == "--expect-shell":
+            # min_value,min_pixels - a bright neutral surface, for PBR shading.
+            parts = [int(value) for value in rest.pop(0).split(",")]
+            if len(parts) != 2:
+                print("::error::--expect-shell wants min_value,min_pixels")
+                return 2
+            shell_expectation[:] = parts
         elif arg == "--expect-colour":
             # r,g,b,tolerance,min_pixels - the duck's own palette: light
             # shells and orange feet. A mis-assembled model renders grey
@@ -301,6 +341,20 @@ def main(argv):
                 print(
                     f"::error::only {got} pixels match the duck's colour "
                     f"({r},{g},{b}) - the model is not rendering its materials"
+                )
+                return 1
+    if shell_expectation:
+        min_value, want = shell_expectation
+        for frame in frames:
+            got = count_neutral_bright(frame, min_value, 26, region)
+            print(
+                f"{frame['path']}: bright neutral shell (>= {min_value}) "
+                f"-> {got} px (want >= {want})"
+            )
+            if got < want:
+                print(
+                    f"::error::only {got} bright neutral pixels - the duck's "
+                    "shell is not rendering"
                 )
                 return 1
     if len(frames) >= 2:

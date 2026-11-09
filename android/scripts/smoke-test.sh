@@ -105,7 +105,7 @@ if [ -s android-screen.png ]; then
   # enough of the screen to pass a whole-frame check while the 3D view is
   # still black.
   python3 scripts/check-frame.py android-screen.png \
-    --region 0.3,0.3,0.7,0.7 --region-lit 0.02     --expect-colour 255,140,50,110,150     --expect-colour 217,217,214,60,150 || exit 1
+    --region 0.3,0.3,0.7,0.7 --region-lit 0.02     --expect-colour 255,140,50,110,150     --expect-shell 170,300 || exit 1
 fi
 if [ -s android-screen.png ] && [ -s android-screen-2.png ]; then
   python3 scripts/check-frame.py android-screen.png android-screen-2.png \
