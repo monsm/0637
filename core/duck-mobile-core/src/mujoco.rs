@@ -35,6 +35,7 @@ unsafe extern "C" {
     fn duck_mj_ngeom(handle: *const DuckMj) -> c_int;
     fn duck_mj_nmesh(handle: *const DuckMj) -> c_int;
     fn duck_mj_version() -> *const c_char;
+    fn duck_mj_set_solver(handle: *mut DuckMj, iterations: c_int, ls_iterations: c_int);
     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
     fn duck_mj_set_timestep(handle: *mut DuckMj, dt: c_double);
 
@@ -210,6 +211,10 @@ impl MujocoIo {
                 .into_owned();
             return Err(message);
         }
+        // The walk policy was trained with 30 solver iterations and 50
+        // line-search iterations (the MJCF default is 100/20); matching the
+        // training solver is part of running the same duck.
+        unsafe { duck_mj_set_solver(handle, 30, 50) };
 
         let nq = unsafe { duck_mj_nq(handle) } as usize;
         let nv = unsafe { duck_mj_nv(handle) } as usize;

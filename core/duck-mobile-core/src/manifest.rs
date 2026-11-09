@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use duck_control::policy::PolicyPaths;
-use robotd_params::{Mode, SetManifest, SkillDef, SkillOverrides};
+use robotd_params::{Mode, SetManifest, SetPolicy, SkillDef, SkillOverrides};
 
 use crate::control::{SkillTuning, Tuning};
 
@@ -30,10 +30,41 @@ impl PolicyBundle {
     }
 }
 
+/// Read `manifest.json`, accepting both shapes the ecosystem publishes.
+///
+/// The official set is one manifest with a `policies` array. A community
+/// repo ships one policy and a *flat* manifest — the fields of a single
+/// entry with no array — and `SetManifest`'s `#[serde(default)]` turns that
+/// into an empty set, which used to leave the app with no one-shot skills at
+/// all. Parse the flat shape too, taking the only `.onnx` beside it when the
+/// entry does not name its file.
+fn read_manifest(dir: &Path) -> Option<SetManifest> {
+    let text = std::fs::read_to_string(dir.join("manifest.json")).ok()?;
+    if let Ok(set) = serde_json::from_str::<SetManifest>(&text) {
+        if !set.policies.is_empty() {
+            return Some(set);
+        }
+    }
+    let mut policy: SetPolicy = serde_json::from_str(&text).ok()?;
+    if policy.file.is_empty() {
+        let mut found: Vec<PathBuf> = std::fs::read_dir(dir)
+            .ok()?
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("onnx"))
+            .collect();
+        if found.len() != 1 {
+            return None;
+        }
+        policy.file = found.pop()?.file_name()?.to_str()?.to_owned();
+    }
+    Some(SetManifest {
+        policies: vec![policy],
+    })
+}
+
 pub fn load(dir: &Path) -> Result<PolicyBundle, String> {
-    let manifest: Option<SetManifest> = std::fs::read_to_string(dir.join("manifest.json"))
-        .ok()
-        .and_then(|text| serde_json::from_str(&text).ok());
+    let manifest = read_manifest(dir);
 
     let walk = ["velstand.onnx", "alpha_walking.onnx"]
         .iter()

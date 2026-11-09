@@ -382,10 +382,13 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.safety.fallen()
     }
 
-    /// Swap the policy set at rest. The body and bring-up state stay; the
-    /// controller (skills, seat, filters) starts fresh.
+    /// Swap the policy set, keeping the robot's state: the same body, the
+    /// same seat, the same skill, the same filter anchor — robotd's
+    /// `Controller::carry_over`. Networks whose digest is unchanged keep
+    /// their recurrent memory; a genuinely different file starts fresh.
     pub fn replace_policy(&mut self, policy: Policy, tuning: Tuning, skills: SkillTuning) {
-        self.controller = Controller::new(policy, tuning, skills);
+        let old = std::mem::replace(&mut self.controller, Controller::new(policy, tuning, skills));
+        self.controller.carry_over(&old);
         self.limp_fall = LimpFall::Idle;
     }
 

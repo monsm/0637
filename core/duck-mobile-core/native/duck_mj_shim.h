@@ -38,6 +38,8 @@ int duck_mj_geom_meshid(const DuckMj* h, int geom);
 int duck_mj_geom_group(const DuckMj* h, int geom);
 /* MuJoCo's own version string. */
 const char* duck_mj_version(void);
+/* Solver iterations the policy was trained with. */
+void duck_mj_set_solver(DuckMj* h, int iterations, int ls_iterations);
 /* Resolved colour: the material's rgba when the geom has one. */
 void duck_mj_geom_colour(const DuckMj* h, int geom, float* out);
 /* MuJoCo's own mesh data, after the compiler's mesh frame. */
