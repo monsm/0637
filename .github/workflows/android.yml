@@ -60,8 +60,13 @@ jobs:
           git -C upstream/microduck checkout da34a22
           git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
           mkdir -p policies
-          for f in velstand.onnx alpha_sitstand.onnx alpha_ground_pick.onnx \
-                   roulade.onnx ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
+          # The complete official set: the manifest references all of these,
+          # and a missing file silently removes a feature (crouch needs
+          # roller_crouch, the stand policy is the fallback walk slot).
+          for f in velstand.onnx alpha_walking.onnx alpha_stand.onnx \
+                   roller.onnx alpha_sitstand.onnx alpha_ground_pick.onnx \
+                   roller_crouch.onnx roulade.onnx \
+                   ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
             curl -L --fail -o "policies/$f" \
               "https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/$f"
           done

@@ -179,7 +179,9 @@ final class Renderer: NSObject, MTKViewDelegate {
                 color: SIMD4<Float>(color[0], color[1], color[2], alpha)
             ))
         }
-        print("renderer: \(instances.count) visual geoms")
+        // NSLog, not print: the CI session reads this from the unified log,
+        // and print() to a pipe can sit in a buffer until the app exits.
+        NSLog("duck: renderer: %d visual geoms", instances.count)
     }
 
     private func loadMesh(named name: String) -> Mesh? {

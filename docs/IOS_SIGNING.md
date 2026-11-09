@@ -48,3 +48,21 @@ profile 里（developer.apple.com → Devices）。装到未登记设备会报
 
 - Apple Configurator / Finder（macOS）：连接 iPhone 后拖入
 - 或 `xcrun devicectl device install app --device <UDID> <path>.ipa`（Xcode 15+）
+
+## 重签时一定要签嵌套的 dylib
+
+未签名 IPA 里有两类 Mach-O：主程序 `Duck`，以及
+`Payload/Duck.app/Frameworks/libduck_mobile_core.dylib`（Rust 核心 + MuJoCo +
+ONNX Runtime 全在里面）。重签工具如果只签主程序和 `*.framework`，这个**裸 dylib**
+会没有有效签名，dyld 在启动时直接拒绝加载 —— 表现就是"点开黑屏"（其实是闪退）。
+
+重签后自查：
+
+```bash
+codesign --verify --deep --strict --verbose=2 Payload/Duck.app
+# 或逐个看
+codesign -dv Payload/Duck.app/Frameworks/libduck_mobile_core.dylib
+```
+
+`codesign --force --deep --sign "..." Payload/Duck.app` 会覆盖到 `Frameworks/*.dylib`；
+Sideloadly / AltStore 一般也这样做，但失败时先怀疑这里。
