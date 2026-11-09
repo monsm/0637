@@ -421,8 +421,8 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMeshSoup(
     let Ok(array) = env.new_float_array(soup.len() as i32) else {
         return std::ptr::null_mut();
     };
-    if env.set_float_array_region(array, 0, &soup).is_err() {
+    if env.set_float_array_region(&array, 0, &soup).is_err() {
         return std::ptr::null_mut();
     }
-    array
+    array.into_raw()
 }
