@@ -158,6 +158,21 @@
 
 ---
 
+## 四之三、时间机器、传感器、MCP 与新界面（2026-11-09 第二批）
+
+| 能力 | 实现 | 验证 |
+|---|---|---|
+| **时间机器** | 所有墙钟计时器改为**仿真时钟**（tick 计数）；快照含 MuJoCo `mjSTATE_INTEGRATION`、BAM 力矩历史、LSTM 记忆、技能相位、安全去抖、时钟本身；核心保留最近 3000 tick | `/time` `/timeline` `/step` `/checkpoint` `/restore` `/seek`；单元测试「倒带重放同一轨迹」；CI 断言暂停不前进、单步精确 +10、0.5× 约半速、倒回后仍 ready |
+| **分叉** | `mj_copyModel`+`mj_copyData` 深拷贝（BAM 每子步写摩擦进模型，必须各自持有）；策略重载独立会话；同一 checkpoint 恢复 | `/fork` `/branches` `/branch/select` `/branch/drop`；CI 断言分叉出现、可选中、可删除 |
+| **传感器** | 相机 / 麦克风 / 深度 / IMU，读数带 `mode` 与 `in_observation:false`；IMU 作为外力推挤；深度可降采样为鸭子 8×8 ToF | `/sensor` `/sensors`；单元测试「晃动变推挤、静止不推」「ToF 8×8 且限幅」；CI 逐项断言 |
+| **MCP** | `/mcp` JSON-RPC：initialize / tools/list / tools/call，12 个工具从 intent 表生成 | 单元测试 3 条（初始化、未知工具失败闭合、限幅）；CI 断言工具列表与 `duck_state` |
+| **PBR 渲染** | Cook-Torrance + 解析环境光 + 菲涅尔边缘 + 高光软限幅 + 接触阴影 | 颜色断言（橙色 313 px / 白壳 1814 px） |
+| **融合界面** | 全屏鸭子（拖动画布走/长按技能环）→ 仪器层（时间轴/传感器/指纹）→ Director 取景器 | XCUITest 开环选 roulade、开时间机器冻结/恢复 |
+
+期间修掉的两个真 bug：**暂停死锁**（暂停后 shell 不再 tick，而解冻请求正是在 tick 里排空的）、**慢放失效**（每帧强制至少一个 tick）。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
