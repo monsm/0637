@@ -53,7 +53,9 @@ if ! adb shell pidof ai.duck.microduck | tr -d '\r' | grep -q .; then
 fi
 echo "app alive with pid $PID"
 
-adb reverse tcp:8765 tcp:8765
+# forward: host port -> device port. `adb reverse` is the opposite
+# direction (device -> host) and would never reach the app's server.
+adb forward tcp:8765 tcp:8765
 STATE=""
 for _ in $(seq 1 120); do
   STATE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
