@@ -561,8 +561,10 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         apply_intent(core, intent);
     }
     // The phone's IMU is an external disturbance, not a sense: a shake is a
-    // shove, exactly as a hand on the real duck would be.
-    if let Some(push) = core.sensors.imu_push() {
+    // shove, exactly as a hand on the real duck would be. It is one impulse —
+    // the reading is consumed here, or a single shake would shove the duck
+    // every tick until the next sensor post.
+    if let Some(push) = core.sensors.take_imu_push() {
         let _ = core.runtime.push(push);
     }
     // A restore replaces the tick that was about to happen: the duck resumes

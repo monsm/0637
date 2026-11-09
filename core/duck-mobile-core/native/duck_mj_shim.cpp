@@ -250,13 +250,20 @@ void duck_mj_zero_joint_friction(DuckMj* h, int joint, double armature,
     h->m->dof_armature[dof] = armature;
     h->m->dof_damping[dof] = 0.0;
     h->m->dof_frictionloss[dof] = 0.0;
-    h->m->jnt_solref[joint * 2 + 0] = solref0;
-    h->m->jnt_solref[joint * 2 + 1] = solref1;
-    h->m->jnt_solimp[joint * 5 + 0] = solimp0;
-    h->m->jnt_solimp[joint * 5 + 1] = solimp1;
-    h->m->jnt_solimp[joint * 5 + 2] = solimp2;
-    h->m->jnt_solimp[joint * 5 + 3] = solimp3;
-    h->m->jnt_solimp[joint * 5 + 4] = solimp4;
+    /* The stiff-friction constants belong to the FRICTIONLOSS constraint, not
+       the joint LIMIT one: `mjModel.dof_solref` is "constraint solver
+       reference: frictionloss", `jnt_solref` is "...: limit". The reference
+       (bam.mjlab.BamActuator and infer_policy.load_mujoco_with_bam) writes
+       solref_friction/solimp_friction, which MuJoCo maps to the dof arrays.
+       Writing them to jnt_* made the limits hard and left the friction budget
+       soft, so a held joint crept. */
+    h->m->dof_solref[dof * 2 + 0] = solref0;
+    h->m->dof_solref[dof * 2 + 1] = solref1;
+    h->m->dof_solimp[dof * 5 + 0] = solimp0;
+    h->m->dof_solimp[dof * 5 + 1] = solimp1;
+    h->m->dof_solimp[dof * 5 + 2] = solimp2;
+    h->m->dof_solimp[dof * 5 + 3] = solimp3;
+    h->m->dof_solimp[dof * 5 + 4] = solimp4;
 }
 
 void duck_mj_set_dof_friction(DuckMj* h, int dof, double frictionloss, double damping) {

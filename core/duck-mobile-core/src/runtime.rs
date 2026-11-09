@@ -336,6 +336,10 @@ pub struct DuckRuntime<T: RobotIo> {
     last_head_command: TickTime,
     /// Simulation time. Everything above is expressed against it.
     clock: SimClock,
+    /// The wall-clock instant tick 0 corresponds to. IdleHead is upstream code
+    /// that speaks `Instant`, so it gets a simulated timeline anchored here:
+    /// exactly 20 ms per tick, frozen while paused, identical on a replay.
+    sim_origin: Instant,
     /// The last tick's report, kept so a single step can publish it.
     last: Option<TickReport>,
     dt: Duration,
@@ -368,6 +372,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_params: robotd_params::IdleParams::default(),
             last_head_command: TickTime::default(),
             clock: SimClock::default(),
+            sim_origin: Instant::now(),
             last: None,
             dt: Duration::from_millis(20),
         }
@@ -513,7 +518,12 @@ impl<T: RobotIo> DuckRuntime<T> {
     pub fn replace_policy(&mut self, policy: Policy, tuning: Tuning, skills: SkillTuning) {
         let old = std::mem::replace(&mut self.controller, Controller::new(policy, tuning, skills));
         self.controller.carry_over(&old);
-        self.limp_fall = LimpFall::Idle;
+        // A reload during a fall must not cancel the reflex: robotd refuses
+        // the swap until the robot is at rest, and the mobile core keeps the
+        // sequence running and lets it finish.
+        if matches!(self.limp_fall, LimpFall::Idle) {
+            self.controller.reset();
+        }
     }
 
     /// A second duck at this exact instant: its own body (a deep copy of the
@@ -883,9 +893,11 @@ impl<T: RobotIo> DuckRuntime<T> {
             && command.twist.iter().all(|value| value.abs() < 1e-3)
             && self.last_head_command.elapsed(now) >= self.idle_head.after()
             && !self.controller.busy();
-        // IdleHead is upstream code that speaks `Instant`; hand it a clock
-        // derived from the tick count so a replay looks around identically.
-        let idle_now = Instant::now() + Duration::from_millis(self.clock.tick * 20);
+        // IdleHead is upstream code that speaks `Instant`. Anchoring it to the
+        // tick count alone (origin + tick * 20 ms) makes it advance exactly one
+        // tick per tick; `Instant::now() + tick * 20 ms` advanced at twice
+        // real time, so the duck fidgeted twice as fast as the real one.
+        let idle_now = self.sim_origin + Duration::from_millis(self.clock.tick * 20);
         let idle = self.idle_head.tick(idle_now, still, self.dt);
         for axis in 0..4 {
             command.head[axis] =

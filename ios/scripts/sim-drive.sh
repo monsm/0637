@@ -321,8 +321,9 @@ api POST /time '{"paused":false}' > /dev/null
 sleep 2
 TICK_SLOW=$(api GET /state | field tick)
 ELAPSED=$((TICK_SLOW - TICK_STEPPED))
-# 2 s at 0.5x is about 50 ticks; allow scheduling slack either way.
-[ "$ELAPSED" -ge 25 ] && [ "$ELAPSED" -le 75 ]
+# 2 s at 0.5x is about 50 ticks. The simulator's timer is not exact under
+# load, so allow 0.35x-0.75x rather than a tight band around 0.5x.
+[ "$ELAPSED" -ge 35 ] && [ "$ELAPSED" -le 75 ]
 check $? "half speed advances about half as fast" "$ELAPSED ticks in 2 s"
 api POST /time '{"speed":1.0}' > /dev/null
 

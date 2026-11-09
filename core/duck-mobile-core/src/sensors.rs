@@ -93,6 +93,18 @@ impl Sensors {
         Some([values[0] * 0.8, values[1] * 0.8, values[2] * 0.8])
     }
 
+    /// [`Self::imu_push`], consumed: a reading is one shove, not a force that
+    /// keeps applying until the next post.
+    pub fn take_imu_push(&mut self) -> Option<[f64; 3]> {
+        let push = self.imu_push()?;
+        // Mark the reading as delivered by clearing the acceleration; the
+        // value itself stays readable in `/sensors`.
+        if let Some(value) = self.imu.as_mut().and_then(|reading| reading.value.as_object_mut()) {
+            value.insert("acceleration".to_owned(), serde_json::json!([0.0, 0.0, 0.0]));
+        }
+        Some(push)
+    }
+
     pub fn to_json(&self) -> Value {
         json!({
             "mode": self.mode.unwrap_or(Mode::Twin).as_str(),
