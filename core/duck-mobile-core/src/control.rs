@@ -16,3 +16,21 @@ pub use inner::*;
 mod idle_head;
 
 pub use idle_head::{IdleHead, IdleOffset};
+
+/// The controller's private state, reachable through the re-exported type.
+impl Controller {
+    /// The policy's recurrent memory, for a checkpoint.
+    pub fn policy_state(&self) -> Vec<u8> {
+        self.policy_ref().state_bytes()
+    }
+
+    /// Restore the driving network and its memory.
+    pub fn restore_policy_state(&mut self, net: Option<duck_control::policy::Net>, bytes: &[u8]) -> bool {
+        self.policy_mut().restore_state(net, bytes)
+    }
+
+    /// The network driving this tick.
+    pub fn active_net(&self) -> Option<duck_control::policy::Net> {
+        self.policy_ref().active_net()
+    }
+}

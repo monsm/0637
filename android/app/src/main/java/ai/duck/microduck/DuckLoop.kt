@@ -19,13 +19,25 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
         }
     }
 
+    private var remainder = 0.0
+
     fun start() {
         scheduler.scheduleAtFixedRate(
             {
                 try {
                     // Keepalive: the core has robotd's 500 ms twist deadman.
                     core.setTwist(input.vx, 0.0, input.wz)
-                    core.tick()
+                    // Paused or slowed: the schedule keeps firing, simulation
+                    // time does not. The loop's own timers are on the
+                    // simulation clock, so they slow down with it.
+                    if (!core.paused()) {
+                        remainder += core.speed()
+                        var whole = remainder.toInt()
+                        remainder -= whole
+                        while (whole-- > 0) {
+                            core.tick()
+                        }
+                    }
                 } catch (_: Throwable) {
                     // A tick that throws must not stop the schedule; the next
                     // one retries.

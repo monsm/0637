@@ -15,6 +15,14 @@ class DuckCore(
 
     val ready: Boolean get() = handle != 0L
 
+    fun paused(): Boolean = synchronized(lock) {
+        if (handle != 0L) nativePaused(handle) else false
+    }
+
+    fun speed(): Double = synchronized(lock) {
+        if (handle != 0L) nativeSpeed(handle) else 1.0
+    }
+
     fun tick(): Int = synchronized(lock) {
         if (handle != 0L) nativeTick(handle) else -1
     }
@@ -121,6 +129,8 @@ class DuckCore(
         @JvmStatic private external fun nativeNew(scene: String, policies: String): Long
         @JvmStatic private external fun nativeFree(handle: Long)
         @JvmStatic private external fun nativeTick(handle: Long): Int
+        @JvmStatic private external fun nativePaused(handle: Long): Boolean
+        @JvmStatic private external fun nativeSpeed(handle: Long): Double
         @JvmStatic private external fun nativeSetTwist(handle: Long, vx: Double, vy: Double, wz: Double)
         @JvmStatic private external fun nativeSetHead(handle: Long, neck: Double, head: Double, yaw: Double, roll: Double)
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)

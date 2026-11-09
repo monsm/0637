@@ -36,6 +36,18 @@ pub enum Intent {
     GroundPick,
     Push([f64; 3]),
     Reload(String),
+    /// Time machine: freeze the duck.
+    Pause(bool),
+    /// Time machine: advance exactly this many 20 ms ticks while paused.
+    Step(u32),
+    /// Time machine: 0.05x .. 4x.
+    Speed(f64),
+    /// Time machine: save the whole duck at this tick.
+    Checkpoint,
+    /// Time machine: resume from a saved tick.
+    Restore(u64),
+    /// Time machine: step back `ticks` and resume from there.
+    Seek(u64),
 }
 
 pub struct IntentQueue {
@@ -43,6 +55,8 @@ pub struct IntentQueue {
     state: Mutex<Value>,
     skills: Mutex<Vec<String>>,
     fingerprint: Mutex<String>,
+    /// The time machine's answers, filled by the core on the next tick.
+    time: Mutex<Value>,
 }
 
 impl Default for IntentQueue {
@@ -65,6 +79,12 @@ impl IntentQueue {
             })),
             skills: Mutex::new(Vec::new()),
             fingerprint: Mutex::new("{}".to_owned()),
+            time: Mutex::new(json!({
+                "tick": 0,
+                "paused": false,
+                "speed": 1.0,
+                "checkpoints": [],
+            })),
         }
     }
 
@@ -102,6 +122,14 @@ impl IntentQueue {
 
     pub fn fingerprint_json(&self) -> String {
         self.fingerprint.lock().expect("intent fingerprint").clone()
+    }
+
+    pub fn set_time(&self, value: Value) {
+        *self.time.lock().expect("intent time") = value;
+    }
+
+    pub fn time_json(&self) -> String {
+        self.time.lock().expect("intent time").to_string()
     }
 }
 
@@ -180,6 +208,46 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/state") => Ok(queue.state_json()),
         ("GET", "/skills") => Ok(queue.skills_json()),
         ("GET", "/fingerprint") => Ok(queue.fingerprint_json()),
+        ("GET", "/time") => Ok(queue.time_json()),
+        ("GET", "/timeline") => Ok(queue.time_json()),
+        ("POST", "/time") => {
+            let paused = value["paused"].as_bool();
+            let speed = value["speed"].as_f64();
+            match (paused, speed) {
+                (Some(paused), _) => {
+                    queue.push(Intent::Pause(paused));
+                    Ok(json!({ "ok": true, "paused": paused }).to_string())
+                }
+                (None, Some(speed)) => {
+                    queue.push(Intent::Speed(speed));
+                    Ok(json!({ "ok": true, "speed": speed }).to_string())
+                }
+                _ => Err("send {paused:true|false} or {speed:0.05..4}"),
+            }
+        }
+        ("POST", "/step") => {
+            let ticks = value["ticks"].as_u64().unwrap_or(1).clamp(1, 500) as u32;
+            queue.push(Intent::Step(ticks));
+            Ok(json!({ "ok": true, "ticks": ticks }).to_string())
+        }
+        ("POST", "/checkpoint") => {
+            queue.push(Intent::Checkpoint);
+            Ok(json!({ "ok": true }).to_string())
+        }
+        ("POST", "/restore") => match value["tick"].as_u64() {
+            Some(tick) => {
+                queue.push(Intent::Restore(tick));
+                Ok(json!({ "ok": true, "tick": tick }).to_string())
+            }
+            None => Err("missing tick"),
+        },
+        ("POST", "/seek") => match value["ticks"].as_u64() {
+            Some(ticks) => {
+                queue.push(Intent::Seek(ticks));
+                Ok(json!({ "ok": true, "back": ticks }).to_string())
+            }
+            None => Err("missing ticks"),
+        },
         ("POST", "/twist") => {
             queue.push(Intent::Twist([
                 value["vx"].as_f64().unwrap_or(0.0),

@@ -54,6 +54,11 @@ int duck_core_geom_info(DuckCore* core, int geom, int* body, int* geom_type,
 
 const char* duck_core_mesh_name(DuckCore* core, int mesh);
 
+/* Time machine: frozen?, ticks per frame, and the current tick index. */
+int duck_core_paused(DuckCore* core);
+double duck_core_speed(DuckCore* core);
+unsigned long long duck_core_tick_index(DuckCore* core);
+
 /* One hash over the scene, meshes, policies and manifest. */
 const char* duck_core_fingerprint(DuckCore* core);
 

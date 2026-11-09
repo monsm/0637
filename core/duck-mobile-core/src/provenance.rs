@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "mujoco")]
 use crate::mujoco;
 
 /// One file's contribution, in sorted order.
@@ -70,7 +71,10 @@ fn collect_files(scene: &Path, policies: &Path) -> Vec<PathBuf> {
 
 /// Hash everything that decides behaviour into one fingerprint.
 pub fn collect(scene: &Path, policies: &Path) -> Provenance {
+    #[cfg(feature = "mujoco")]
     let mujoco_version = mujoco::version();
+    #[cfg(not(feature = "mujoco"))]
+    let mujoco_version = "unlinked".to_owned();
     let mut overall = Sha256::new();
     overall.update(b"duck-provenance-v1");
     overall.update(mujoco_version.as_bytes());

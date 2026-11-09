@@ -122,6 +122,7 @@ dependencies = [
  "duck-control",
  "jni",
  "robotd-params",
+ "serde",
  "serde_json",
  "sha2",
  "tracing",

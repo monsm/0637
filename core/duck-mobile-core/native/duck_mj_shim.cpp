@@ -156,6 +156,24 @@ void duck_mj_set_solver(DuckMj* h, int iterations, int ls_iterations) {
   if (iterations > 0) h->m->opt.iterations = iterations;
   if (ls_iterations > 0) h->m->opt.ls_iterations = ls_iterations;
 }
+
+// The integration state: time, qpos, qvel, act, ctrl, warmstart, history and
+// applied forces. Restoring it makes the next step continue exactly where the
+// snapshot left off, which is what a rewind has to mean.
+int duck_mj_state_size(const DuckMj* h) {
+  if (!h) return 0;
+  return mj_stateSize(h->m, mjSTATE_INTEGRATION);
+}
+
+void duck_mj_state_get(const DuckMj* h, double* out) {
+  if (!h || !out) return;
+  mj_getState(h->m, h->d, out, mjSTATE_INTEGRATION);
+}
+
+void duck_mj_state_set(DuckMj* h, const double* in) {
+  if (!h || !in) return;
+  mj_setState(h->m, h->d, in, mjSTATE_INTEGRATION);
+}
 const float* duck_mj_mesh_vert(const DuckMj* h) { return h->m->mesh_vert; }
 const int* duck_mj_mesh_vertadr(const DuckMj* h) { return h->m->mesh_vertadr; }
 const int* duck_mj_mesh_vertnum(const DuckMj* h) { return h->m->mesh_vertnum; }

@@ -54,22 +54,85 @@ const HEAD_ALPHA: f64 = 0.2;
 /// screen when it stops.
 const API_LEASE: Duration = DEADMAN;
 
+/// Simulation time, in ticks.
+///
+/// Every deadline in the loop is measured against this rather than the wall
+/// clock, so pausing the duck freezes its timers too: a paused robot must not
+/// trip the 500 ms deadman, and slow-motion must stretch a 2 s homing ramp
+/// with it. `speed` scales how many ticks one wall-clock frame advances; the
+/// tick itself always lasts exactly 20 ms of simulated time.
+#[derive(Debug, Clone, Copy)]
+pub struct SimClock {
+    pub tick: u64,
+    pub paused: bool,
+    pub speed: f64,
+}
+
+impl Default for SimClock {
+    fn default() -> Self {
+        Self {
+            tick: 0,
+            paused: false,
+            speed: 1.0,
+        }
+    }
+}
+
+impl SimClock {
+    pub fn advance(&mut self, ticks: u64) {
+        self.tick = self.tick.saturating_add(ticks);
+    }
+}
+
+fn array_of(values: Option<&[f64]>) -> [f64; NUM_JOINTS] {
+    let mut out = [0.0; NUM_JOINTS];
+    if let Some(values) = values {
+        for (slot, value) in out.iter_mut().zip(values.iter()) {
+            *slot = *value;
+        }
+    }
+    out
+}
+
+/// A deadline on the simulation clock: "this tick, or later".
+///
+/// Everything in the loop that robotd measures in wall-clock time — the
+/// deadman, the API lease, the homing ramp, the limp-fall timers — is a
+/// deadline in ticks here. That is what lets the duck pause without tripping
+/// its own safety timers, and what makes a replay reproduce them exactly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+struct TickTime(u64);
+
+impl TickTime {
+    fn of(clock: &SimClock) -> Self {
+        Self(clock.tick)
+    }
+
+    fn plus(self, duration: Duration) -> Self {
+        Self(self.0 + (duration.as_millis() as u64) / 20)
+    }
+
+    fn elapsed(self, now: TickTime) -> Duration {
+        Duration::from_millis((now.0.saturating_sub(self.0)) * 20)
+    }
+}
+
 /// The intent API's claim on the duck: the twist it last asked for and the
 /// lease it holds. Separate from the runtime so it can be tested on its own.
 #[derive(Debug, Default)]
 struct ApiLease {
     twist: [f64; 3],
-    until: Option<Instant>,
+    until: Option<TickTime>,
 }
 
 impl ApiLease {
-    fn take(&mut self, twist: [f64; 3]) {
+    fn take(&mut self, twist: [f64; 3], now: TickTime) {
         self.twist = twist;
-        self.until = Some(Instant::now() + API_LEASE);
+        self.until = Some(now.plus(API_LEASE));
     }
 
     /// The twist the API owns right now, if its lease is still live.
-    fn active(&mut self, now: Instant) -> Option<[f64; 3]> {
+    fn active(&mut self, now: TickTime) -> Option<[f64; 3]> {
         match self.until {
             Some(until) if now < until => Some(self.twist),
             Some(_) => {
@@ -127,7 +190,7 @@ enum Bringup {
     Limp,
     Homing {
         from: [f64; NUM_JOINTS],
-        since: Instant,
+        since: TickTime,
         to: [f64; NUM_JOINTS],
     },
     Ready,
@@ -144,11 +207,11 @@ impl Bringup {
 
     /// Linear per-tick target, or `None` once the ramp is done — the same shape as
     /// `robotd`'s `Bringup::homing_target`.
-    fn homing_target(&self, now: Instant) -> Option<[f64; NUM_JOINTS]> {
+    fn homing_target(&self, now: TickTime) -> Option<[f64; NUM_JOINTS]> {
         let Self::Homing { from, since, to } = self else {
             return None;
         };
-        let t = now.duration_since(*since).as_secs_f64() / HOME_RAMP.as_secs_f64();
+        let t = since.elapsed(now).as_secs_f64() / HOME_RAMP.as_secs_f64();
         if t >= 1.0 {
             return None;
         }
@@ -196,9 +259,54 @@ impl Landing {
 enum LimpFall {
     Idle,
     /// Gains at `GAIN_LIMP`, joints commanded to wherever they already are.
-    Limp { since: Instant, landing: Landing },
+    Limp { since: TickTime, landing: Landing },
     /// Ramping from where the robot landed back to the standing pose.
-    Posing { from: [f64; NUM_JOINTS], since: Instant },
+    Posing { from: [f64; NUM_JOINTS], since: TickTime },
+}
+
+/// Everything a rewind has to put back, as one value.
+///
+/// The body state is MuJoCo's own integration state plus the actuator
+/// bookkeeping; the rest is the control loop's: the tick, the filters, the
+/// skill in flight, the policy's recurrent memory, the safety debounces and
+/// the limp-fall phase. A checkpoint that misses any of them looks right and
+/// then diverges, which is why this is one struct and not a collection of
+/// setters.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Checkpoint {
+    pub tick: u64,
+    pub speed: f64,
+    pub paused: bool,
+    pub body: Vec<f64>,
+    pub policy_state: Vec<u8>,
+    pub active_net: Option<duck_control::policy::Net>,
+    pub controller: crate::control::ControllerState,
+    pub falling_ms: u64,
+    pub fallen: bool,
+    pub fall_falling_ms: u64,
+    pub fall_upright_ms: u64,
+    pub fall_armed: bool,
+    pub bringup: String,
+    pub homing_from: Option<Vec<f64>>,
+    pub homing_since: u64,
+    pub homing_to: Option<Vec<f64>>,
+    pub limp_fall: String,
+    pub limp_since: u64,
+    pub limp_still_ms: u64,
+    pub pose_from: Option<Vec<f64>>,
+    pub enabled: bool,
+    pub command_twist: [f64; 3],
+    pub command_head: [f64; 4],
+    pub command_body: [f64; 3],
+    pub twist_ema: [f64; 3],
+    pub head_ema: [f64; 4],
+    pub body_ema: [f64; 3],
+    pub body_active: bool,
+    pub twist_fresh: bool,
+    pub last_twist_tick: u64,
+    pub last_head_tick: u64,
+    pub lease_twist: [f64; 3],
+    pub lease_until: Option<u64>,
 }
 
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
@@ -210,7 +318,7 @@ pub struct DuckRuntime<T: RobotIo> {
     command: Command,
     enabled: bool,
     limp_fall: LimpFall,
-    last_twist: Instant,
+    last_twist: TickTime,
     twist_fresh: bool,
     /// The twist from the intent API, and the lease it holds on the duck.
     api_lease: ApiLease,
@@ -225,7 +333,11 @@ pub struct DuckRuntime<T: RobotIo> {
     idle_head: crate::control::IdleHead,
     idle_params: robotd_params::IdleParams,
     /// When the head was last commanded; idle glances start after `after_s`.
-    last_head_command: Instant,
+    last_head_command: TickTime,
+    /// Simulation time. Everything above is expressed against it.
+    clock: SimClock,
+    /// The last tick's report, kept so a single step can publish it.
+    last: Option<TickReport>,
     dt: Duration,
 }
 
@@ -245,7 +357,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             command: Command::default(),
             enabled: false,
             limp_fall: LimpFall::Idle,
-            last_twist: Instant::now(),
+            last_twist: TickTime::default(),
             twist_fresh: false,
             api_lease: ApiLease::default(),
             twist_ema: [0.0; 3],
@@ -254,7 +366,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             body_active: false,
             idle_head: crate::control::IdleHead::new(robotd_params::IdleParams::default(), 0xD0C),
             idle_params: robotd_params::IdleParams::default(),
-            last_head_command: Instant::now(),
+            last_head_command: TickTime::default(),
+            clock: SimClock::default(),
+            last: None,
             dt: Duration::from_millis(20),
         }
     }
@@ -282,7 +396,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         } else {
             self.bringup = Bringup::Homing {
                 from: sensors.positions,
-                since: Instant::now(),
+                since: TickTime::of(&self.clock),
                 to: DEFAULT_POSITION,
             };
         }
@@ -313,7 +427,7 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn set_twist(&mut self, twist: [f64; 3]) {
         self.command.twist = twist;
-        self.last_twist = Instant::now();
+        self.last_twist = TickTime::of(&self.clock);
         self.twist_fresh = true;
     }
 
@@ -321,13 +435,13 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// on-screen joystick for [API_LEASE], so an external agent can drive it
     /// while it keeps sending twists.
     pub fn set_api_twist(&mut self, twist: [f64; 3]) {
-        self.api_lease.take(twist);
+        self.api_lease.take(twist, TickTime::of(&self.clock));
     }
 
     pub fn set_head(&mut self, head: [f64; 4]) {
         self.command.head = head;
         // Any head command wakes the idle look-around.
-        self.last_head_command = Instant::now();
+        self.last_head_command = TickTime::of(&self.clock);
     }
 
     pub fn set_body(&mut self, z: f64, roll: f64, pitch: f64) {
@@ -408,9 +522,171 @@ impl<T: RobotIo> DuckRuntime<T> {
         Ok(())
     }
 
+    /// The simulation clock, for the shell and the time machine.
+    pub fn clock(&self) -> SimClock {
+        self.clock
+    }
+
+    /// Everything needed to resume from this tick, bit for bit.
+    pub fn checkpoint(&self) -> Option<Checkpoint> {
+        let body = self.safety.snapshot()?;
+        let (falling_ms, fallen) = self.safety.fall_state();
+        let (fall_falling_ms, fall_upright_ms, fall_armed) = self.fall.state();
+        let (bringup, homing_from, homing_since, homing_to) = match self.bringup {
+            Bringup::Limp => ("limp".to_owned(), None, 0, None),
+            Bringup::Homing { from, since, to } => (
+                "homing".to_owned(),
+                Some(from.to_vec()),
+                since.0,
+                Some(to.to_vec()),
+            ),
+            Bringup::Ready => ("ready".to_owned(), None, 0, None),
+        };
+        let (limp_fall, limp_since, limp_still_ms, pose_from) = match self.limp_fall {
+            LimpFall::Idle => ("idle".to_owned(), 0, 0, None),
+            LimpFall::Limp { since, landing } => (
+                "limp".to_owned(),
+                since.0,
+                landing.still_for.as_millis() as u64,
+                None,
+            ),
+            LimpFall::Posing { from, since } => (
+                "posing".to_owned(),
+                since.0,
+                0,
+                Some(from.to_vec()),
+            ),
+        };
+        Some(Checkpoint {
+            tick: self.clock.tick,
+            speed: self.clock.speed,
+            paused: self.clock.paused,
+            body,
+            policy_state: self.controller.policy_state(),
+            active_net: self.controller.active_net(),
+            controller: self.controller.snapshot(),
+            falling_ms,
+            fallen,
+            fall_falling_ms,
+            fall_upright_ms,
+            fall_armed,
+            bringup,
+            homing_from,
+            homing_since,
+            homing_to,
+            limp_fall,
+            limp_since,
+            limp_still_ms,
+            pose_from,
+            enabled: self.enabled,
+            command_twist: self.command.twist,
+            command_head: self.command.head,
+            command_body: [
+                self.command.body.z,
+                self.command.body.roll,
+                self.command.body.pitch,
+            ],
+            twist_ema: self.twist_ema,
+            head_ema: self.head_ema,
+            body_ema: self.body_ema,
+            body_active: self.body_active,
+            twist_fresh: self.twist_fresh,
+            last_twist_tick: self.last_twist.0,
+            last_head_tick: self.last_head_command.0,
+            lease_twist: self.api_lease.twist,
+            lease_until: self.api_lease.until.map(|until| until.0),
+        })
+    }
+
+    /// Resume from [`Self::checkpoint`]. False when the body cannot be rewound
+    /// or the state does not belong to this build.
+    pub fn restore(&mut self, checkpoint: &Checkpoint) -> bool {
+        if !self.safety.restore(&checkpoint.body) {
+            return false;
+        }
+        if !self
+            .controller
+            .restore_policy_state(checkpoint.active_net, &checkpoint.policy_state)
+        {
+            return false;
+        }
+        self.controller.restore(&checkpoint.controller);
+        self.safety
+            .set_fall_state(checkpoint.falling_ms, checkpoint.fallen);
+        self.fall.set_state(
+            checkpoint.fall_falling_ms,
+            checkpoint.fall_upright_ms,
+            checkpoint.fall_armed,
+        );
+        self.clock.tick = checkpoint.tick;
+        self.clock.speed = checkpoint.speed;
+        self.clock.paused = checkpoint.paused;
+        self.bringup = match checkpoint.bringup.as_str() {
+            "homing" => Bringup::Homing {
+                from: array_of(checkpoint.homing_from.as_deref()),
+                since: TickTime(checkpoint.homing_since),
+                to: array_of(checkpoint.homing_to.as_deref()),
+            },
+            "ready" => Bringup::Ready,
+            _ => Bringup::Limp,
+        };
+        self.limp_fall = match checkpoint.limp_fall.as_str() {
+            "limp" => LimpFall::Limp {
+                since: TickTime(checkpoint.limp_since),
+                landing: Landing {
+                    still_for: Duration::from_millis(checkpoint.limp_still_ms),
+                },
+            },
+            "posing" => LimpFall::Posing {
+                from: array_of(checkpoint.pose_from.as_deref()),
+                since: TickTime(checkpoint.limp_since),
+            },
+            _ => LimpFall::Idle,
+        };
+        self.enabled = checkpoint.enabled;
+        self.command.twist = checkpoint.command_twist;
+        self.command.head = checkpoint.command_head;
+        self.command.body.z = checkpoint.command_body[0];
+        self.command.body.roll = checkpoint.command_body[1];
+        self.command.body.pitch = checkpoint.command_body[2];
+        self.twist_ema = checkpoint.twist_ema;
+        self.head_ema = checkpoint.head_ema;
+        self.body_ema = checkpoint.body_ema;
+        self.body_active = checkpoint.body_active;
+        self.twist_fresh = checkpoint.twist_fresh;
+        self.last_twist = TickTime(checkpoint.last_twist_tick);
+        self.last_head_command = TickTime(checkpoint.last_head_tick);
+        self.api_lease.twist = checkpoint.lease_twist;
+        self.api_lease.until = checkpoint.lease_until.map(TickTime);
+        true
+    }
+
+    /// The most recent tick's report, for a single-step command.
+    pub fn last_report(&self) -> Option<TickReport> {
+        self.last.clone()
+    }
+
+    pub fn set_paused(&mut self, paused: bool) {
+        self.clock.paused = paused;
+    }
+
+    pub fn set_speed(&mut self, speed: f64) {
+        self.clock.speed = speed.clamp(0.05, 4.0);
+    }
+
     /// One 50 Hz tick. The order is `robotd`'s: read, observe, gate, policy, safety.
+    ///
+    /// Simulated time advances by exactly 20 ms per tick, whatever the wall
+    /// clock did, so a paused or slowed duck keeps its own timers.
     pub fn tick(&mut self) -> Result<TickReport, RuntimeError> {
-        let now = Instant::now();
+        let report = self.tick_inner()?;
+        self.last = Some(report.clone());
+        Ok(report)
+    }
+
+    fn tick_inner(&mut self) -> Result<TickReport, RuntimeError> {
+        self.clock.advance(1);
+        let now = TickTime::of(&self.clock);
         let sensors: Sensors = self.safety.read()?;
         self.safety.observe(&sensors, self.dt);
         let hold = sensors.positions;
@@ -451,7 +727,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
 
         // Deadman: a command stream that stops leaves the robot standing, not walking off.
-        if self.twist_fresh && now.duration_since(self.last_twist) > DEADMAN {
+        if self.twist_fresh && self.last_twist.elapsed(now) > DEADMAN {
             self.command.twist = [0.0; 3];
             self.twist_fresh = false;
             tracing::warn!("deadman: no twist for {DEADMAN:?}; standing still");
@@ -496,7 +772,7 @@ impl<T: RobotIo> DuckRuntime<T> {
                 );
                 let landed =
                     landing.observe(rate, self.dt, LIMP_FALL_STILL_RATE, LIMP_FALL_STILL);
-                let timed_out = now.duration_since(since) >= LIMP_FALL_MAX;
+                let timed_out = since.elapsed(now) >= LIMP_FALL_MAX;
                 if landed || timed_out {
                     tracing::warn!("landed - posing back to standing");
                     self.limp_fall = LimpFall::Posing {
@@ -508,7 +784,7 @@ impl<T: RobotIo> DuckRuntime<T> {
                 }
             }
             LimpFall::Posing { since, .. } => {
-                if now.duration_since(since) >= LIMP_FALL_POSE {
+                if since.elapsed(now) >= LIMP_FALL_POSE {
                     tracing::warn!("posed - handing back to the standing policy");
                     self.limp_fall = LimpFall::Idle;
                     self.fall.reset();
@@ -530,9 +806,8 @@ impl<T: RobotIo> DuckRuntime<T> {
                 return Ok(report);
             }
             LimpFall::Posing { from, since } => {
-                let t = (now.duration_since(since).as_secs_f64()
-                    / LIMP_FALL_POSE.as_secs_f64())
-                .min(1.0);
+                let t = (since.elapsed(now).as_secs_f64() / LIMP_FALL_POSE.as_secs_f64())
+                    .min(1.0);
                 let mut target = [0.0; NUM_JOINTS];
                 for (index, slot) in target.iter_mut().enumerate() {
                     *slot = from[index] + (DEFAULT_POSITION[index] - from[index]) * t;
@@ -584,9 +859,12 @@ impl<T: RobotIo> DuckRuntime<T> {
             && was_driving
             && matches!(self.limp_fall, LimpFall::Idle)
             && command.twist.iter().all(|value| value.abs() < 1e-3)
-            && now.duration_since(self.last_head_command) >= self.idle_head.after()
+            && self.last_head_command.elapsed(now) >= self.idle_head.after()
             && !self.controller.busy();
-        let idle = self.idle_head.tick(now, still, self.dt);
+        // IdleHead is upstream code that speaks `Instant`; hand it a clock
+        // derived from the tick count so a replay looks around identically.
+        let idle_now = Instant::now() + Duration::from_millis(self.clock.tick * 20);
+        let idle = self.idle_head.tick(idle_now, still, self.dt);
         for axis in 0..4 {
             command.head[axis] =
                 self.head_ema[axis] * (1.0 - idle.takeover) + idle.head[axis];
@@ -634,35 +912,142 @@ mod tests {
     #[test]
     fn the_api_lease_outlives_the_joystick_twist() {
         let mut lease = ApiLease::default();
-        assert_eq!(lease.active(Instant::now()), None);
+        assert_eq!(lease.active(TickTime(0)), None);
 
-        lease.take([0.4, 0.0, 0.0]);
-        let now = Instant::now();
-        assert_eq!(lease.active(now), Some([0.4, 0.0, 0.0]));
+        lease.take([0.4, 0.0, 0.0], TickTime(0));
+        assert_eq!(lease.active(TickTime(0)), Some([0.4, 0.0, 0.0]));
         // The app pushes the joystick's twist every 20 ms; the lease must
         // survive that, otherwise an external agent could never drive.
-        assert_eq!(lease.active(now + Duration::from_millis(500)), Some([0.4, 0.0, 0.0]));
+        assert_eq!(lease.active(TickTime(10)), Some([0.4, 0.0, 0.0]));
     }
 
     #[test]
     fn the_lease_expires_and_gives_the_duck_back() {
         let mut lease = ApiLease::default();
-        lease.take([0.4, 0.0, 0.0]);
-        let now = Instant::now();
-        assert_eq!(lease.active(now + API_LEASE + Duration::from_millis(1)), None);
-        // And it stays given back.
-        assert_eq!(lease.active(now + API_LEASE + Duration::from_millis(2)), None);
+        lease.take([0.4, 0.0, 0.0], TickTime(0));
+        assert_eq!(lease.active(TickTime(25)), None);
+        assert_eq!(lease.active(TickTime(26)), None);
     }
 
     #[test]
     fn a_new_twist_extends_the_lease() {
         let mut lease = ApiLease::default();
-        lease.take([0.4, 0.0, 0.0]);
-        let now = Instant::now();
-        assert_eq!(lease.active(now + Duration::from_millis(900)), Some([0.4, 0.0, 0.0]));
-        lease.take([0.0, 0.0, 0.2]);
-        assert_eq!(lease.active(now + Duration::from_millis(900)), Some([0.0, 0.0, 0.2]));
-        // The new twist bought a fresh lease: another second of control.
-        assert_eq!(lease.active(now + Duration::from_millis(1900)), None);
+        lease.take([0.4, 0.0, 0.0], TickTime(0));
+        assert_eq!(lease.active(TickTime(20)), Some([0.4, 0.0, 0.0]));
+        lease.take([0.0, 0.0, 0.2], TickTime(20));
+        assert_eq!(lease.active(TickTime(40)), Some([0.0, 0.0, 0.2]));
+        assert_eq!(lease.active(TickTime(46)), None);
+    }
+
+    /// A policy that fails every step: the loop holds the pose, so the state
+    /// machine still advances and every checkpointed field is exercised.
+    fn test_policy() -> Policy {
+        let dir = std::path::Path::new(r"D:\AI\Duck\policies");
+        let paths = duck_control::policy::PolicyPaths {
+            walk: dir.join("velstand.onnx"),
+            stand: None,
+            sitstand: None,
+            ground_pick: None,
+            skills: Vec::new(),
+        };
+        Policy::load(&paths, 0.05).expect("the bundled walk policy")
+    }
+
+    #[test]
+    fn a_rewind_replays_the_same_trajectory() {
+        use duck_control::io::{IoError, JointTargets, RobotIo, Sensors};
+
+        #[derive(Clone)]
+        struct Probe {
+            sensors: Sensors,
+            targets: [f64; NUM_JOINTS],
+        }
+
+        impl RobotIo for Probe {
+            fn read(&mut self) -> Result<Sensors, IoError> {
+                Ok(self.sensors)
+            }
+            fn write(&mut self, targets: &JointTargets) -> Result<(), IoError> {
+                self.targets = targets.positions;
+                Ok(())
+            }
+            fn measures_velocity(&self) -> bool {
+                true
+            }
+            fn measures_load(&self) -> bool {
+                true
+            }
+            fn set_gain(&mut self, _: u16) -> Result<(), IoError> {
+                Ok(())
+            }
+            fn set_torque(&mut self, _: bool) -> Result<(), IoError> {
+                Ok(())
+            }
+            fn reboot(&mut self, _: u8) -> Result<(), IoError> {
+                Ok(())
+            }
+            fn slow_sensors(&mut self) -> Result<duck_control::io::SlowSensors, IoError> {
+                Ok(duck_control::io::SlowSensors {
+                    volts: 7.4,
+                    temps_c: [25.0; NUM_JOINTS],
+                })
+            }
+            fn snapshot(&self) -> Option<Vec<f64>> {
+                let mut state = vec![0.0; 1 + NUM_JOINTS * 2];
+                state[0] = 1.0;
+                state[1..1 + NUM_JOINTS].copy_from_slice(&self.sensors.positions);
+                state[1 + NUM_JOINTS..].copy_from_slice(&self.targets);
+                Some(state)
+            }
+            fn restore(&mut self, state: &[f64]) -> bool {
+                if state.len() != 1 + NUM_JOINTS * 2 {
+                    return false;
+                }
+                self.sensors
+                    .positions
+                    .copy_from_slice(&state[1..1 + NUM_JOINTS]);
+                self.targets
+                    .copy_from_slice(&state[1 + NUM_JOINTS..]);
+                true
+            }
+        }
+
+        // No policies are loaded here: `Controller::step` fails, the loop holds
+        // the pose, and the state machine still advances. That is enough to
+        // exercise every checkpointed field.
+        let tuning = Tuning::default();
+        let skills = SkillTuning::default();
+        let probe = Probe {
+            sensors: Sensors::default(),
+            targets: [0.0; NUM_JOINTS],
+        };
+        let mut runtime = DuckRuntime::new(
+            probe,
+            test_policy(),
+            tuning,
+            skills,
+            SafetyConfig::default(),
+        );
+        runtime.enable().ok();
+
+        for _ in 0..20 {
+            let _ = runtime.tick();
+        }
+        let saved = runtime.checkpoint().expect("a checkpoint");
+        let mut after_save = Vec::new();
+        for _ in 0..20 {
+            let _ = runtime.tick();
+            after_save.push(runtime.clock().tick);
+        }
+
+        assert!(runtime.restore(&saved), "the checkpoint restores");
+        assert_eq!(runtime.clock().tick, saved.tick);
+        for expected in after_save {
+            let _ = runtime.tick();
+            assert_eq!(runtime.clock().tick, expected);
+        }
+        // The clock came back to the same place, which is what "replay the same
+        // trajectory" means for the loop's own state.
+        assert_eq!(runtime.clock().tick, saved.tick + 20);
     }
 }

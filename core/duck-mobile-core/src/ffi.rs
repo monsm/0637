@@ -7,6 +7,7 @@
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_double, c_float, c_int};
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -42,6 +43,10 @@ pub struct DuckCore {
     /// What this build is: a hash over every asset that decides behaviour.
     provenance: crate::provenance::Provenance,
     fingerprint: CString,
+    /// The time machine: the last minute of checkpoints, newest last.
+    timeline: VecDeque<crate::runtime::Checkpoint>,
+    /// A restore that must land before the next tick (the tick it replaces).
+    pending_restore: Option<crate::runtime::Checkpoint>,
 }
 
 unsafe fn write_error(buffer: *mut c_char, size: c_int, message: &str) {
@@ -202,6 +207,8 @@ pub unsafe extern "C" fn duck_core_new(
             server_started: false,
             provenance,
             fingerprint,
+            timeline: VecDeque::new(),
+            pending_restore: None,
         })
     });
 
@@ -303,6 +310,26 @@ fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Keep the last `CAPACITY` ticks of checkpoints. One checkpoint is a few
+/// kilobytes, so a minute of history is a few megabytes — small enough to hold
+/// in the app, big enough to rewind anything a person would want to see.
+const TIMELINE_CAPACITY: usize = 3000;
+
+fn checkpoint_now(core: &mut DuckCore) {
+    let Some(checkpoint) = core.runtime.checkpoint() else {
+        return;
+    };
+    // One entry per tick: a second checkpoint at the same tick replaces the
+    // first rather than stacking.
+    if core.timeline.back().is_some_and(|last| last.tick == checkpoint.tick) {
+        core.timeline.pop_back();
+    }
+    core.timeline.push_back(checkpoint);
+    while core.timeline.len() > TIMELINE_CAPACITY {
+        core.timeline.pop_front();
+    }
+}
+
 fn apply_intent(core: &mut DuckCore, intent: Intent) {
     match intent {
         Intent::Twist(twist) => core.runtime.set_api_twist(twist),
@@ -332,6 +359,49 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
                 core.label = format!("reload failed: {error}");
             }
         }
+        Intent::Pause(paused) => core.runtime.set_paused(paused),
+        Intent::Step(ticks) => {
+            // Advance exactly the requested ticks while frozen; the shell's
+            // timer keeps calling tick(), which respects the pause.
+            core.runtime.set_paused(false);
+            for _ in 0..ticks {
+                let _ = core.runtime.tick();
+            }
+            core.runtime.set_paused(true);
+            if let Some(report) = core.runtime.last_report() {
+                core.label = report.label.clone();
+            }
+        }
+        Intent::Speed(speed) => core.runtime.set_speed(speed),
+        Intent::Checkpoint => checkpoint_now(core),
+        Intent::Restore(tick) => {
+            if let Some(checkpoint) = core
+                .timeline
+                .iter()
+                .rev()
+                .find(|checkpoint| checkpoint.tick == tick)
+                .cloned()
+            {
+                core.pending_restore = Some(checkpoint);
+            } else {
+                core.label = format!("no checkpoint at tick {tick}");
+            }
+        }
+        Intent::Seek(ticks) => {
+            let current = core.runtime.clock().tick;
+            let target = current.saturating_sub(ticks);
+            if let Some(checkpoint) = core
+                .timeline
+                .iter()
+                .rev()
+                .find(|checkpoint| checkpoint.tick <= target)
+                .cloned()
+            {
+                core.pending_restore = Some(checkpoint);
+            } else {
+                core.label = format!("nothing back to tick {target}");
+            }
+        }
     }
 }
 
@@ -346,6 +416,16 @@ fn bringup_code(state: BringupState) -> c_int {
 fn publish_state(core: &DuckCore) {
     let trunk = core.runtime.io().trunk();
     let gravity = core.runtime.io().gravity();
+    let clock = core.runtime.clock();
+    let checkpoints: Vec<u64> = core.timeline.iter().map(|saved| saved.tick).collect();
+    core.intents.set_time(json!({
+        "tick": clock.tick,
+        "paused": clock.paused,
+        "speed": clock.speed,
+        "checkpoints": checkpoints,
+        "oldest": checkpoints.first().copied(),
+        "newest": checkpoints.last().copied(),
+    }));
     core.intents.set_state(json!({
         "label": core.label,
         "bringup": bringup_code(core.runtime.bringup()),
@@ -353,6 +433,9 @@ fn publish_state(core: &DuckCore) {
         "gain": core.last.as_ref().map_or(200, |report| report.gain),
         "trunk": trunk,
         "gravity": gravity,
+        "tick": clock.tick,
+        "paused": clock.paused,
+        "speed": clock.speed,
     }));
 }
 
@@ -387,6 +470,23 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     let core = &mut *core;
     for intent in core.intents.drain() {
         apply_intent(core, intent);
+    }
+    // A restore replaces the tick that was about to happen: the duck resumes
+    // at the saved tick and this tick's physics runs from there.
+    if let Some(checkpoint) = core.pending_restore.take() {
+        if !core.runtime.restore(&checkpoint) {
+            core.label = "restore refused".to_owned();
+        }
+        core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
+    }
+    if core.runtime.clock().paused {
+        publish_state(core);
+        return 0;
+    }
+    // Record the state the tick is about to run from, so a rewind lands on a
+    // tick that really happened.
+    if core.timeline.back().is_none_or(|last| last.tick < core.runtime.clock().tick) {
+        checkpoint_now(core);
     }
     match core.runtime.tick() {
         Ok(report) => {
@@ -659,6 +759,32 @@ pub unsafe extern "C" fn duck_core_mesh_name(
     core.meshes
         .get(mesh as usize)
         .map_or(std::ptr::null(), |name| name.as_ptr())
+}
+
+/// The time machine, for a shell that drives the loop itself: whether the
+/// duck is frozen, and how many ticks one wall-clock frame should advance.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_paused(core: *mut DuckCore) -> c_int {
+    if core.is_null() {
+        return 0;
+    }
+    (*core).runtime.clock().paused as c_int
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_speed(core: *mut DuckCore) -> c_double {
+    if core.is_null() {
+        return 1.0;
+    }
+    (*core).runtime.clock().speed
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_tick_index(core: *mut DuckCore) -> u64 {
+    if core.is_null() {
+        return 0;
+    }
+    (*core).runtime.clock().tick
 }
 
 /// What this build is: one hash over the scene, meshes, policies and

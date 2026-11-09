@@ -40,6 +40,10 @@ int duck_mj_geom_group(const DuckMj* h, int geom);
 const char* duck_mj_version(void);
 /* Solver iterations the policy was trained with. */
 void duck_mj_set_solver(DuckMj* h, int iterations, int ls_iterations);
+/* The whole simulation state, for the time machine: size, save, restore. */
+int duck_mj_state_size(const DuckMj* h);
+void duck_mj_state_get(const DuckMj* h, double* out);
+void duck_mj_state_set(DuckMj* h, const double* in);
 /* Resolved colour: the material's rgba when the geom has one. */
 void duck_mj_geom_colour(const DuckMj* h, int geom, float* out);
 /* MuJoCo's own mesh data, after the compiler's mesh frame. */

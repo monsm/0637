@@ -149,12 +149,30 @@ final class DuckController: ObservableObject {
     }
 
     /// The 50 Hz control tick, on the main run loop.
+    ///
+    /// The timer always fires at 20 ms; the core decides whether this frame
+    /// advances simulation time. A paused duck still gets its state published,
+    /// and slow motion runs one tick every few frames — the loop's own timers
+    /// are on the simulation clock, so they slow down with it.
     private func startTimer() {
         let timer = Timer(timeInterval: 0.02, repeats: true) { [weak self] _ in
             self?.tick()
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+    }
+
+    /// How many ticks this frame should advance, from the speed setting.
+    private var speedRemainder: Double = 0
+
+    private func ticksForThisFrame() -> Int {
+        guard let core else { return 0 }
+        if duck_core_paused(core) != 0 { return 0 }
+        let speed = duck_core_speed(core)
+        speedRemainder += speed
+        let whole = Int(speedRemainder)
+        speedRemainder -= Double(whole)
+        return min(whole, 8)
     }
 
     deinit {
@@ -210,7 +228,10 @@ final class DuckController: ObservableObject {
         let x = deadzone(Float(joystick.x))
         let y = deadzone(Float(joystick.y))
         duck_core_set_twist(core, Double(-y) * 0.4, 0.0, Double(-x) * 1.0)
-        _ = duck_core_tick(core)
+        // Paused or slowed: the timer keeps firing, simulation time does not.
+        for _ in 0..<ticksForThisFrame() {
+            _ = duck_core_tick(core)
+        }
 
         if Date().timeIntervalSince(lastStatus) > 0.1 {
             var status = DuckStatus()

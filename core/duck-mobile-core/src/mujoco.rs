@@ -36,6 +36,9 @@ unsafe extern "C" {
     fn duck_mj_nmesh(handle: *const DuckMj) -> c_int;
     fn duck_mj_version() -> *const c_char;
     fn duck_mj_set_solver(handle: *mut DuckMj, iterations: c_int, ls_iterations: c_int);
+    fn duck_mj_state_size(handle: *const DuckMj) -> c_int;
+    fn duck_mj_state_get(handle: *const DuckMj, out: *mut c_double);
+    fn duck_mj_state_set(handle: *mut DuckMj, input: *const c_double);
     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
     fn duck_mj_set_timestep(handle: *mut DuckMj, dt: c_double);
 
@@ -498,6 +501,68 @@ impl MujocoIo {
         }
     }
 
+    /// The simulation state, for the time machine: MuJoCo's integration state
+    /// plus the bookkeeping that lives on this side of the boundary (the BAM
+    /// torque history, the hold pose, torque and release flags).
+    /// The raw handle, for the runtime's snapshot path. Borrowed for the call only.
+    pub fn handle(&self) -> *mut DuckMj {
+        self.handle
+    }
+
+    pub fn snapshot_state(&self) -> Vec<f64> {
+        let size = unsafe { duck_mj_state_size(self.handle) } as usize;
+        let mut state = vec![0.0; size];
+        unsafe { duck_mj_state_get(self.handle, state.as_mut_ptr()) };
+        // The scalar bookkeeping, appended so a restore is one contiguous copy.
+        state.push(self.kp);
+        state.push(if self.torque_on { 1.0 } else { 0.0 });
+        state.push(if self.released { 1.0 } else { 0.0 });
+        state.extend_from_slice(&self.held_trunk);
+        state.extend_from_slice(&self.held_joints);
+        if let Some(bam) = &self.bam {
+            state.push(bam.q_target.len() as f64);
+            state.extend_from_slice(&bam.q_target);
+            state.extend_from_slice(&bam.previous_torque);
+        } else {
+            state.push(0.0);
+        }
+        state
+    }
+
+    /// Put back what [`Self::snapshot_state`] returned. A size mismatch is
+    /// refused rather than half-applied.
+    pub fn restore_state(&mut self, state: &[f64]) -> bool {
+        let size = unsafe { duck_mj_state_size(self.handle) } as usize;
+        let fixed = size + 3 + 7 + NUM_JOINTS;
+        if state.len() < fixed {
+            return false;
+        }
+        unsafe { duck_mj_state_set(self.handle, state.as_ptr()) };
+        let mut cursor = size;
+        self.kp = state[cursor];
+        self.torque_on = state[cursor + 1] > 0.5;
+        self.released = state[cursor + 2] > 0.5;
+        cursor += 3;
+        self.held_trunk.copy_from_slice(&state[cursor..cursor + 7]);
+        cursor += 7;
+        self.held_joints
+            .copy_from_slice(&state[cursor..cursor + NUM_JOINTS]);
+        cursor += NUM_JOINTS;
+        let count = state[cursor] as usize;
+        cursor += 1;
+        if count > 0 {
+            if state.len() < cursor + count * 2 {
+                return false;
+            }
+            if let Some(bam) = &mut self.bam {
+                bam.q_target.copy_from_slice(&state[cursor..cursor + count]);
+                bam.previous_torque
+                    .copy_from_slice(&state[cursor + count..cursor + count * 2]);
+            }
+        }
+        true
+    }
+
     pub fn geom_count(&self) -> usize {
         (unsafe { duck_mj_ngeom(self.handle) }) as usize
     }
@@ -699,6 +764,14 @@ impl RobotIo for MujocoIo {
             }
         }
         Ok(())
+    }
+
+    fn snapshot(&self) -> Option<Vec<f64>> {
+        Some(self.snapshot_state())
+    }
+
+    fn restore(&mut self, state: &[f64]) -> bool {
+        self.restore_state(state)
     }
 
     fn measures_velocity(&self) -> bool {

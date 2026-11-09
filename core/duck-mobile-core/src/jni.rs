@@ -16,7 +16,7 @@ use jni::JNIEnv;
 use crate::ffi::{
     duck_core_body_count, duck_core_body_pose, duck_core_free, duck_core_geom_count,
     duck_core_geom_info, duck_core_ground_pick, duck_core_mesh_name, duck_core_mesh_soup,
-    duck_core_new,
+    duck_core_new, duck_core_paused, duck_core_speed,
     duck_core_push, duck_core_reload_policies, duck_core_render_qpos, duck_core_set_body,
     duck_core_set_head, duck_core_set_twist, duck_core_sit_toggle, duck_core_skill_count,
     duck_core_skill_name, duck_core_start_intent_server, duck_core_status, duck_core_tick,
@@ -425,4 +425,24 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMeshSoup(
         return std::ptr::null_mut();
     }
     array.into_raw()
+}
+
+/// Time machine: frozen?
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativePaused(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jni::sys::jboolean {
+    (unsafe { duck_core_paused(handle as *mut DuckCore) } != 0) as jni::sys::jboolean
+}
+
+/// Time machine: ticks per wall-clock frame.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSpeed(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jdouble {
+    unsafe { duck_core_speed(handle as *mut DuckCore) }
 }
