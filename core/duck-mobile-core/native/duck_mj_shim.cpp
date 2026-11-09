@@ -150,6 +150,7 @@ int duck_mj_geom_type(const DuckMj* h, int geom) { return h->m->geom_type[geom];
 int duck_mj_geom_bodyid(const DuckMj* h, int geom) { return h->m->geom_bodyid[geom]; }
 int duck_mj_geom_meshid(const DuckMj* h, int geom) { return h->m->geom_dataid[geom]; }
 int duck_mj_geom_group(const DuckMj* h, int geom) { return h->m->geom_group[geom]; }
+const char* duck_mj_version(void) { return mj_versionString(); }
 const float* duck_mj_mesh_vert(const DuckMj* h) { return h->m->mesh_vert; }
 const int* duck_mj_mesh_vertadr(const DuckMj* h) { return h->m->mesh_vertadr; }
 const int* duck_mj_mesh_vertnum(const DuckMj* h) { return h->m->mesh_vertnum; }

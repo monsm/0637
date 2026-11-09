@@ -34,6 +34,7 @@ unsafe extern "C" {
     fn duck_mj_nbody(handle: *const DuckMj) -> c_int;
     fn duck_mj_ngeom(handle: *const DuckMj) -> c_int;
     fn duck_mj_nmesh(handle: *const DuckMj) -> c_int;
+    fn duck_mj_version() -> *const c_char;
     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
     fn duck_mj_set_timestep(handle: *mut DuckMj, dt: c_double);
 
@@ -90,6 +91,19 @@ unsafe extern "C" {
     fn duck_mj_forward(handle: *mut DuckMj);
     fn duck_mj_step(handle: *mut DuckMj);
     fn duck_mj_quat2mat(mat: *mut c_double, quat: *const c_double);
+}
+
+/// MuJoCo's version, for the provenance fingerprint.
+pub fn version() -> String {
+    unsafe {
+        let pointer = duck_mj_version();
+        if pointer.is_null() {
+            return "unknown".to_owned();
+        }
+        std::ffi::CStr::from_ptr(pointer)
+            .to_string_lossy()
+            .into_owned()
+    }
 }
 
 const WIRE_NAMES: [&str; NUM_JOINTS] = [
@@ -437,6 +451,19 @@ impl MujocoIo {
                 quat[body * 4 + 3],
             ],
         )
+    }
+
+    /// MuJoCo's version, for the provenance fingerprint.
+    pub fn version() -> String {
+        unsafe {
+            let pointer = duck_mj_version();
+            if pointer.is_null() {
+                return "unknown".to_owned();
+            }
+            std::ffi::CStr::from_ptr(pointer)
+                .to_string_lossy()
+                .into_owned()
+        }
     }
 
     pub fn geom_count(&self) -> usize {

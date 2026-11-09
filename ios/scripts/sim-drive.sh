@@ -191,6 +191,13 @@ for name in roulade kick_left kick_right; do
   check $? "skill listed: $name" "$SKILLS"
 done
 
+# ---------------------------------------------------------------- provenance
+# The build proves which scene, meshes and policies it is running.
+FINGERPRINT=$(api GET /fingerprint || true)
+echo "$FINGERPRINT" | tee "$OUT/fingerprint.json" > /dev/null
+printf '%s' "$FINGERPRINT" | grep -qE '"fingerprint":"[0-9a-f]{64}"'
+check $? "build fingerprint is served" "$(printf '%s' "$FINGERPRINT" | grep -oE '"fingerprint":"[0-9a-f]{64}"' | head -1)"
+
 # ---------------------------------------------------------------- twist
 echo "--- walk ---"
 BEFORE=$(api GET /state | field trunk)

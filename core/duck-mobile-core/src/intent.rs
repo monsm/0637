@@ -41,6 +41,7 @@ pub struct IntentQueue {
     commands: Mutex<VecDeque<Intent>>,
     state: Mutex<Value>,
     skills: Mutex<Vec<String>>,
+    fingerprint: Mutex<String>,
 }
 
 impl Default for IntentQueue {
@@ -62,6 +63,7 @@ impl IntentQueue {
                 "gravity": [0.0, 0.0, -1.0],
             })),
             skills: Mutex::new(Vec::new()),
+            fingerprint: Mutex::new("{}".to_owned()),
         }
     }
 
@@ -91,6 +93,14 @@ impl IntentQueue {
 
     pub fn skills_json(&self) -> String {
         json!({ "skills": *self.skills.lock().expect("intent skills") }).to_string()
+    }
+
+    pub fn set_fingerprint(&self, document: String) {
+        *self.fingerprint.lock().expect("intent fingerprint") = document;
+    }
+
+    pub fn fingerprint_json(&self) -> String {
+        self.fingerprint.lock().expect("intent fingerprint").clone()
     }
 }
 
@@ -168,6 +178,7 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
     let result = match (method, path) {
         ("GET", "/state") => Ok(queue.state_json()),
         ("GET", "/skills") => Ok(queue.skills_json()),
+        ("GET", "/fingerprint") => Ok(queue.fingerprint_json()),
         ("POST", "/twist") => {
             queue.push(Intent::Twist([
                 value["vx"].as_f64().unwrap_or(0.0),

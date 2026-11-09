@@ -19,6 +19,7 @@ pub mod intent;
 
 pub mod io;
 pub mod manifest;
+pub mod provenance;
 #[cfg(feature = "mujoco")]
 pub mod ffi;
 #[cfg(feature = "mujoco")]

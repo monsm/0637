@@ -75,6 +75,15 @@ fi
 echo "$STATE" | tee intent-state.json
 curl -sf --max-time 5 http://127.0.0.1:8765/skills | tee intent-skills.json || true
 
+# The build proves which scene, meshes and policies it is running.
+FINGERPRINT=$(curl -sf --max-time 5 http://127.0.0.1:8765/fingerprint || true)
+echo "$FINGERPRINT" | tee intent-fingerprint.json > /dev/null
+if ! echo "$FINGERPRINT" | grep -qE '"fingerprint":"[0-9a-f]{64}"'; then
+  echo "::error::the build fingerprint is missing or malformed"
+  exit 1
+fi
+echo "fingerprint: $(echo "$FINGERPRINT" | grep -oE '"fingerprint":"[0-9a-f]{64}"')"
+
 # Drive the duck through its own intent API, the way an external agent
 # would: the API holds the duck for a lease, so keep the twist coming.
 for _ in $(seq 1 8); do

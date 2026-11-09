@@ -123,6 +123,7 @@ dependencies = [
  "jni",
  "robotd-params",
  "serde_json",
+ "sha2",
  "tracing",
 ]
 

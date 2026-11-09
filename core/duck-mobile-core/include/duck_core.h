@@ -54,6 +54,9 @@ int duck_core_geom_info(DuckCore* core, int geom, int* body, int* geom_type,
 
 const char* duck_core_mesh_name(DuckCore* core, int mesh);
 
+/* One hash over the scene, meshes, policies and manifest. */
+const char* duck_core_fingerprint(DuckCore* core);
+
 /* Triangle soup (px,py,pz,nx,ny,nz per vertex) in MuJoCo's mesh frame.
    Returns the float count; fills `out` when it is non-null and large
    enough. Use this instead of parsing the STL files. */

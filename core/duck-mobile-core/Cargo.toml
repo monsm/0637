@@ -18,6 +18,7 @@ duck-control = { path = "../../upstream/microduck/duck-control", default-feature
 # Official skill config types used by robotd's control.rs.
 robotd-params = { path = "../../upstream/microduck/robotd-params" }
 serde_json = "1"
+sha2 = "0.11"
 tracing = "0.1"
 
 [features]

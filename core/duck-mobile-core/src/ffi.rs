@@ -39,6 +39,9 @@ pub struct DuckCore {
     label: String,
     intents: Arc<IntentQueue>,
     server_started: bool,
+    /// What this build is: a hash over every asset that decides behaviour.
+    provenance: crate::provenance::Provenance,
+    fingerprint: CString,
 }
 
 unsafe fn write_error(buffer: *mut c_char, size: c_int, message: &str) {
@@ -169,6 +172,10 @@ pub unsafe extern "C" fn duck_core_new(
         );
         stage("enable");
         runtime.enable().map_err(|error| error.to_string())?;
+        stage("provenance");
+        let provenance = crate::provenance::collect(Path::new(&scene), &policies);
+        let fingerprint = CString::new(provenance.fingerprint.clone()).unwrap_or_default();
+        stage(&format!("fingerprint {}", provenance.fingerprint));
         stage("ready");
 
         let skills = runtime
@@ -183,6 +190,7 @@ pub unsafe extern "C" fn duck_core_new(
             .collect();
         let intents = Arc::new(IntentQueue::new());
         intents.set_skills(runtime.skill_names());
+        intents.set_fingerprint(provenance.to_json());
 
         Ok(DuckCore {
             runtime,
@@ -192,6 +200,8 @@ pub unsafe extern "C" fn duck_core_new(
             label: "idle".to_owned(),
             intents,
             server_started: false,
+            provenance,
+            fingerprint,
         })
     });
 
@@ -648,6 +658,16 @@ pub unsafe extern "C" fn duck_core_mesh_name(
     core.meshes
         .get(mesh as usize)
         .map_or(std::ptr::null(), |name| name.as_ptr())
+}
+
+/// What this build is: one hash over the scene, meshes, policies and
+/// manifest. Two builds with the same fingerprint run the same duck.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_fingerprint(core: *mut DuckCore) -> *const c_char {
+    if core.is_null() {
+        return std::ptr::null();
+    }
+    (*core).fingerprint.as_ptr()
 }
 
 /// Triangle soup for a mesh: (px, py, pz, nx, ny, nz) per vertex, three per
