@@ -351,6 +351,24 @@ esac
 api POST /time '{"paused":false}' > /dev/null
 api POST /time '{"speed":1.0}' > /dev/null
 
+# ---------------------------------------------------------------- MCP
+# The duck as a tool: an MCP client lists the tools and calls one.
+echo "--- mcp ---"
+INIT=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}' http://127.0.0.1:8765/mcp || true)
+printf '%s' "$INIT" | grep -q '"protocolVersion"'
+check $? "MCP initialize answers" "$(printf '%s' "$INIT" | head -c 100)"
+
+TOOLS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8765/mcp || true)
+echo "$TOOLS" | tee "$OUT/mcp-tools.json" > /dev/null
+for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors; do
+  printf '%s' "$TOOLS" | grep -q "\"$tool\""
+  check $? "MCP tool listed: $tool" ""
+done
+
+STATE=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"duck_state"}}'   http://127.0.0.1:8765/mcp || true)
+printf '%s' "$STATE" | grep -q '"content"'
+check $? "MCP duck_state answers with content" "$(printf '%s' "$STATE" | head -c 90)"
+
 # ---------------------------------------------------------------- sensors
 # Every sensor the phone adds is verified by pushing a reading and reading it
 # back, and by checking that only the IMU reaches the duck as a disturbance.

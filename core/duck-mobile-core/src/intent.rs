@@ -242,6 +242,11 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/timeline") => Ok(queue.time_json()),
         ("GET", "/branches") => Ok(queue.branches_json()),
         ("GET", "/sensors") => Ok(queue.sensors_json()),
+        ("POST", "/mcp") => Ok(crate::mcp::handle(&body, &queue)),
+        ("GET", "/mcp") => Ok(crate::mcp::handle(
+            r#"{"jsonrpc":"2.0","id":0,"method":"tools/list"}"#,
+            &queue,
+        )),
         ("POST", "/sensor") => match value["sensor"].as_str() {
             Some(sensor) => {
                 let reading = crate::sensors::Reading {
