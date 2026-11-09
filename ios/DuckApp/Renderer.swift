@@ -9,6 +9,8 @@ private struct Uniforms {
     var model: simd_float4x4
     var color: SIMD4<Float>
     var light: SIMD4<Float>
+    /// x: metalness, y: roughness, z: exposure.
+    var material: SIMD4<Float>
 }
 
 private struct Mesh {
@@ -352,7 +354,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             // The shader negates this and dots it with the normal, so the
             // vector points the way the light travels; w carries the floor's
             // checker flag.
-            light: SIMD4<Float>(light.x, light.y, light.z, checker ? 1 : 0)
+            light: SIMD4<Float>(light.x, light.y, light.z, checker ? 1 : 0),
+            // The duck is painted plastic over a few metal parts; the floor is
+            // matte. Roughness is what keeps the shells from looking like chrome.
+            material: checker
+                ? SIMD4<Float>(0.0, 0.85, 1.0, 0)
+                : SIMD4<Float>(0.05, 0.42, 1.0, 0)
         )
         encoder.setVertexBuffer(mesh.buffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)

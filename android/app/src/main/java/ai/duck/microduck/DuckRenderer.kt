@@ -37,6 +37,7 @@ class DuckRenderer(
     private var uColor = 0
     private var uLight = 0
     private var uChecker = 0
+    private var uMaterial = 0
     private var aPos = 0
     private var aNormal = 0
     private val meshes = mutableMapOf<Int, Mesh>()
@@ -56,6 +57,7 @@ class DuckRenderer(
         uColor = GLES30.glGetUniformLocation(program, "uColor")
         uLight = GLES30.glGetUniformLocation(program, "uLight")
         uChecker = GLES30.glGetUniformLocation(program, "uChecker")
+        uMaterial = GLES30.glGetUniformLocation(program, "uMaterial")
         aPos = GLES30.glGetAttribLocation(program, "aPos")
         aNormal = GLES30.glGetAttribLocation(program, "aNormal")
         buildScene()
@@ -217,6 +219,12 @@ class DuckRenderer(
         GLES30.glUniform4fv(uColor, 1, color, 0)
         GLES30.glUniform3f(uLight, light[0], light[1], light[2])
         GLES30.glUniform1f(uChecker, checker)
+        // The duck is painted plastic over a few metal parts; the floor is matte.
+        if (checker > 0.5f) {
+            GLES30.glUniform2f(uMaterial, 0f, 0.85f)
+        } else {
+            GLES30.glUniform2f(uMaterial, 0.05f, 0.42f)
+        }
 
         mesh.buffer.position(0)
         GLES30.glEnableVertexAttribArray(aPos)
@@ -390,17 +398,81 @@ class DuckRenderer(
             uniform vec4 uColor;
             uniform vec3 uLight;
             uniform float uChecker;
+            uniform vec2 uMaterial;
             out vec4 fragColor;
+
+            // A cheap analytic environment: sky above, bounce below. Gives a
+            // dielectric something to reflect and a metal something to mirror.
+            vec3 environment(vec3 direction) {
+                float up = clamp(direction.z * 0.5 + 0.5, 0.0, 1.0);
+                vec3 sky = mix(vec3(0.16, 0.19, 0.24), vec3(0.55, 0.65, 0.80), up);
+                vec3 ground = vec3(0.10, 0.11, 0.13);
+                float horizon = smoothstep(-0.15, 0.15, direction.z);
+                return mix(ground, sky, horizon);
+            }
+
+            float distributionGGX(vec3 n, vec3 h, float roughness) {
+                float a = roughness * roughness;
+                float a2 = a * a;
+                float ndoth = max(dot(n, h), 0.0);
+                float denom = ndoth * ndoth * (a2 - 1.0) + 1.0;
+                return a2 / max(3.14159265 * denom * denom, 1e-5);
+            }
+
+            float geometrySchlick(float ndotv, float roughness) {
+                float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+                return ndotv / max(ndotv * (1.0 - k) + k, 1e-5);
+            }
+
+            vec3 fresnelSchlick(float cosTheta, vec3 f0) {
+                return f0 + (1.0 - f0) * pow(1.0 - cosTheta, 5.0);
+            }
+
             void main() {
-                vec3 normal = normalize(vNormal);
-                float diffuse = max(dot(normal, normalize(uLight)), 0.0);
+                vec3 n = normalize(vNormal);
+                vec3 v = normalize(-vWorld);
+                vec3 l = normalize(-uLight);
+                vec3 h = normalize(l + v);
+
+                float metalness = clamp(uMaterial.x, 0.0, 1.0);
+                float roughness = clamp(uMaterial.y, 0.04, 1.0);
+
                 vec3 base = uColor.rgb;
                 if (uChecker > 0.5) {
                     vec2 cell = floor(vWorld.xy / 0.2);
                     float odd = mod(cell.x + cell.y, 2.0);
                     base = mix(vec3(0.20, 0.30, 0.40), vec3(0.10, 0.20, 0.30), odd);
                 }
-                fragColor = vec4(base * (0.30 + 0.70 * diffuse), uColor.a);
+
+                vec3 f0 = mix(vec3(0.04), base, metalness);
+                vec3 diffuseAlbedo = base * (1.0 - metalness);
+
+                float ndotl = max(dot(n, l), 0.0);
+                float ndotv = max(dot(n, v), 1e-4);
+
+                float d = distributionGGX(n, h, roughness);
+                float g = geometrySchlick(ndotv, roughness) * geometrySchlick(ndotl, roughness);
+                vec3 f = fresnelSchlick(max(dot(h, v), 0.0), f0);
+                vec3 specular = (d * g) * f / max(4.0 * ndotv * ndotl, 1e-4);
+
+                vec3 ambientDir = reflect(-v, n);
+                vec3 ambient = environment(ambientDir) * mix(0.35, 1.0, metalness);
+                float rim = pow(1.0 - ndotv, 3.0);
+
+                vec3 color = diffuseAlbedo * (0.18 + 0.82 * ndotl) * 1.15
+                           + specular * ndotl
+                           + ambient * diffuseAlbedo * 0.55
+                           + ambient * f0 * (0.15 + 0.85 * rim);
+
+                if (uChecker > 0.5) {
+                    float radial = length(vWorld.xy);
+                    float shadow = smoothstep(0.02, 0.55, radial);
+                    color *= mix(0.55, 1.0, shadow);
+                }
+
+                color = color / (color + vec3(1.0));
+                color = pow(color, vec3(1.0 / 2.2));
+                fragColor = vec4(color, uColor.a);
             }
         """.trimIndent()
     }
