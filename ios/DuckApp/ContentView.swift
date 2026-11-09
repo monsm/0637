@@ -244,6 +244,9 @@ struct SkillRing: View {
                             .background(.ultraThinMaterial, in: Capsule())
                     }
                     .buttonStyle(.plain)
+                    // The ring's entries share their names with nothing else,
+                    // but an accessibility id keeps the query unambiguous.
+                    .accessibilityIdentifier("ring-\(name)")
                     .offset(
                         x: radius * cos(angle - .pi / 2),
                         y: radius * sin(angle - .pi / 2)
@@ -251,12 +254,14 @@ struct SkillRing: View {
                 }
                 VStack(spacing: 6) {
                     Text("sit")
+                        .accessibilityIdentifier("ring-sit")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(.ultraThinMaterial, in: Capsule())
                         .onTapGesture { onPick("sit") }
                     Text("pick")
+                        .accessibilityIdentifier("ring-ground_pick")
                         .font(.system(size: 11, weight: .medium, design: .rounded))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)

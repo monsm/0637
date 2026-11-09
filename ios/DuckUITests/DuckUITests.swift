@@ -28,8 +28,10 @@ final class DuckUITests: XCTestCase {
         var last = ""
         while Date() < deadline {
             let element = labelElement()
-            if element.exists {
-                last = element.label
+            // The live bar is the one the test watches; the sheet has its own.
+            let visible = element.firstMatch
+            if visible.exists {
+                last = visible.label
                 if wanted.contains(last) { return last }
             }
             usleep(100_000)
@@ -42,7 +44,9 @@ final class DuckUITests: XCTestCase {
         let skills = app.buttons["Skills"]
         XCTAssertTrue(skills.waitForExistence(timeout: 10), "the skills button is missing")
         skills.tap()
-        let option = app.buttons[name]
+        // The ring's entry carries a unique id: the same skill name can appear
+        // in more than one place once the shell has a ring and a sheet.
+        let option = app.buttons["ring-\(name)"]
         XCTAssertTrue(
             option.waitForExistence(timeout: 10),
             "the skill ring has no \(name)"
@@ -78,14 +82,14 @@ final class DuckUITests: XCTestCase {
             app.staticTexts["This duck"].waitForExistence(timeout: 10),
             "the instrument sheet did not open"
         )
-        let freeze = app.buttons["Freeze"]
+        let freeze = app.buttons["time-Freeze"]
         XCTAssertTrue(freeze.waitForExistence(timeout: 5), "the freeze button is missing")
         freeze.tap()
         XCTAssertTrue(
-            app.buttons["Resume"].waitForExistence(timeout: 5),
+            app.buttons["time-Resume"].waitForExistence(timeout: 5),
             "freeze did not flip to resume"
         )
-        app.buttons["Resume"].tap()
+        app.buttons["time-Resume"].tap()
 
         // Close the sheet and keep driving.
         app.swipeDown()

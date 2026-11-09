@@ -29,7 +29,7 @@ struct InstrumentSheet: View {
             Text(controller.label)
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
-                .accessibilityIdentifier("duck-label")
+                .accessibilityIdentifier("sheet-label")
         }
     }
 
@@ -113,6 +113,7 @@ struct InstrumentSheet: View {
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("time-\(title)")
     }
 
     // MARK: - Telemetry
