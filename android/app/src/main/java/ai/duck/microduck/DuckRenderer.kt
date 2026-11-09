@@ -43,7 +43,6 @@ class DuckRenderer(
     private val instances = mutableListOf<Instance>()
     private var floor: Mesh? = null
     private var aspect = 1f
-    private var lastTick = 0L
     private val yaw = Math.PI.toFloat()
     private val pitch = 0.32f
     private val distance = 0.85f
@@ -68,14 +67,7 @@ class DuckRenderer(
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        val now = System.nanoTime()
-        if (now - lastTick >= 20_000_000L) {
-            // Keepalive: the core has robotd's 500 ms twist deadman.
-            core.setTwist(input.vx, 0.0, input.wz)
-            core.tick()
-            lastTick = now
-        }
-
+        // The 50 Hz loop runs on DuckLoop's own scheduler; this only draws.
         val status = core.status()
         val trunk = if (status.size >= 9) {
             floatArrayOf(status[3].toFloat(), status[4].toFloat(), status[5].toFloat())

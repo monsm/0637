@@ -29,11 +29,21 @@ pub const HOME_RAMP: Duration = Duration::from_secs(2);
 /// `robotd`'s `gain_limp`: yield rather than fight the floor.
 pub const GAIN_LIMP: u16 = 50;
 /// How long the limp-fall reflex holds the pose before handing back.
-const LIMP_SETTLE: Duration = Duration::from_millis(500);
+/// robotd's limp-fall timings: the limp ends when the gyro reads still, not on a timer.
+const LIMP_FALL_STILL: Duration = Duration::from_millis(200);
+const LIMP_FALL_MAX: Duration = Duration::from_millis(1500);
+const LIMP_FALL_POSE: Duration = Duration::from_millis(600);
+const LIMP_FALL_STILL_RATE: f64 = 1.0;
+const GAIN_POSE: u16 = 160;
 /// After a limp-fall, drive zero command for this long so velstand can get up.
-const RECOVERY: Duration = Duration::from_secs(2);
 /// `SafetyConfig::default().deadman`.
 const DEADMAN: Duration = Duration::from_millis(500);
+
+/// robotd's `[control] cmd_alpha` / `head_alpha`: the client's command is
+/// smoothed per tick (`cmd += alpha * (target - cmd)`), so a stick snap
+/// becomes a ramp the gait can follow.
+const CMD_ALPHA: f64 = 0.2;
+const HEAD_ALPHA: f64 = 0.2;
 
 /// How long a twist from the intent API keeps control after it arrives.
 ///
@@ -42,7 +52,7 @@ const DEADMAN: Duration = Duration::from_millis(500);
 /// and an external agent could not drive the duck at all. With the lease the
 /// API owns the duck while it keeps talking, and control goes back to the
 /// screen when it stops.
-const API_LEASE: Duration = Duration::from_millis(1000);
+const API_LEASE: Duration = DEADMAN;
 
 /// The intent API's claim on the duck: the twist it last asked for and the
 /// lease it holds. Separate from the runtime so it can be tested on its own.
@@ -160,6 +170,37 @@ pub struct TickReport {
     pub bringup: BringupState,
 }
 
+/// Watching a limping robot for the moment it stops moving.
+///
+/// The end of the limp is read from the gyro rather than timed: a stumble is
+/// over in a few hundred milliseconds, a topple takes most of a second, and
+/// ending the limp early is landing stiff after all. Debounced, because a
+/// tumbling robot passes through instants of near-zero rate on its way over.
+#[derive(Debug, Clone, Copy, Default)]
+struct Landing {
+    still_for: Duration,
+}
+
+impl Landing {
+    fn observe(&mut self, rate: Option<f64>, period: Duration, below: f64, held: Duration) -> bool {
+        self.still_for = match rate {
+            Some(rate) if rate < below => self.still_for.saturating_add(period),
+            _ => Duration::ZERO,
+        };
+        self.still_for >= held
+    }
+}
+
+/// robotd's limp-fall sequence.
+#[derive(Debug, Clone, Copy)]
+enum LimpFall {
+    Idle,
+    /// Gains at `GAIN_LIMP`, joints commanded to wherever they already are.
+    Limp { since: Instant, landing: Landing },
+    /// Ramping from where the robot landed back to the standing pose.
+    Posing { from: [f64; NUM_JOINTS], since: Instant },
+}
+
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
 pub struct DuckRuntime<T: RobotIo> {
     safety: Safety<T>,
@@ -168,13 +209,18 @@ pub struct DuckRuntime<T: RobotIo> {
     bringup: Bringup,
     command: Command,
     enabled: bool,
-    limp_until: Option<Instant>,
-    limp_hold: Option<[f64; NUM_JOINTS]>,
-    recover_until: Option<Instant>,
+    limp_fall: LimpFall,
     last_twist: Instant,
     twist_fresh: bool,
     /// The twist from the intent API, and the lease it holds on the duck.
     api_lease: ApiLease,
+    /// The smoothed command, per tick, exactly as robotd keeps it.
+    twist_ema: [f64; 3],
+    head_ema: [f64; 4],
+    body_ema: [f64; 3],
+    /// Whether a client is holding the standing body pose (robotd's
+    /// `PoseIntent.active`); while it is, the twist is zeroed.
+    body_active: bool,
     dt: Duration,
 }
 
@@ -193,12 +239,14 @@ impl<T: RobotIo> DuckRuntime<T> {
             bringup: Bringup::Limp,
             command: Command::default(),
             enabled: false,
-            limp_until: None,
-            limp_hold: None,
-            recover_until: None,
+            limp_fall: LimpFall::Idle,
             last_twist: Instant::now(),
             twist_fresh: false,
             api_lease: ApiLease::default(),
+            twist_ema: [0.0; 3],
+            head_ema: [0.0; 4],
+            body_ema: [0.0; 3],
+            body_active: false,
             dt: Duration::from_millis(20),
         }
     }
@@ -233,6 +281,10 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.enabled = true;
         self.twist_fresh = false;
         self.command.twist = [0.0; 3];
+        self.twist_ema = [0.0; 3];
+        self.head_ema = [0.0; 4];
+        self.body_ema = [0.0; 3];
+        self.body_active = false;
         Ok(())
     }
 
@@ -242,9 +294,12 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.enabled = false;
         self.bringup = Bringup::Limp;
         self.controller.reset();
-        self.limp_until = None;
-        self.limp_hold = None;
-        self.recover_until = None;
+        self.twist_ema = [0.0; 3];
+        self.head_ema = [0.0; 4];
+        self.body_ema = [0.0; 3];
+        self.body_active = false;
+        self.fall.reset();
+        self.limp_fall = LimpFall::Idle;
         Ok(())
     }
 
@@ -269,6 +324,15 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.command.body.z = z;
         self.command.body.roll = roll;
         self.command.body.pitch = pitch;
+        // robotd's PoseIntent.active: the loop glides toward the pose while it
+        // is held, and snaps back when the client releases it.
+        self.body_active = true;
+    }
+
+    /// Release the standing body pose (robotd's B-button exit): the offset
+    /// snaps back to nominal and the twist is live again.
+    pub fn release_body(&mut self) {
+        self.body_active = false;
     }
 
     pub fn skill_names(&self) -> Vec<String> {
@@ -322,9 +386,7 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// controller (skills, seat, filters) starts fresh.
     pub fn replace_policy(&mut self, policy: Policy, tuning: Tuning, skills: SkillTuning) {
         self.controller = Controller::new(policy, tuning, skills);
-        self.limp_until = None;
-        self.limp_hold = None;
-        self.recover_until = None;
+        self.limp_fall = LimpFall::Idle;
     }
 
     /// Shake/shove input: an external trunk velocity impulse.
@@ -350,8 +412,12 @@ impl<T: RobotIo> DuckRuntime<T> {
 
         match self.bringup {
             Bringup::Limp => {
+                // Torque off, but still write and step: a limp duck has to
+                // fall, not freeze in the pose it was standing in.
+                self.safety.apply(hold, hold, 0)?;
                 report.label = "limp".to_owned();
                 report.gain = 0;
+                report.targets = hold;
                 return Ok(report);
             }
             Bringup::Homing { to, .. } => {
@@ -378,39 +444,92 @@ impl<T: RobotIo> DuckRuntime<T> {
             tracing::warn!("deadman: no twist for {DEADMAN:?}; standing still");
         }
 
-        // Limp-fall reflex: drop the gain and ride the fall out, then let velstand get up.
-        if let Some(until) = self.limp_until {
-            if now < until {
-                let target = self.limp_hold.unwrap_or(hold);
-                self.safety.apply(target, hold, GAIN_LIMP)?;
+        // Limp-fall, robotd's sequence: go soft before the landing, let the
+        // robot arrive limp, put it back into the standing pose, and only then
+        // hand it to the policy. Read from the fall predictor, not the `fallen`
+        // verdict: a verdict that waits for the robot to be down cannot make
+        // it soft before it lands.
+        let was_driving = self.enabled && matches!(self.bringup, Bringup::Ready);
+
+        // Abandoned mid-sequence: something else took the robot.
+        if !matches!(self.limp_fall, LimpFall::Idle) && !was_driving {
+            self.limp_fall = LimpFall::Idle;
+            self.fall.reset();
+        }
+
+        match self.limp_fall {
+            LimpFall::Idle => {
+                let eligible = was_driving
+                    && !self.safety.fallen()
+                    && !self.controller.busy()
+                    && !self.controller.is_sitting();
+                if eligible && self.safety.imu_ready() {
+                    if self.fall.observe(&sensors.imu, self.dt) {
+                        tracing::warn!("falling - going limp to land soft");
+                        self.limp_fall = LimpFall::Limp {
+                            since: now,
+                            landing: Landing::default(),
+                        };
+                    }
+                } else {
+                    // Not eligible: drop any debounce rather than resuming it
+                    // later against a robot that has moved on.
+                    self.fall.reset();
+                }
+            }
+            LimpFall::Limp { since, mut landing } => {
+                let rate = Some(
+                    sensors.imu.gyro.iter().map(|w| w * w).sum::<f64>().sqrt(),
+                );
+                let landed =
+                    landing.observe(rate, self.dt, LIMP_FALL_STILL_RATE, LIMP_FALL_STILL);
+                let timed_out = now.duration_since(since) >= LIMP_FALL_MAX;
+                if landed || timed_out {
+                    tracing::warn!("landed - posing back to standing");
+                    self.limp_fall = LimpFall::Posing {
+                        from: hold,
+                        since: now,
+                    };
+                } else {
+                    self.limp_fall = LimpFall::Limp { since, landing };
+                }
+            }
+            LimpFall::Posing { since, .. } => {
+                if now.duration_since(since) >= LIMP_FALL_POSE {
+                    tracing::warn!("posed - handing back to the standing policy");
+                    self.limp_fall = LimpFall::Idle;
+                    self.fall.reset();
+                    self.controller.reset();
+                }
+            }
+        }
+
+        // The whole sequence owns the targets: the controller is not stepped.
+        match self.limp_fall {
+            LimpFall::Idle => {}
+            LimpFall::Limp { .. } => {
+                // Command the joints to wherever they are: the softest thing
+                // the servos can do short of cutting torque.
+                self.safety.apply(hold, hold, GAIN_LIMP)?;
                 report.label = "limp_fall".to_owned();
-                report.targets = target;
+                report.targets = hold;
                 report.gain = GAIN_LIMP;
                 return Ok(report);
             }
-            self.limp_until = None;
-            self.limp_hold = None;
-            self.recover_until = Some(now + RECOVERY);
-            self.controller.reset();
-            tracing::info!("limp-fall: settle done; handing back to the policy to get up");
-        }
-
-        let recovering = self.recover_until.is_some_and(|until| now < until);
-        if self.recover_until.is_some_and(|until| now >= until) {
-            self.recover_until = None;
-        }
-
-        if !recovering
-            && !self.controller.busy()
-            && self.fall.observe(&sensors.imu, self.dt)
-        {
-            self.limp_until = Some(now + LIMP_SETTLE);
-            self.limp_hold = Some(hold);
-            self.safety.apply(hold, hold, GAIN_LIMP)?;
-            report.label = "limp_fall".to_owned();
-            report.targets = hold;
-            report.gain = GAIN_LIMP;
-            return Ok(report);
+            LimpFall::Posing { from, since } => {
+                let t = (now.duration_since(since).as_secs_f64()
+                    / LIMP_FALL_POSE.as_secs_f64())
+                .min(1.0);
+                let mut target = [0.0; NUM_JOINTS];
+                for (index, slot) in target.iter_mut().enumerate() {
+                    *slot = from[index] + (DEFAULT_POSITION[index] - from[index]) * t;
+                }
+                self.safety.apply(target, hold, GAIN_POSE)?;
+                report.label = "pose".to_owned();
+                report.targets = target;
+                report.gain = GAIN_POSE;
+                return Ok(report);
+            }
         }
 
         let mut command = self.command;
@@ -419,13 +538,41 @@ impl<T: RobotIo> DuckRuntime<T> {
         if let Some(twist) = self.api_lease.active(now) {
             command.twist = twist;
         }
-        if recovering {
-            command.twist = [0.0; 3];
+
+        // Smooth the client's command the way robotd does, so the policy sees
+        // a ramp rather than a step.
+        for axis in 0..3 {
+            self.twist_ema[axis] += CMD_ALPHA * (command.twist[axis] - self.twist_ema[axis]);
+            command.twist[axis] = self.twist_ema[axis];
         }
+        for axis in 0..4 {
+            if command.head[axis].is_finite() {
+                self.head_ema[axis] +=
+                    HEAD_ALPHA * (command.head[axis] - self.head_ema[axis]);
+            }
+            command.head[axis] = self.head_ema[axis];
+        }
+        if self.body_active {
+            let target = [command.body.z, command.body.roll, command.body.pitch];
+            for axis in 0..3 {
+                self.body_ema[axis] += CMD_ALPHA * (target[axis] - self.body_ema[axis]);
+            }
+        } else {
+            self.body_ema = [0.0; 3];
+        }
+        command.body.z = self.body_ema[0];
+        command.body.roll = self.body_ema[1];
+        command.body.pitch = self.body_ema[2];
 
         match self
             .controller
-            .step(&sensors, &command, false, self.dt.as_secs_f64(), 1.0)
+            .step(
+                &sensors,
+                &command,
+                self.body_active,
+                self.dt.as_secs_f64(),
+                1.0,
+            )
         {
             Ok(step) => {
                 self.safety.apply(step.targets, hold, step.gain)?;

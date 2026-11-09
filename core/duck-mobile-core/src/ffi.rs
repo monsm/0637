@@ -308,6 +308,7 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
         Intent::Twist(twist) => core.runtime.set_api_twist(twist),
         Intent::Head(head) => core.runtime.set_head(head),
         Intent::Body(z, roll, pitch) => core.runtime.set_body(z, roll, pitch),
+        Intent::BodyRelease => core.runtime.release_body(),
         Intent::Skill(name) => {
             if let Err(error) = core.runtime.trigger_skill(&name) {
                 core.label = format!("skill refused: {error}");

@@ -30,6 +30,7 @@ pub enum Intent {
     Twist([f64; 3]),
     Head([f64; 4]),
     Body(f64, f64, f64),
+    BodyRelease,
     Skill(String),
     Sit,
     GroundPick,
@@ -197,11 +198,16 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Ok(json!({ "ok": true }).to_string())
         }
         ("POST", "/body") => {
-            queue.push(Intent::Body(
-                value["z"].as_f64().unwrap_or(0.0),
-                value["roll"].as_f64().unwrap_or(0.0),
-                value["pitch"].as_f64().unwrap_or(0.0),
-            ));
+            // `active: false` releases the pose (robotd's B-button exit).
+            if value["active"].as_bool() == Some(false) {
+                queue.push(Intent::BodyRelease);
+            } else {
+                queue.push(Intent::Body(
+                    value["z"].as_f64().unwrap_or(0.0),
+                    value["roll"].as_f64().unwrap_or(0.0),
+                    value["pitch"].as_f64().unwrap_or(0.0),
+                ));
+            }
             Ok(json!({ "ok": true }).to_string())
         }
         ("POST", "/skill") => match value["name"].as_str() {

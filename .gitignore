@@ -44,3 +44,7 @@ work/ci-shot/
 
 # Reference renders for visual comparison
 work/refrender/
+
+# Audit scratch from workflow agents
+work/audit-backlash/
+work/audit_tmp/

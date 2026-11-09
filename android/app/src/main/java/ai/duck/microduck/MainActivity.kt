@@ -46,6 +46,7 @@ import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private var core: DuckCore? = null
+    private var loop: DuckLoop? = null
     private lateinit var input: DuckInput
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
                     onCoreCreated = { created ->
                         core = created
                         created.startIntentServer(8765)
+                        loop = DuckLoop(created, input).also { it.start() }
                     },
                     input = input,
                 )
@@ -66,6 +68,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        loop?.stop()
+        loop = null
         core?.close()
         core = null
         super.onDestroy()
@@ -135,8 +139,10 @@ private fun DuckScreen(
         StatusPanel(status, Modifier.align(Alignment.TopStart).padding(16.dp))
 
         Joystick(Modifier.align(Alignment.BottomStart).padding(24.dp).size(150.dp)) { x, y ->
-            input.vx = -y * 0.4
-            input.wz = x * 1.0
+            // robotd's pad: a 0.1 deadzone per axis, yaw negated (clockwise is
+            // positive on the real controller).
+            input.vx = deadzone(-y) * 0.4
+            input.wz = -deadzone(x) * 1.0
         }
 
         active?.let { Controls(it, skills, Modifier.align(Alignment.BottomEnd).padding(24.dp)) }
@@ -231,3 +237,6 @@ private fun Joystick(modifier: Modifier = Modifier, onChange: (Float, Float) -> 
         )
     }
 }
+
+/** robotd's AxisBinding::evaluate: inside 0.1 the axis reads zero, otherwise as-is. */
+private fun deadzone(value: Float): Float = if (kotlin.math.abs(value) < 0.1f) 0f else value

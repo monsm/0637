@@ -190,6 +190,11 @@ final class DuckController: ObservableObject {
         }
     }
 
+    /// robotd's AxisBinding::evaluate: inside 0.1 the axis reads zero.
+    private func deadzone(_ value: Float) -> Float {
+        abs(value) < 0.1 ? 0 : value
+    }
+
     private func push(x: Double, y: Double, z: Double) {
         guard let core else { return }
         _ = duck_core_push(core, x, y, z)
@@ -200,9 +205,11 @@ final class DuckController: ObservableObject {
 
         // The core has robotd's 500 ms deadman: a twist must keep arriving.
         // The joystick is sent every tick, zero included.
-        let x = Float(joystick.x)
-        let y = Float(joystick.y)
-        duck_core_set_twist(core, Double(-y) * 0.4, 0.0, Double(x) * 1.0)
+        // robotd's pad: a 0.1 deadzone per axis, yaw negated (clockwise is
+        // positive on the real controller).
+        let x = deadzone(Float(joystick.x))
+        let y = deadzone(Float(joystick.y))
+        duck_core_set_twist(core, Double(-y) * 0.4, 0.0, Double(-x) * 1.0)
         _ = duck_core_tick(core)
 
         if Date().timeIntervalSince(lastStatus) > 0.1 {
