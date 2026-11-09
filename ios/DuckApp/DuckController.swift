@@ -11,6 +11,9 @@ import simd
 final class DuckController: ObservableObject {
     @Published var ready = false
     @Published var errorMessage: String?
+    /// Set when the Metal renderer could not start. A failed renderer used to
+    /// mean a black screen and no clue; this is what the user sees instead.
+    @Published var renderError: String?
     @Published var bringup = 0
     @Published var fallen = false
     @Published var gain = 200

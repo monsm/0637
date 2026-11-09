@@ -74,10 +74,28 @@ if [ -z "$STATE" ]; then
 fi
 echo "$STATE" | tee intent-state.json
 curl -sf --max-time 5 http://127.0.0.1:8765/skills | tee intent-skills.json || true
+
+# Drive the duck through its own intent API, the way an external agent
+# would: the API holds the duck for a lease, so keep the twist coming.
+for _ in $(seq 1 8); do
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d '{"vx":0.4,"vy":0.0,"wz":0.0}' http://127.0.0.1:8765/twist > /dev/null || true
+  sleep 0.3
+done
+curl -sf --max-time 5 http://127.0.0.1:8765/state | tee intent-state-walking.json || true
+
 # A black screen is the failure this app is prone to (the core load used to
 # block the main thread). Catch it in CI instead of on the user's device.
+# Two frames, taken while the duck walks: they must not be blank, and they
+# must not be identical — a renderer that never started draws the same
+# picture forever.
 adb exec-out screencap -p > android-screen.png || true
+adb exec-out screencap -p > android-screen-2.png || true
 if [ -s android-screen.png ]; then
   python3 scripts/check-frame.py android-screen.png || exit 1
+fi
+if [ -s android-screen.png ] && [ -s android-screen-2.png ]; then
+  python3 scripts/check-frame.py android-screen.png android-screen-2.png \
+    --min-diff 0.0002 || exit 1
 fi
 echo "smoke test passed"

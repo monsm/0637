@@ -3,12 +3,17 @@
 
 The app renders a dark scene (0x0E131A) with a lit floor grid, so "dark"
 alone is not a signal. A blank frame shows as (nearly) every pixel at
-luminance 0 with only one or two distinct colours — SwiftUI's material
+luminance 0 with only one or two distinct colours - SwiftUI's material
 background plus the loading text would still produce several colours and
 text pixels.
 
-Usage: check-frame.py <screenshot.png> [--min-lit 0.0005]
-Exit code 0 = the frame has content, 1 = blank.
+With two files the frames are also compared: a renderer that never came up
+draws the same image every time, and a frozen scene never changes either.
+
+Usage:
+    check-frame.py <screenshot.png> [--min-lit 0.0005]
+    check-frame.py <a.png> <b.png> [--min-diff 0.0002]
+Exit code 0 = the frame has content, 1 = blank (or frozen, in compare mode).
 """
 import sys
 import zlib
@@ -88,17 +93,9 @@ def unfilter(raw, width, height, channels):
     return out
 
 
-def main(argv):
-    if len(argv) < 2:
-        print("usage: check-frame.py <screenshot.png>")
-        return 2
-    path = argv[1]
-    min_lit = 0.0005
-    if "--min-lit" in argv:
-        min_lit = float(argv[argv.index("--min-lit") + 1])
+def load(path):
     width, height, channels, raw = read_png(path)
     pixels = unfilter(raw, width, height, channels)
-    total = width * height
     lit = 0
     colours = set()
     for index in range(0, len(pixels), channels):
@@ -109,23 +106,103 @@ def main(argv):
             lit += 1
         if len(colours) < 64:
             colours.add((r >> 3, g >> 3, b >> 3))
-    ratio = lit / total if total else 0
+    total = width * height
+    return {
+        "path": path,
+        "width": width,
+        "height": height,
+        "channels": channels,
+        "pixels": pixels,
+        "lit": lit / total if total else 0,
+        "colours": colours,
+    }
+
+
+def check_single(frame, min_lit):
     print(
-        f"{path}: {width}x{height} lit={ratio:.4%} colours={len(colours)}"
+        f"{frame['path']}: {frame['width']}x{frame['height']} "
+        f"lit={frame['lit']:.4%} colours={len(frame['colours'])}"
     )
-    if ratio < min_lit:
+    if frame["lit"] < min_lit:
         print(
-            f"::error::frame is blank (only {ratio:.4%} lit pixels, "
-            f"{len(colours)} colours) — the app is showing a black screen"
+            f"::error::frame is blank (only {frame['lit']:.4%} lit pixels, "
+            f"{len(frame['colours'])} colours) - the app is showing a black screen"
         )
-        return 1
-    if len(colours) < 3:
+        return False
+    if len(frame["colours"]) < 3:
         print(
-            f"::error::frame has only {len(colours)} distinct colours — "
+            f"::error::frame has only {len(frame['colours'])} distinct colours - "
             "the app is showing an empty scene"
         )
-        return 1
+        return False
     print("frame has content")
+    return True
+
+
+def compare(first, second, min_diff):
+    """Fraction of pixels that differ between two frames."""
+    if (first["width"], first["height"]) != (second["width"], second["height"]):
+        print(
+            f"::error::frame sizes differ: {first['width']}x{first['height']} "
+            f"vs {second['width']}x{second['height']}"
+        )
+        return False
+    channels = first["channels"]
+    a = first["pixels"]
+    b = second["pixels"]
+    total = first["width"] * first["height"]
+    differing = 0
+    for index in range(0, len(a), channels):
+        # Ignore tiny differences: the simulator can dither.
+        if (
+            abs(a[index] - b[index]) > 8
+            or abs(a[index + 1] - b[index + 1]) > 8
+            or abs(a[index + 2] - b[index + 2]) > 8
+        ):
+            differing += 1
+    ratio = differing / total if total else 0.0
+    print(
+        f"{first['path']} vs {second['path']}: "
+        f"{differing}/{total} pixels differ ({ratio:.4%})"
+    )
+    if ratio < min_diff:
+        print(
+            f"::error::the two frames are the same ({ratio:.4%} differ, "
+            f"want {min_diff:.4%}) - the renderer is frozen or never started"
+        )
+        return False
+    print("the frames differ - the scene is live")
+    return True
+
+
+def main(argv):
+    if len(argv) < 2:
+        print("usage: check-frame.py <screenshot.png> [<other.png>] [--min-lit N] [--min-diff N]")
+        return 2
+    min_lit = 0.0005
+    min_diff = 0.0002
+    flags = []
+    rest = list(argv[1:])
+    while rest:
+        arg = rest.pop(0)
+        if arg == "--min-lit":
+            min_lit = float(rest.pop(0))
+        elif arg == "--min-diff":
+            min_diff = float(rest.pop(0))
+        elif arg.startswith("--"):
+            flags.append(arg)
+        else:
+            flags.append(arg)
+    paths = [arg for arg in flags if not arg.startswith("--")]
+
+    frames = [load(path) for path in paths]
+    for frame in frames:
+        if not check_single(frame, min_lit):
+            return 1
+    if len(frames) >= 2:
+        for first, second in zip(frames, frames[1:]):
+            if not compare(first, second, min_diff):
+                return 1
     return 0
 
 

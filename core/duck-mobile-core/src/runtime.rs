@@ -35,6 +35,42 @@ const RECOVERY: Duration = Duration::from_secs(2);
 /// `SafetyConfig::default().deadman`.
 const DEADMAN: Duration = Duration::from_millis(500);
 
+/// How long a twist from the intent API keeps control after it arrives.
+///
+/// The app pushes the on-screen joystick's twist into the runtime every
+/// frame, so an API twist without a lease would be overwritten 20 ms later
+/// and an external agent could not drive the duck at all. With the lease the
+/// API owns the duck while it keeps talking, and control goes back to the
+/// screen when it stops.
+const API_LEASE: Duration = Duration::from_millis(1000);
+
+/// The intent API's claim on the duck: the twist it last asked for and the
+/// lease it holds. Separate from the runtime so it can be tested on its own.
+#[derive(Debug, Default)]
+struct ApiLease {
+    twist: [f64; 3],
+    until: Option<Instant>,
+}
+
+impl ApiLease {
+    fn take(&mut self, twist: [f64; 3]) {
+        self.twist = twist;
+        self.until = Some(Instant::now() + API_LEASE);
+    }
+
+    /// The twist the API owns right now, if its lease is still live.
+    fn active(&mut self, now: Instant) -> Option<[f64; 3]> {
+        match self.until {
+            Some(until) if now < until => Some(self.twist),
+            Some(_) => {
+                self.until = None;
+                None
+            }
+            None => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum RuntimeError {
     Io(IoError),
@@ -137,6 +173,8 @@ pub struct DuckRuntime<T: RobotIo> {
     recover_until: Option<Instant>,
     last_twist: Instant,
     twist_fresh: bool,
+    /// The twist from the intent API, and the lease it holds on the duck.
+    api_lease: ApiLease,
     dt: Duration,
 }
 
@@ -160,6 +198,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             recover_until: None,
             last_twist: Instant::now(),
             twist_fresh: false,
+            api_lease: ApiLease::default(),
             dt: Duration::from_millis(20),
         }
     }
@@ -213,6 +252,13 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.command.twist = twist;
         self.last_twist = Instant::now();
         self.twist_fresh = true;
+    }
+
+    /// A twist from the intent API. It takes the duck over from the
+    /// on-screen joystick for [API_LEASE], so an external agent can drive it
+    /// while it keeps sending twists.
+    pub fn set_api_twist(&mut self, twist: [f64; 3]) {
+        self.api_lease.take(twist);
     }
 
     pub fn set_head(&mut self, head: [f64; 4]) {
@@ -368,6 +414,11 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
 
         let mut command = self.command;
+        // An API twist owns the duck while its lease is live; the on-screen
+        // joystick gets it back when the API goes quiet.
+        if let Some(twist) = self.api_lease.active(now) {
+            command.twist = twist;
+        }
         if recovering {
             command.twist = [0.0; 3];
         }
@@ -391,5 +442,45 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
         report.fallen = self.safety.fallen();
         Ok(report)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_api_lease_outlives_the_joystick_twist() {
+        let mut lease = ApiLease::default();
+        assert_eq!(lease.active(Instant::now()), None);
+
+        lease.take([0.4, 0.0, 0.0]);
+        let now = Instant::now();
+        assert_eq!(lease.active(now), Some([0.4, 0.0, 0.0]));
+        // The app pushes the joystick's twist every 20 ms; the lease must
+        // survive that, otherwise an external agent could never drive.
+        assert_eq!(lease.active(now + Duration::from_millis(500)), Some([0.4, 0.0, 0.0]));
+    }
+
+    #[test]
+    fn the_lease_expires_and_gives_the_duck_back() {
+        let mut lease = ApiLease::default();
+        lease.take([0.4, 0.0, 0.0]);
+        let now = Instant::now();
+        assert_eq!(lease.active(now + API_LEASE + Duration::from_millis(1)), None);
+        // And it stays given back.
+        assert_eq!(lease.active(now + API_LEASE + Duration::from_millis(2)), None);
+    }
+
+    #[test]
+    fn a_new_twist_extends_the_lease() {
+        let mut lease = ApiLease::default();
+        lease.take([0.4, 0.0, 0.0]);
+        let now = Instant::now();
+        assert_eq!(lease.active(now + Duration::from_millis(900)), Some([0.4, 0.0, 0.0]));
+        lease.take([0.0, 0.0, 0.2]);
+        assert_eq!(lease.active(now + Duration::from_millis(900)), Some([0.0, 0.0, 0.2]));
+        // The new twist bought a fresh lease: another second of control.
+        assert_eq!(lease.active(now + Duration::from_millis(1900)), None);
     }
 }

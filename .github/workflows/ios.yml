@@ -288,48 +288,13 @@ jobs:
             tail -20 sim-boot.log sim-bootstatus.log 2>/dev/null || true
             exit 1
           fi
-          # CI builds carry an ad-hoc signature; install that build as-is.
-          xcrun simctl install "$UDID" "$APP" || {
-            echo "::error::simctl install failed"
-            ls -la "$APP"
-            plutil -p "$APP/Info.plist" | head -30 || true
-            /usr/bin/codesign -dv "$APP" 2>&1 || true
-            exit 1
-          }
-          xcrun simctl spawn "$UDID" log stream --style compact > sim-console.log 2>&1 &
-          STREAM_PID=$!
-          xcrun simctl launch "$UDID" ai.duck.microduck | tee sim-launch.log
-          # The intent API answers only once MuJoCo loaded the scene, the
-          # policies loaded and the 50 Hz loop is ticking. Poll it: that is
-          # the real liveness check (launchctl reports the app as gone when
-          # the simulator suspends it).
-          STATE=""
-          for i in $(seq 1 60); do
-            STATE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state || true)
-            [ -n "$STATE" ] && break
-            sleep 3
-          done
-          kill "$STREAM_PID" 2>/dev/null || true
-          grep -E "duck:|dyld|abort|Fatal" sim-console.log | head -40 || true
-          if [ -z "$STATE" ]; then
-            echo "::error::intent API did not answer — the core is not ticking"
-            xcrun simctl io "$UDID" screenshot sim-screenshot.png || true
-            xcrun simctl spawn "$UDID" log show --last 5m --style compact               --predicate 'process == "Duck"' > sim-syslog.log || true
-            for f in sim-console.log sim-syslog.log; do
-              tail -c 1500000 "$f" > "$f.tail" && mv "$f.tail" "$f"
-            done
-            tail -60 sim-syslog.log || true
-            exit 1
-          fi
-          echo "$STATE" | tee intent-state.json
-          curl -sf --max-time 5 http://127.0.0.1:8765/skills | tee intent-skills.json || true
-          xcrun simctl io "$UDID" screenshot sim-screenshot.png || true
-          # A black screen is the failure this app is prone to (the core load
-          # used to block the main thread). Catch it in CI instead of on the
-          # user's device.
-          if [ -f sim-screenshot.png ]; then
-            python3 scripts/check-frame.py sim-screenshot.png || exit 1
-          fi
+          # Every Mach-O in the simulator bundle must be a simulator slice.
+          bash ios/scripts/check-platforms.sh "$APP" IOSSIMULATOR || exit 1
+          # A scripted session: install, launch, drive the duck through its
+          # own intent API and look at the frames.
+          bash ios/scripts/sim-drive.sh "$APP" "$UDID" sim-drive || exit 1
+          cp sim-drive/state-initial.json intent-state.json 2>/dev/null || true
+          cp sim-drive/skills.json intent-skills.json 2>/dev/null || true
           (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/Duck-ios-simulator.zip" "$(basename "$APP")")
           xcrun simctl shutdown "$UDID" || true
 
@@ -379,10 +344,15 @@ jobs:
             otool -L ios/build-device/Build/Products/Release-iphoneos/Duck.app/Duck || true
             exit 1
           fi
+          # And every Mach-O in the bundle must be an iOS image, not a
+          # simulator one. A simulator slice installs fine and then dies in
+          # dyld before the first frame — the black screen the user saw.
+          bash ios/scripts/check-platforms.sh \
+            ios/build-device/Build/Products/Release-iphoneos/Duck.app IOS || exit 1
 
       - name: Package unsigned IPA
         id: ipa
-        if: always()
+        if: always() && steps.xcodebuilddev.outcome == 'success'
         run: |
           set -euo pipefail
           APP="ios/build-device/Build/Products/Release-iphoneos/Duck.app"
@@ -406,6 +376,8 @@ jobs:
             && git checkout FETCH_HEAD -- ci-logs || true
           rm -f ci-logs/ios/intent-state.json ci-logs/ios/intent-skills.json
           cp sim-launch.log ci-logs/ios/ 2>/dev/null || true
+          mkdir -p ci-logs/ios/sim-drive
+          cp sim-drive/* ci-logs/ios/sim-drive/ 2>/dev/null || true
           for f in sim-syslog.log sim-syslog-all.log; do
             tail -c 1500000 "$f" > "$f.tail" && mv "$f.tail" "$f" 2>/dev/null || true
           done
@@ -467,4 +439,5 @@ jobs:
             sim-syslog-all.log
             sim-console.log
             sim-launch.log
+            sim-drive
           if-no-files-found: ignore

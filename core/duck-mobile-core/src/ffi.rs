@@ -295,7 +295,7 @@ fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<(), String> {
 
 fn apply_intent(core: &mut DuckCore, intent: Intent) {
     match intent {
-        Intent::Twist(twist) => core.runtime.set_twist(twist),
+        Intent::Twist(twist) => core.runtime.set_api_twist(twist),
         Intent::Head(head) => core.runtime.set_head(head),
         Intent::Body(z, roll, pitch) => core.runtime.set_body(z, roll, pitch),
         Intent::Skill(name) => {

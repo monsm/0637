@@ -1,5 +1,6 @@
 import Foundation
 import MetalKit
+import UIKit
 import simd
 import SwiftUI
 
@@ -22,6 +23,36 @@ private struct Instance {
     let color: SIMD4<Float>
 }
 
+/// Why the renderer could not start. Every one of these used to end in a
+/// silent `nil`: the view was created, no delegate was attached, and the
+/// screen stayed black with nothing in the log. The app now reports the
+/// reason on screen instead.
+enum RendererError: Error, CustomStringConvertible {
+    case noDevice
+    case noQueue
+    case noLibrary(String)
+    case noFunction(String)
+    case noPipeline
+    case noDepthState
+
+    var description: String {
+        switch self {
+        case .noDevice:
+            return "Metal device unavailable"
+        case .noQueue:
+            return "Metal command queue unavailable"
+        case .noLibrary(let detail):
+            return "Metal library unavailable: \(detail)"
+        case .noFunction(let name):
+            return "Metal function '\(name)' missing"
+        case .noPipeline:
+            return "Metal pipeline creation failed"
+        case .noDepthState:
+            return "Metal depth stencil state failed"
+        }
+    }
+}
+
 /// Metal renderer: one draw per visual geom, transforms read from MuJoCo
 /// bodies each frame. Physics runs at 50 Hz; rendering at the display rate.
 final class Renderer: NSObject, MTKViewDelegate {
@@ -38,12 +69,33 @@ final class Renderer: NSObject, MTKViewDelegate {
     private let pitch: Float = 0.32
     private let distance: Float = 0.85
 
+    /// Why the last `init?` failed. A renderer that could not start used to
+    /// leave a black screen with nothing to look at.
+    fileprivate static var lastError: String?
+
     init?(controller: DuckController, view: MTKView) {
-        guard let device = MTLCreateSystemDefaultDevice(),
-              let queue = device.makeCommandQueue(),
-              let library = Renderer.makeLibrary(device),
-              let vertexFunction = library.makeFunction(name: "duck_vertex"),
-              let fragmentFunction = library.makeFunction(name: "duck_fragment") else {
+        Renderer.lastError = nil
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Renderer.lastError = RendererError.noDevice.description
+            return nil
+        }
+        guard let queue = device.makeCommandQueue() else {
+            Renderer.lastError = RendererError.noQueue.description
+            return nil
+        }
+        let library: MTLLibrary
+        do {
+            library = try Renderer.makeLibrary(device)
+        } catch {
+            Renderer.lastError = (error as? RendererError)?.description ?? "\(error)"
+            return nil
+        }
+        guard let vertexFunction = library.makeFunction(name: "duck_vertex") else {
+            Renderer.lastError = RendererError.noFunction("duck_vertex").description
+            return nil
+        }
+        guard let fragmentFunction = library.makeFunction(name: "duck_fragment") else {
+            Renderer.lastError = RendererError.noFunction("duck_fragment").description
             return nil
         }
         self.device = device
@@ -56,6 +108,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
         descriptor.depthAttachmentPixelFormat = .depth32Float
         guard let pipeline = try? device.makeRenderPipelineState(descriptor: descriptor) else {
+            Renderer.lastError = RendererError.noPipeline.description
             return nil
         }
         self.pipeline = pipeline
@@ -64,6 +117,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         depthDescriptor.depthCompareFunction = .less
         depthDescriptor.isDepthWriteEnabled = true
         guard let depthState = device.makeDepthStencilState(descriptor: depthDescriptor) else {
+            Renderer.lastError = RendererError.noDepthState.description
             return nil
         }
         self.depthState = depthState
@@ -74,6 +128,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         view.colorPixelFormat = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
         view.clearColor = MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+        // Without a delegate the view would stay black even if the renderer
+        // failed later, so give it the scene background as a floor.
+        view.backgroundColor = UIColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
         view.preferredFramesPerSecond = 60
         view.delegate = self
         buildInstances()
@@ -154,18 +211,30 @@ final class Renderer: NSObject, MTKViewDelegate {
     /// avoids a root-level default.metallib, which Xcode 26 refuses to code
     /// sign ("code object is not signed at all"). Falls back to the compiled
     /// library when the source is absent.
-    private static func makeLibrary(_ device: MTLDevice) -> MTLLibrary? {
+    private static func makeLibrary(_ device: MTLDevice) throws -> MTLLibrary {
         let candidates = [
             Bundle.main.url(forResource: "Shaders", withExtension: "metal", subdirectory: "DuckResources"),
             Bundle.main.url(forResource: "Shaders", withExtension: "metal"),
         ]
+        var sourceProblem = "Shaders.metal not found in the bundle"
         for case let url? in candidates {
-            if let source = try? String(contentsOf: url, encoding: .utf8),
-               let library = try? device.makeLibrary(source: source, options: nil) {
-                return library
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                sourceProblem = "\(url.lastPathComponent) is not readable"
+                continue
+            }
+            do {
+                return try device.makeLibrary(source: source, options: nil)
+            } catch {
+                sourceProblem = "Shaders.metal failed to compile: \(error.localizedDescription)"
             }
         }
-        return device.makeDefaultLibrary()
+        // The compiled library is the fallback. `makeDefaultLibrary()` has
+        // changed shape across SDKs (optional or not), so widen it first.
+        let fallback: MTLLibrary? = device.makeDefaultLibrary()
+        if let library = fallback {
+            return library
+        }
+        throw RendererError.noLibrary(sourceProblem)
     }
 
     private static func makeFloor(device: MTLDevice) -> Mesh {
@@ -391,7 +460,17 @@ struct MetalView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView()
+        view.backgroundColor = UIColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
         context.coordinator.renderer = Renderer(controller: controller, view: view)
+        if context.coordinator.renderer == nil {
+            // A renderer that failed to start used to leave a black screen
+            // with nothing to look at. Report it instead.
+            let message = Renderer.lastError ?? "the renderer could not start"
+            NSLog("duck: renderer failed: %@", message)
+            DispatchQueue.main.async {
+                controller.renderError = message
+            }
+        }
         return view
     }
 

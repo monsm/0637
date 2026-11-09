@@ -7,7 +7,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            if controller.ready {
+            if controller.ready && controller.renderError == nil {
                 MetalView(controller: controller)
                     .ignoresSafeArea()
             } else {
@@ -15,6 +15,12 @@ struct ContentView: View {
                 // so it only exists once the core is ready.
                 Color(red: 0.055, green: 0.075, blue: 0.10)
                     .ignoresSafeArea()
+            }
+
+            if let failure = failureMessage {
+                // Never leave the user looking at a black screen: say what
+                // went wrong.
+                failureCard(failure)
             }
 
             VStack {
@@ -37,6 +43,28 @@ struct ContentView: View {
             controller.joystick = value
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// The first thing that went wrong: the core, then the renderer.
+    private var failureMessage: String? {
+        if let error = controller.errorMessage { return error }
+        if let error = controller.renderError { return error }
+        return nil
+    }
+
+    private func failureCard(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Text("MicroDuck could not start")
+                .font(.headline)
+            Text(message)
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+        }
+        .padding(24)
+        .frame(maxWidth: 420)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .padding(32)
     }
 
     private var statusPanel: some View {

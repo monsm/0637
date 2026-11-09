@@ -242,7 +242,10 @@ jobs:
           cp android-logcat.log ci-logs/android/ 2>/dev/null || true
           cp am-start.log ci-logs/android/ 2>/dev/null || true
           cp intent-state.json ci-logs/android/ 2>/dev/null || true
+          cp intent-state-walking.json ci-logs/android/ 2>/dev/null || true
           cp intent-skills.json ci-logs/android/ 2>/dev/null || true
+          cp android-screen.png ci-logs/android/ 2>/dev/null || true
+          cp android-screen-2.png ci-logs/android/ 2>/dev/null || true
           echo "run=${{ github.run_id }}" > ci-logs/android/smoke.txt
           echo "emulator=${{ steps.emulator.outcome }}" >> ci-logs/android/smoke.txt
           echo "alignment=${{ steps.alignment.outcome }}" >> ci-logs/android/smoke.txt
@@ -266,7 +269,10 @@ jobs:
             android-logcat.log
             am-start.log
             intent-state.json
+            intent-state-walking.json
             intent-skills.json
+            android-screen.png
+            android-screen-2.png
             unstripped/
 
       - uses: actions/upload-artifact@v4
