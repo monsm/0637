@@ -75,7 +75,7 @@ final class DuckController: ObservableObject {
 
         // Parse the meshes on this worker queue: the renderer only has to
         // make GPU buffers when the first frame is built.
-        let meshes: [String: [Float]]
+        let meshes: [Int32: [Float]]
         if let created {
             meshes = DuckController.parseMeshes(core: created)
         } else {
