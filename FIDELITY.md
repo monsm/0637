@@ -20,7 +20,8 @@
 | 全技能调度（walk / sit / rise / roulade / kick / ground pick） | ✅ 模拟器实测逐项通过 |
 | manifest 解析 / 自定义策略热加载 | ✅ |
 | 本地 intent API（HTTP） | ✅ `/state /skills /twist /head /body /skill /sit /ground_pick /push /reload` |
-| iOS SwiftUI + Metal + C ABI | ✅ CI 模拟器 **32/32** 检查通过（构建、启动、行走 0.7 m、坐/站、3 技能、抓取、推挤、热重载、3D 视口点亮、帧在动、XCUITest 点按钮）；未签名 IPA 已产出 |
+| iOS SwiftUI + Metal + C ABI | ✅ CI 模拟器 **32/32** 检查通过（构建、启动、行走 0.7 m、坐/站、3 技能、抓取、推挤、热重载、3D 视口点亮、帧在动、鸭子材质颜色、XCUITest 点按钮）；未签名 IPA 已产出 |
+| 3D 外观 | ✅ 几何直接取 MuJoCo `mesh_vert`+`mesh_face`，颜色按 `mat_rgba` 解析，头灯照明；与官方渲染对照一致（白壳、橙嘴/橙脚） |
 | Android（Kotlin + GLES3） | ✅ CI 模拟器冒烟通过（行走、意图 API、画面检查） |
 | 手机 IMU 扰动 | ✅（shake → trunk push） |
 | 相机 / LiDAR / AR / 麦克风 | 未开始 |
