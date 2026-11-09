@@ -193,6 +193,32 @@
 
 ---
 
+## 四之五、清掉审计余项（2026-11-10 第三批）
+
+上表"其余确认项"中除了 roller 模式（需要 `roller.onnx` 作为主动力网络，属于换一套策略集，
+不是补一个功能）之外，全部落地，并在 CI 里逐条断言：
+
+| 项 | 实现 | 验证 |
+|---|---|---|
+| **声音** | `sounds/`（官方可种子化声码合成器）**原文件编译进核心**，不搬样本。`greet` 在 enable 时、`peck` 在 disable 前、`chirp` 按需；变体轮换，同一个种子永远是同一只鸭 | 单元测试 4 条（每个 tag 都有可听 PCM、同种子同声音、变体不重复、未知 tag 拒绝）；`/sound` 与 MCP `duck_sound`；两端各有 `AudioTrack` / `AVAudioEngine` 播放 |
+| **本体感知发布** | `/state` 新增 `proprioception`：编码器侧关节位置与速度、电流、IMU（陀螺/重力/四元数）、本 tick 命令、`imu_ready`、`p_held`、`volts`、电量百分比。首 tick 之前形状相同，客户端不必区分 | CI 断言 `positions` / `targets` / `imu_ready` / `mouth` |
+| **即时确认语义** | 一次性动作改为**带票据**：`/skill` `/sit` `/ground_pick` `/reload` `/time` `/step` `/checkpoint` `/restore` `/seek` `/fork` `/branch/*` 等 tick 决定后再答复，拒绝会带着原因回到客户端；控制流（`/twist` `/head` `/body`）仍不等待 | 单元测试 2 条（拒绝可见、无 tick 时报 pending）；CI 断言未知技能返回 `ok:false` + `no such skill` |
+| **技能表一致** | `/skills` 补上 `sit` / `stand` / `ground_pick`，`/skill` 接受它们（`sit`/`stand` 幂等），壳里的技能环显示同一张表 | CI 逐项断言 6 个名字 |
+| **拾取检测器** | `robotd/src/pickup.rs` **原文件编译进核心**，配官方 `pickup_detector.onnx`（两端都打进包）。只看走路/站立网络；技能、坐下、limp-fall 一律让开并重置窗口 | 上游 6 条单元测试随核心一起跑 |
+| **手拎** | `/carry` + 两端的「拎起」按钮：躯干上加弹簧力（`xfrc_applied`），**不是关节目标**，所以分类器读到的和真鸭被拎起来时一样；放下后由分类器交还策略 | CI 断言拎起后躯干升高 > 3 cm |
+| **IMU 预热门控** | 25 个融合样本（真机 `Imu::ready()` 的 0.5 s）之前，home 保持、策略不驱动；home→ready 的推进也等这个门 | 与上游同一常量，`imu_ready` 发布在 `/state` |
+| **电池** | 电压取 BAM 模型的端电压（`vin − 0.1×|torque|`，下限 6.0 V），不再硬编码 7.4 V；`battery_percent` 按官方 6.6–8.2 V 区间 | `/state` 的 `volts` / `battery_percent` |
+| **嘴** | 新增 `/mouth` 与 MCP `duck_mouth`；官方走路场景没有嘴关节，所以**明确拒绝**并说明原因（`has_mouth:false`），而不是假装接受 | CI 按 `has_mouth` 分支断言：有则动，无则拒绝 |
+
+顺带修掉的两个 CI 问题：日志发布步骤在拷贝**之后**才 checkout 旧 `ci-logs`，导致每次发布的
+都是上一次的日志（tombstone 日期早一天就是这么来的）；`patches/**` 不在 workflow 的触发路径里，
+改补丁不会重建。
+
+**roller 模式**仍属已知范围：它换的是整套策略（`roller.onnx` 作主动力网络、`roller_crouch` 顶替
+ground pick、站立网络关闭），需要 manifest 级的模式切换，不是补一条分歧。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
@@ -226,8 +252,10 @@
 | 项 | 状态 |
 |---|---|
 | iOS 真机 IPA | 流水线就绪，等签名凭据 |
-| 相机 / LiDAR / AR 模式 | 规划见 [docs/SENSORS_PLAN.md](docs/SENSORS_PLAN.md)，未实现 |
-| 麦克风 / 扬声器 | 未实现 |
+| 相机 / LiDAR / AR 模式 | 传感器读数与 8×8 ToF 降采样已实现（`/sensors`）；把相机画面合成进 3D 场景未实现 |
+| 扬声器 | ✅ 官方声码合成器编译进核心，两端已接扬声器 |
+| 麦克风 | 读数通道已实现（`/sensors`，可作惊吓/咕咕的反应源）；真机常开监听未实现 |
+| roller 模式 | 需 manifest 级模式切换（换主动力网络），未实现 |
 | 渲染器 PBR / 阴影 / 帧间插值 | 当前为基础 PBR + 单光源，未做插值 |
 | Android 真机实测 | CI 仅覆盖模拟器（API 30 x86_64）；arm64 真机未跑 |
 | 性能指标（帧率/功耗） | 未采集 |
