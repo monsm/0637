@@ -48,3 +48,6 @@ work/refrender/
 # Audit scratch from workflow agents
 work/audit-backlash/
 work/audit_tmp/
+
+# Scratch patch scripts
+work/patch_*.py
