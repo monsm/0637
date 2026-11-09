@@ -313,7 +313,6 @@ struct DirectorOverlay: View {
     let controller: DuckController
 
     var body: some View {
-        let _ = languageTick
         GeometryReader { geometry in
             let bar = geometry.size.height * 0.055
             VStack {
