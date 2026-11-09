@@ -16,6 +16,117 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A device IPA needs an Apple signing identity. These jobs are no-ops
+  # (skipped) until the repository has the signing secrets; the simulator
+  # app below stays the default artifact.
+  check-signing:
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.check.outputs.available }}
+    steps:
+      - id: check
+        env:
+          CERT: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          if [ -n "$CERT" ] && [ -n "$PROFILE" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "signing secrets present — a device IPA will be built"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "no signing secrets — skipping the device IPA"
+          fi
+
+  device:
+    needs: check-signing
+    if: needs.check-signing.outputs.available == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch upstream sources and policies
+        run: |
+          git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
+          git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
+          git -C upstream/microduck checkout da34a22
+          git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
+          mkdir -p policies
+          for f in velstand.onnx alpha_sitstand.onnx alpha_ground_pick.onnx                    roulade.onnx ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
+            curl -L --fail -o "policies/$f"               "https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/$f"
+          done
+      - name: Toolchain
+        run: |
+          brew install xcodegen cmake ninja
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target add --toolchain 1.99.1 aarch64-apple-ios
+      - uses: actions/cache@v4
+        with:
+          path: ios/third_party
+          key: ios-device-btmlkj-eidckx3.80.4-moe5.19.7-s5
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-ios-device
+      - name: ONNX Runtime iOS
+        run: bash ios/scripts/fetch-ort-ios.sh
+      - name: MuJoCo iOS (device slice)
+        run: BUILD_DEVICE=1 bash ios/scripts/build-mujoco-ios.sh
+      - name: Stage resources
+        run: bash ios/scripts/stage-resources.sh
+      - name: Rust core (device)
+        run: bash ios/scripts/build-rust-ios.sh aarch64-apple-ios
+      - name: Generate Xcode project
+        run: |
+          cd ios
+          xcodegen generate
+      - name: Import signing identity
+        env:
+          CERT_BASE64: ${{ secrets.IOS_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_CERT_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          security create-keychain -p build "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p build "$KEYCHAIN"
+          echo "$CERT_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN"             -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s             -k build "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$PROFILE_BASE64" | base64 --decode             > "$HOME/Library/MobileDevice/Provisioning Profiles/profile.mobileprovision"
+      - name: Archive and export IPA
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD || 'development' }}
+        run: |
+          set -o pipefail
+          cd ios
+          xcodebuild             -project Duck.xcodeproj             -scheme Duck             -configuration Release             -sdk iphoneos             -archivePath "$RUNNER_TEMP/Duck.xcarchive"             DEVELOPMENT_TEAM="$TEAM_ID"             CODE_SIGN_STYLE=Manual             CODE_SIGN_IDENTITY="Apple Development"             PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"             archive > "$RUNNER_TEMP/archive.log" 2>&1 || {
+              tail -n 120 "$RUNNER_TEMP/archive.log"; exit 1; }
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>$EXPORT_METHOD</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict><key>ai.duck.microduck</key><string>$PROFILE_NAME</string></dict>
+            <key>compileBitcode</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive             -archivePath "$RUNNER_TEMP/Duck.xcarchive"             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"             -exportPath "$RUNNER_TEMP/ipa"             > "$RUNNER_TEMP/export.log" 2>&1 || {
+              tail -n 120 "$RUNNER_TEMP/export.log"; exit 1; }
+          ls -la "$RUNNER_TEMP/ipa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Duck-ios-ipa
+          path: ${{ runner.temp }}/ipa/*.ipa
+          if-no-files-found: error
+
   build:
     runs-on: macos-latest
     timeout-minutes: 60
