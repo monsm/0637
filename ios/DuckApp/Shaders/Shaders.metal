@@ -121,6 +121,9 @@ fragment float4 duck_fragment(
         float radial = length(in.world.xy);
         float shadow = smoothstep(0.02, 0.55, radial);
         color *= mix(0.55, 1.0, shadow);
+        // A ground plane seen from a shallow angle gets almost no key light,
+        // so give it its own ambient floor or the room reads as a void.
+        color = max(color, base * 0.55);
     }
 
     // The scene's colours are authored in display space, so the albedo must

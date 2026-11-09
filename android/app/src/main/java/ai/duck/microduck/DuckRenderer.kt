@@ -469,6 +469,9 @@ class DuckRenderer(
                     float radial = length(vWorld.xy);
                     float shadow = smoothstep(0.02, 0.55, radial);
                     color *= mix(0.55, 1.0, shadow);
+                    // A ground plane seen from a shallow angle gets almost no
+                    // key light; give it its own ambient floor.
+                    color = max(color, base * 0.55);
                 }
 
                 // Keep the albedo: only highlights get a soft knee, or the
