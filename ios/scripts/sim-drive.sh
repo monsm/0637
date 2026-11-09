@@ -225,8 +225,11 @@ for _ in $(seq 1 12); do
   case "$STAND_LABEL" in
     rise|walk|stand) break ;;
   esac
-  sleep 1
   api POST /sit '{}' > /dev/null
+  # Give the intent a tick to land before reading: reading immediately sees
+  # the old label, retries, and toggles a duck that had already stood back up
+  # into the seat. The rise lasts 1 s, so 0.6 s still sees it.
+  sleep 0.6
   STAND_LABEL=$(api GET /state | field label)
 done
 case "$STAND_LABEL" in
