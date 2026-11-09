@@ -31,3 +31,6 @@ __pycache__/
 *.iml
 .idea/
 *.xcuserstate
+
+# Local copies of CI artifacts
+dist/
