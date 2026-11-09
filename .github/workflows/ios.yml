@@ -242,6 +242,7 @@ jobs:
           find ios/third_party -maxdepth 3 -name '*.log' \
             -exec cp {} ci-logs/ios/ \; 2>/dev/null || true
           cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
+          cp ios/build-device/xcodebuild.log ci-logs/ios/xcodebuild-device.log 2>/dev/null || true
           {
             echo "run=${{ github.run_id }}"
             echo "sha=${{ github.sha }}"
@@ -348,9 +349,34 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ios/build-device
-          if ! xcodebuild             -project ios/Duck.xcodeproj             -scheme Duck             -configuration Release             -sdk iphoneos             -arch arm64             -derivedDataPath ios/build-device             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             CODE_SIGN_IDENTITY=""             build > ios/build-device/xcodebuild.log 2>&1; then
+          # The simulator build populated Xcode's shared Swift module cache,
+          # and the device build reused those .swiftmodules — which made it
+          # link /usr/lib/swift/libswiftsimd.dylib, a simulator-only library
+          # that does not exist on a device, so dyld refused to launch the
+          # app and the user only saw a black launch screen. Give the device
+          # build its own module cache.
+          export MODULE_CACHE_DIR="$PWD/ios/build-device/ModuleCache"
+          mkdir -p "$MODULE_CACHE_DIR"
+          if ! xcodebuild \
+            -project ios/Duck.xcodeproj \
+            -scheme Duck \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            -derivedDataPath ios/build-device \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build > ios/build-device/xcodebuild.log 2>&1; then
             echo "::error::xcodebuild (device) failed"
             tail -n 120 ios/build-device/xcodebuild.log || true
+            exit 1
+          fi
+          # The link must not reference simulator-only libraries.
+          if otool -L ios/build-device/Build/Products/Release-iphoneos/Duck.app/Duck \
+            | grep -q "swiftsimd"; then
+            echo "::error::device app links the simulator-only libswiftsimd.dylib"
+            otool -L ios/build-device/Build/Products/Release-iphoneos/Duck.app/Duck || true
             exit 1
           fi
 
