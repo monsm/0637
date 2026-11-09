@@ -247,6 +247,11 @@ jobs:
         if: always()
         run: |
           mkdir -p ci-logs/android
+          # Overlay the previous logs FIRST, then copy: a checkout after the
+          # copies replaces this run's files with the branch's older ones, so
+          # the published log is yesterday's under today's commit message.
+          git fetch --depth 1 origin ci-logs \
+            && git checkout FETCH_HEAD -- ci-logs || true
           cp android-logcat.log ci-logs/android/ 2>/dev/null || true
           cp am-start.log ci-logs/android/ 2>/dev/null || true
           cp intent-state.json ci-logs/android/ 2>/dev/null || true
@@ -261,8 +266,6 @@ jobs:
           echo "alignment=${{ steps.alignment.outcome }}" >> ci-logs/android/smoke.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
-          git fetch --depth 1 origin ci-logs \
-            && git checkout FETCH_HEAD -- ci-logs || true
           git add -f ci-logs || true
           git commit -m "ci-logs: Android smoke run ${{ github.run_id }} [skip ci]" || true
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
