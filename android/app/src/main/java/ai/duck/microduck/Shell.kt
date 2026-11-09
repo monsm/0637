@@ -109,7 +109,7 @@ fun Shell(
             Spacer(Modifier.size(14.dp))
             SurfaceChip(Copy.live, surface == Surface.Live) { surface = Surface.Live }
             SurfaceChip(Copy.director, surface == Surface.Director) { surface = Surface.Director }
-            SurfaceChip(Copy.language.label) {
+            SurfaceChip(Copy.language.label, false) {
                 Copy.language = if (Copy.language == Copy.Language.English) {
                     Copy.Language.Chinese
                 } else {
