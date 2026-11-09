@@ -77,6 +77,72 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
+private fun DuckScreen(
+    coreProvider: () -> DuckCore?,
+    onCoreCreated: (DuckCore) -> Unit,
+    input: DuckInput,
+) {
+    val context = LocalContext.current
+    var core by remember { mutableStateOf(coreProvider()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf(DoubleArray(0)) }
+    var skills by remember { mutableStateOf(emptyList<String>()) }
+
+    // MuJoCo scene + ONNX policy loading takes seconds; doing it on the main
+    // thread froze the UI (Choreographer: Skipped 40 frames) and stalled the
+    // loader. Create the core on a worker thread.
+    LaunchedEffect(Unit) {
+        if (core != null) return@LaunchedEffect
+        val created = withContext(Dispatchers.IO) {
+            runCatching {
+                val root = AssetStager.stage(context)
+                DuckCore(
+                    File(root, "robot/microduck/scene_backlash.xml").path,
+                    File(root, "policies").path,
+                )
+            }
+        }
+        created.onSuccess { if (it.ready) { onCoreCreated(it); core = it } else { error = "core failed" } }
+            .onFailure { error = it.message }
+    }
+
+    LaunchedEffect(core) {
+        val active = core ?: return@LaunchedEffect
+        skills = (0 until active.skillCount()).mapNotNull { active.skillName(it) }
+        while (true) {
+            status = active.status()
+            delay(100)
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(Color(0xFF0E131A))) {
+        val active = core
+        if (active != null) {
+            AndroidView(
+                factory = { ctx ->
+                    GLSurfaceView(ctx).apply {
+                        setEGLContextClientVersion(3)
+                        setRenderer(DuckRenderer(ctx, active, input))
+                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            // The fused shell owns the chrome: live duck, instrument sheet,
+            // viewfinder.
+            Shell(active, skills, input, Modifier.fillMaxSize())
+        } else {
+            Text(
+                error ?: "Loading MuJoCo + policies…",
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+            )
+            StatusPanel(status, Modifier.align(Alignment.TopStart).padding(16.dp))
+        }
+    }
+}
+
+@Composable
 private fun StatusPanel(status: DoubleArray, modifier: Modifier = Modifier) {
     val bringup = status.getOrNull(0)?.toInt() ?: 0
     val fallen = (status.getOrNull(1) ?: 0.0) != 0.0
@@ -101,4 +167,4 @@ private fun StatusPanel(status: DoubleArray, modifier: Modifier = Modifier) {
 }
 
 /** robotd's AxisBinding::evaluate: inside 0.1 the axis reads zero, otherwise as-is. */
-private fun deadzone(value: Float): Float = if (kotlin.math.abs(value) < 0.1f) 0f else value
+internal fun deadzone(value: Float): Float = if (kotlin.math.abs(value) < 0.1f) 0f else value
