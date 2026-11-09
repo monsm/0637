@@ -221,6 +221,11 @@ pub struct DuckRuntime<T: RobotIo> {
     /// Whether a client is holding the standing body pose (robotd's
     /// `PoseIntent.active`); while it is, the twist is zeroed.
     body_active: bool,
+    /// The real duck looks around when nothing is happening.
+    idle_head: crate::control::IdleHead,
+    idle_params: robotd_params::IdleParams,
+    /// When the head was last commanded; idle glances start after `after_s`.
+    last_head_command: Instant,
     dt: Duration,
 }
 
@@ -247,6 +252,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             head_ema: [0.0; 4],
             body_ema: [0.0; 3],
             body_active: false,
+            idle_head: crate::control::IdleHead::new(robotd_params::IdleParams::default(), 0xD0C),
+            idle_params: robotd_params::IdleParams::default(),
+            last_head_command: Instant::now(),
             dt: Duration::from_millis(20),
         }
     }
@@ -318,6 +326,8 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn set_head(&mut self, head: [f64; 4]) {
         self.command.head = head;
+        // Any head command wakes the idle look-around.
+        self.last_head_command = Instant::now();
     }
 
     pub fn set_body(&mut self, z: f64, roll: f64, pitch: f64) {
@@ -566,6 +576,28 @@ impl<T: RobotIo> DuckRuntime<T> {
         command.body.z = self.body_ema[0];
         command.body.roll = self.body_ema[1];
         command.body.pitch = self.body_ema[2];
+
+        // The idle look-around, robotd's: a still duck glances, tilts its head
+        // and breathes, and the head command it feeds is an observation input
+        // (the policy's head block), exactly as on the real robot.
+        let still = self.idle_params.enabled_in(robotd_params::Mode::Walk)
+            && was_driving
+            && matches!(self.limp_fall, LimpFall::Idle)
+            && command.twist.iter().all(|value| value.abs() < 1e-3)
+            && now.duration_since(self.last_head_command) >= self.idle_head.after()
+            && !self.controller.busy();
+        let idle = self.idle_head.tick(now, still, self.dt);
+        for axis in 0..4 {
+            command.head[axis] =
+                self.head_ema[axis] * (1.0 - idle.takeover) + idle.head[axis];
+        }
+        // The breath moves the body pose the standing network was trained on,
+        // and only while no client holds that pose itself.
+        if !self.body_active
+            && self.controller.driving() == Some(crate::control::Driving::Stand)
+        {
+            command.body.z += idle.body_z;
+        }
 
         match self
             .controller
