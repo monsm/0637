@@ -323,14 +323,11 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p ios/build-device
-          # The simulator build populated Xcode's shared Swift module cache,
-          # and the device build reused those .swiftmodules — which made it
-          # link /usr/lib/swift/libswiftsimd.dylib, a simulator-only library
-          # that does not exist on a device, so dyld refused to launch the
-          # app and the user only saw a black launch screen. Give the device
-          # build its own module cache.
-          export MODULE_CACHE_DIR="$PWD/ios/build-device/ModuleCache"
-          mkdir -p "$MODULE_CACHE_DIR"
+          # The device build shares the runner with the simulator build, so
+          # give it its own Swift module cache rather than whatever the
+          # simulator build left behind. MODULE_CACHE_DIR is an Xcode build
+          # setting; an environment variable does nothing, so it is passed on
+          # the command line.
           if ! xcodebuild \
             -project ios/Duck.xcodeproj \
             -scheme Duck \
@@ -338,6 +335,7 @@ jobs:
             -sdk iphoneos \
             -arch arm64 \
             -derivedDataPath ios/build-device \
+            MODULE_CACHE_DIR="$PWD/ios/build-device/ModuleCache" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -346,16 +344,11 @@ jobs:
             tail -n 120 ios/build-device/xcodebuild.log || true
             exit 1
           fi
-          # The link must not reference simulator-only libraries.
-          if otool -L ios/build-device/Build/Products/Release-iphoneos/Duck.app/Duck \
-            | grep -q "swiftsimd"; then
-            echo "::error::device app links the simulator-only libswiftsimd.dylib"
-            otool -L ios/build-device/Build/Products/Release-iphoneos/Duck.app/Duck || true
-            exit 1
-          fi
-          # And every Mach-O in the bundle must be an iOS image, not a
-          # simulator one. A simulator slice installs fine and then dies in
-          # dyld before the first frame — the black screen the user saw.
+          # Every Mach-O in the bundle must be an iOS image, not a simulator
+          # one: a simulator slice installs fine and then dies in dyld before
+          # the first frame. /usr/lib/swift/libswiftsimd.dylib is NOT a
+          # simulator-only library (it lives in the device dyld shared cache),
+          # so its presence here is not a failure.
           bash ios/scripts/check-platforms.sh \
             ios/build-device/Build/Products/Release-iphoneos/Duck.app IOS || exit 1
           # The renderer compiles Shaders.metal at runtime. Without it the

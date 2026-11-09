@@ -27,6 +27,11 @@ final class DuckController: ObservableObject {
     private let motion = CMMotionManager()
     private var lastPush = Date.distantPast
 
+    /// The renderer's vertex data, parsed on the worker queue before the
+    /// first frame: 38 STLs and 21.6 MB of triangles used to be read inside
+    /// makeUIView, which froze the first frame for seconds on a device.
+    private(set) var meshVertices: [String: [Float]] = [:]
+
     init() {
         // Creating the core loads the MuJoCo scene (215k vertices) and the
         // ONNX policies — seconds on a device. Doing that here blocked the
@@ -66,6 +71,15 @@ final class DuckController: ObservableObject {
             }
         }
 
+        // Parse the meshes on this worker queue: the renderer only has to
+        // make GPU buffers when the first frame is built.
+        let meshes: [String: [Float]]
+        if let created {
+            meshes = DuckController.parseMeshes(core: created)
+        } else {
+            meshes = [:]
+        }
+
         // `[weak self]`: inside createCore `self` is non-optional, so the
         // inner closure has to capture it weakly before it can be unwrapped.
         DispatchQueue.main.async { [weak self] in
@@ -79,6 +93,7 @@ final class DuckController: ObservableObject {
             }
 
             self.core = created
+            self.meshVertices = meshes
             self.ready = true
             NSLog("duck: core created")
             let port = duck_core_start_intent_server(created, 8765)
@@ -86,6 +101,47 @@ final class DuckController: ObservableObject {
             self.startTimer()
             self.startMotion()
         }
+    }
+
+    /// Every visual geom's STL, parsed once on the worker queue.
+    private static func parseMeshes(core: OpaquePointer) -> [String: [Float]] {
+        var parsed: [String: [Float]] = [:]
+        let count = Int(duck_core_geom_count(core))
+        for geom in 0..<count {
+            var body: Int32 = 0
+            var type: Int32 = 0
+            var meshID: Int32 = -1
+            var group: Int32 = 0
+            var position = [Double](repeating: 0, count: 3)
+            var rotation = [Double](repeating: 0, count: 4)
+            var color = [Float](repeating: 0, count: 4)
+            let result = position.withUnsafeMutableBufferPointer { pos in
+                rotation.withUnsafeMutableBufferPointer { quat in
+                    color.withUnsafeMutableBufferPointer { rgba in
+                        duck_core_geom_info(
+                            core, Int32(geom), &body, &type, &meshID, &group,
+                            pos.baseAddress, quat.baseAddress, rgba.baseAddress
+                        )
+                    }
+                }
+            }
+            guard result == 0, group == 2, type == 7, meshID >= 0 else { continue }
+            guard let namePointer = duck_core_mesh_name(core, meshID) else { continue }
+            let name = String(cString: namePointer)
+            if parsed[name] != nil { continue }
+            guard let url = Bundle.main.url(
+                forResource: name,
+                withExtension: "stl",
+                subdirectory: "DuckResources/robot/microduck/assets"
+            ) else {
+                continue
+            }
+            if let vertices = STLLoader.load(url: url) {
+                parsed[name] = vertices
+            }
+        }
+        NSLog("duck: parsed %d meshes off the main thread", parsed.count)
+        return parsed
     }
 
     /// The 50 Hz control tick, on the main run loop.

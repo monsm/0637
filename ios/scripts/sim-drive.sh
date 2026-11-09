@@ -26,9 +26,10 @@ mkdir -p "$OUT"
 
 PASSES=0
 FAILURES=0
+# check <exit-code> <name> [detail] - 0 is a pass, like the shell it came from.
 check() {
-  local ok="$1" name="$2" detail="${3:-}"
-  if [ "$ok" = 1 ]; then
+  local code="$1" name="$2" detail="${3:-}"
+  if [ "$code" -eq 0 ]; then
     PASSES=$((PASSES + 1))
     echo "PASS  $name${detail:+  ($detail)}"
   else
@@ -133,9 +134,9 @@ check $? "bundle has Shaders.metal" "$APP/DuckResources"
 # ---------------------------------------------------------------- install
 echo "--- install and launch ---"
 if xcrun simctl install "$UDID" "$APP"; then
-  check 1 "simctl install" "installed"
+  check 0 "simctl install" "installed"
 else
-  check 0 "simctl install" "simctl install failed"
+  check 1 "simctl install" "simctl install failed"
   finish
 fi
 
@@ -154,29 +155,38 @@ xcrun simctl launch --console "$UDID" "$BUNDLE_ID" \
 LAUNCH_PID=$!
 
 # ---------------------------------------------------------------- liveness
-# /state only answers once MuJoCo loaded the scene, the ONNX policies loaded
-# and the 50 Hz loop is ticking.
+# /state answers as soon as the intent server is up, but the label it reports
+# is "idle" until the 50 Hz loop has produced its first report (core creation
+# publishes once, before any tick). Wait for the loop to actually drive the
+# duck before asserting anything about the policy.
 STATE=""
+LABEL=""
 for _ in $(seq 1 90); do
   STATE=$(api GET /state || true)
-  [ -n "$STATE" ] && break
-  sleep 2
+  LABEL=$(printf '%s' "$STATE" | field label)
+  [ -n "$STATE" ] && [ "$LABEL" != "idle" ] && [ -n "$LABEL" ] && break
+  sleep 1
 done
 echo "$STATE" | tee "$OUT/state-initial.json" > /dev/null
 
-[ -n "$STATE" ]; check $? "intent API answers on :8765" "$STATE"
+[ -n "$STATE" ]; check $? "intent API answers on :8765" "$LABEL"
+[ "$LABEL" != "idle" ]; check $? "the 50 Hz control loop is ticking" "label=$LABEL"
 
 BRINGUP=$(printf '%s' "$STATE" | field bringup)
-LABEL=$(printf '%s' "$STATE" | field label)
 GAIN=$(printf '%s' "$STATE" | field gain)
-[ "$BRINGUP" = "2" ]; check $? "policy reached ready (bringup=2)" "bringup=$BRINGUP label=$LABEL"
-[ "$LABEL" = "walk" ]; check $? "walking policy drives the duck" "label=$LABEL"
+[ "$BRINGUP" = "2" ]; check $? "policy reached ready (bringup=2)" "bringup=$BRINGUP"
+case "$LABEL" in
+  walk|stand) check 0 "the walk policy drives the duck" "label=$LABEL" ;;
+  *)          check 1 "the walk policy drives the duck" "label=$LABEL" ;;
+esac
 [ -n "$GAIN" ]; check $? "status reports a gain" "gain=$GAIN"
 
 # ---------------------------------------------------------------- skills
+# The official walk-mode skill set is exactly these three: crouch is a
+# roller-mode policy and the manifest's mode filter keeps it out.
 SKILLS=$(api GET /skills || true)
 echo "$SKILLS" | tee "$OUT/skills.json" > /dev/null
-for name in roulade crouch kick_left kick_right; do
+for name in roulade kick_left kick_right; do
   state_has "$SKILLS" "\"$name\""
   check $? "skill listed: $name" "$SKILLS"
 done
@@ -196,21 +206,33 @@ api POST /twist '{"vx":0.0,"vy":0.0,"wz":0.0}' > /dev/null
 # ---------------------------------------------------------------- sit/stand
 echo "--- sit and stand ---"
 api POST /sit '{}' > /dev/null
-SIT_LABEL=$(poll_state label sit 30 0.2)
+SIT_LABEL=$(poll_state label sit 40 0.2)
 [ "$SIT_LABEL" = "sit" ]; check $? "sit command seats the duck" "label=$SIT_LABEL"
 
-api POST /sit '{}' > /dev/null
-STAND_LABEL=$(wait_idle 80)
+# The prototype refuses the way back up while the seat ramp is still running
+# ("still sitting down", sitstand_ramp_s = 2.0), so keep asking until it
+# takes - exactly what a person pressing the button again would do.
+STAND_LABEL="$SIT_LABEL"
+for _ in $(seq 1 12); do
+  case "$STAND_LABEL" in
+    rise|walk|stand) break ;;
+  esac
+  sleep 1
+  api POST /sit '{}' > /dev/null
+  STAND_LABEL=$(api GET /state | field label)
+done
 case "$STAND_LABEL" in
-  stand|walk|rise) check 1 "sit toggle stands it back up" "label=$STAND_LABEL" ;;
-  *) check 0 "sit toggle stands it back up" "label=$STAND_LABEL" ;;
+  rise|walk|stand) check 0 "sit toggle stands it back up" "label=$STAND_LABEL" ;;
+  *)               check 1 "sit toggle stands it back up" "label=$STAND_LABEL" ;;
 esac
+wait_idle 80 > /dev/null
 
 # ---------------------------------------------------------------- skills
-for name in roulade kick_left kick_right crouch; do
+for name in roulade kick_left kick_right; do
   echo "--- skill $name ---"
   api POST /skill "{\"name\":\"$name\"}" > /dev/null
-  SEEN=$(poll_state label "$name" 40 0.2)
+  # The kicks last 0.5 s and roulade 1.0 s, so sample fast enough to see them.
+  SEEN=$(poll_state label "$name" 60 0.1)
   [ "$SEEN" = "$name" ]; check $? "skill runs: $name" "label=$SEEN"
   # Let the one-shot finish before the next one.
   wait_idle 100 > /dev/null

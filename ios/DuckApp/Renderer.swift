@@ -186,6 +186,11 @@ final class Renderer: NSObject, MTKViewDelegate {
 
     private func loadMesh(named name: String) -> Mesh? {
         if let cached = meshes[name] { return cached }
+        // The controller parses the STLs on its worker queue while the core
+        // is being created; parsing them here would freeze the first frame.
+        if let vertices = controller.meshVertices[name], !vertices.isEmpty {
+            return storeMesh(named: name, vertices: vertices)
+        }
         let bundle = Bundle.main
         guard let url = bundle.url(
             forResource: name,
@@ -197,6 +202,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         guard let vertices = STLLoader.load(url: url), !vertices.isEmpty else {
             return nil
         }
+        return storeMesh(named: name, vertices: vertices)
+    }
+
+    private func storeMesh(named name: String, vertices: [Float]) -> Mesh? {
         guard let buffer = device.makeBuffer(
             bytes: vertices,
             length: vertices.count * MemoryLayout<Float>.stride,
@@ -392,7 +401,7 @@ private func lookAt(eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) -
 
 // MARK: - STL
 
-private enum STLLoader {
+enum STLLoader {
     /// Flat array of (px, py, pz, nx, ny, nz) per vertex, three per triangle.
     static func load(url: URL) -> [Float]? {
         guard let data = try? Data(contentsOf: url) else { return nil }
