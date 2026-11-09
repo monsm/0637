@@ -36,6 +36,7 @@ class DuckRenderer(
     private var uModel = 0
     private var uColor = 0
     private var uLight = 0
+    private var uChecker = 0
     private var aPos = 0
     private var aNormal = 0
     private val meshes = mutableMapOf<Int, Mesh>()
@@ -55,6 +56,7 @@ class DuckRenderer(
         uModel = GLES30.glGetUniformLocation(program, "uModel")
         uColor = GLES30.glGetUniformLocation(program, "uColor")
         uLight = GLES30.glGetUniformLocation(program, "uLight")
+        uChecker = GLES30.glGetUniformLocation(program, "uChecker")
         aPos = GLES30.glGetAttribLocation(program, "aPos")
         aNormal = GLES30.glGetAttribLocation(program, "aNormal")
         buildScene()
@@ -118,7 +120,7 @@ class DuckRenderer(
         headlight[2] /= lightLength
 
         floor?.let {
-            draw(it, identity(), floatArrayOf(0.14f, 0.15f, 0.18f, 1f), headlight, viewProjection)
+            draw(it, identity(), floatArrayOf(0.14f, 0.15f, 0.18f, 1f), headlight, 1f, viewProjection)
         }
 
         for (instance in instances) {
@@ -136,7 +138,7 @@ class DuckRenderer(
             Matrix.multiplyMM(world, 0, body, 0, rotation, 0)
             val model = FloatArray(16)
             Matrix.multiplyMM(model, 0, world, 0, instance.local, 0)
-            draw(instance.mesh, model, instance.color, headlight, viewProjection)
+            draw(instance.mesh, model, instance.color, headlight, 0f, viewProjection)
         }
     }
 
@@ -213,6 +215,7 @@ class DuckRenderer(
         model: FloatArray,
         color: FloatArray,
         light: FloatArray,
+        checker: Float,
         viewProjection: FloatArray,
     ) {
         val mvp = FloatArray(16)
@@ -221,6 +224,7 @@ class DuckRenderer(
         GLES30.glUniformMatrix4fv(uModel, 1, false, model, 0)
         GLES30.glUniform4fv(uColor, 1, color, 0)
         GLES30.glUniform3f(uLight, light[0], light[1], light[2])
+        GLES30.glUniform1f(uChecker, checker)
 
         mesh.buffer.position(0)
         GLES30.glEnableVertexAttribArray(aPos)
@@ -378,9 +382,11 @@ class DuckRenderer(
             uniform mat4 uMvp;
             uniform mat4 uModel;
             out vec3 vNormal;
+            out vec3 vWorld;
             void main() {
                 gl_Position = uMvp * vec4(aPos, 1.0);
                 vNormal = normalize(mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNormal);
+                vWorld = (uModel * vec4(aPos, 1.0)).xyz;
             }
         """.trimIndent()
 
@@ -388,13 +394,21 @@ class DuckRenderer(
             #version 300 es
             precision mediump float;
             in vec3 vNormal;
+            in vec3 vWorld;
             uniform vec4 uColor;
             uniform vec3 uLight;
+            uniform float uChecker;
             out vec4 fragColor;
             void main() {
                 vec3 normal = normalize(vNormal);
                 float diffuse = max(dot(normal, normalize(uLight)), 0.0);
-                fragColor = vec4(uColor.rgb * (0.30 + 0.70 * diffuse), uColor.a);
+                vec3 base = uColor.rgb;
+                if (uChecker > 0.5) {
+                    vec2 cell = floor(vWorld.xy / 0.2);
+                    float odd = mod(cell.x + cell.y, 2.0);
+                    base = mix(vec3(0.20, 0.30, 0.40), vec3(0.10, 0.20, 0.30), odd);
+                }
+                fragColor = vec4(base * (0.30 + 0.70 * diffuse), uColor.a);
             }
         """.trimIndent()
     }

@@ -303,7 +303,7 @@ final class Renderer: NSObject, MTKViewDelegate {
 
         draw(mesh: floor, model: matrix_identity_float4x4,
              color: SIMD4<Float>(0.14, 0.15, 0.18, 1),
-             light: forward, viewProjection: viewProjection, encoder: encoder)
+             light: forward, checker: true, viewProjection: viewProjection, encoder: encoder)
 
         var poses: [Int: (SIMD3<Float>, SIMD4<Float>)] = [:]
         for instance in instances {
@@ -313,7 +313,7 @@ final class Renderer: NSObject, MTKViewDelegate {
             guard let (position, rotation) = poses[instance.body] else { continue }
             let model = translation(position) * quaternionMatrix(rotation) * instance.local
             draw(mesh: instance.mesh, model: model, color: instance.color,
-                 light: forward, viewProjection: viewProjection, encoder: encoder)
+                 light: forward, checker: false, viewProjection: viewProjection, encoder: encoder)
         }
 
         encoder.endEncoding()
@@ -341,6 +341,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         model: simd_float4x4,
         color: SIMD4<Float>,
         light: SIMD3<Float>,
+        checker: Bool,
         viewProjection: simd_float4x4,
         encoder: MTLRenderCommandEncoder
     ) {
@@ -349,8 +350,9 @@ final class Renderer: NSObject, MTKViewDelegate {
             model: model,
             color: color,
             // The shader negates this and dots it with the normal, so the
-            // vector points the way the light travels.
-            light: SIMD4<Float>(light.x, light.y, light.z, 0)
+            // vector points the way the light travels; w carries the floor's
+            // checker flag.
+            light: SIMD4<Float>(light.x, light.y, light.z, checker ? 1 : 0)
         )
         encoder.setVertexBuffer(mesh.buffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)

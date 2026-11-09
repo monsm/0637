@@ -13,6 +13,7 @@ struct VertexIn {
 struct VertexOut {
     float4 position [[position]];
     float3 normal;
+    float3 world;
 };
 
 struct Uniforms {
@@ -31,6 +32,7 @@ vertex VertexOut duck_vertex(
     VertexOut out;
     out.position = uniforms.mvp * float4(input.px, input.py, input.pz, 1.0);
     out.normal = normalize((uniforms.model * float4(input.nx, input.ny, input.nz, 0.0)).xyz);
+    out.world = (uniforms.model * float4(input.px, input.py, input.pz, 1.0)).xyz;
     return out;
 }
 
@@ -42,6 +44,14 @@ fragment float4 duck_fragment(
     float3 light = normalize(-uniforms.light.xyz);
     float diffuse = max(dot(normal, light), 0.0);
     float rim = pow(1.0 - max(normal.z, 0.0), 2.0);
-    float3 color = uniforms.color.rgb * (0.30 + 0.70 * diffuse) + rim * 0.06;
+    // light.w doubles as the checker flag: the floor uses the official
+    // scene's groundplane colours instead of a flat slab.
+    float3 base = uniforms.color.rgb;
+    if (uniforms.light.w > 0.5) {
+        float2 cell = floor(in.world.xy / 0.2);
+        float odd = fmod(cell.x + cell.y, 2.0);
+        base = mix(float3(0.20, 0.30, 0.40), float3(0.10, 0.20, 0.30), odd);
+    }
+    float3 color = base * (0.30 + 0.70 * diffuse) + rim * 0.06;
     return float4(color, uniforms.color.a);
 }
