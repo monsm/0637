@@ -54,3 +54,6 @@ work/patch_*.py
 
 # Workflow agents' scratch
 work/scratch/
+
+# MuJoCo writes this beside the model
+MUJOCO_LOG.TXT
