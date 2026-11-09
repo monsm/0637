@@ -184,12 +184,19 @@ final class DuckController: ObservableObject {
 
     private func ticksForThisFrame() -> Int {
         guard let core else { return 0 }
-        if duck_core_paused(core) != 0 { return 0 }
+        // Always tick at least once: the core drains the intent queue and
+        // publishes state on every call, and a paused duck must still be able
+        // to receive the request that unpauses it. When paused the core does
+        // not advance the simulation, so the tick is cheap.
+        if duck_core_paused(core) != 0 {
+            speedRemainder = 0
+            return 1
+        }
         let speed = duck_core_speed(core)
         speedRemainder += speed
         let whole = Int(speedRemainder)
         speedRemainder -= Double(whole)
-        return min(whole, 8)
+        return max(1, min(whole, 8))
     }
 
     deinit {

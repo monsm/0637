@@ -387,7 +387,9 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
             core.runtime.set_paused(true);
             if let Some(report) = core.runtime.last_report() {
                 core.label = report.label.clone();
+                core.last = Some(report);
             }
+            publish_state(core);
         }
         Intent::Speed(speed) => core.runtime.set_speed(speed),
         Intent::Checkpoint => checkpoint_now(core),

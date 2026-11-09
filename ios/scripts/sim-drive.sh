@@ -450,7 +450,13 @@ check $? "frames 2-3 differ (scene is live)" ""
 # can sit in a buffer, so the app's own trail is read from the log stream.
 echo "--- renderer log ---"
 sleep 1
+# The log stream was started before launch; give it a moment to flush and read
+# the unified log directly if the stream is short.
 LOG=$(cat "$OUT/sim-console.log" "$OUT/app-stdout.log" 2>/dev/null)
+if ! printf '%s' "$LOG" | grep -q "duck: core created"; then
+  LOG="$LOG
+$(xcrun simctl spawn "$UDID" log show --last 5m --style compact --predicate 'process == "Duck"' 2>/dev/null || true)"
+fi
 printf '%s' "$LOG" | grep -q "duck: core created"
 check $? "log: core created" ""
 printf '%s' "$LOG" | grep -qE "renderer: [1-9][0-9]* visual geoms"

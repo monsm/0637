@@ -27,13 +27,18 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
                 try {
                     // Keepalive: the core has robotd's 500 ms twist deadman.
                     core.setTwist(input.vx, 0.0, input.wz)
-                    // Paused or slowed: the schedule keeps firing, simulation
-                    // time does not. The loop's own timers are on the
-                    // simulation clock, so they slow down with it.
-                    if (!core.paused()) {
+                    // Always tick at least once: the core drains the intent
+                    // queue and publishes state on every call, so a paused duck
+                    // can still receive the request that unpauses it. When
+                    // paused the core does not advance the simulation.
+                    if (core.paused()) {
+                        remainder = 0.0
+                        core.tick()
+                    } else {
                         remainder += core.speed()
                         var whole = remainder.toInt()
                         remainder -= whole
+                        if (whole < 1) whole = 1
                         while (whole-- > 0) {
                             core.tick()
                         }
