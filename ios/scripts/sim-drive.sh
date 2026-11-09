@@ -109,7 +109,8 @@ dump_logs() {
   grep -E "duck:|renderer|dyld|Library not loaded|abort|Fatal|Metal|assert" \
     "$OUT/sim-syslog.log" 2>/dev/null | tail -n 60 || true
   echo "=== crash reports ==="
-  ls -t ~/Library/Logs/DiagnosticReports/*.ips 2>/dev/null | head -3 | while read -r f; do
+  # Only this app's reports: the runner image carries unrelated ones.
+  ls -t ~/Library/Logs/DiagnosticReports/*Duck*.ips 2>/dev/null | head -3 | while read -r f; do
     echo "--- $f"
     head -c 4000 "$f"
   done
@@ -237,9 +238,15 @@ wait_idle 80 > /dev/null
 # ---------------------------------------------------------------- skills
 for name in roulade kick_left kick_right; do
   echo "--- skill $name ---"
-  api POST /skill "{\"name\":\"$name\"}" > /dev/null
-  # The kicks last 0.5 s and roulade 1.0 s, so sample fast enough to see them.
-  SEEN=$(poll_state label "$name" 60 0.1)
+  # The kicks last 0.5 s and roulade 1.0 s: sample fast, and retry if the
+  # scheduler was still finishing the previous move and refused the request.
+  SEEN=""
+  for _ in $(seq 1 3); do
+    api POST /skill "{\"name\":\"$name\"}" > /dev/null
+    SEEN=$(poll_state label "$name" 40 0.05)
+    [ "$SEEN" = "$name" ] && break
+    wait_idle 40 > /dev/null
+  done
   [ "$SEEN" = "$name" ]; check $? "skill runs: $name" "label=$SEEN"
   # Let the one-shot finish before the next one.
   wait_idle 100 > /dev/null
