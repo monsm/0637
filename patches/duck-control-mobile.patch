@@ -67,10 +67,10 @@ index 19444e4..121b2b3 100644
          Self {
              config,
 diff --git a/duck-control/src/io.rs b/duck-control/src/io.rs
-index c250752..b682303 100644
+index c250752..6935646 100644
 --- a/duck-control/src/io.rs
 +++ b/duck-control/src/io.rs
-@@ -117,6 +117,44 @@ pub trait RobotIo {
+@@ -117,6 +117,51 @@ pub trait RobotIo {
      fn read(&mut self) -> Result<Sensors>;
      fn write(&mut self, targets: &JointTargets) -> Result<()>;
  
@@ -79,6 +79,13 @@ index c250752..b682303 100644
 +    /// body ignore it.
 +    fn push(&mut self, _velocity: [f64; 3]) -> Result<()> {
 +        Ok(())
++    }
++
++    /// Whether this body has a mouth servo at all. The real duck does; the
++    /// official walking scene does not, so a beak intent there is refused
++    /// rather than accepted and silently dropped.
++    fn has_mouth(&self) -> bool {
++        false
 +    }
 +
 +    /// Where the trunk is, world frame. A backend with no body has none.
@@ -314,10 +321,10 @@ index 17a5a97..d003240 100644
          if let Some(state) = &mut self.state {
              state.h.try_extract_tensor_mut::<f32>().unwrap().1.fill(0.0);
 diff --git a/duck-control/src/safety.rs b/duck-control/src/safety.rs
-index 9330f3a..cac0ffc 100644
+index 9330f3a..01e915e 100644
 --- a/duck-control/src/safety.rs
 +++ b/duck-control/src/safety.rs
-@@ -179,6 +179,53 @@ impl<T: RobotIo> Safety<T> {
+@@ -179,6 +179,58 @@ impl<T: RobotIo> Safety<T> {
          self.io.read()
      }
  
@@ -338,6 +345,11 @@ index 9330f3a..cac0ffc 100644
 +    /// The write handle stays owned by safety: this cannot command a motor.
 +    pub fn io(&self) -> &T {
 +        &self.io
++    }
++
++    /// Whether the body has a beak to command.
++    pub fn has_mouth(&self) -> bool {
++        self.io.has_mouth()
 +    }
 +
 +    /// The body, for inputs that are not motor writes. Still not a way to
