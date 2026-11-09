@@ -114,7 +114,7 @@ final class DuckController: ObservableObject {
         // inner closure has to capture it weakly before it can be unwrapped.
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
-            guard created != nil else {
+            guard let created else {
                 self.errorMessage = error.withUnsafeBufferPointer {
                     String(cString: $0.baseAddress!)
                 }
