@@ -12,18 +12,23 @@
 - 对**某一台真实鸭子 + 真实物理世界**：做不到 100%。不是工程能力问题，是信息与定义问题（见 §3）。
 - 手机传感器可以全部接入，但**不能直接当成鸭子的本体感知**——那样反而会破坏 1:1（见 §4）。
 
-### 0.1 当前实现状态（2026-11-08）
+### 0.1 当前实现状态（2026-11-09）
 
 | 项 | 状态 |
 |---|---|
 | 官方 MJCF / BAM M6 / ONNX / 61 维 / 50 Hz | ✅ 桌面 + 端内 MuJoCo 验证；BAM 与官方 Python 对拍 < 1e-9 |
-| 全技能调度（walk / sit / rise / roulade / kick / ground pick） | ✅ 26 s 实测 |
+| 全技能调度（walk / sit / rise / roulade / kick / ground pick） | ✅ 模拟器实测逐项通过 |
 | manifest 解析 / 自定义策略热加载 | ✅ |
-| 本地 intent API（HTTP） | ✅ |
-| iOS SwiftUI + Metal + C ABI | 代码完成；待 macOS CI 编译与真机验证 |
+| 本地 intent API（HTTP） | ✅ `/state /skills /twist /head /body /skill /sit /ground_pick /push /reload` |
+| iOS SwiftUI + Metal + C ABI | ✅ CI 模拟器 **32/32** 检查通过（构建、启动、行走 0.7 m、坐/站、3 技能、抓取、推挤、热重载、3D 视口点亮、帧在动、XCUITest 点按钮）；未签名 IPA 已产出 |
+| Android（Kotlin + GLES3） | ✅ CI 模拟器冒烟通过（行走、意图 API、画面检查） |
 | 手机 IMU 扰动 | ✅（shake → trunk push） |
 | 相机 / LiDAR / AR / 麦克风 | 未开始 |
-| Android | 未开始 |
+| 真机 | 未验证（需要 Apple 签名或自签工具；CI 无物理设备） |
+
+> 2026-11-09 的 CI 证据（iOS run `42553736386`，commit `307b839`）：
+> 视口中心区域点亮 100%、70 个渲染 geom、三帧互不相同、`/twist` 后 trunk 位移 0.696 m、
+> `label` 依次出现 `walk → sit → rise → roulade → kick_left → kick_right → ground_pick`。
 
 ---
 

@@ -63,7 +63,7 @@
 
 | 验证项 | iOS | Android |
 |---|---|---|
-| 构建产物 | 模拟器 `.app`（23.7 MB）/ 真机 IPA（需签名，见下） | **APK 49.0 MB** |
+| 构建产物 | 模拟器 `.app` / 未签名真机 IPA 25.7 MB（含 device slice + 着色器 + 10 个策略） | **APK 49.0 MB** |
 | 安装 + 启动 | ✅ | ✅ |
 | MuJoCo 场景加载 | ✅ | ✅（nq=35 nv=34 nu=14，38 网格） |
 | ONNX 策略推理 | ✅ | ✅ |
@@ -71,7 +71,15 @@
 | 姿态 | `gravity ≈ (0.03, 0.01, −0.999)`，trunk_z = 0.1156 m | `gravity ≈ (0.034, 0.010, −0.999)`，trunk_z = 0.1156 m |
 | 当前策略标签 | `walk` | `walk` |
 | Intent API `/state` `/skills` | ✅ | ✅ `roulade / kick_left / kick_right` |
-| 冒烟结论 | 连续多轮 **success** | **smoke test passed** |
+| 3D 渲染 | ✅ 视口中心点亮 **100%**，70 个 geom，三帧互不相同 | ✅ 画面检查（点亮率 + 颜色数） |
+| 行走 | ✅ `/twist` → trunk 位移 **0.696 m** | ✅ 冒烟内驱动 |
+| 坐 / 站 | ✅ `sit → rise` | — |
+| 技能逐个运行 | ✅ roulade / kick_left / kick_right | — |
+| 地面抓取 | ✅ `label=ground_pick` | — |
+| 外力推挤 | ✅ 推后仍 `bringup=2` | — |
+| 策略热重载 | ✅ 重载后技能仍可用 | — |
+| UI 按钮（XCUITest） | ✅ 逐个点击并断言标签变化 | — |
+| 冒烟结论 | **32/32 检查通过** | **smoke test passed** |
 
 模拟器内实测状态（两端一致）：
 
@@ -99,6 +107,9 @@
 
 | # | 问题 | 根因 | 修复 |
 |---|---|---|---|
+| 0 | **真机/模拟器 3D 全黑**（界面正常） | `stage-resources.sh` 每次构建 `rm -rf DuckResources` 后只拷回 XML/STL/ONNX，**把 `Shaders.metal` 删了**；包里没有着色器 → `Renderer.init?` 返回 nil → MTKView 无 delegate → 一帧不画。整屏点亮率 8.19%，视口中心 **0.0000%**、1 种颜色 | 着色器移到 `ios/DuckApp/Shaders/`（staging 删不到），staging 拷回并缺失即失败；设备包断言；截图检查增加 `--region` 视口区域并检查相邻帧差异 |
+| 0b | 地板和朝上的面全黑 | iOS 着色器 `light = normalize(-uniforms.light.xyz)`，传入 `z=+1` 导致光从地板下方照来，`dot((0,0,1), light) < 0`；Android 无此负号 | 改为 `z=-1`，与 Android 一致 |
+| 0c | iOS 构建一直红（`7b3b8ec` 起） | `createCore` 内 `self` 非可选，`DispatchQueue.main.async { guard let self }` 编译报错 | 内层闭包加 `[weak self]` |
 | 1 | Android 闪退 | NDK 的 `libdl.a` 是"静态可执行文件"shim，把 `malloc/newlocale/__cxa_atexit` 静态拉进 .so，scudo 全局未初始化 → 除零 | 用 llvm-ar 只保留 dl 成员重建 `libdl.a`；CI 断言 bionic 符号不出现 |
 | 2 | Android 链接失败 | 缺 `__gxx_personality_v0`（C++ ABI）；API 21 stub 缺 `pthread_atfork`；API 28 无 ELF TLS | 补 `c++abi`、`--no-undefined`、`--platform 29`，minSdk 29 |
 | 3 | Android 崩溃 | MuJoCo C++ 异常穿越进 Rust → abort | shim 改为 C++17 + try/catch，错误走错误缓冲 |
@@ -131,8 +142,9 @@
 | `Duck-android` | 49.0 MB | 可直接安装的 debug APK |
 | `Duck-android-smoke-logs` | 3.0 MB | logcat、intent 应答、阶段日志 |
 | `Duck-core-unstripped` | 2.9 MB | 带符号的 .so，用于 tombstone 符号化 |
-| `Duck-ios-app` / `Duck-ios-simulator` | 23.7 / 22.9 MB | 模拟器 `.app` 与 zip |
-| `Duck-ios-smoke-logs` | 0.4 MB | 截图、NSLog 轨迹、intent 应答 |
+| `Duck-ios-app` / `Duck-ios-simulator` | 26.7 / 25.8 MB | 模拟器 `.app` 与 zip |
+| `Duck-ios-unsigned-ipa` | 25.7 MB | **未签名真机 IPA**（device arm64，含着色器 + 10 个策略），用 Sideloadly/AltStore 自签后安装 |
+| `Duck-ios-smoke-logs` | 0.8 MB | 三帧截图、NSLog 轨迹、intent 应答、会话日志 |
 | `Duck-ios-ipa` | — | 配置签名 secrets 后产出 |
 
 ---
