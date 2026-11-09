@@ -38,3 +38,6 @@ dist/
 # Scratch space: extracted artifacts and source clones
 work/ipa-inspect-*/
 work/mujoco-grep/
+
+# Local CI screenshot copies
+work/ci-shot/

@@ -118,6 +118,33 @@ def load(path):
     }
 
 
+def region_stats(frame, region):
+    """Lit ratio and colour count inside a fractional (x0, y0, x1, y1) box."""
+    x0, y0, x1, y1 = region
+    width = frame["width"]
+    height = frame["height"]
+    channels = frame["channels"]
+    pixels = frame["pixels"]
+    left, right = int(width * x0), int(width * x1)
+    top, bottom = int(height * y0), int(height * y1)
+    lit = 0
+    total = 0
+    colours = set()
+    for y in range(top, bottom):
+        row = y * width
+        for x in range(left, right):
+            index = (row + x) * channels
+            r = pixels[index]
+            g = pixels[index + 1] if channels >= 3 else r
+            b = pixels[index + 2] if channels >= 3 else r
+            if 0.2126 * r + 0.7152 * g + 0.0722 * b > 24:
+                lit += 1
+            total += 1
+            if len(colours) < 64:
+                colours.add((r >> 3, g >> 3, b >> 3))
+    return (lit / total if total else 0.0), len(colours)
+
+
 def check_single(frame, min_lit):
     print(
         f"{frame['path']}: {frame['width']}x{frame['height']} "
@@ -177,10 +204,15 @@ def compare(first, second, min_diff):
 
 def main(argv):
     if len(argv) < 2:
-        print("usage: check-frame.py <screenshot.png> [<other.png>] [--min-lit N] [--min-diff N]")
+        print(
+            "usage: check-frame.py <screenshot.png> [<other.png>] "
+            "[--min-lit N] [--min-diff N] [--region x0,y0,x1,y1] [--region-lit N]"
+        )
         return 2
     min_lit = 0.0005
     min_diff = 0.0002
+    region = None
+    region_lit = 0.02
     flags = []
     rest = list(argv[1:])
     while rest:
@@ -189,8 +221,13 @@ def main(argv):
             min_lit = float(rest.pop(0))
         elif arg == "--min-diff":
             min_diff = float(rest.pop(0))
-        elif arg.startswith("--"):
-            flags.append(arg)
+        elif arg == "--region":
+            region = tuple(float(part) for part in rest.pop(0).split(","))
+            if len(region) != 4:
+                print("::error::--region wants x0,y0,x1,y1 as fractions")
+                return 2
+        elif arg == "--region-lit":
+            region_lit = float(rest.pop(0))
         else:
             flags.append(arg)
     paths = [arg for arg in flags if not arg.startswith("--")]
@@ -199,6 +236,24 @@ def main(argv):
     for frame in frames:
         if not check_single(frame, min_lit):
             return 1
+    if region:
+        # The whole-frame check above passes on an app whose SwiftUI chrome
+        # draws over a black 3D viewport: the buttons light up enough
+        # pixels. Check the scene region instead - a black Metal view puts
+        # 0% lit pixels there.
+        for frame in frames:
+            ratio, colours = region_stats(frame, region)
+            print(
+                f"{frame['path']}: region {region} "
+                f"lit={ratio:.4%} colours={colours}"
+            )
+            if ratio < region_lit:
+                print(
+                    f"::error::the 3D viewport is black (only {ratio:.4%} lit "
+                    f"pixels inside {region}, want {region_lit:.4%}) - the "
+                    "renderer is not drawing the scene"
+                )
+                return 1
     if len(frames) >= 2:
         for first, second in zip(frames, frames[1:]):
             if not compare(first, second, min_diff):

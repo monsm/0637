@@ -92,7 +92,11 @@ curl -sf --max-time 5 http://127.0.0.1:8765/state | tee intent-state-walking.jso
 adb exec-out screencap -p > android-screen.png || true
 adb exec-out screencap -p > android-screen-2.png || true
 if [ -s android-screen.png ]; then
-  python3 scripts/check-frame.py android-screen.png || exit 1
+  # The scene region must be lit: SwiftUI/Compose chrome alone can light up
+  # enough of the screen to pass a whole-frame check while the 3D view is
+  # still black.
+  python3 scripts/check-frame.py android-screen.png \
+    --region 0.3,0.3,0.7,0.7 --region-lit 0.02 || exit 1
 fi
 if [ -s android-screen.png ] && [ -s android-screen-2.png ]; then
   python3 scripts/check-frame.py android-screen.png android-screen-2.png \

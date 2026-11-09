@@ -349,6 +349,15 @@ jobs:
           # dyld before the first frame — the black screen the user saw.
           bash ios/scripts/check-platforms.sh \
             ios/build-device/Build/Products/Release-iphoneos/Duck.app IOS || exit 1
+          # The renderer compiles Shaders.metal at runtime. Without it the
+          # app installs, answers on :8765 and shows a black 3D view - the
+          # exact failure the user saw, which the Debug simulator build also
+          # reproduced while the whole-frame check still passed.
+          test -f ios/build-device/Build/Products/Release-iphoneos/Duck.app/DuckResources/Shaders.metal || {
+            echo "::error::device bundle has no DuckResources/Shaders.metal"
+            ls -la ios/build-device/Build/Products/Release-iphoneos/Duck.app/DuckResources/ | head -20 || true
+            exit 1
+          }
 
       - name: Package unsigned IPA
         id: ipa
@@ -423,7 +432,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         id: artifactipa
-        if: always()
+        if: always() && steps.xcodebuilddev.outcome == 'success'
         with:
           name: Duck-ios-unsigned-ipa
           path: Duck-ios-unsigned.ipa

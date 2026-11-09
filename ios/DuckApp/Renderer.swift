@@ -336,7 +336,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             mvp: viewProjection * model,
             model: model,
             color: color,
-            light: SIMD4<Float>(-0.45, -0.65, 1.0, 0)
+            // The shader negates this and dots it with the normal, so the
+            // stored vector points the way the light travels: down. Passing
+            // +1 here (as this did) lit the scene from below and left the
+            // floor and every upward face black. Android passes
+            // (-0.45, -0.65, 1.0) straight to dot(); this matches it.
+            light: SIMD4<Float>(-0.45, -0.65, -1.0, 0)
         )
         encoder.setVertexBuffer(mesh.buffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)

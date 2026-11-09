@@ -77,6 +77,13 @@ dump_logs() {
 }
 
 # ---------------------------------------------------------------- install
+step "checking the bundle"
+# The shader is compiled at runtime, so it has to be in the bundle. When it
+# was not, the renderer returned nil, no delegate was attached and the 3D
+# view was pure black on every build.
+[ -f "$APP/DuckResources/Shaders.metal" ] || fail \
+  "the bundle has no DuckResources/Shaders.metal - the renderer cannot start"
+
 step "installing $APP"
 xcrun simctl install "$UDID" "$APP" || fail "simctl install failed"
 
@@ -156,8 +163,11 @@ for i in 1 2 3; do
 done
 
 for i in 1 2 3; do
+  # The whole-frame check alone passes on a black 3D viewport with working
+  # SwiftUI chrome, so check the scene region too.
   python3 "$ROOT/scripts/check-frame.py" "$OUT/frame-$i.png" \
-    || fail "frame $i is blank — the app is showing a black screen"
+    --region 0.3,0.3,0.7,0.7 --region-lit 0.02 \
+    || fail "frame $i is blank - the app is showing a black screen"
 done
 python3 "$ROOT/scripts/check-frame.py" "$OUT/frame-1.png" "$OUT/frame-2.png" \
   --min-diff 0.0002 \

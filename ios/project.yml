@@ -18,6 +18,11 @@ targets:
       - path: DuckApp
         excludes:
           - "DuckResources/**"
+          # Shaders.metal is copied into DuckResources by
+          # stage-resources.sh and compiled at runtime. Excluded here so
+          # Xcode does not turn it into a root-level default.metallib
+          # (which Xcode 26 refuses to code sign).
+          - "Shaders/**"
       # Shaders.metal lives inside the Resources folder reference, which is
       # copied verbatim: Xcode never compiles it, so no default.metallib ends
       # up at the bundle root (Xcode 26 refuses to code sign that), and the
@@ -63,9 +68,12 @@ targets:
       - framework: Frameworks/libduck_mobile_core.dylib
         embed: true
         codeSign: true
+      # ONNX Runtime is linked statically INTO libduck_mobile_core.dylib, so
+      # the app only needs it at link time. Embedding the xcframework put an
+      # inert 33 KB stub (with a temp-path install name) in the bundle.
       - framework: third_party/onnxruntime.xcframework
-        embed: true
-        codeSign: true
+        embed: false
+        codeSign: false
       - sdk: Metal.framework
       - sdk: MetalKit.framework
       - sdk: CoreMotion.framework

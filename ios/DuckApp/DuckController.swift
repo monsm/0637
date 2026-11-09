@@ -66,7 +66,9 @@ final class DuckController: ObservableObject {
             }
         }
 
-        DispatchQueue.main.async {
+        // `[weak self]`: inside createCore `self` is non-optional, so the
+        // inner closure has to capture it weakly before it can be unwrapped.
+        DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             guard created != nil else {
                 self.errorMessage = error.withUnsafeBufferPointer {
