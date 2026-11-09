@@ -1,0 +1,158 @@
+# MicroDuck 数字版 — 阶段性成果报告
+
+日期：2026-11-09 · 里程碑：M1 完成、M2 双平台端到端打通
+
+---
+
+## 一、目标与验收口径
+
+把 Pollen Robotics × Hugging Face 的物理 MicroDuck（约 25 cm / 800 g 的 RL 双足机器鸭）
+做成 iOS + Android 数字版，**1:1 复刻**外观与机械运动。
+
+「1:1」按 [FIDELITY.md](FIDELITY.md) 的定义执行：
+
+| 层级 | 含义 | 状态 |
+|---|---|---|
+| L1 模型一致 | 与官方 MJCF / STL / ONNX / BAM 参数逐字节一致 | ✅ |
+| L2 运动一致 | 同一策略、同一观测、同一执行器模型，轨迹与官方仿真对齐 | ✅（M1 实测） |
+| L3 场景一致 | 与 `duck-sim` 同一场景与控制栈 | ✅ |
+| L4 物理机体一致 | 与某一台实体鸭逐参数一致 | ❌ 不可能（个体差异），已声明 |
+
+---
+
+## 二、M1：官方栈验证（桌面/仿真）
+
+**结论：官方模型 + BAM 执行器 + ONNX 策略在本地闭环复现成功。**
+
+| 项 | 结果 |
+|---|---|
+| 模型 | 官方 `scene_backlash.xml` + 38 个 STL 网格（215,317 顶点 / 431,802 面） |
+| 执行器 | BAM M6（XL330，电压控制律 + 反电动势 + Stribeck/方向/二次摩擦），与官方 Python 数值对拍 **误差 < 1e-9** |
+| 策略 | `velstand.onnx`（61 维观测 → 14 动作），ONNX Runtime 1.24 |
+| 行走实测 | 0.4 m/s 指令 → **1.457 m / 10 s**，trunk 高度 0.114–0.119 m，全程直立 |
+| 全技能 | sitstand / groundpick / kick / roulade / roller 全部加载并执行 |
+
+---
+
+## 三、M2：移动端双平台（本次主要成果）
+
+### 3.1 架构
+
+```
+┌───────────────────────────────┐
+│  iOS (SwiftUI + Metal)        │  Android (Compose + GLES3)  │
+└──────────────┬────────────────┘
+               │  C ABI (DuckCore)
+┌──────────────┴────────────────┐
+│  duck-mobile-core (Rust)      │
+│  ├ robotd 技能调度器（原样复用）│
+│  ├ duck-control：观测/策略/安全 │
+│  ├ BAM M6 执行器模型（Rust）    │
+│  └ MuJoCo 3.10（端内，静态链接）│
+│     + ONNX Runtime（策略推理）  │
+└───────────────────────────────┘
+```
+
+关键决策：**不重写官方控制逻辑**。`robotd/src/control.rs` 通过 `#[path]` 直接编译进来，
+`duck-control` 只加 feature 补丁去掉 Dynamixel 硬件总线，其余（观测布局、策略运行时、
+安全、摔倒判定、技能优先级 roulade>kick>groundpick>sit>stand>walk）与官方一致。
+
+### 3.2 CI 实测（GitHub Actions，非本地构建）
+
+两端都在**模拟器/模拟机里真启动、真跑策略、真响应 API**：
+
+| 验证项 | iOS | Android |
+|---|---|---|
+| 构建产物 | 模拟器 `.app`（23.7 MB）/ 真机 IPA（需签名，见下） | **APK 49.0 MB** |
+| 安装 + 启动 | ✅ | ✅ |
+| MuJoCo 场景加载 | ✅ | ✅（nq=35 nv=34 nu=14，38 网格） |
+| ONNX 策略推理 | ✅ | ✅ |
+| Bring-up（Limp→Homing→Ready） | ✅ `bringup: 2` | ✅ `bringup: 2` |
+| 姿态 | `gravity ≈ (0.03, 0.01, −0.999)`，trunk_z = 0.1156 m | `gravity ≈ (0.034, 0.010, −0.999)`，trunk_z = 0.1156 m |
+| 当前策略标签 | `walk` | `walk` |
+| Intent API `/state` `/skills` | ✅ | ✅ `roulade / kick_left / kick_right` |
+| 冒烟结论 | 连续多轮 **success** | **smoke test passed** |
+
+模拟器内实测状态（两端一致）：
+
+```json
+{"bringup":2,"fallen":false,"gain":200,"label":"walk",
+ "gravity":[0.034,0.010,-0.999],"trunk":[0.002,0.0004,0.1156]}
+```
+
+### 3.3 App 功能
+
+- 3D 渲染：官方 STL 网格逐 geom 绘制，金属/着色器，跟随 trunk 的第三人称相机
+- 控制：摇杆（vx / wz）、Sit/Stand、Ground pick、技能按钮（roulade / kick_left / kick_right）、Reload AI
+- 手机传感器：CoreMotion 50 Hz，晃动 → `duck_core_push` 给躯干施加扰动（Twin 语义：
+  手机不替代本体感知，只提供外部扰动）
+- 本地 Intent API（`0.0.0.0:8765`）：`/state` `/skills` `/twist` `/head` `/body`
+  `/skill` `/sit` `/ground_pick` `/push` `/reload`，供用户自己的 AI agent 驱动
+- 自定义策略：把 ONNX + manifest 放进 `Documents/policies` 后 Reload AI
+
+---
+
+## 四、期间解决的关键工程问题
+
+调试全部在 CI 内完成（禁止本地移动构建），日志通过 `ci-logs` 分支 + `duck-rust` logcat
+标签 + 未 strip 符号库回传。主要根因链：
+
+| # | 问题 | 根因 | 修复 |
+|---|---|---|---|
+| 1 | Android 闪退 | NDK 的 `libdl.a` 是"静态可执行文件"shim，把 `malloc/newlocale/__cxa_atexit` 静态拉进 .so，scudo 全局未初始化 → 除零 | 用 llvm-ar 只保留 dl 成员重建 `libdl.a`；CI 断言 bionic 符号不出现 |
+| 2 | Android 链接失败 | 缺 `__gxx_personality_v0`（C++ ABI）；API 21 stub 缺 `pthread_atfork`；API 28 无 ELF TLS | 补 `c++abi`、`--no-undefined`、`--platform 29`，minSdk 29 |
+| 3 | Android 崩溃 | MuJoCo C++ 异常穿越进 Rust → abort | shim 改为 C++17 + try/catch，错误走错误缓冲 |
+| 4 | STL 加载失败 | MuJoCo 3.10 的解码器是**插件归档成员**，无引用 → 被归档丢弃 | iOS `-force_load`、Android 在 `--whole-archive` 间直接给归档路径 |
+| 5 | Android 加载停滞 | `duck_core_new` 在主线程，UI 冻结 | 移到 `Dispatchers.IO`，UI 显示加载态 |
+| 6 | 冒烟测不通 | `adb reverse` 方向错（设备→宿主） | 改 `adb forward`（宿主→设备） |
+| 7 | 模拟器慢 50 倍 | runner 用户不在 `kvm` 组，静默退化为软件模拟 | `sudo chmod 666 /dev/kvm` |
+| 8 | iOS 装不上 | 根目录 `Resources/` 让 codesign 按 macOS 深包处理 → plist 未绑定；`default.metallib` 触发 Xcode 26 签名限制；`-force_load,path` 逗号形式被 ld64 静默忽略 | 资源目录改名 `DuckResources`、着色器运行时编译、`-force_load` 拆两个参数 |
+
+---
+
+## 五、iOS 真机安装说明
+
+当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
+
+已就绪的真机流水线（`14ff01f`）：配置 5 个 secrets 后 CI 自动额外产出 **`Duck-ios-ipa`**：
+
+`IOS_CERT_P12_BASE64` / `IOS_CERT_PASSWORD` / `IOS_PROVISIONING_PROFILE_BASE64` /
+`IOS_PROVISIONING_PROFILE_NAME` / `IOS_TEAM_ID`（详见 [docs/IOS_SIGNING.md](docs/IOS_SIGNING.md)）。
+
+无 secrets 时该 job 自动跳过，不影响双平台构建。CI 签名需付费 Apple 开发者账号；
+`development`/`ad-hoc` 还要求目标设备 UDID 已登记。
+
+---
+
+## 六、当前产物
+
+| Artifact | 大小 | 说明 |
+|---|---|---|
+| `Duck-android` | 49.0 MB | 可直接安装的 debug APK |
+| `Duck-android-smoke-logs` | 3.0 MB | logcat、intent 应答、阶段日志 |
+| `Duck-core-unstripped` | 2.9 MB | 带符号的 .so，用于 tombstone 符号化 |
+| `Duck-ios-app` / `Duck-ios-simulator` | 23.7 / 22.9 MB | 模拟器 `.app` 与 zip |
+| `Duck-ios-smoke-logs` | 0.4 MB | 截图、NSLog 轨迹、intent 应答 |
+| `Duck-ios-ipa` | — | 配置签名 secrets 后产出 |
+
+---
+
+## 七、未完成 / 下一步
+
+| 项 | 状态 |
+|---|---|
+| iOS 真机 IPA | 流水线就绪，等签名凭据 |
+| 相机 / LiDAR / AR 模式 | 规划见 [docs/SENSORS_PLAN.md](docs/SENSORS_PLAN.md)，未实现 |
+| 麦克风 / 扬声器 | 未实现 |
+| 渲染器 PBR / 阴影 / 帧间插值 | 当前为基础 PBR + 单光源，未做插值 |
+| Android 真机实测 | CI 仅覆盖模拟器（API 30 x86_64）；arm64 真机未跑 |
+| 性能指标（帧率/功耗） | 未采集 |
+
+---
+
+## 八、仓库与复现
+
+- 仓库：`github.com/monsm/0637`
+- Android/iOS 构建全部由 GitHub Actions 完成，产物在对应 run 的 Artifacts
+- 上游固定：`pollen-robotics/microduck@da34a22` + `patches/duck-control-mobile.patch`
+- CI 迭代记录见 [M2_PROGRESS.md](M2_PROGRESS.md)
