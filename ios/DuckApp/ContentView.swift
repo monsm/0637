@@ -31,17 +31,20 @@ struct ContentView: View {
         let _ = languageTick
         GeometryReader { geometry in
             ZStack {
+                // The drive gesture lives ON the scene rather than on a
+                // full-screen clear layer: a separate hit-testing layer above
+                // a UIView-backed Metal view is what swallowed the bars'
+                // presses on a device.
                 scene
-                if controller.ready && controller.renderError == nil {
-                    // The scene is the interface: taps on it drive the duck.
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .gesture(driveGesture(in: geometry.size))
-                        .onLongPressGesture(minimumDuration: 0.35) {
+                    .contentShape(Rectangle())
+                    .gesture(driveGesture(in: geometry.size))
+                    .onLongPressGesture(minimumDuration: 0.35) {
+                        if controller.ready && controller.renderError == nil {
                             showRing = true
                         }
-                }
+                    }
                 chrome(in: geometry.size)
+                    .zIndex(2)
                 if showRing {
                     SkillRing(names: controller.skillNames()) { name in
                         controller.trigger(name)
@@ -112,12 +115,16 @@ struct ContentView: View {
             Spacer()
             if let failure = failureMessage {
                 failureCard(failure)
+            } else {
+                // No card: the space between the bars stays transparent to taps.
+                Color.clear.frame(height: 0)
             }
             bottomBar
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 12)
+        .allowsHitTesting(true)
     }
 
     private var failureMessage: String? {
@@ -199,6 +206,7 @@ struct ContentView: View {
                     .font(.system(size: 18))
                     .frame(width: 46, height: 46)
                     .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Copy.time)
@@ -212,6 +220,7 @@ struct ContentView: View {
                     .font(.system(size: 18))
                     .frame(width: 46, height: 46)
                     .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Copy.skills)
@@ -223,6 +232,7 @@ struct ContentView: View {
                 .font(.system(size: 10, design: .rounded))
                 .foregroundStyle(.secondary)
                 .opacity(controller.ready ? 1 : 0)
+                .allowsHitTesting(false)
         }
     }
 

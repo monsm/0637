@@ -414,6 +414,9 @@ struct MetalView: UIViewRepresentable {
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView()
         view.backgroundColor = UIColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+        // A UIView inside SwiftUI keeps its own hit-testing; without this the
+        // MTKView swallows the SwiftUI gestures layered over it.
+        view.isUserInteractionEnabled = false
         context.coordinator.renderer = Renderer(controller: controller, view: view)
         if context.coordinator.renderer == nil {
             // A renderer that failed to start used to leave a black screen
