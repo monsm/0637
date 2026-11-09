@@ -5,6 +5,9 @@ on:
     paths:
       - "ios/**"
       - "core/**"
+      # The upstream patch changes what the core compiles against, so a patch
+      # edit is a build input even when no Rust file moved.
+      - "patches/**"
       - ".github/workflows/ios.yml"
   workflow_dispatch:
 

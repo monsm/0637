@@ -30,6 +30,14 @@ pub struct DuckStatus {
     pub label: [c_char; 64],
     pub trunk: [c_double; 3],
     pub gravity: [c_double; 3],
+    /// The loop's own state, as `robotd` publishes it. Mirrors `duck_core.h`;
+    /// the two have to move together.
+    pub imu_ready: c_int,
+    pub picked_up: c_int,
+    pub p_held: c_double,
+    pub mouth: c_double,
+    pub volts: c_double,
+    pub has_mouth: c_int,
 }
 
 pub struct DuckCore {

@@ -5,6 +5,9 @@ on:
     paths:
       - "android/**"
       - "core/**"
+      # The upstream patch changes what the core compiles against, so a patch
+      # edit is a build input even when no Rust file moved.
+      - "patches/**"
       - ".github/workflows/android.yml"
   workflow_dispatch:
 
