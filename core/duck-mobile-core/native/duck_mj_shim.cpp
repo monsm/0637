@@ -132,7 +132,17 @@ double* duck_mj_ctrl(DuckMj* h) { return h->d->ctrl; }
 double* duck_mj_actuator_force(DuckMj* h) { return h->d->actuator_force; }
 double* duck_mj_xpos(DuckMj* h) { return h->d->xpos; }
 double* duck_mj_xquat(DuckMj* h) { return h->d->xquat; }
-float* duck_mj_geom_rgba(DuckMj* h) { return h->m->geom_rgba; }
+// The colour MuJoCo's own renderer uses: the material's rgba when the geom
+// has one, the geom's own rgba otherwise. geom_rgba alone is the default
+// grey for every geom that references a material.
+void duck_mj_geom_colour(const DuckMj* h, int geom, float* out) {
+  const int mat = h->m->geom_matid[geom];
+  const float* src = (mat >= 0) ? &h->m->mat_rgba[4 * mat] : &h->m->geom_rgba[4 * geom];
+  out[0] = src[0];
+  out[1] = src[1];
+  out[2] = src[2];
+  out[3] = src[3];
+}
 double* duck_mj_geom_pos(DuckMj* h) { return h->m->geom_pos; }
 double* duck_mj_geom_quat(DuckMj* h) { return h->m->geom_quat; }
 double* duck_mj_geom_size(DuckMj* h) { return h->m->geom_size; }

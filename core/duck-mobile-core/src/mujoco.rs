@@ -43,7 +43,7 @@ unsafe extern "C" {
     fn duck_mj_actuator_force(handle: *mut DuckMj) -> *mut c_double;
     fn duck_mj_xpos(handle: *mut DuckMj) -> *mut c_double;
     fn duck_mj_xquat(handle: *mut DuckMj) -> *mut c_double;
-    fn duck_mj_geom_rgba(handle: *mut DuckMj) -> *mut f32;
+    fn duck_mj_geom_colour(handle: *const DuckMj, geom: c_int, out: *mut f32);
     fn duck_mj_geom_pos(handle: *mut DuckMj) -> *mut c_double;
     fn duck_mj_geom_quat(handle: *mut DuckMj) -> *mut c_double;
     fn duck_mj_geom_type(handle: *const DuckMj, geom: c_int) -> c_int;
@@ -524,8 +524,10 @@ impl MujocoIo {
         let pos = unsafe { slice::from_raw_parts(duck_mj_geom_pos(self.handle), self.geom_count() * 3) };
         let quat =
             unsafe { slice::from_raw_parts(duck_mj_geom_quat(self.handle), self.geom_count() * 4) };
-        let rgba =
-            unsafe { slice::from_raw_parts(duck_mj_geom_rgba(self.handle), self.geom_count() * 4) };
+        // Resolve the material: geom_rgba alone is the default grey for
+        // every geom that references a material.
+        let mut rgba = [0f32; 4];
+        unsafe { duck_mj_geom_colour(self.handle, geom as c_int, rgba.as_mut_ptr()) };
         Some(GeomInfo {
             body: unsafe { duck_mj_geom_bodyid(self.handle, geom as c_int) } as usize,
             geom_type: unsafe { duck_mj_geom_type(self.handle, geom as c_int) },
@@ -538,12 +540,7 @@ impl MujocoIo {
                 quat[geom * 4 + 2],
                 quat[geom * 4 + 3],
             ],
-            rgba: [
-                rgba[geom * 4],
-                rgba[geom * 4 + 1],
-                rgba[geom * 4 + 2],
-                rgba[geom * 4 + 3],
-            ],
+            rgba,
         })
     }
 
