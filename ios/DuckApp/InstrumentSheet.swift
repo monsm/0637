@@ -37,7 +37,7 @@ struct InstrumentSheet: View {
 
     private var timeMachine: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionTitle("Time machine", detail: "tick \(controller.tick)")
+            sectionTitle("Time machine", detail: "tick \(controller.simTick)")
 
             // The scrubber spans the checkpoints the core actually kept.
             VStack(spacing: 6) {
@@ -51,7 +51,7 @@ struct InstrumentSheet: View {
                         Capsule()
                             .fill(Color.accentColor.opacity(0.6))
                             .frame(
-                                width: width * CGFloat(controller.tick - controller.oldestTick)
+                                width: width * CGFloat(controller.simTick - controller.oldestTick)
                                     / CGFloat(max(span, 1)),
                                 height: 6
                             )
@@ -61,7 +61,7 @@ struct InstrumentSheet: View {
                 HStack {
                     Text("\(controller.oldestTick)")
                     Spacer()
-                    Text("\(controller.tick)")
+                    Text("\(controller.simTick)")
                 }
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(.secondary)

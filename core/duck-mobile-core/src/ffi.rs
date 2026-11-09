@@ -972,6 +972,18 @@ pub unsafe extern "C" fn duck_core_speed(core: *mut DuckCore) -> c_double {
     (*core).runtime.clock().speed
 }
 
+/// The oldest checkpoint the core still holds, for the scrubber's span.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_oldest_tick(core: *mut DuckCore) -> u64 {
+    if core.is_null() {
+        return 0;
+    }
+    (*core)
+        .timeline
+        .front()
+        .map_or(0, |checkpoint| checkpoint.tick)
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_tick_index(core: *mut DuckCore) -> u64 {
     if core.is_null() {

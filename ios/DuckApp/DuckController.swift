@@ -24,7 +24,8 @@ final class DuckController: ObservableObject {
     @Published var trunk = SIMD3<Float>(0, 0, 0.12)
     @Published var gravity = SIMD3<Float>(0, 0, -1)
     /// The time machine, as the shell shows it.
-    @Published var tick: UInt64 = 0
+    /// The simulation tick, distinct from `tick()` the 50 Hz step.
+    @Published var simTick: UInt64 = 0
     @Published var oldestTick: UInt64 = 0
     @Published var paused = false
     @Published var speed = 1.0
@@ -272,7 +273,9 @@ final class DuckController: ObservableObject {
 
     private func refreshClock() {
         guard let core else { return }
-        tick = duck_core_tick_index(core)
+        simTick = duck_core_tick_index(core)
+        let oldest = duck_core_oldest_tick(core)
+        oldestTick = oldest == 0 ? simTick : oldest
         paused = duck_core_paused(core) != 0
         speed = duck_core_speed(core)
     }

@@ -65,6 +65,7 @@ int duck_core_fork(DuckCore* core, const char* label);
 int duck_core_paused(DuckCore* core);
 double duck_core_speed(DuckCore* core);
 unsigned long long duck_core_tick_index(DuckCore* core);
+unsigned long long duck_core_oldest_tick(DuckCore* core);
 
 /* One hash over the scene, meshes, policies and manifest. */
 const char* duck_core_fingerprint(DuckCore* core);

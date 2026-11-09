@@ -299,7 +299,7 @@ struct DirectorOverlay: View {
                 .padding(.leading, 14)
             }
             .overlay(alignment: .bottomTrailing) {
-                Text(String(format: "t %llu · %.2fx", controller.tick, controller.speed))
+                Text(String(format: "t %llu · %.2fx", controller.simTick, controller.speed))
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.7))
                     .padding(.bottom, bar / 2 - 5)
