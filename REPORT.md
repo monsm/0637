@@ -125,6 +125,30 @@
 
 ---
 
+## 四之二、与真机的保真度审计（2026-11-09）
+
+用 6 个维度（关节传感、61 维观测、控制循环、安全/摔倒、执行器与物理、技能/manifest）
+逐行对比移动核心与官方 `robotd`/训练栈，共 56 条候选、33 条中等以上，经对抗验证后
+**确认 32 条**（1 条被驳回）。已修复的高危项：
+
+| 分歧 | 真机的做法 | 修复 |
+|---|---|---|
+| 关节观测只读马达侧角度 | 编码器在齿隙**输出侧**：`qpos[servo] + qpos[backlash]`（训练栈 `joint_pos_rel_backlash`、真机 `present_position`） | 观测与 BAM 电压环都改为和值；速度观测同样取和，BAM 的 `dq` 保持马达侧（与 `BacklashEncoderBamActuator` 一致） |
+| limp-fall 是固定 500 ms + 冻结姿态 | 陀螺判落地（1.0 rad/s 持续 200 ms，上限 1500 ms），随即 600 ms 把落地姿态插值回站立姿态（gain 160），再交还策略；触发有「正在驱动/未摔倒/不忙/不在坐/IMU 就绪」门控 | 按原状态机移植为 `LimpFall::{Idle,Limp,Posing}`，删除自创的 2 s 恢复窗 |
+| 指令无平滑 | 每个 tick `cmd += 0.2 × (target − cmd)`（`cmd_alpha`/`head_alpha`） | 摇杆 twist、头部、身体姿态都按 0.2 平滑；身体姿态加 `active` 标志（松开即回零、期间 twist 置零） |
+| Limp 阶段不写不发步 | 力矩关但是仍然写目标并推进物理 | 补 `safety.apply(..., 0)` |
+| Android 从 `onDrawFrame` 跑控制 | 真机固定 50 Hz | 独立 `ScheduledExecutorService` 每 20 ms tick，渲染只读状态 |
+| 摇杆偏航反向、无死区 | 0.1 死区，偏航取反 | 两端一致 |
+| API 租约 1 s 长于 deadman | deadman 500 ms | 租约改为 500 ms |
+
+审计同时**驳回了 1 条**（IMU 中位数滤波），并在复核中否掉了 2 条中危（BAM 摩擦数组实际正确；
+1.75 A 电流限在引用的训练文件里不存在）。
+
+尚未处理的中危项：策略热重载未走「回 homing / carry_over」、扁平 manifest 会得到空技能表、
+MuJoCo 积分器（Euler vs 训练用的 implicitfast）与求解迭代次数（100 vs 30）。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
