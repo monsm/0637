@@ -171,7 +171,7 @@ jobs:
           rustup toolchain install 1.99.1 --profile minimal
           # Target std must go into the pinned toolchain: core/rust-toolchain.toml
           # selects it for the build, and targets are per-toolchain.
-          rustup target add --toolchain 1.99.1 aarch64-apple-ios-sim
+          rustup target add --toolchain 1.99.1 aarch64-apple-ios-sim aarch64-apple-ios
 
       - name: Cache native deps
         id: cachendk
@@ -326,6 +326,46 @@ jobs:
           (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/Duck-ios-simulator.zip" "$(basename "$APP")")
           xcrun simctl shutdown "$UDID" || true
 
+      - name: MuJoCo iOS (device slice)
+        id: mujocodev
+        if: always()
+        run: BUILD_DEVICE=1 bash ios/scripts/build-mujoco-ios.sh
+
+      - name: Rust core (device)
+        id: rustdevice
+        if: always()
+        run: bash ios/scripts/build-rust-ios.sh aarch64-apple-ios
+
+      - name: Build unsigned device app
+        id: xcodebuilddev
+        if: always()
+        run: |
+          set -o pipefail
+          mkdir -p ios/build-device
+          if ! xcodebuild             -project ios/Duck.xcodeproj             -scheme Duck             -configuration Release             -sdk iphoneos             -arch arm64             -derivedDataPath ios/build-device             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             CODE_SIGN_IDENTITY=""             build > ios/build-device/xcodebuild.log 2>&1; then
+            echo "::error::xcodebuild (device) failed"
+            tail -n 120 ios/build-device/xcodebuild.log || true
+            exit 1
+          fi
+
+      - name: Package unsigned IPA
+        id: ipa
+        if: always()
+        run: |
+          set -euo pipefail
+          APP="ios/build-device/Build/Products/Release-iphoneos/Duck.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::device app bundle missing at $APP"
+            exit 1
+          fi
+          rm -rf Payload Duck-ios-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry Duck-ios-unsigned.ipa Payload
+          ls -la Duck-ios-unsigned.ipa
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist"
+          lipo -info "$APP/Duck" || true
+
       - name: Publish smoke logs
         if: always()
         run: |
@@ -376,6 +416,14 @@ jobs:
           name: Duck-ios-simulator
           path: Duck-ios-simulator.zip
           if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        id: artifactipa
+        if: always()
+        with:
+          name: Duck-ios-unsigned-ipa
+          path: Duck-ios-unsigned.ipa
+          if-no-files-found: warn
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -6,7 +6,8 @@
 |---|---|
 | `Duck-ios-simulator.zip` | **模拟器包**：解压后 `xcrun simctl install booted Duck.app`，或直接拖进 Simulator。仅 arm64 Mac 上的 iOS 模拟器可用 |
 | `Duck-ios-app` | 未压缩的同一份 `.app` |
-| `Duck-ios-ipa` | **真机 IPA**：仅在配置了签名 secrets 时产出（见下） |
+| `Duck-ios-unsigned-ipa` | **未签名真机 IPA**：device arm64 构建，未做任何签名。可直接交给 Sideloadly / AltStore / Xcode 等工具用你自己的证书重签后安装；未重签不能直接装进 iPhone |
+| `Duck-ios-ipa` | **已签名真机 IPA**：仅在配置了签名 secrets 时产出（见下） |
 
 模拟器包做的是 ad-hoc 签名（`CODE_SIGN_IDENTITY=-`），**不能装进物理 iPhone** ——
 iOS 真机只接受用 Apple 开发者证书 + provisioning profile 签名的 App。这是平台限制，
