@@ -53,6 +53,8 @@ pub struct DuckCore {
     branches: Vec<Branch>,
     /// Which branch the tick drives: 0 is the original.
     selected: usize,
+    /// The latest phone-sensor readings, and the mode they were taken in.
+    sensors: crate::sensors::Sensors,
 }
 
 struct Branch {
@@ -223,6 +225,7 @@ pub unsafe extern "C" fn duck_core_new(
             pending_restore: None,
             branches: Vec::new(),
             selected: 0,
+            sensors: crate::sensors::Sensors::default(),
         })
     });
 
@@ -401,6 +404,23 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) {
                 core.label = format!("no checkpoint at tick {tick}");
             }
         }
+        Intent::Sensor(reading) => {
+            use crate::sensors::Mode;
+            let mode = match reading.mode.as_str() {
+                "ar" => Some(Mode::Ar),
+                "possession" => Some(Mode::Possession),
+                "eval-only" => Some(Mode::Eval),
+                _ => Some(Mode::Twin),
+            };
+            core.sensors.mode = mode;
+            match reading.sensor.as_str() {
+                "imu" => core.sensors.imu = Some(reading),
+                "camera" => core.sensors.camera = Some(reading),
+                "microphone" => core.sensors.microphone = Some(reading),
+                "depth" => core.sensors.depth = Some(reading),
+                _ => {}
+            }
+        }
         Intent::Fork(label) => {
             let Some(fork) = core.runtime.fork() else {
                 core.label = "fork refused: the body cannot be cloned".to_owned();
@@ -484,6 +504,7 @@ fn publish_state(core: &DuckCore) {
         "branches": branches,
         "selected": selected,
     }));
+    core.intents.set_sensors(core.sensors.to_json());
     core.intents.set_time(json!({
         "tick": clock.tick,
         "paused": clock.paused,
@@ -536,6 +557,11 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     let core = &mut *core;
     for intent in core.intents.drain() {
         apply_intent(core, intent);
+    }
+    // The phone's IMU is an external disturbance, not a sense: a shake is a
+    // shove, exactly as a hand on the real duck would be.
+    if let Some(push) = core.sensors.imu_push() {
+        let _ = core.runtime.push(push);
     }
     // A restore replaces the tick that was about to happen: the duck resumes
     // at the saved tick and this tick's physics runs from there.

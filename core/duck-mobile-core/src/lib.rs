@@ -25,6 +25,7 @@ pub mod ffi;
 #[cfg(feature = "mujoco")]
 pub mod mujoco;
 pub mod runtime;
+pub mod sensors;
 
 #[cfg(all(target_os = "android", feature = "mujoco"))]
 pub mod jni;

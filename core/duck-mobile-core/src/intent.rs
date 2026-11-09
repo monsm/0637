@@ -54,6 +54,8 @@ pub enum Intent {
     DropBranch(String),
     /// Drive one branch, or the original when empty.
     SelectBranch(String),
+    /// A phone sensor reading (camera, microphone, depth, IMU).
+    Sensor(crate::sensors::Reading),
 }
 
 pub struct IntentQueue {
@@ -65,6 +67,8 @@ pub struct IntentQueue {
     time: Mutex<Value>,
     /// The forks: one entry per branch, filled by the core.
     branches: Mutex<Value>,
+    /// The latest phone-sensor readings.
+    sensors: Mutex<Value>,
 }
 
 impl Default for IntentQueue {
@@ -88,6 +92,7 @@ impl IntentQueue {
             skills: Mutex::new(Vec::new()),
             fingerprint: Mutex::new("{}".to_owned()),
             branches: Mutex::new(json!({ "branches": [], "selected": "" })),
+            sensors: Mutex::new(json!({ "mode": "twin" })),
             time: Mutex::new(json!({
                 "tick": 0,
                 "paused": false,
@@ -147,6 +152,14 @@ impl IntentQueue {
 
     pub fn branches_json(&self) -> String {
         self.branches.lock().expect("intent branches").to_string()
+    }
+
+    pub fn set_sensors(&self, value: Value) {
+        *self.sensors.lock().expect("intent sensors") = value;
+    }
+
+    pub fn sensors_json(&self) -> String {
+        self.sensors.lock().expect("intent sensors").to_string()
     }
 }
 
@@ -228,6 +241,21 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/time") => Ok(queue.time_json()),
         ("GET", "/timeline") => Ok(queue.time_json()),
         ("GET", "/branches") => Ok(queue.branches_json()),
+        ("GET", "/sensors") => Ok(queue.sensors_json()),
+        ("POST", "/sensor") => match value["sensor"].as_str() {
+            Some(sensor) => {
+                let reading = crate::sensors::Reading {
+                    sensor: sensor.to_owned(),
+                    mode: value["mode"].as_str().unwrap_or("twin").to_owned(),
+                    value: value["value"].clone(),
+                    tick_ms: value["tick_ms"].as_u64().unwrap_or(0),
+                    in_observation: false,
+                };
+                queue.push(Intent::Sensor(reading));
+                Ok(json!({ "ok": true }).to_string())
+            }
+            None => Err("missing sensor"),
+        },
         ("POST", "/fork") => {
             let label = value["label"]
                 .as_str()

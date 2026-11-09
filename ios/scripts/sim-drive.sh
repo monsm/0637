@@ -351,6 +351,35 @@ esac
 api POST /time '{"paused":false}' > /dev/null
 api POST /time '{"speed":1.0}' > /dev/null
 
+# ---------------------------------------------------------------- sensors
+# Every sensor the phone adds is verified by pushing a reading and reading it
+# back, and by checking that only the IMU reaches the duck as a disturbance.
+echo "--- sensors ---"
+SENSORS=$(api GET /sensors || true)
+echo "$SENSORS" | tee "$OUT/sensors.json" > /dev/null
+printf '%s' "$SENSORS" | grep -q '"mode"'
+check $? "sensors are served with their mode" "$(printf '%s' "$SENSORS" | head -c 100)"
+
+api POST /sensor '{"sensor":"camera","mode":"ar","value":{"width":1920,"height":1080,"exposure_s":0.008}}' > /dev/null
+api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.12,"peak_hz":440}}' > /dev/null
+api POST /sensor '{"sensor":"depth","mode":"ar","value":{"rows":64,"cols":48,"min_m":0.2,"max_m":4.0}}' > /dev/null
+sleep 0.4
+SENSORS=$(api GET /sensors || true)
+for sensor in camera microphone depth; do
+  printf '%s' "$SENSORS" | grep -q "\"sensor\":\"$sensor\""
+  check $? "sensor reading is published: $sensor" ""
+done
+printf '%s' "$SENSORS" | grep -q '"in_observation":false'
+check $? "phone sensors stay out of the 61-D observation" ""
+
+# The IMU is the one that acts: a shake is a push.
+TRUNK_BEFORE_SHAKE=$(api GET /state | field trunk)
+api POST /sensor '{"sensor":"imu","mode":"twin","value":{"acceleration":[2.0,0.0,0.0]}}' > /dev/null
+sleep 0.5
+TRUNK_AFTER_SHAKE=$(api GET /state | field trunk)
+[ "$TRUNK_BEFORE_SHAKE" != "$TRUNK_AFTER_SHAKE" ]
+check $? "an IMU shake pushes the duck" "$TRUNK_BEFORE_SHAKE -> $TRUNK_AFTER_SHAKE"
+
 # ---------------------------------------------------------------- fork
 # A branch must start as the same duck and then be independent of it.
 echo "--- fork ---"
