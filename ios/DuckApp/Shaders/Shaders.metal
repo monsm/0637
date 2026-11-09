@@ -120,10 +120,12 @@ fragment float4 duck_fragment(
         color *= mix(0.55, 1.0, shadow);
     }
 
+    // The scene's colours are authored in display space, so the albedo must
+    // reach the screen unchanged; only highlights get a soft knee. A Reinhard
+    // curve over the whole surface washed the duck's orange out to beige.
     color *= exposure;
-    // Reinhard tone map, then a gentle gamma, so highlights roll off instead
-    // of clipping to white.
-    color = color / (color + float3(1.0));
-    color = pow(color, float3(1.0 / 2.2));
+    color = clamp(color, 0.0, 4.0);
+    color = mix(color, color / (color + float3(0.55)) * 1.55, smoothstep(0.72, 1.6, max(max(color.r, color.g), color.b)));
+    color = clamp(color, 0.0, 1.0);
     return float4(color, uniforms.color.a);
 }

@@ -470,8 +470,15 @@ class DuckRenderer(
                     color *= mix(0.55, 1.0, shadow);
                 }
 
-                color = color / (color + vec3(1.0));
-                color = pow(color, vec3(1.0 / 2.2));
+                // Keep the albedo: only highlights get a soft knee, or the
+                // duck's orange washes out to beige.
+                color = clamp(color, 0.0, 4.0);
+                color = mix(
+                    color,
+                    color / (color + vec3(0.55)) * 1.55,
+                    smoothstep(0.72, 1.6, max(max(color.r, color.g), color.b))
+                );
+                color = clamp(color, 0.0, 1.0);
                 fragColor = vec4(color, uColor.a);
             }
         """.trimIndent()
