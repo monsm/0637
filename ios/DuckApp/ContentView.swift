@@ -69,8 +69,21 @@ struct ContentView: View {
     @ViewBuilder
     private var scene: some View {
         if controller.ready && controller.renderError == nil {
-            MetalView(controller: controller)
-                .ignoresSafeArea()
+            ZStack {
+                // Behind the Metal view, never as its sublayer: sublayers draw
+                // above the drawable and would cover the duck.
+                if controller.cameraActive {
+                    CameraBackdrop(session: controller.camera.session)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                }
+                MetalView(controller: controller)
+                    .ignoresSafeArea()
+            }
+            .onAppear { controller.setDirector(surface == .director) }
+            .onChange(of: surface) { _, newValue in
+                controller.setDirector(newValue == .director)
+            }
         } else {
             Color(red: 0.055, green: 0.075, blue: 0.10)
                 .ignoresSafeArea()
@@ -80,6 +93,8 @@ struct ContentView: View {
                 .allowsHitTesting(false)
         }
     }
+
+
 
     // MARK: - Driving
 
@@ -211,6 +226,7 @@ struct ContentView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(option == .live ? "surface-live" : "surface-director")
             }
         }
     }

@@ -50,6 +50,9 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_CFBundleDisplayName: MicroDuck
         INFOPLIST_KEY_NSMotionUsageDescription: "Shake your phone to push the digital duck."
+        # Director mode composites the 3D duck over the rear camera. Asked
+        # only when Director is opened, never at launch.
+        INFOPLIST_KEY_NSCameraUsageDescription: "Director mode puts the digital duck in your room. The camera image never reaches the duck's senses."
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: "The local intent API lets your own AI agent drive the duck."
         SWIFT_OBJC_BRIDGING_HEADER: DuckApp/DuckCore-Bridging-Header.h
         HEADER_SEARCH_PATHS:

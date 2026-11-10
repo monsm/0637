@@ -271,6 +271,13 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
+        // Director mode composites the duck over the live camera. The clear
+        // colour must be transparent *and* black: CAMetalLayer's contents are
+        // premultiplied, so a dark-blue clear would veil the image.
+        let camera = controller.cameraActive
+        view.clearColor = camera
+            ? MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+            : MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
         guard let core = controller.core,
               let drawable = view.currentDrawable,
               let descriptor = view.currentRenderPassDescriptor,
@@ -308,9 +315,14 @@ final class Renderer: NSObject, MTKViewDelegate {
         // world light left the front of the duck almost black.
         let forward = simd_normalize(focus - eye)
 
-        draw(mesh: floor, model: matrix_identity_float4x4,
-             color: SIMD4<Float>(0.14, 0.15, 0.18, 1),
-             light: forward, checker: true, viewProjection: viewProjection, encoder: encoder)
+        // The studio floor is the one thing that must not be drawn over a
+        // camera image: a 4 m opaque plane at z=-0.002 hides the room and the
+        // duck's feet. Physics ground stays at z=0 either way.
+        if !camera {
+            draw(mesh: floor, model: matrix_identity_float4x4,
+                 color: SIMD4<Float>(0.14, 0.15, 0.18, 1),
+                 light: forward, checker: true, viewProjection: viewProjection, encoder: encoder)
+        }
 
         var poses: [Int: (SIMD3<Float>, SIMD4<Float>)] = [:]
         for instance in instances {
@@ -423,6 +435,10 @@ struct MetalView: UIViewRepresentable {
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView()
         view.backgroundColor = UIColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+        // Able to composite over a camera preview: an opaque layer would
+        // paint the studio colour over the room in Director mode.
+        view.isOpaque = false
+        view.layer.isOpaque = false
         // A UIView inside SwiftUI keeps its own hit-testing; without this the
         // MTKView swallows the SwiftUI gestures layered over it.
         view.isUserInteractionEnabled = false

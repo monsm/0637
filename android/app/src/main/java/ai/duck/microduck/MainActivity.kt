@@ -96,6 +96,10 @@ private fun DuckScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf(DoubleArray(0)) }
     var skills by remember { mutableStateOf(emptyList<String>()) }
+    var surface by remember { mutableStateOf(Surface.Live) }
+    var cameraAvailable by remember { mutableStateOf(false) }
+    val cameraActive = surface == Surface.Director && cameraAvailable
+    LaunchedEffect(cameraActive) { input.cameraActive = cameraActive }
 
     // MuJoCo scene + ONNX policy loading takes seconds; doing it on the main
     // thread froze the UI (Choreographer: Skipped 40 frames) and stalled the
@@ -134,10 +138,25 @@ private fun DuckScreen(
     Box(Modifier.fillMaxSize().background(Color(0xFF0E131A))) {
         val active = core
         if (active != null) {
+            // Director: the room, then the duck over it. CameraX renders into
+            // a TextureView behind the GL surface; the camera never feeds the
+            // control loop.
+            if (surface == Surface.Director) {
+                CameraBackdrop(
+                    active = true,
+                    onAvailability = { cameraAvailable = it },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             AndroidView(
                 factory = { ctx ->
                     GLSurfaceView(ctx).apply {
                         setEGLContextClientVersion(3)
+                        // Alpha in the surface: Director clears to alpha 0 so
+                        // the camera behind shows through.
+                        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                        holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+                        setZOrderMediaOverlay(true)
                         setRenderer(DuckRenderer(ctx, active, input))
                         renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                     }
@@ -150,6 +169,8 @@ private fun DuckScreen(
                 core = active,
                 skills = skills,
                 input = input,
+                surface = surface,
+                onSurface = { surface = it },
                 quack = onQuack,
                 modifier = Modifier.fillMaxSize(),
             )

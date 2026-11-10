@@ -82,6 +82,13 @@ class DuckRenderer(
             floatArrayOf(0f, 0f, 0.12f)
         }
 
+        // Director mode: transparent and black, so the camera behind shows
+        // through and the studio colour does not veil it.
+        if (input.cameraActive) {
+            GLES30.glClearColor(0f, 0f, 0f, 0f)
+        } else {
+            GLES30.glClearColor(0.055f, 0.075f, 0.10f, 1f)
+        }
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         GLES30.glUseProgram(program)
 
@@ -118,8 +125,12 @@ class DuckRenderer(
         headlight[1] /= lightLength
         headlight[2] /= lightLength
 
-        floor?.let {
-            draw(it, identity(), floatArrayOf(0.14f, 0.15f, 0.18f, 1f), headlight, 1f, viewProjection)
+        // The studio floor would hide the room (and the duck's feet) over a
+        // camera image. Physics ground stays at z=0 either way.
+        if (!input.cameraActive) {
+            floor?.let {
+                draw(it, identity(), floatArrayOf(0.14f, 0.15f, 0.18f, 1f), headlight, 1f, viewProjection)
+            }
         }
 
         for (instance in instances) {

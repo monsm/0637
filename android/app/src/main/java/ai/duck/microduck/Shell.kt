@@ -51,10 +51,11 @@ fun Shell(
     core: DuckCore?,
     skills: List<String>,
     input: DuckInput,
+    surface: Surface,
+    onSurface: (Surface) -> Unit,
     quack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    var surface by remember { mutableStateOf(Surface.Live) }
     var showRing by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
     var carrying by remember { mutableStateOf(false) }
@@ -128,8 +129,8 @@ fun Shell(
                 )
             }
             Spacer(Modifier.size(14.dp))
-            SurfaceChip(Copy.live, surface == Surface.Live) { surface = Surface.Live }
-            SurfaceChip(Copy.director, surface == Surface.Director) { surface = Surface.Director }
+            SurfaceChip(Copy.live, surface == Surface.Live) { onSurface(Surface.Live) }
+            SurfaceChip(Copy.director, surface == Surface.Director) { onSurface(Surface.Director) }
             SurfaceChip(Copy.language.label, false) {
                 Copy.language = if (Copy.language == Copy.Language.English) {
                     Copy.Language.Chinese
@@ -179,7 +180,7 @@ fun Shell(
     }
 }
 
-private enum class Surface { Live, Director }
+enum class Surface { Live, Director }
 
 @Composable
 private fun SurfaceChip(label: String, selected: Boolean, onClick: () -> Unit) {

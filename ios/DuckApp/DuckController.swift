@@ -57,6 +57,14 @@ final class DuckController: ObservableObject {
     private var lastPush = Date.distantPast
     /// The duck's own voice: the core decides when, this owns the speaker.
     let voice = Voice()
+    /// Director mode: the rear camera behind the duck. The renderer goes
+    /// transparent and drops its floor, and the room is the real one.
+    let camera = CameraFeed()
+    /// Read by the renderer each frame; true only when Director is open *and*
+    /// a camera actually started (the simulator has none).
+    @Published var cameraActive = false
+    private var wantsCamera = false
+    private var cameraCancellable: AnyCancellable?
 
     /// The renderer's triangle soups, built on the worker queue before the
     /// first frame, keyed by MuJoCo mesh id.
@@ -132,6 +140,14 @@ final class DuckController: ObservableObject {
     }
 
     init() {
+        // The camera coming up later than Director opening must flip the
+        // renderer over without the shell having to poll.
+        cameraCancellable = camera.$available
+            .receive(on: RunLoop.main)
+            .sink { [weak self] available in
+                guard let self else { return }
+                self.cameraActive = self.wantsCamera && available
+            }
         // Creating the core loads the MuJoCo scene (215k vertices) and the
         // ONNX policies — seconds on a device. Doing that here blocked the
         // main thread, so SwiftUI never rendered a frame and the app showed a
@@ -487,6 +503,18 @@ final class DuckController: ObservableObject {
             lastStatus = Date()
             refreshClock()
         }
+    }
+
+    /// Enter or leave Director mode. Opening starts the camera; leaving stops
+    /// it, so the indicator goes out and the sensor is released.
+    func setDirector(_ on: Bool) {
+        wantsCamera = on
+        if on {
+            camera.start()
+        } else {
+            camera.stop()
+        }
+        cameraActive = on && camera.available
     }
 
     func sit() {

@@ -100,5 +100,24 @@ final class DuckUITests: XCTestCase {
             ["walk", "stand"].contains(after),
             "the duck stopped after the time machine: label=\(after)"
         )
+
+        // Director mode: the camera is unavailable in the simulator, and the
+        // app must keep rendering the studio view and driving the duck rather
+        // than prompt, block, or go black.
+        let director = app.buttons["surface-director"]
+        XCTAssertTrue(director.waitForExistence(timeout: 10), "no Director switch")
+        director.tap()
+        usleep(1_500_000)
+        let inDirector = waitForLabel(["walk", "stand"], timeout: 20)
+        XCTAssertTrue(
+            ["walk", "stand"].contains(inDirector),
+            "the duck stopped in Director mode: label=\(inDirector)"
+        )
+        app.buttons["surface-live"].tap()
+        let backLive = waitForLabel(["walk", "stand"], timeout: 20)
+        XCTAssertTrue(
+            ["walk", "stand"].contains(backLive),
+            "the duck stopped after leaving Director: label=\(backLive)"
+        )
     }
 }

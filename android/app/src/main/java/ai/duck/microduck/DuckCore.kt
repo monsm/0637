@@ -257,4 +257,6 @@ object AssetStager {
 class DuckInput {
     @Volatile var vx: Double = 0.0
     @Volatile var wz: Double = 0.0
+    /** Director mode with a live camera: the renderer goes transparent. */
+    @Volatile var cameraActive: Boolean = false
 }
