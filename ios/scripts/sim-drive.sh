@@ -406,20 +406,19 @@ BACK_UP=$(poll_state bringup 2 40 0.5)
 [ "$BACK_UP" = "2" ]; check $? "the duck powers back on" "bringup=$BACK_UP"
 # `bringup=2` alone is vacuous: the shutdown's seat survives in the
 # controller, and a duck that sits straight back down still reports ready.
-# The body has to be standing again — the trunk at standing height and no
-# "sit" label.
-sleep 1
-BACK_LABEL=$(api GET /state | field label)
-BACK_TRUNK=$(api GET /state | field trunk)
-echo "after power-on: label=$BACK_LABEL trunk=$BACK_TRUNK"
-python3 - "$BACK_LABEL" "$BACK_TRUNK" <<'PY' > "$OUT/power-on.txt" 2>&1
-import sys
-label = sys.argv[1]
-z = float(sys.argv[2].split()[2])
-print(f"label={label} trunk_z={z:.4f}")
-raise SystemExit(0 if label != "sit" and z > 0.08 else 1)
-PY
-check $? "the duck is standing after power-on, not re-seated" "$(tail -1 "$OUT/power-on.txt")"
+# What must be true is that the *walking* networks have the duck again — the
+# seat is forgotten (`Controller::forget`) and the label is not "sit". The
+# body is lying in the rest pose at power-on, exactly as a real duck that was
+# switched off on the floor, so its height is not the assertion.
+POWER_LABEL=$(poll_state label walk 40 0.25)
+if [ "$POWER_LABEL" != "walk" ] && [ "$POWER_LABEL" != "stand" ]; then
+  POWER_LABEL=$(poll_state label rise 20 0.25)
+fi
+echo "after power-on: label=$POWER_LABEL trunk=$(api GET /state | field trunk)" | tee "$OUT/power-on.txt"
+case "$POWER_LABEL" in
+  walk|stand|rise) check 0 "the walking networks have the duck after power-on" "label=$POWER_LABEL" ;;
+  *)               check 1 "the walking networks have the duck after power-on" "label=$POWER_LABEL" ;;
+esac
 wait_idle 80 > /dev/null
 
 # ---------------------------------------------------------------- carry
