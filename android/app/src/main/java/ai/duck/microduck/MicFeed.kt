@@ -54,7 +54,7 @@ class MicFeed {
         running = false
         try {
             recorder?.apply {
-                if (recordState == AudioRecord.RECORDSTATE_RECORDING) stopRecording()
+                if (recordingState == AudioRecord.RECORDSTATE_RECORDING) stop()
                 release()
             }
         } catch (_: Throwable) {
@@ -91,7 +91,7 @@ class MicFeed {
         }
         // Construction can succeed with a valid state but a dead source; only
         // start when the recorder reports it can actually record.
-        if (recorder.recordState != AudioRecord.RECORDSTATE_RECORDABLE) {
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
             runCatching { recorder.release() }
             return null
         }
@@ -114,7 +114,7 @@ class MicFeed {
      */
     private fun measureAndPost(samples: ShortArray) {
         val recorder = this.recorder ?: return
-        if (recorder.recordState != AudioRecord.RECORDSTATE_RECORDING) return
+        if (recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING) return
         val window = ShortArray(READ_SAMPLES * WINDOW_READS)
         var total = 0
         for (block in 0 until WINDOW_READS) {

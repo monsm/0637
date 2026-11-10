@@ -94,7 +94,9 @@ final class DuckController: ObservableObject {
     /// The room's microphone. It taps Voice's engine rather than making a
     /// second one: one app, one AVAudioSession. Created at init but never
     /// started until the sheet's toggle is switched on.
-    private let mic = MicFeed(voice: voice)
+    /// `voice` is another stored property: a stored-property initializer runs
+    /// before self exists, so this must be lazy.
+    private lazy var mic = MicFeed(voice: voice)
     /// Published answers from that feed; the sheet reads these instead of
     /// importing AVFoundation just to show "denied".
     @Published private(set) var micDenied = false
