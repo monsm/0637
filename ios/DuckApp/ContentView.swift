@@ -211,6 +211,14 @@ struct ContentView: View {
                     .font(.system(size: 12, design: .rounded))
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("duck-label")
+                // The ring's verdict outlives the skill's brief label. A slow
+                // CI runner must be able to read it after the move finishes.
+                if !controller.lastSkill.isEmpty {
+                    Text(controller.lastSkill)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("duck-last-skill")
+                }
                 if controller.fallen {
                     Text(Copy.fell)
                         .font(.system(size: 11, weight: .semibold, design: .rounded))

@@ -66,12 +66,18 @@ final class DuckUITests: XCTestCase {
             "the 50 Hz loop never drove the duck: label=\(ready)"
         )
 
-        // A skill from the ring.
+        // A skill from the ring. The moving label lasts only as long as the
+        // move itself — under a second — and XCTest's own element query can
+        // take longer than that on a busy simulator runner. Assert the durable
+        // verdict the shell keeps from duck_core_trigger_skill's return value:
+        // it proves the button reached the core and the core accepted it.
         try pickSkill("roulade")
-        XCTAssertEqual(
-            waitForLabel(["roulade"], timeout: 20), "roulade",
+        let verdict = app.staticTexts["duck-last-skill"]
+        XCTAssertTrue(
+            verdict.waitForExistence(timeout: 20),
             "the roulade ring entry did not reach the core"
         )
+        XCTAssertEqual(verdict.label, "roulade", "the ring started the wrong skill")
         _ = waitForLabel(["walk", "stand"], timeout: 30)
 
         // The time machine: freeze, step, resume.

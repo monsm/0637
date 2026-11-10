@@ -33,6 +33,10 @@ final class DuckController: ObservableObject {
     @Published var hasMouth = false
     /// "walk" or "roller", from /state.
     @Published var driveMode = "walk"
+    /// The last skill the ring actually started. `duck_core_trigger_skill`
+    /// returns 1 when the core accepted it; the moving label is overwritten
+    /// by the next 20 ms tick, so the shell keeps this durable answer.
+    @Published var lastSkill = ""
     @Published var volts: Double = 0
     /// The platform's own measurements, once a second.
     @Published var fps: Double = 0
@@ -628,7 +632,8 @@ final class DuckController: ObservableObject {
     /// unknown name rather than pretending it started.
     func trigger(_ name: String) {
         guard let core else { return }
-        name.withCString { _ = duck_core_trigger_skill(core, $0) }
+        let started = name.withCString { duck_core_trigger_skill(core, $0) }
+        if started != 0 { lastSkill = name }
     }
 
     /// Reload a user-supplied policy set from Documents/policies when it has a
