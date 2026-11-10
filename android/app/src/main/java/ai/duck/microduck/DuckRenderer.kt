@@ -63,6 +63,9 @@ class DuckRenderer(
         aPos = GLES30.glGetAttribLocation(program, "aPos")
         aNormal = GLES30.glGetAttribLocation(program, "aNormal")
         buildScene()
+        // Record the model this scene was built from, so the first frame does
+        // not rebuild it straight away.
+        builtGeneration = core.modelGeneration()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
