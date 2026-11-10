@@ -164,10 +164,15 @@ LAUNCH_PID=$!
 # duck before asserting anything about the policy.
 STATE=""
 LABEL=""
+BRINGUP=""
+# Wait for the loop to hand the duck to the policy, not merely to tick: the
+# real bring-up holds still until the orientation filter has 25 samples
+# (~0.5 s) and the homing ramp finishes, so `homing` is a real state here.
 for _ in $(seq 1 90); do
   STATE=$(api GET /state || true)
   LABEL=$(printf '%s' "$STATE" | field label)
-  [ -n "$STATE" ] && [ "$LABEL" != "idle" ] && [ -n "$LABEL" ] && break
+  BRINGUP=$(printf '%s' "$STATE" | field bringup)
+  [ -n "$STATE" ] && [ "$BRINGUP" = "2" ] && break
   sleep 1
 done
 echo "$STATE" | tee "$OUT/state-initial.json" > /dev/null
@@ -175,7 +180,6 @@ echo "$STATE" | tee "$OUT/state-initial.json" > /dev/null
 [ -n "$STATE" ]; check $? "intent API answers on :8765" "$LABEL"
 [ "$LABEL" != "idle" ]; check $? "the 50 Hz control loop is ticking" "label=$LABEL"
 
-BRINGUP=$(printf '%s' "$STATE" | field bringup)
 GAIN=$(printf '%s' "$STATE" | field gain)
 [ "$BRINGUP" = "2" ]; check $? "policy reached ready (bringup=2)" "bringup=$BRINGUP"
 case "$LABEL" in
