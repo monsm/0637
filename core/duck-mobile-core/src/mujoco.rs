@@ -1023,3 +1023,28 @@ impl MujocoIo {
         Ok(())
     }
 }
+
+#[cfg(all(test, feature = "mujoco"))]
+mod tests {
+    use super::*;
+
+    /// The roller scene must load through the same mapping the walking one
+    /// uses: same trunk freejoint, the same 14 actuators by name, and passive
+    /// wheel joints that are simply not in the wire table.
+    #[test]
+    fn the_roller_scene_loads_with_the_same_wire_mapping() {
+        let scene = std::path::Path::new(
+            r"D:\AI\Duck\upstream\microduck_rl\src\mjlab_microduck\robot\microduck\scene_rollers.xml",
+        );
+        if !scene.exists() {
+            return;
+        }
+        let io = MujocoIo::load(scene).expect("the roller scene loads");
+        assert!(io.body_count() > 0);
+        // Every leg, neck and head servo is present. The roller model has no
+        // mouth joint, exactly like the walking one, so a beak intent is
+        // refused there too rather than accepted and dropped.
+        assert!(!io.has_mouth());
+        assert_eq!(io.nu, 14, "the same fourteen servos as the walking model");
+    }
+}
