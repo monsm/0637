@@ -304,4 +304,43 @@ mod tests {
             }
         }
     }
+
+    /// Roller is a whole-bundle switch: a different locomotion network, no
+    /// standing network, the crouch where walking has the ground pick, and
+    /// the same skills — upstream deliberately does not filter skills by mode.
+    #[test]
+    fn the_roller_manifest_swaps_the_bundle_and_keeps_the_skills() {
+        let dir = Path::new(r"D:\AI\Duck\policies");
+        if !dir.join("roller.onnx").exists() || !dir.join("roller_crouch.onnx").exists() {
+            return;
+        }
+        let walk = load_mode(dir, Mode::Walk).expect("walk");
+        let roller = load_mode(dir, Mode::Roller).expect("roller");
+
+        assert!(walker_walk(&walk), "walking keeps velstand: {:?}", walk.paths.walk);
+        assert!(roller.paths.walk.ends_with("roller.onnx"));
+        assert!(roller.standing_disabled, "the roller has no standing network");
+        assert_eq!(roller.paths.stand, None);
+        assert!(roller
+            .paths
+            .ground_pick
+            .as_ref()
+            .is_some_and(|path| path.ends_with("roller_crouch.onnx")));
+        // The crouch's own timing comes from the manifest, not the walking pick.
+        assert_eq!(roller.skill_tuning.ground_pick_period, 5.0);
+        assert_eq!(roller.skill_tuning.ground_pick_end_phase, 0.7);
+
+        let walk_names: Vec<&str> = walk.skills.iter().map(|s| s.name.as_str()).collect();
+        let roller_names: Vec<&str> = roller.skills.iter().map(|s| s.name.as_str()).collect();
+        assert_eq!(walk_names, roller_names, "skills are not mode-filtered");
+        assert!(roller_names.contains(&"roulade"));
+
+        // The same seed of tuning except the locomotion scale: the roller set
+        // declares action_scale 0.8.
+        assert_eq!(roller.action_scale, Some(0.8));
+    }
+
+    fn walker_walk(bundle: &PolicyBundle) -> bool {
+        bundle.paths.walk.ends_with("velstand.onnx")
+    }
 }
