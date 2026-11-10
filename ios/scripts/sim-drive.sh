@@ -404,6 +404,22 @@ api POST /power '{}' > /dev/null
 check $? "power-on accepted" ""
 BACK_UP=$(poll_state bringup 2 40 0.5)
 [ "$BACK_UP" = "2" ]; check $? "the duck powers back on" "bringup=$BACK_UP"
+# `bringup=2` alone is vacuous: the shutdown's seat survives in the
+# controller, and a duck that sits straight back down still reports ready.
+# The body has to be standing again — the trunk at standing height and no
+# "sit" label.
+sleep 1
+BACK_LABEL=$(api GET /state | field label)
+BACK_TRUNK=$(api GET /state | field trunk)
+echo "after power-on: label=$BACK_LABEL trunk=$BACK_TRUNK"
+python3 - "$BACK_LABEL" "$BACK_TRUNK" <<'PY' > "$OUT/power-on.txt" 2>&1
+import sys
+label = sys.argv[1]
+z = float(sys.argv[2].split()[2])
+print(f"label={label} trunk_z={z:.4f}")
+raise SystemExit(0 if label != "sit" and z > 0.08 else 1)
+PY
+check $? "the duck is standing after power-on, not re-seated" "$(tail -1 "$OUT/power-on.txt")"
 wait_idle 80 > /dev/null
 
 # ---------------------------------------------------------------- carry
