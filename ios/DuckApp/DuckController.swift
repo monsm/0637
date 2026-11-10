@@ -67,6 +67,10 @@ final class DuckController: ObservableObject {
     @Published var faceGauge = "Unknown"
     @Published var faceBattery = "—"
     @Published var faceBars = 0
+    /// The trick book: how many of the duck's own moves and emotions it has
+    /// actually performed, from /state.life. A collection you fill by playing,
+    /// not a list of names.
+    @Published var trickBook = "—"
     /// The flashlight's colour while lit, nil when off. A toggle publishes the
     /// FFI's new state directly rather than waiting for the next poll.
     @Published var flashlightColor: String?
@@ -526,6 +530,15 @@ final class DuckController: ObservableObject {
                         self.behaviorSummary = "—"
                     }
                     self.parseLeds(json["leds"])
+                    if let life = json["life"] as? [String: Any] {
+                        let emotions = life["emotions"] as? [String: Any] ?? [:]
+                        let skills = life["skills"] as? [String: Any] ?? [:]
+                        self.trickBook = String(
+                            format: "%d/13 moods · %d tricks",
+                            emotions.count,
+                            skills.reduce(0) { $0 + ($1.value as? Int ?? 0) }
+                        )
+                    }
                 }
             }.resume()
         }

@@ -643,11 +643,14 @@ private fun InstrumentSheet(
     // percentage and the flashlight, published on /state.leds. A duck with
     // no face is a duck that looks broken, so the sheet draws one.
     var face by remember { mutableStateOf(FaceUi()) }
+    // The trick book: how many of its own moods and moves the duck has run.
+    var trickBook by remember { mutableStateOf("—") }
     LaunchedEffect(core) {
         while (true) {
             micSummary = fetchMicSummary()
             behaviorSummary = fetchBehaviorSummary()
             face = fetchFace()
+            trickBook = fetchTrickBook()
             delay(1000)
         }
     }
@@ -744,6 +747,14 @@ private fun InstrumentSheet(
             ) {
                 Text(Copy.behavior, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
                 Text(behaviorSummary, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.trickBook, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Text(trickBook, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
             }
             // The face: the status LED's verdict, the four-light battery gauge
             // and the pack percentage, all read back from /state.leds.
@@ -881,6 +892,32 @@ private fun fetchFace(): FaceUi {
         FaceUi(status, bars, percent, color)
     } catch (_: Throwable) {
         FaceUi()
+    }
+}
+
+/** The trick book, from the same /state the sheet already polls. */
+private fun fetchTrickBook(): String {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/state")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 1500
+        connection.readTimeout = 1500
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        // org.json, not a regex: the life object holds nested maps whose
+        // braces defeat a flat pattern.
+        val life = org.json.JSONObject(text).optJSONObject("life") ?: return "—"
+        val emotions = life.optJSONObject("emotions")
+        val skills = life.optJSONObject("skills")
+        var tricks = 0L
+        if (skills != null) {
+            val names = skills.keys()
+            while (names.hasNext()) tricks += skills.optLong(names.next())
+        }
+        "${emotions?.length() ?: 0}/13 moods · $tricks tricks"
+    } catch (_: Throwable) {
+        "—"
     }
 }
 
