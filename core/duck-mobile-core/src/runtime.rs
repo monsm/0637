@@ -368,6 +368,10 @@ pub struct Checkpoint {
     /// The drive mode, as a string ("walk"/"roller").
     #[serde(default)]
     pub mode: String,
+    /// The odometry estimator's whole state: a rewind that restored the body
+    /// but not the anchor would publish a pose from a future that is gone.
+    #[serde(default)]
+    pub odometry: Vec<f64>,
 }
 
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
@@ -428,6 +432,9 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The pack voltage, smoothed the way `robotd` smooths it: a step sag must
     /// not reach the empty threshold.
     volts_ema: Option<f64>,
+    /// Where the duck believes it is, from its own legs and IMU. `robotd` ticks
+    /// it inside the control loop on fresh samples once the IMU has warmed.
+    odometry: odometry::Odometry,
     /// The duck's voice. `robotd` quacks once as the loop comes up, chirps on
     /// the mode cue and pecks before the servos go quiet; the same here.
     voice: crate::voice::Voice,
@@ -478,6 +485,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             shutdown: Shutdown::Idle,
             powered_off: false,
             shutdown_requested: false,
+            odometry: odometry::Odometry::alpha(),
             volts_ema: None,
             voice: crate::voice::Voice::new(0xD0C),
             sounds: std::collections::VecDeque::new(),
@@ -511,6 +519,20 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn imu_samples(&self) -> u64 {
         self.imu_samples
+    }
+
+    /// Where the duck believes it is: trunk position in the world frame, and
+    /// heading in the boot-relative frame the IMU defines.
+    pub fn position(&self) -> [f64; 3] {
+        self.odometry.position()
+    }
+
+    pub fn yaw(&self) -> f64 {
+        self.odometry.yaw()
+    }
+
+    pub fn anchor(&self) -> ([f64; 2], usize) {
+        (self.odometry.anchor_xy(), self.odometry.anchor_foot())
     }
 
     /// Somebody is holding the duck: a spring toward `anchor + offset`.
@@ -919,6 +941,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             volts: self.volts,
             mouth: self.mouth,
             mode: self.mode.as_str().to_owned(),
+            odometry: self.odometry.snapshot(),
         })
     }
 
@@ -989,6 +1012,11 @@ impl<T: RobotIo> DuckRuntime<T> {
             "roller" => robotd_params::Mode::Roller,
             _ => robotd_params::Mode::Walk,
         };
+        if !checkpoint.odometry.is_empty() {
+            // A snapshot this build cannot read is ignored rather than
+            // half-applied: the estimate restarts from the restored pose.
+            let _ = self.odometry.restore(&checkpoint.odometry);
+        }
         // The pickup window is a second of history from a future this duck no
         // longer had. Forget it rather than score rows against a replay.
         if let Some(watch) = self.pickup.as_mut() {
@@ -1316,6 +1344,14 @@ impl<T: RobotIo> DuckRuntime<T> {
                 report.gain = GAIN_POSE;
                 return Ok(report);
             }
+        }
+
+        // `robotd` updates odometry only on fresh samples and only once the
+        // orientation filter has converged: seeding the anchor from a
+        // quaternion that is still swinging would put the world origin
+        // somewhere the robot never was.
+        if warm && !self.powered_off {
+            self.odometry.update(&sensors.positions, sensors.imu.quat);
         }
 
         // The orientation is still a default, not a measurement: hold the pose,

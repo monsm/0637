@@ -17,6 +17,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 duck-control = { path = "../../upstream/microduck/duck-control", default-features = false }
 # Official skill config types used by robotd's control.rs.
 robotd-params = { path = "../../upstream/microduck/robotd-params" }
+# The robot's own contact odometry: where it is, from its legs and IMU. Pure
+# Rust (MJCF parsed with roxmltree), so it compiles for both mobile targets.
+odometry = { path = "../../upstream/microduck/odometry" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"

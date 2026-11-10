@@ -121,6 +121,7 @@ dependencies = [
  "cc",
  "duck-control",
  "jni",
+ "odometry",
  "robotd-params",
  "serde",
  "serde_json",
@@ -311,6 +312,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "odometry"
+version = "0.18.9"
+dependencies = [
+ "duck-ipc-proto",
+ "kinematics",
 ]
 
 [[package]]

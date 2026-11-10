@@ -849,6 +849,14 @@ fn publish_state(core: &DuckCore) {
         "paused": clock.paused,
         "speed": clock.speed,
         "mode": core.runtime.mode().as_str(),
+        // The duck's own estimate of where it is, NOT the simulator's ground
+        // truth: it comes from the same legs and IMU the physical duck has.
+        "pose": {
+            "position": core.runtime.position(),
+            "yaw": core.runtime.yaw(),
+            "anchor_xy": core.runtime.anchor().0,
+            "anchor_foot": core.runtime.anchor().1,
+        },
         "powered_off": core.runtime.powered_off(),
         "carrying": core.runtime.carrying(),
         "notice": core
