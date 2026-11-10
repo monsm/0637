@@ -161,6 +161,11 @@ struct InstrumentSheet: View {
             if controller.volts > 0 {
                 row(Copy.battery, String(format: "%.2f V", controller.volts))
             }
+            // What the phone itself achieved, once a second. The 50 Hz target
+            // is robotd's; a tick rate below it means the phone cannot keep up.
+            if controller.fps > 0 {
+                row("fps / Hz", String(format: "%.0f / %.1f", controller.fps, controller.ticksPerSecond))
+            }
         }
         .padding(14)
         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))

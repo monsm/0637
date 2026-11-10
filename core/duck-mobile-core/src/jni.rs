@@ -15,7 +15,7 @@ use jni::JNIEnv;
 
 use crate::ffi::{
     duck_core_body_count, duck_core_mode, duck_core_model_generation, duck_core_next_sound,
-    duck_core_release_body,
+    duck_core_release_body, duck_core_set_performance,
     duck_core_queue_sound, duck_core_render_sound, duck_core_set_mode,
     duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
     duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_load_pickup,
@@ -191,6 +191,17 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeLoadPickup(
 }
 
 /// The next sound the duck wants, as a tag; `null` when none is queued.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetPerformance(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    fps: jdouble,
+    tps: jdouble,
+) {
+    unsafe { duck_core_set_performance(handle as *mut DuckCore, fps, tps) };
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMode(
     mut env: JNIEnv,
@@ -408,6 +419,8 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeStatus(
         mouth: 0.0,
         volts: 0.0,
         has_mouth: 0,
+        fps: 0.0,
+        ticks_per_second: 0.0,
     };
     if unsafe { duck_core_status(handle as *mut DuckCore, &mut status) } != 0 {
         return empty_array(&mut env);
@@ -428,6 +441,8 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeStatus(
         status.mouth,
         status.volts,
         status.has_mouth as f64,
+        status.fps,
+        status.ticks_per_second,
     ];
     double_array(&mut env, &values)
 }

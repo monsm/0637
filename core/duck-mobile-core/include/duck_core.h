@@ -22,6 +22,10 @@ typedef struct DuckStatus {
     double mouth;    /* beak opening commanded, 0..1 */
     double volts;    /* pack voltage, 0 when not read yet */
     int has_mouth;   /* 1 when the scene has a mouth joint to move */
+    /* The platform's own measurements, once a second: display frames per
+       second and control ticks per second achieved (target: 50). */
+    double fps;
+    double ticks_per_second;
 } DuckStatus;
 
 DuckCore* duck_core_new(const char* scene_path, const char* policies_dir,
@@ -48,6 +52,10 @@ int duck_core_push(DuckCore* core, double vx, double vy, double vz);
 /* Bumped when the body model changed (a mode switch). Renderers that cache
    geometry rebuild when it moves. */
 unsigned long long duck_core_model_generation(DuckCore* core);
+
+/* The platform's own measurements, once a second: frames drawn per second and
+   control ticks achieved per second. Diagnostic, not part of the duck. */
+void duck_core_set_performance(DuckCore* core, double fps, double tps);
 
 /* The drive mode currently loaded: "walk" or "roller". */
 const char* duck_core_mode(DuckCore* core);

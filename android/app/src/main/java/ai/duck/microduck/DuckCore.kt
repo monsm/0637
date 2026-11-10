@@ -90,6 +90,11 @@ class DuckCore(
         if (handle != 0L) nativeRenderSound(handle, tag) ?: FloatArray(0) else FloatArray(0)
     }
 
+    /** The platform's own measurements, once a second: fps and ticks/s. */
+    fun setPerformance(fps: Double, tps: Double) = synchronized(lock) {
+        if (handle != 0L) nativeSetPerformance(handle, fps, tps)
+    }
+
     /** The drive mode loaded now: "walk" or "roller". */
     fun mode(): String = synchronized(lock) {
         if (handle != 0L) nativeMode(handle) ?: "walk" else "walk"
@@ -219,6 +224,7 @@ class DuckCore(
         @JvmStatic private external fun nativeReleaseBody(handle: Long)
         @JvmStatic private external fun nativeCarry(handle: Long, dx: Double, dy: Double, dz: Double, active: Boolean)
         @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
+        @JvmStatic private external fun nativeSetPerformance(handle: Long, fps: Double, tps: Double)
         @JvmStatic private external fun nativeMode(handle: Long): String?
         @JvmStatic private external fun nativeSetMode(handle: Long, mode: String): Int
         @JvmStatic private external fun nativeModelGeneration(handle: Long): Long
@@ -283,4 +289,9 @@ class DuckInput {
     @Volatile var wz: Double = 0.0
     /** Director mode with a live camera: the renderer goes transparent. */
     @Volatile var cameraActive: Boolean = false
+    // Performance counters, reset once a second. The loop counts ticks, the
+    // renderer counts frames; whoever ticks over the second writes them back
+    // to the core so /state reports what was actually achieved.
+    @Volatile var ticks: Int = 0
+    @Volatile var frames: Int = 0
 }

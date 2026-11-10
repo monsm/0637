@@ -38,6 +38,10 @@ pub struct DuckStatus {
     pub mouth: c_double,
     pub volts: c_double,
     pub has_mouth: c_int,
+    /// The platform's own measurements, once a second: display frames per
+    /// second and control ticks per second achieved (target: 50).
+    pub fps: c_double,
+    pub ticks_per_second: c_double,
 }
 
 pub struct DuckCore {
@@ -74,6 +78,9 @@ pub struct DuckCore {
     /// and its scene.
     scene: String,
     policies: std::path::PathBuf,
+    /// The platform's own measurements, written once a second: display frames
+    /// per second and control ticks per second actually achieved.
+    performance: (f64, f64),
     /// Bumped whenever the body model changes (a mode switch). The renderer
     /// caches geometry per model; a new generation means rebuild it.
     model_generation: u64,
@@ -253,6 +260,7 @@ pub unsafe extern "C" fn duck_core_new(
             rendered_sound: None,
             scene: scene.clone(),
             policies: policies.clone(),
+            performance: (0.0, 0.0),
             model_generation: 0,
         })
     });
@@ -321,6 +329,15 @@ pub unsafe extern "C" fn duck_core_reload_policies(
 }
 
 /// Start the local intent API on `0.0.0.0:port`. Idempotent.
+/// The platform's own measurements, once a second: frames drawn per second and
+/// control ticks achieved per second. Diagnostic, not part of the duck.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_set_performance(core: *mut DuckCore, fps: f64, tps: f64) {
+    if !core.is_null() {
+        (*core).performance = (fps, tps);
+    }
+}
+
 /// The drive mode currently loaded: "walk" or "roller".
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_mode(core: *mut DuckCore) -> *const c_char {
@@ -907,6 +924,10 @@ fn publish_state(core: &DuckCore) {
         },
         "powered_off": active.powered_off(),
         "carrying": active.carrying(),
+        "performance": {
+            "fps": core.performance.0,
+            "ticks_per_second": core.performance.1,
+        },
         "notice": core
             .notice
             .as_ref()
@@ -1326,6 +1347,8 @@ pub unsafe extern "C" fn duck_core_status(core: *mut DuckCore, out: *mut DuckSta
     out.mouth = report.map_or(0.0, |report| report.mouth);
     out.volts = report.and_then(|report| report.volts).unwrap_or(0.0);
     out.has_mouth = active.has_mouth() as c_int;
+    out.fps = core.performance.0;
+    out.ticks_per_second = core.performance.1;
     0
 }
 
@@ -1668,6 +1691,8 @@ mod tests {
             mouth: 0.0,
             volts: 0.0,
             has_mouth: 0,
+            fps: 0.0,
+            ticks_per_second: 0.0,
         };
         assert_eq!(unsafe { duck_core_status(core, &mut status) }, 0);
         assert_eq!(status.bringup, 2, "already at home -> Ready");

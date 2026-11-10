@@ -330,10 +330,14 @@ private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
                         append(" · ")
                         append(if (status[9] > 0.5) "IMU warm" else "IMU warming")
                         // [0 bringup, 1 fallen, 2 gain, 3..5 trunk, 6..8 gravity,
-                        //  9 imu_ready, 10 picked_up, 11 p_held, 12 mouth, 13 volts]
+                        //  9 imu_ready, 10 picked_up, 11 p_held, 12 mouth, 13 volts,
+                        //  14 fps, 15 ticks/s]
                         append(" · beak ${"%.2f".format(status[12])}")
                         if (status[10] > 0.5) append(" · in a hand")
                         if (status[13] > 0.0) append(" · pack ${"%.2f".format(status[13])} V")
+                        if ((status.getOrNull(14) ?: 0.0) > 0.0) append(
+                            " · ${"%.0f".format(status[14])} fps · ${"%.1f".format(status[15])} Hz"
+                        )
                     },
                     color = Color.White.copy(alpha = 0.65f),
                     fontSize = 11.sp,

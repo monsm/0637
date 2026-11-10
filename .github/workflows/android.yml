@@ -296,8 +296,29 @@ jobs:
           cp android-screen.png ci-logs/android/ 2>/dev/null || true
           cp android-screen-2.png ci-logs/android/ 2>/dev/null || true
           echo "run=${{ github.run_id }}" > ci-logs/android/smoke.txt
+          echo "sha=${{ github.sha }}" >> ci-logs/android/smoke.txt
           echo "emulator=${{ steps.emulator.outcome }}" >> ci-logs/android/smoke.txt
           echo "alignment=${{ steps.alignment.outcome }}" >> ci-logs/android/smoke.txt
+          # The build chain's step outcomes: the failure publisher only runs
+          # on failure, so without this a green run's steps.txt is a stale
+          # failure log from weeks ago under today's commit.
+          {
+            echo "run=${{ github.run_id }}"
+            echo "sha=${{ github.sha }}"
+            echo "checkout=${{ steps.checkout.outcome }}"
+            echo "rusttoolchain=${{ steps.rusttoolchain.outcome }}"
+            echo "upstream=${{ steps.upstream.outcome }}"
+            echo "mujoco=${{ steps.mujoco.outcome }}"
+            echo "ort=${{ steps.ort.outcome }}"
+            echo "stage=${{ steps.stage.outcome }}"
+            echo "rustcore=${{ steps.rustcore.outcome }}"
+            echo "apk=${{ steps.apk.outcome }}"
+            echo "gradlesetup=${{ steps.gradlesetup.outcome }}"
+            echo "gradle=${{ steps.apk.outcome }}"
+            echo "emulator=${{ steps.emulator.outcome }}"
+            echo "alignment=${{ steps.alignment.outcome }}"
+            echo "publishlogs=${{ steps.publishlogs.outcome }}"
+          } > ci-logs/android/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
           git add -f ci-logs || true

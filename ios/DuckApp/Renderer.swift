@@ -280,6 +280,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     }
 
     func draw(in view: MTKView) {
+        controller.noteFrame()
         // Director mode composites the duck over the live camera. The clear
         // colour must be transparent *and* black: CAMetalLayer's contents are
         // premultiplied, so a dark-blue clear would veil the image.

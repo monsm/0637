@@ -86,6 +86,7 @@ class DuckRenderer(
             builtGeneration = generation
         }
         // The 50 Hz loop runs on DuckLoop's own scheduler; this only draws.
+        input.frames++
         val status = core.status()
         // The camera follows the interpolated trunk, not the status sample: a
         // camera on a slower clock than the duck makes the room judder.

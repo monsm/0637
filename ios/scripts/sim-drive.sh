@@ -219,6 +219,13 @@ printf '%s' "$PROPRIO" | grep -q '"positions"'
 check $? "measured joint positions are published" ""
 printf '%s' "$PROPRIO" | grep -q '"targets"'
 check $? "commanded joint targets are published" ""
+printf '%s' "$PROPRIO" | grep -q '"performance"'
+check $? "state publishes the platform's own performance" ""
+PERF_TPS=$(printf '%s' "$PROPRIO" | grep -oE '"ticks_per_second":[0-9.]+' | head -1 | cut -d: -f2)
+case "$PERF_TPS" in
+  ''|0|0.0) check 1 "performance ticks_per_second is $PERF_TPS — counters not wired" "" ;;
+  *) check 0 "the control loop reports $PERF_TPS ticks/s" "" ;;
+esac
 printf '%s' "$PROPRIO" | grep -q '"imu_ready":true'
 check $? "the IMU reports warm once the loop is driving" ""
 printf '%s' "$PROPRIO" | grep -q '"mouth"'

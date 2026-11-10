@@ -472,6 +472,28 @@ jobs:
             echo "simsmoke=${{ steps.simsmoke.outcome }}"
             echo "uitest=${{ steps.uitest.outcome }}"
           } > ci-logs/ios/smoke.txt
+          # The build chain's step outcomes: the failure publisher only runs
+          # on failure, so without this a green run's steps.txt is a stale
+          # failure log from weeks ago under today's commit.
+          {
+            echo "run=${{ github.run_id }}"
+            echo "sha=${{ github.sha }}"
+            echo "checkout=${{ steps.checkout.outcome }}"
+            echo "upstream=${{ steps.upstream.outcome }}"
+            echo "toolchain=${{ steps.toolchain.outcome }}"
+            echo "ort=${{ steps.ort.outcome }}"
+            echo "mujoco=${{ steps.mujoco.outcome }}"
+            echo "stage=${{ steps.stage.outcome }}"
+            echo "rustcore=${{ steps.rustcore.outcome }}"
+            echo "xcodegen=${{ steps.xcodegen.outcome }}"
+            echo "xcodebuild=${{ steps.xcodebuild.outcome }}"
+            echo "simsmoke=${{ steps.simsmoke.outcome }}"
+            echo "uitest=${{ steps.uitest.outcome }}"
+            echo "mujocodev=${{ steps.mujocodev.outcome }}"
+            echo "rustdevice=${{ steps.rustdevice.outcome }}"
+            echo "xcodebuilddev=${{ steps.xcodebuilddev.outcome }}"
+            echo "ipa=${{ steps.ipa.outcome }}"
+          } > ci-logs/ios/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
           git add -f ci-logs || true

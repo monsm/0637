@@ -34,6 +34,9 @@ final class DuckController: ObservableObject {
     /// "walk" or "roller", from /state.
     @Published var driveMode = "walk"
     @Published var volts: Double = 0
+    /// The platform's own measurements, once a second.
+    @Published var fps: Double = 0
+    @Published var ticksPerSecond: Double = 0
     @Published var trunk = SIMD3<Float>(0, 0, 0.12)
     @Published var gravity = SIMD3<Float>(0, 0, -1)
     /// The time machine, as the shell shows it.
@@ -54,6 +57,12 @@ final class DuckController: ObservableObject {
     private(set) var core: OpaquePointer?
     private var timer: Timer?
     private var lastStatus = Date.distantPast
+    /// Performance counters, reset once a second by the sensor timer: frames
+    /// the renderer drew and 50 Hz ticks actually achieved. Written back to
+    /// the core so /state reports what the app measured, not a guess.
+    private var frameCount = 0
+    private var tickCount = 0
+    private var perfAnchor = Date()
     private var policyDirectory = ""
     private let motion = CMMotionManager()
     private var lastPush = Date.distantPast
@@ -88,6 +97,11 @@ final class DuckController: ObservableObject {
     /// alpha halfway through a slowed tick and freeze the pose.
     private var poseInterval: TimeInterval = 0.02
     private var bodyCount = 0
+
+    /// The renderer drew one frame. Called from `draw(in:)` once per frame.
+    func noteFrame() {
+        frameCount += 1
+    }
 
     /// 0…1 through the current 20 ms tick, for the renderer.
     func interpolationAlpha(now: TimeInterval = Date().timeIntervalSinceReferenceDate) -> Float {
@@ -365,6 +379,7 @@ final class DuckController: ObservableObject {
     }
 
     private func pollSensors() {
+        reportPerformance()
         guard let url = URL(string: "http://127.0.0.1:8765/sensors") else { return }
         var request = URLRequest(url: url)
         request.timeoutInterval = 1.5
@@ -381,6 +396,19 @@ final class DuckController: ObservableObject {
                 self.imuSummary = Self.summary(json["imu"], keys: ["acceleration"])
             }
         }.resume()
+    }
+
+    /// One measurement per second: frames per second the renderer achieved
+    /// and control ticks per second against the 50 Hz target. Diagnostic only.
+    private func reportPerformance() {
+        guard let core else { return }
+        let now = Date()
+        let elapsed = now.timeIntervalSince(perfAnchor)
+        guard elapsed > 0.5 else { return }
+        duck_core_set_performance(core, Double(frameCount) / elapsed, Double(tickCount) / elapsed)
+        frameCount = 0
+        tickCount = 0
+        perfAnchor = now
     }
 
     private static func summary(_ reading: Any?, keys: [String]) -> String {
@@ -474,7 +502,7 @@ final class DuckController: ObservableObject {
         // Paused or slowed: the timer keeps firing, simulation time does not.
         var stepped = false
         for _ in 0..<ticksForThisFrame() {
-            if duck_core_tick(core) == 0 { stepped = true }
+            if duck_core_tick(core) == 0 { stepped = true; tickCount += 1 }
         }
         // One snapshot per frame, after the steps: the renderer interpolates
         // between this and the previous one, so the duck moves at the display
@@ -509,6 +537,8 @@ final class DuckController: ObservableObject {
                 mouth = status.mouth
                 volts = status.volts
                 hasMouth = status.has_mouth != 0
+                fps = status.fps
+                ticksPerSecond = status.ticks_per_second
                 if let pointer = duck_core_mode(core) {
                     driveMode = String(cString: pointer)
                 }

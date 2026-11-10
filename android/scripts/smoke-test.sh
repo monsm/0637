@@ -84,12 +84,25 @@ for name in sit stand ground_pick; do
   fi
 done
 # The duck's own senses reach the API, not just its commands.
-for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"'; do
+for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"' '"performance"'; do
   if ! echo "$STATE" | grep -q "$needle"; then
     echo "::error::/state does not publish $needle"
     exit 1
   fi
 done
+# The platform's own measurements: after a few seconds the loop has ticked
+# enough for the once-a-second report to be non-zero. A zero here means the
+# counters are not wired, which is exactly what this check exists to catch.
+sleep 2
+PERF=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
+TPS=$(echo "$PERF" | grep -oE '"ticks_per_second":[0-9.]+' | head -1 | cut -d: -f2)
+case "$TPS" in
+  ''|0|0.0)
+    echo "::error::/state.performance.ticks_per_second is $TPS — the counters are not wired"
+    exit 1
+    ;;
+esac
+echo "performance: $TPS ticks/s"
 # A one-shot answers with the tick's verdict: an unknown skill is refused in
 # words rather than accepted and dropped.
 REFUSED=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"name":"fly"}' http://127.0.0.1:8765/skill || true)
