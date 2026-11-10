@@ -176,12 +176,11 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
 
     let paths = PolicyPaths {
         walk,
-        // Roller has no standing network: command magnitude cannot select
-        // one, and `standing_disabled` makes that explicit in the policy.
-        stand: match mode {
-            Mode::Walk => existing(dir.join("alpha_stand.onnx")),
-            Mode::Roller => None,
-        },
+        // **No standing network in either mode**, which is the robot's own
+        // default: velstand (set v5) stands still at zero command on its own,
+        // and `[policy] stand = "none"` in the shipped config. `alpha_stand`
+        // ships in the set for sets that predate velstand, not for this one.
+        stand: None,
         sitstand,
         ground_pick,
         skills: skills
