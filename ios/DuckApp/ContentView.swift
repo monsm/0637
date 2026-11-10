@@ -38,6 +38,11 @@ struct ContentView: View {
     /// the finger ends it. The flag marks the gesture so the Button's release
     /// action does not also queue a chirp on the way up.
     @State private var wheeeHolding = false
+    /// When the gesture itself ended a ride, so the Button action — which
+    /// fires on the same finger lift, after the gesture's `onEnded` — can
+    /// tell that release apart from a fresh tap. The window matters only for
+    /// a lift outside the button, where the action never runs.
+    @State private var wheeeEndedAt = Date.distantPast
 
     enum Surface: String, CaseIterable {
         case live = "Live"
@@ -360,11 +365,11 @@ struct ContentView: View {
             // The duck's own voice: `robotctl quack` is a chirp.
             Button {
                 // Held for 0.3 s it is the joy-ride instead: `wheeeGesture`
-                // starts the ride, and the first action after it is the
-                // ride's own release, not a chirp stacked on the end segment.
-                if wheeeHolding {
+                // starts it and ends it on the lift, and the gesture's end
+                // runs before this action, so this sees the marker it left.
+                if wheeeHolding || Date().timeIntervalSince(wheeeEndedAt) < 0.5 {
                     wheeeHolding = false
-                    controller.setWheee(false)
+                    wheeeEndedAt = .distantPast
                 } else if let core = controller.core {
                     controller.voice.play(core: core, tag: "chirp")
                 }
@@ -456,9 +461,12 @@ struct ContentView: View {
             }
             .onEnded { value in
                 guard case .second(_, let drag) = value else { return }
-                // The drag's end is the finger lift this gesture exists to see.
+                // The drag's end is the finger lift this gesture exists to
+                // see. `wheeeEndedAt` lets the Button action — which fires on
+                // this same lift — recognise the release and keep quiet.
                 if drag != nil || wheeeHolding {
                     wheeeHolding = false
+                    wheeeEndedAt = Date()
                     controller.setWheee(false)
                 }
             }
