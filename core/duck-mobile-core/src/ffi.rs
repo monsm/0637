@@ -346,6 +346,14 @@ pub unsafe extern "C" fn duck_core_set_performance(core: *mut DuckCore, fps: f64
     }
 }
 
+/// The held wheee ride: 1 starts it (start + repeating loops), 0 ends it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_wheee(core: *mut DuckCore, hold: c_int) {
+    if !core.is_null() {
+        (*core).runtime.wheee(hold != 0);
+    }
+}
+
 /// `robot.flashlight` on a phone: toggle or set the virtual face LED.
 /// `color` is one of white/red/green/blue/yellow/cyan/magenta. Returns the
 /// new state: 0 off, 1..7 the colour index + 1.
@@ -741,6 +749,10 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                 refuse(core, format!("no such sound: {tag}"))
             }
         }
+        Intent::Wheee(hold) => {
+            core.runtime.wheee(hold);
+            json!({ "ok": true, "held": hold })
+        }
         Intent::Look { target, neck_pitch } => {
             let gaze = core.runtime.look_at(target, neck_pitch);
             json!({ "ok": true, "head": gaze.joints, "clamped": gaze.clamped })
@@ -1049,6 +1061,7 @@ fn publish_state(core: &DuckCore) {
         "carrying": active.carrying(),
         "last_sound": active.last_sound(),
         "last_emotion_sound": active.last_emotion_sound(),
+        "last_ride_segment": active.last_ride_segment(),
         "leds": {
             "status": active.face().status,
             "gauge": active.face().gauge,

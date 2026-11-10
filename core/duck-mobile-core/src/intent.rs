@@ -83,6 +83,8 @@ pub enum Intent {
     Sensor(crate::sensors::Reading),
     /// `robot.flashlight`: the virtual face LED, one of robotd's seven colours.
     Flashlight { toggle: bool, on: bool, color: String },
+    /// The held wheee ride: `hold` starts it, releasing ends it.
+    Wheee(bool),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
     Look { target: [f64; 3], neck_pitch: f64 },
     /// Recognized speech, as text. The core maps it to one of its own verbs,
@@ -504,6 +506,9 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
             None => Err("missing tag"),
         },
+        ("POST", "/wheee") => Ok(queue
+            .request(Intent::Wheee(value["hold"].as_bool().unwrap_or(false)))
+            .to_string()),
         ("POST", "/look") => Ok(queue.request(Intent::Look {
             target: [
                 value["x"].as_f64().unwrap_or(1.0),

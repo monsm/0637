@@ -318,6 +318,24 @@ sys.exit(0 if float('${YAW:-0}') > 0.2 else 1)
 " 2>/dev/null
 check $? "look aims where you asked" "head_yaw=$LOOK_YAW"
 
+# Held wheee: the ride is three official segments, streamed through the
+# same speaker channel. The platform polls next_sound, so give it a moment.
+echo "--- wheee ---"
+api POST /wheee '{"hold":true}' > /dev/null || true
+sleep 1
+RIDE=$(api GET /state | field last_ride_segment)
+case "$RIDE" in
+  wheee:start:*|wheee:loop:*) check 0 "the ride streams start/loop" "$RIDE" ;;
+  *) check 1 "the ride never started" "$RIDE" ;;
+esac
+api POST /wheee '{"hold":false}' > /dev/null || true
+sleep 1
+RIDE_END=$(api GET /state | field last_ride_segment)
+case "$RIDE_END" in
+  wheee:end:*) check 0 "the ride ends on release" "$RIDE_END" ;;
+  *) check 1 "the ride never ended" "$RIDE_END" ;;
+esac
+
 # Speech: the recognizer lives on the platform, but the mapping from words
 # to verbs is the core's, and a client can post text directly. Chinese and
 # English must name the same verbs.
@@ -691,7 +709,7 @@ check $? "MCP initialize answers" "$(printf '%s' "$INIT" | head -c 100)"
 
 TOOLS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8765/mcp || true)
 echo "$TOOLS" | tee "$OUT/mcp-tools.json" > /dev/null
-for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear duck_look; do
+for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear duck_look duck_wheee; do
   printf '%s' "$TOOLS" | grep -q "\"$tool\""
   check $? "MCP tool listed: $tool" ""
 done

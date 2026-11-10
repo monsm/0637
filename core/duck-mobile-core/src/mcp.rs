@@ -53,6 +53,16 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_wheee",
+            "description": "The duck's joy-ride: hold=true starts the official wheee (start segment + repeating loops), hold=false ends it. This is the held sound the physical duck's trigger makes.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "hold": { "type": "boolean" } },
+                "required": ["hold"],
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "duck_look",
             "description": "Aim the head at a point in the duck's own frame (metres: x forward, y left, z up; the duck's position is /state.pose). Returns the joint angles and whether the aim was clamped by the servos' travel.",
             "inputSchema": {
@@ -274,6 +284,9 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             // refusal is the useful half of a skill call.
             Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
         }
+        "duck_wheee" => Ok(queue.request(crate::intent::Intent::Wheee(
+            arguments.get("hold").and_then(Value::as_bool).unwrap_or(false),
+        ))),
         "duck_look" => Ok(queue.request(crate::intent::Intent::Look {
             target: [
                 number(arguments, "x"),

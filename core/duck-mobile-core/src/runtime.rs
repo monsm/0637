@@ -440,6 +440,9 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The virtual face LEDs: status, battery gauge and flashlight. The phone
     /// has no I²C expander, but the verdict and the colours are the duck's.
     face: crate::leds::Face,
+    /// The last ride segment the platform pulled, so a client can see the
+    /// held wheee actually streaming start/loop/end.
+    last_ride_segment: Option<String>,
     /// The last emotion wav specifically. `last_sound` is overwritten by the
     /// next reaction (a coo, an alarm), so a client checking *that the
     /// emotion's voice was queued* needs a field only emotions write.
@@ -539,6 +542,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_idle: crate::control::IdleOffset::default(),
             face: crate::leds::Face::default(),
             last_sound: None,
+            last_ride_segment: None,
             last_emotion_sound: None,
             last_pickup_paused: false,
             last_fallen: false,
@@ -650,6 +654,12 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     /// The next tag the shell should play, if any.
     pub fn take_sound(&mut self) -> Option<String> {
+        // Ride segments jump the one-shot queue: a loop arriving late would
+        // leave the duck mid-air with no sound under it.
+        if let Some(segment) = self.voice.pending_segment() {
+            self.last_ride_segment = Some(segment.clone());
+            return Some(segment);
+        }
         self.sounds.pop_front()
     }
 
@@ -659,7 +669,15 @@ impl<T: RobotIo> DuckRuntime<T> {
         if let Some(name) = tag.strip_prefix("emotion:") {
             return self.emotion_pcm(name);
         }
+        if tag.starts_with("wheee:") {
+            return self.voice.render_segment(tag);
+        }
         self.render_tag(tag)
+    }
+
+    /// `robotctl`'s held wheee, as a hold level rather than a one-shot.
+    pub fn wheee(&mut self, hold: bool) {
+        self.voice.wheee(hold);
     }
 
     pub fn voice_seed(&self) -> u32 {
@@ -949,6 +967,10 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.face.flashlight =
             crate::leds::flashlight_after(self.face.flashlight, toggle, on, color);
         self.face
+    }
+
+    pub fn last_ride_segment(&self) -> Option<&str> {
+        self.last_ride_segment.as_deref()
     }
 
     pub fn last_emotion_sound(&self) -> Option<&str> {
@@ -1354,6 +1376,12 @@ impl<T: RobotIo> DuckRuntime<T> {
         // duck has. Do it on the same cadence rather than every tick.
         self.slow_ticks = self.slow_ticks.wrapping_add(1);
         if self.slow_ticks % 50 == 0 {
+            // A held ride needs its next loop before the last one runs dry:
+            // each loop is 1.6-2.2 s, so queueing one a second keeps two in
+            // the platform's queue at all times.
+            if self.voice.wheee_held() {
+                self.voice.queue_loop();
+            }
             if let Ok(slow) = self.safety.slow_sensors() {
                 self.volts = Some(slow.volts);
                 // The BAM model reports the motor-bus voltage. robotd's soc.rs
