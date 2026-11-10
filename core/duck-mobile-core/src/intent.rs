@@ -31,6 +31,10 @@ use serde_json::{json, Value};
 /// the timeout is what a backgrounded app looks like.
 const ACTION_TIMEOUT: Duration = Duration::from_millis(300);
 
+/// A mode switch loads a second MJCF and a whole policy set, then enables the
+/// body: the same work as core creation, and worth waiting for.
+const MODE_TIMEOUT: Duration = Duration::from_secs(30);
+
 #[derive(Debug, Clone)]
 pub enum Intent {
     Twist([f64; 3]),
@@ -202,8 +206,14 @@ impl IntentQueue {
     /// 50 Hz stream cannot wait half a tick for every sample, and a twist has
     /// no decision to report.
     pub fn request(&self, intent: Intent) -> Value {
+        self.request_within(intent, ACTION_TIMEOUT)
+    }
+
+    /// [`Self::request`] with an explicit budget. A mode switch loads a second
+    /// MJCF and a policy set on the tick thread, which is seconds, not ticks.
+    pub fn request_within(&self, intent: Intent, timeout: Duration) -> Value {
         let id = self.push(intent);
-        self.await_result(id, ACTION_TIMEOUT).unwrap_or_else(|| {
+        self.await_result(id, timeout).unwrap_or_else(|| {
             json!({
                 "ok": false,
                 "pending": true,
@@ -439,7 +449,11 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("POST", "/sit") => Ok(queue.request(Intent::Sit).to_string()),
         ("POST", "/ground_pick") => Ok(queue.request(Intent::GroundPick).to_string()),
         ("POST", "/mode") => match value["mode"].as_str() {
-            Some(mode) => Ok(queue.request(Intent::Mode(mode.to_owned())).to_string()),
+            // The switch rebuilds MuJoCo and the policy set: seconds, not the
+            // 300 ms a one-shot gets.
+            Some(mode) => Ok(queue
+                .request_within(Intent::Mode(mode.to_owned()), MODE_TIMEOUT)
+                .to_string()),
             None => Err("missing mode"),
         },
         // The voice, by tag: `robotctl quack` is a chirp, and the others are

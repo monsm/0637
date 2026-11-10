@@ -463,6 +463,7 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     core.timeline.clear();
     core.branches.clear();
     core.selected = 0;
+    core.pending_restore = None;
     core.last = None;
     core.sensors = crate::sensors::Sensors::default();
     let names = published_skills(core.runtime.skill_names());
