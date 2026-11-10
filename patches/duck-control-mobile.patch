@@ -383,6 +383,85 @@ index 9330f3a..01e915e 100644
      /// Bus reads that are not part of the tick, passed through rather than exposing the IO.
      ///
      /// Safety owns the only `RobotIo` handle — that is what makes "nothing commands a motor
+diff --git a/odometry/src/lib.rs b/odometry/src/lib.rs
+index 2b94eaa..1121af7 100644
+--- a/odometry/src/lib.rs
++++ b/odometry/src/lib.rs
+@@ -174,6 +174,74 @@ impl Odometry {
+         self.yaw = rot.yaw();
+     }
+ 
++    /// The estimator's whole state, for a checkpoint.
++    ///
++    /// The anchor is history: where the duck believes its stance foot is now
++    /// depends on every step since boot, so a rewind that restored the body
++    /// but not this would publish a pose from a future that no longer happened.
++    pub fn snapshot(&self) -> Vec<f64> {
++        let mut state = Vec::with_capacity(18);
++        state.extend_from_slice(&self.position);
++        state.push(self.yaw);
++        state.extend_from_slice(&self.anchor_xy);
++        state.push(self.anchor_foot as f64);
++        state.extend_from_slice(&self.anchor_local);
++        state.push(self.pending_ticks as f64);
++        state.push(if self.needs_init { 1.0 } else { 0.0 });
++        match self.pending {
++            Some((foot, local, xy)) => {
++                state.push(1.0);
++                state.push(foot as f64);
++                state.extend_from_slice(&local);
++                state.extend_from_slice(&xy);
++            }
++            None => {
++                state.push(0.0);
++            }
++        }
++        state
++    }
++
++    /// Put back what [`Self::snapshot`] returned. A snapshot from another build
++    /// or another anchor set is refused rather than partly applied.
++    pub fn restore(&mut self, state: &[f64]) -> bool {
++        // position 3 + yaw 1 + anchor_xy 2 + foot 1 + local 3 + ticks 1 + init 1
++        let fixed = 12;
++        if state.len() < fixed {
++            return false;
++        }
++        let mut cursor = 0;
++        let mut take = |n: usize| {
++            let slice = &state[cursor..cursor + n];
++            cursor += n;
++            slice
++        };
++        let position = take(3);
++        self.position.copy_from_slice(position);
++        self.yaw = take(1)[0];
++        let xy = take(2);
++        self.anchor_xy.copy_from_slice(xy);
++        self.anchor_foot = take(1)[0] as usize;
++        let local = take(3);
++        self.anchor_local.copy_from_slice(local);
++        self.pending_ticks = take(1)[0] as u32;
++        self.needs_init = take(1)[0] > 0.5;
++        if state.len() > fixed && state[fixed] > 0.5 {
++            let rest = &state[fixed + 1..];
++            if rest.len() < 6 {
++                return false;
++            }
++            self.pending = Some((
++                rest[0] as usize,
++                [rest[1], rest[2], rest[3]],
++                [rest[4], rest[5]],
++            ));
++        } else {
++            self.pending = None;
++        }
++        true
++    }
++
+     /// Trunk position in the world frame, metres. Z is height above the ground
+     /// plane the anchor defines.
+     pub fn position(&self) -> [f64; 3] {
 diff --git a/robotd/src/control.rs b/robotd/src/control.rs
 index 62c39c1..b0bce0a 100644
 --- a/robotd/src/control.rs
