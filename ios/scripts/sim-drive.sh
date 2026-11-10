@@ -531,8 +531,10 @@ sleep 2
 TICK_SLOW=$(api GET /state | field tick)
 ELAPSED=$((TICK_SLOW - TICK_STEPPED))
 # 2 s at 0.5x is about 50 ticks. The simulator's timer is not exact under
-# load, so allow 0.35x-0.75x rather than a tight band around 0.5x.
-[ "$ELAPSED" -ge 35 ] && [ "$ELAPSED" -le 75 ]
+# load — a green run measured 34 once — so allow 0.30x-0.75x rather than a
+# tight band around 0.5x. What the check must catch is full speed (100) or a
+# stopped clock (0), not CI jitter.
+[ "$ELAPSED" -ge 30 ] && [ "$ELAPSED" -le 75 ]
 check $? "half speed advances about half as fast" "$ELAPSED ticks in 2 s"
 api POST /time '{"speed":1.0}' > /dev/null
 
