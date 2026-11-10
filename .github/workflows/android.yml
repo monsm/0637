@@ -250,7 +250,13 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
           # The session's own lines are the only account of which check
           # failed; the step log is not downloadable without admin rights.
-          script: bash android/scripts/smoke-test.sh 2>&1 | tee smoke-session.log; exit ${PIPESTATUS[0]}
+          # Redirect rather than pipe: this action runs the script with `sh`,
+          # which has no PIPESTATUS.
+          script: |
+            bash android/scripts/smoke-test.sh > smoke-session.log 2>&1
+            status=$?
+            cat smoke-session.log
+            exit $status
 
       - name: Publish smoke-test logs
         id: publishlogs
