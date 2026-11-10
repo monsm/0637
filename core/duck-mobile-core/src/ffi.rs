@@ -932,7 +932,7 @@ pub unsafe extern "C" fn duck_core_render_sound(
         return 0;
     };
     if !out.is_null() {
-        if capacity as usize < pcm.len() {
+        if (capacity as usize) < pcm.len() {
             return 0;
         }
         std::ptr::copy_nonoverlapping(pcm.as_ptr(), out, pcm.len());
