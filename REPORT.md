@@ -210,6 +210,10 @@
 | **电池** | 电压取 BAM 模型的端电压（`vin − 0.1×|torque|`，下限 6.0 V），不再硬编码 7.4 V；`battery_percent` 按官方 6.6–8.2 V 区间 | `/state` 的 `volts` / `battery_percent` |
 | **嘴** | 新增 `/mouth` 与 MCP `duck_mouth`；官方走路场景没有嘴关节，所以**明确拒绝**并说明原因（`has_mouth:false`），而不是假装接受 | CI 按 `has_mouth` 分支断言：有则动，无则拒绝 |
 
+第四批（相机/roller/插值/关机/摇杆/里程计）在 iOS 模拟器上 **90 项检查全过**
+（含 roller→walk 往返、坐→憩姿→off→上电、`/state.pose`、拎起、声音、MCP），UI 测试通过；
+Android 冒烟通过（同一 `2001371` 构建，`{"mode":"roller","ok":true}`、`pose` 字段齐备）。
+
 顺带修掉的两个 CI 问题：日志发布步骤在拷贝**之后**才 checkout 旧 `ci-logs`，导致每次发布的
 都是上一次的日志（tombstone 日期早一天就是这么来的）；`patches/**` 不在 workflow 的触发路径里，
 改补丁不会重建。
