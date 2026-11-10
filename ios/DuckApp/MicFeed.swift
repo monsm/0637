@@ -121,7 +121,7 @@ final class MicFeed: ObservableObject {
         guard rate > 0 else { return }
         var sumSquares = 0.0
         var crossings = 0
-        var previous = channel[0]
+        var previous = Double(channel[0])
         for i in 0..<count {
             let sample = Double(channel[i])
             sumSquares += sample * sample
