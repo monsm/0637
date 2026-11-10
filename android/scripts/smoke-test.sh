@@ -121,6 +121,13 @@ if curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"tag
   exit 1
 fi
 
+# The duck's own odometry: an estimate from its legs and IMU, not the
+# simulator's ground truth.
+if ! echo "$STATE" | grep -q '"pose"'; then
+  echo "::error::/state does not publish the duck's pose"
+  exit 1
+fi
+
 # A drive mode is a whole-bundle switch: roller loads roller.onnx as the
 # locomotion network and drops the standing network. The state says which
 # bundle is loaded; the roller scene ships beside the walking one.

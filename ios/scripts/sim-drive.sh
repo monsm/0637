@@ -231,6 +231,17 @@ echo "$FINGERPRINT" | tee "$OUT/fingerprint.json" > /dev/null
 printf '%s' "$FINGERPRINT" | grep -qE '"fingerprint":"[0-9a-f]{64}"'
 check $? "build fingerprint is served" "$(printf '%s' "$FINGERPRINT" | grep -oE '"fingerprint":"[0-9a-f]{64}"' | head -1)"
 
+# ---------------------------------------------------------------- odometry
+# The duck's own estimate of where it is: contact odometry from its legs and
+# IMU, the same estimator robotd ticks. It is not the simulator's ground truth.
+echo "--- odometry ---"
+POSE=$(api GET /state | python3 -c "
+import json,sys
+p=json.load(sys.stdin).get('pose') or {}
+print('%.3f %.3f %.3f %.3f' % (*p.get('position',[0,0,0]), p.get('yaw',0)))
+" 2>/dev/null || echo "")
+[ -n "$POSE" ]; check $? "the duck publishes its own pose" "pose=$POSE"
+
 # ---------------------------------------------------------------- twist
 echo "--- walk ---"
 BEFORE=$(api GET /state | field trunk)
