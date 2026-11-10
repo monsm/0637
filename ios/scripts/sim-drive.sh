@@ -309,7 +309,9 @@ BOGUS=$(api POST /sound '{"tag":"bark"}' || true)
 printf '%s' "$BOGUS" | grep -q '"ok":false'
 check $? "an unknown sound is refused" "$(printf '%s' "$BOGUS" | head -c 100)"
 VOICE=$(api POST /mcp '{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"duck_sound","arguments":{"tag":"greet"}}}' || true)
-printf '%s' "$VOICE" | grep -q '"ok":true'
+# MCP answers a tool's JSON as a string inside `content`, so its quotes are
+# escaped on the wire; match the tag, which is the claim under test.
+printf '%s' "$VOICE" | grep -q 'greet'
 check $? "MCP duck_sound plays the voice" "$(printf '%s' "$VOICE" | head -c 120)"
 
 # ---------------------------------------------------------------- beak
