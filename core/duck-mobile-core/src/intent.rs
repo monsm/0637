@@ -83,6 +83,10 @@ pub enum Intent {
     Sensor(crate::sensors::Reading),
     /// `robot.flashlight`: the virtual face LED, one of robotd's seven colours.
     Flashlight { toggle: bool, on: bool, color: String },
+    /// Recognized speech, as text. The core maps it to one of its own verbs,
+    /// so a phone's recognizer, a typed word and an AI client all take the
+    /// same path.
+    Heard(String),
 }
 
 /// An intent with the ticket its client is waiting on.
@@ -497,6 +501,10 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("POST", "/sound") => match value["tag"].as_str() {
             Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
             None => Err("missing tag"),
+        },
+        ("POST", "/heard") => match value["text"].as_str() {
+            Some(text) => Ok(queue.request(Intent::Heard(text.to_owned())).to_string()),
+            None => Err("missing text"),
         },
         ("POST", "/flashlight") => Ok(queue
             .request(Intent::Flashlight {

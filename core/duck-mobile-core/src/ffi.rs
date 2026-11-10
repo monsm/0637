@@ -741,6 +741,36 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                 refuse(core, format!("no such sound: {tag}"))
             }
         }
+        Intent::Heard(text) => {
+            let Some((phrase, heard)) = crate::speech::interpret(&text) else {
+                // Silence is not an error the client should have to parse:
+                // say what was heard and that nothing matched.
+                return json!({ "ok": false, "heard": text, "reason": "no verb matched" });
+            };
+            let result = match heard {
+                crate::speech::Heard::Skill(name) => core
+                    .runtime
+                    .trigger_skill(name)
+                    .map(|started| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": name, "chained": !started }))
+                    .map_err(str::to_owned),
+                crate::speech::Heard::Sit => {
+                    let sitting = core.runtime.is_sitting();
+                    core.runtime
+                        .sit_toggle()
+                        .map(|did| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "sit", "did": did }))
+                        .map_err(str::to_owned)
+                }
+                crate::speech::Heard::GroundPick => core
+                    .runtime
+                    .start_ground_pick()
+                    .map(|()| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "ground_pick" }))
+                    .map_err(str::to_owned),
+            };
+            match result {
+                Ok(value) => value,
+                Err(error) => refuse(core, error),
+            }
+        }
         Intent::Flashlight { toggle, on, color } => {
             let face = core.runtime.set_flashlight(toggle, on, &color);
             publish_state(core);

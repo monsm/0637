@@ -126,6 +126,13 @@ case "$TPS" in
     ;;
 esac
 echo "performance: $TPS ticks/s"
+# The words-to-verbs table is the core's, so a Chinese sentence must run a
+# skill even when no recognizer is present (CI has no microphone).
+HEARD=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"text":"翻滚"}' http://127.0.0.1:8765/heard || true)
+if ! echo "$HEARD" | grep -q '"skill":"roulade"'; then
+  echo "::error::Chinese speech did not map to roulade: $HEARD"
+  exit 1
+fi
 # robotd's face LEDs, as state: status, gauge, seven-colour flashlight.
 FLASH=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"color":"cyan"}' http://127.0.0.1:8765/flashlight || true)
 if ! echo "$FLASH" | grep -q '"color":"cyan"'; then

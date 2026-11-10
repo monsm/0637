@@ -297,6 +297,21 @@ check $? "flashlight sets an official colour" "$(printf '%s' "$FLASH" | head -c 
 FLASH2=$(api POST /flashlight '{}' || true)
 printf '%s' "$FLASH2" | grep -q '"flashlight":0'
 check $? "flashlight toggles back off" "$(printf '%s' "$FLASH2" | head -c 120)"
+# Speech: the recognizer lives on the platform, but the mapping from words
+# to verbs is the core's, and a client can post text directly. Chinese and
+# English must name the same verbs.
+echo "--- heard ---"
+HEARD=$(api POST /heard '{"text":"翻滚"}' || true)
+printf '%s' "$HEARD" | grep -q '"skill":"roulade"'
+check $? "Chinese speech maps to a skill" "$(printf '%s' "$HEARD" | head -c 140)"
+HEARD2=$(api POST /heard '{"text":"excited"}' || true)
+printf '%s' "$HEARD2" | grep -q '"skill":"excited"'
+check $? "English speech maps to the same table" "$(printf '%s' "$HEARD2" | head -c 140)"
+HEARD3=$(api POST /heard '{"text":"qwertyuiop"}' || true)
+printf '%s' "$HEARD3" | grep -q '"ok":false'
+check $? "unrecognized speech is refused, not guessed" "$(printf '%s' "$HEARD3" | head -c 140)"
+wait_idle 100 > /dev/null
+
 echo "--- odometry ---"
 POSE=$(api GET /state | python3 -c "
 import json,sys
@@ -655,7 +670,7 @@ check $? "MCP initialize answers" "$(printf '%s' "$INIT" | head -c 100)"
 
 TOOLS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8765/mcp || true)
 echo "$TOOLS" | tee "$OUT/mcp-tools.json" > /dev/null
-for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight; do
+for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear; do
   printf '%s' "$TOOLS" | grep -q "\"$tool\""
   check $? "MCP tool listed: $tool" ""
 done

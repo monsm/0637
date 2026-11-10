@@ -53,6 +53,16 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_hear",
+            "description": "Say something to the duck in Chinese or English and it does the matching verb: 坐下/sit, 翻滚/roll, 开心/excited, 摇头/no, 捡起来/pick, ... Returns what it heard and what it did.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "text": { "type": "string" } },
+                "required": ["text"],
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "duck_flashlight",
             "description": "Toggle the duck's virtual face flashlight, or set it to one of robotd's seven colours: white, red, green, blue, yellow, cyan, magenta.",
             "inputSchema": {
@@ -251,6 +261,13 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             // The tool answers what the duck did, not what the queue took: a
             // refusal is the useful half of a skill call.
             Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
+        }
+        "duck_hear" => {
+            let text = arguments
+                .get("text")
+                .and_then(Value::as_str)
+                .ok_or("missing text")?;
+            Ok(queue.request(crate::intent::Intent::Heard(text.to_owned())))
         }
         "duck_flashlight" => {
             let on = arguments.get("on").and_then(Value::as_bool);
