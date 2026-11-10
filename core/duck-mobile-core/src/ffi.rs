@@ -431,6 +431,11 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     if core.runtime.busy() || core.runtime.is_sitting() {
         return Err("a move is running; the duck must be standing still".to_owned());
     }
+    if core.runtime.powered_off() {
+        // A new bundle would arrive powered on, under a duck that was
+        // deliberately switched off. Upstream refuses the same way.
+        return Err("the duck is powered off; power it on first".to_owned());
+    }
     let scene = scene_for(core, mode)
         .ok_or_else(|| format!("no scene for {name} beside {}", core.scene))?;
     let bundle = crate::manifest::load_mode(&core.policies, mode)?;
