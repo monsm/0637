@@ -14,13 +14,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -337,12 +340,23 @@ private fun RoundChip(label: String, onClick: () -> Unit) {
     }
 }
 
+// The 13 official robotd emotions ride the same /skills list as the action
+// skills. The split lives in the shell; the wire names stay the protocol's.
+private val emotionSkills = setOf(
+    "angry", "curious", "defiant", "devastated", "excited", "impatient",
+    "laugh", "mmh", "mock", "no", "sad", "yes", "yes_fast",
+)
+
 @Composable
 private fun SkillRing(
     skills: List<String>,
     onPick: (String) -> Unit,
     onClose: () -> Unit,
 ) {
+    // Group, don't filter: an unknown future skill falls into Actions rather
+    // than disappearing from the ring.
+    val actions = skills.filter { it !in emotionSkills }
+    val emotions = skills.filter { it in emotionSkills }
     Box(
         Modifier
             .fillMaxSize()
@@ -351,22 +365,47 @@ private fun SkillRing(
         contentAlignment = Alignment.Center,
     ) {
         Column(
+            Modifier
+                .fillMaxHeight(0.86f)
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            skills.forEach { name ->
-                Box(
-                    Modifier
-                        .background(Color.White.copy(alpha = 0.16f), CircleShape)
-                        .pointerInput(Unit) { detectTapGestures { onPick(name) } }
-                        .padding(horizontal = 18.dp, vertical = 10.dp),
-                ) {
-                    Text(skillLabel(name), color = Color.White, fontSize = 13.sp)
-                }
+            if (actions.isNotEmpty()) {
+                SkillHeading(Copy.actions)
+                actions.forEach { name -> SkillChip(name, onPick) }
+            }
+            if (emotions.isNotEmpty()) {
+                if (actions.isNotEmpty()) Spacer(Modifier.height(10.dp))
+                SkillHeading(Copy.emotions)
+                emotions.forEach { name -> SkillChip(name, onPick) }
             }
             // `sit` and `ground_pick` are already in the skills list (/skills
             // publishes them now); the ring shows the list, not a second copy.
         }
+    }
+}
+
+@Composable
+private fun SkillHeading(label: String) {
+    Text(
+        label,
+        color = Color.White.copy(alpha = 0.55f),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Medium,
+    )
+}
+
+@Composable
+private fun SkillChip(name: String, onPick: (String) -> Unit) {
+    Box(
+        Modifier
+            .background(Color.White.copy(alpha = 0.16f), CircleShape)
+            .pointerInput(Unit) { detectTapGestures { onPick(name) } }
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+    ) {
+        Text(skillLabel(name), color = Color.White, fontSize = 13.sp)
     }
 }
 
@@ -425,9 +464,13 @@ private fun InstrumentSheet(
     // back. It lives here, in the sheet's own loop, so it costs nothing while
     // the sheet is closed.
     var micSummary by remember { mutableStateOf("—") }
+    // The duck's own behaviour: an emotion timeline, or the idle look-around.
+    // A static duck reads as switched off, so the sheet says what it is doing.
+    var behaviorSummary by remember { mutableStateOf("—") }
     LaunchedEffect(core) {
         while (true) {
             micSummary = fetchMicSummary()
+            behaviorSummary = fetchBehaviorSummary()
             delay(1000)
         }
     }
@@ -483,6 +526,14 @@ private fun InstrumentSheet(
                     }
                 }
             }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.behavior, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Text(behaviorSummary, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(if (paused) Copy.resume else Copy.freeze) {
                     paused = !paused
@@ -527,6 +578,32 @@ private fun ButtonChip(label: String, onClick: () -> Unit) {
 }
 
 enum class MicState { Off, On, Denied }
+
+/** One line from GET /state: the emotion playing, or the idle look-around. */
+private fun fetchBehaviorSummary(): String {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/state")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 1500
+        connection.readTimeout = 1500
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        val emotion = Regex(""""emotion"\s*:\s*\{[^}]*\}""").find(text)?.value
+        val name = emotion?.let { Regex(""""name"\s*:\s*"([^"]+)"""").find(it)?.groupValues?.get(1) }
+        if (name != null) {
+            val elapsed = Regex(""""elapsed_s"\s*:\s*([0-9.]+)"""").find(emotion)?.groupValues?.get(1) ?: "0"
+            val duration = Regex(""""duration_s"\s*:\s*([0-9.]+)"""").find(emotion)?.groupValues?.get(1) ?: "0"
+            return "$name $elapsed/${duration}s"
+        }
+        val gain = Regex(""""idle"\s*:\s*\{[^}]*\}""").find(text)?.value
+            ?.let { Regex(""""takeover"\s*:\s*([0-9.]+)"""").find(it)?.groupValues?.get(1)?.toDoubleOrNull() }
+        if (gain != null && gain > 0.1) return "looking around ${(gain * 100).toInt()}%"
+        "—"
+    } catch (_: Throwable) {
+        "—"
+    }
+}
 
 /**
  * The one-line summary the core last published for the microphone, read from

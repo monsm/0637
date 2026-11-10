@@ -46,6 +46,10 @@ enum Copy {
     static var director: String { pick("Director", "取景") }
     static var time: String { pick("Time", "时间") }
     static var skills: String { pick("Skills", "技能") }
+    /// The skill picker's two groups: the duck's moves and its moods.
+    static var actions: String { pick("Actions", "动作") }
+    static var emotions: String { pick("Emotions", "情绪") }
+    static var close: String { pick("Close", "关闭") }
     static var couldNotStart: String { pick("MicroDuck could not start", "MicroDuck 无法启动") }
     static var viewfinder: String { pick("VIEWFINDER", "取景器") }
     static var sit: String { pick("sit", "坐下") }
@@ -96,6 +100,7 @@ enum Copy {
     static var microphone: String { pick("microphone", "麦克风") }
     /// A refused permission is a real state: "—" would claim no sensor exists.
     static var denied: String { pick("denied", "未授权") }
+    static var behavior: String { pick("behaviour", "此刻") }
     static var depth: String { pick("depth", "深度") }
     static var provenance: String { pick("Provenance", "出处") }
     static var reload: String { pick("Reload AI", "重载 AI") }
@@ -115,7 +120,7 @@ enum Copy {
 /// A skill's display name. The wire name is the protocol's; the label is the
 /// shell's, so a Chinese interface can say 翻滚 while the API still says
 /// `roulade`. English intentionally reuses the wire name — it is already the
-/// protocol's human-readable verb, and the ring's accessibility id stays that
+/// protocol's human-readable verb, and the picker's accessibility id stays that
 /// same wire name in either language.
 enum SkillLabel {
     static func of(_ name: String) -> String {
@@ -128,6 +133,21 @@ enum SkillLabel {
         case "kick_left": return "左踢"
         case "kick_right": return "右踢"
         case "crouch": return "蹲下"
+        // `robotd`'s thirteen emotions, published by `/skills` as skills of
+        // their own. Each is a scripted timeline with its own voice.
+        case "angry": return "生气"
+        case "curious": return "好奇"
+        case "defiant": return "不服"
+        case "devastated": return "崩溃"
+        case "excited": return "兴奋"
+        case "impatient": return "不耐烦"
+        case "laugh": return "大笑"
+        case "mmh": return "嗯哼"
+        case "mock": return "嘲弄"
+        case "no": return "摇头"
+        case "sad": return "难过"
+        case "yes": return "点头"
+        case "yes_fast": return "快速点头"
         // A user-supplied manifest can name any skill. Showing its wire name
         // is honest: inventing a translation would mislabel the policy.
         default: return name

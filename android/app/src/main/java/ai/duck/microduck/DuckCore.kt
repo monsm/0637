@@ -115,6 +115,11 @@ class DuckCore(
         if (handle != 0L) nativeSetMode(handle, mode) else -1
     }
 
+    /** The real duck's emotion timelines and voices; returns how many loaded. */
+    fun loadEmotions(path: String): Int = synchronized(lock) {
+        if (handle != 0L) nativeLoadEmotions(handle, path) else -1
+    }
+
     /** The pickup classifier `robotd` scores. Returns 0 when it loaded. */
     fun loadPickup(path: String): Int = synchronized(lock) {
         if (handle != 0L) nativeLoadPickup(handle, path) else -1
@@ -229,6 +234,7 @@ class DuckCore(
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
         @JvmStatic private external fun nativeReleaseBody(handle: Long)
         @JvmStatic private external fun nativeCarry(handle: Long, dx: Double, dy: Double, dz: Double, active: Boolean)
+        @JvmStatic private external fun nativeLoadEmotions(handle: Long, path: String): Int
         @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
         @JvmStatic private external fun nativeSetPerformance(handle: Long, fps: Double, tps: Double)
         @JvmStatic private external fun nativeMode(handle: Long): String?

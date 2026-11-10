@@ -437,52 +437,113 @@ struct ContentView: View {
     }
 }
 
-/// The ring of skills: every verb `/skills` publishes — the manifest's
-/// one-shots and the loop's own `sit` / `stand` / `ground_pick` — arranged
-/// around a hold.
+/// The skills picker: every verb `/skills` publishes, grouped into the moves
+/// the duck has always had and `robotd`'s emotions. Twenty entries would pile
+/// up on a circle, so they live in a scrolling panel instead — same material
+/// capsules, same tap-outside-to-close overlay.
 struct SkillRing: View {
     let names: [String]
     let onPick: (String) -> Void
     let onClose: () -> Void
+
+    /// `robotd`'s emotion verbs. Everything else — the locomotion verbs, the
+    /// one-shots and any skill a user manifest adds — is an action.
+    private static let emotionNames: Set<String> = [
+        "angry", "curious", "defiant", "devastated", "excited", "impatient",
+        "laugh", "mmh", "mock", "no", "sad", "yes", "yes_fast",
+    ]
+
+    private var actions: [String] {
+        names.filter { !Self.emotionNames.contains($0) }
+    }
+
+    private var emotions: [String] {
+        names.filter { Self.emotionNames.contains($0) }
+    }
 
     var body: some View {
         ZStack {
             Color.black.opacity(0.45)
                 .ignoresSafeArea()
                 .onTapGesture(perform: onClose)
-            ZStack {
-                ForEach(Array(names.enumerated()), id: \.offset) { index, name in
-                    let angle = Double(index) / Double(max(names.count, 1)) * 2 * .pi
-                    let radius: CGFloat = 120
+            picker
+                .transition(.scale.combined(with: .opacity))
+        }
+    }
+
+    private var picker: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(Copy.skills)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .background(Color.white.opacity(0.10), in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Copy.close)
+                .accessibilityIdentifier("ring-close")
+            }
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 16) {
+                    if !actions.isEmpty {
+                        section(Copy.actions, names: actions)
+                    }
+                    if !emotions.isEmpty {
+                        section(Copy.emotions, names: emotions)
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+            .frame(maxHeight: 360)
+        }
+        .padding(16)
+        .frame(maxWidth: 360)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
+        .padding(.horizontal, 24)
+    }
+
+    /// One group of capsules: a small heading, then an adaptive grid so the
+    /// English wire names still fit three to a row.
+    private func section(_ title: String, names: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(.secondary)
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 88), spacing: 8)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(names, id: \.self) { name in
                     Button {
                         onPick(name)
                     } label: {
                         Text(SkillLabel.of(name))
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .padding(.horizontal, 14)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .padding(.horizontal, 10)
                             .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
                     .buttonStyle(.plain)
-                    // The ring's entries share their names with nothing else,
-                    // but an accessibility id keeps the query unambiguous.
+                    // The picker's entries share their names with nothing
+                    // else, but an accessibility id keeps the UI test's query
+                    // unambiguous — and every entry is reachable by scrolling.
                     .accessibilityIdentifier("ring-\(name)")
-                    .offset(
-                        x: radius * cos(angle - .pi / 2),
-                        y: radius * sin(angle - .pi / 2)
-                    )
                 }
-                Circle()
-                    .fill(.ultraThinMaterial)
-                    .frame(width: 54, height: 54)
-                    .overlay(
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 18))
-                            .foregroundStyle(.secondary)
-                    )
-                    .onTapGesture(perform: onClose)
             }
-            .transition(.scale.combined(with: .opacity))
         }
     }
 }

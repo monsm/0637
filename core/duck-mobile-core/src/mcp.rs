@@ -44,7 +44,7 @@ pub fn tools() -> Value {
         },
         {
             "name": "duck_skill",
-            "description": "Run one of the duck's own one-shot skills: roulade, kick_left, kick_right.",
+            "description": "Run one of the duck's own one-shot skills: roulade, kick_left, kick_right, or one of the 13 official emotions (curious, excited, sad, laugh, yes, no, ...). Get the full list from GET /skills.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "name": { "type": "string" } },

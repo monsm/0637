@@ -15,6 +15,7 @@ pub use duck_control;
 /// identical to the robot.
 pub mod bam;
 pub mod control;
+pub mod emotion;
 pub mod intent;
 
 pub mod io;

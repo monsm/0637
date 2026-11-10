@@ -200,6 +200,13 @@ for name in roulade kick_left kick_right sit stand ground_pick; do
   state_has "$SKILLS" "\"$name\""
   check $? "skill listed: $name" "$SKILLS"
 done
+# `robotd/emotions/`: thirteen scripted timelines with their own voices are
+# skills on the real robot, so `robot.do curious` must be discoverable too.
+EMOTIONS="angry curious defiant devastated excited impatient laugh mmh mock no sad yes yes_fast"
+for name in $EMOTIONS; do
+  state_has "$SKILLS" "\"$name\""
+  check $? "emotion listed: $name" "$SKILLS"
+done
 
 # An action route answers with the tick's verdict. A skill that does not exist
 # is refused in words, not accepted and dropped.
@@ -251,6 +258,25 @@ check $? "build fingerprint is served" "$(printf '%s' "$FINGERPRINT" | grep -oE 
 # ---------------------------------------------------------------- odometry
 # The duck's own estimate of where it is: contact odometry from its legs and
 # IMU, the same estimator robotd ticks. It is not the simulator's ground truth.
+# A duck standing perfectly still reads as switched off. robotd's IdleHead
+# starts glancing after 2 s and fades in over 1.5 s; /state publishes its gain
+# and head command so "it looks alive" is a measurable assertion, not a hope.
+echo "--- idle look-around ---"
+sleep 5
+IDLE=$(api GET /state | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin).get('idle') or {}
+    print(d.get('takeover',0), max(abs(x) for x in d.get('head',[0]) or [0]))
+except Exception: print('0 0')
+" 2>/dev/null || true)
+IDLE_GAIN=${IDLE%% *}; IDLE_HEAD=${IDLE##* }
+python3 -c "
+import sys
+sys.exit(0 if float('${IDLE_GAIN:-0}') > 0.8 and float('${IDLE_HEAD:-0}') > 0.001 else 1)
+" 2>/dev/null
+check $? "a still duck looks around" "takeover=$IDLE_GAIN head=$IDLE_HEAD"
+
 echo "--- odometry ---"
 POSE=$(api GET /state | python3 -c "
 import json,sys
@@ -314,6 +340,31 @@ for name in roulade kick_left kick_right; do
   # Let the one-shot finish before the next one.
   wait_idle 100 > /dev/null
 done
+
+# An emotion is a scripted timeline, not a policy: its head/beak pose is
+# applied by the 50 Hz loop, and `/state.emotion` is the honest evidence that
+# it ran. `curious` is 2.9 s; check both that it starts and that its clock
+# advances, so a dead loader cannot pass on a cached field.
+api POST /skill '{"name":"curious"}' > /dev/null
+EMOTION=$(api GET /state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('emotion',{}).get('name',''))
+except Exception: print('')
+" 2>/dev/null || true)
+[ "$EMOTION" = "curious" ]; check $? "an emotion plays: curious" "emotion=$EMOTION"
+sleep 0.5
+EMOTION_LATER=$(api GET /state | python3 -c "
+import json,sys
+try:
+    e=json.load(sys.stdin).get('emotion') or {}
+    print(e.get('elapsed_s',0), e.get('name',''))
+except Exception: print('0 ')
+" 2>/dev/null || true)
+case "$EMOTION_LATER" in
+  0\ *|0.0\ *|"") check 1 "the emotion clock advances" "$EMOTION_LATER" ;;
+  *) check 0 "the emotion clock advances" "$EMOTION_LATER" ;;
+esac
+wait_idle 100 > /dev/null
 
 # ---------------------------------------------------------------- ground pick
 echo "--- ground pick ---"

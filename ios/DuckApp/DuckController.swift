@@ -58,6 +58,8 @@ final class DuckController: ObservableObject {
     @Published var sensorMode = "twin"
     @Published var cameraSummary = "—"
     @Published var microphoneSummary = "—"
+    /// What the duck is feeling and how awake it looks, read from /state.
+    @Published var behaviorSummary = "—"
     @Published var depthSummary = "—"
     @Published var imuSummary = "—"
     /// What the sheet's microphone row shows. Denial is a real state, not an
@@ -302,6 +304,13 @@ final class DuckController: ObservableObject {
                 duck_core_load_pickup(created, pointer)
             }
             NSLog("duck: pickup detector -> %d", pickupLoaded)
+            // `robot.do curious` and the other twelve: the official emotion
+            // keyframes and their 48 kHz voices, staged beside the policies.
+            let emotions = resourceURL.appendingPathComponent("DuckResources/emotions").path
+            let emotionCount = emotions.withCString { pointer in
+                duck_core_load_emotions(created, pointer)
+            }
+            NSLog("duck: emotions -> %d", emotionCount)
             let port = duck_core_start_intent_server(created, 8765)
             NSLog("duck: intent server -> %d", port)
             self.voice.start()
@@ -446,6 +455,36 @@ final class DuckController: ObservableObject {
         guard let url = URL(string: "http://127.0.0.1:8765/sensors") else { return }
         var request = URLRequest(url: url)
         request.timeoutInterval = 1.5
+        // The same 1 Hz poll reads the duck's behaviour: an emotion timeline
+        // in progress, or the idle look-around's gain. A duck that stands
+        // perfectly still reads as switched off, so the sheet says what it is
+        // doing rather than leaving the user to guess.
+        let life = URL(string: "http://127.0.0.1:8765/state").flatMap { url in
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 1.5
+            return request
+        }
+        if let life {
+            URLSession.shared.dataTask(with: life) { [weak self] data, _, _ in
+                guard let data,
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                else { return }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    if let emotion = json["emotion"] as? [String: Any],
+                       let name = emotion["name"] as? String {
+                        let elapsed = emotion["elapsed_s"] as? Double ?? 0
+                        let duration = emotion["duration_s"] as? Double ?? 0
+                        self.behaviorSummary = String(format: "%@ %.1f/%.1fs", name, elapsed, duration)
+                    } else if let idle = json["idle"] as? [String: Any],
+                              let takeover = idle["takeover"] as? Double, takeover > 0.1 {
+                        self.behaviorSummary = String(format: "looking around %.0f%%", takeover * 100)
+                    } else {
+                        self.behaviorSummary = "—"
+                    }
+                }
+            }.resume()
+        }
         URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
             guard let data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -154,6 +154,10 @@ struct InstrumentSheet: View {
                 .accessibilityIdentifier("drive-mode")
             }
             row(Copy.imu, controller.imuReady ? Copy.yes : Copy.no)
+            // What the duck is doing with its head when nobody is steering:
+            // an emotion timeline, or the idle look-around. The row is the
+            // evidence that this is an animal, not a frozen model.
+            row(Copy.behavior, controller.behaviorSummary)
             row(Copy.held, controller.pickedUp ? Copy.yes : Copy.no)
             if controller.hasMouth {
                 row(Copy.mouth, String(format: "%.2f", controller.mouth))

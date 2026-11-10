@@ -119,6 +119,13 @@ private fun DuckScreen(
                 if (pickup.exists()) {
                     core.loadPickup(pickup.path)
                 }
+                // `robot.do curious` and the other twelve: the official
+                // keyframe timelines and their 48 kHz voices, staged as
+                // assets/emotions next to the policies.
+                val emotions = File(root, "emotions")
+                if (emotions.isDirectory) {
+                    android.util.Log.i("duck", "emotions loaded: ${core.loadEmotions(emotions.path)}")
+                }
                 core
             }
         }

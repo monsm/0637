@@ -384,6 +384,14 @@ pub struct Checkpoint {
     pub shutdown_since: u64,
     #[serde(default)]
     pub shutdown_from: Option<Vec<f64>>,
+    /// The emotion playing at this tick, so a rewind can resume the same
+    /// timeline instead of dropping it and leaving the pose mid-glance.
+    #[serde(default)]
+    pub emotion_name: Option<String>,
+    #[serde(default)]
+    pub emotion_elapsed: f64,
+    #[serde(default)]
+    pub emotion_skill_delivered: bool,
 }
 
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
@@ -408,6 +416,12 @@ pub struct DuckRuntime<T: RobotIo> {
     body_active: bool,
     /// The real duck looks around when nothing is happening.
     idle_head: crate::control::IdleHead,
+    /// The last idle offset, published so a client can see the duck is alive.
+    last_idle: crate::control::IdleOffset,
+    /// `robotd/emotions/`: thirteen keyframe timelines with their own voices.
+    /// Loaded from the app bundle, not baked in, so the data stays upstream's.
+    emotions: crate::emotion::Library,
+    emotion_playing: Option<crate::emotion::Playing>,
     idle_params: robotd_params::IdleParams,
     /// When the head was last commanded; idle glances start after `after_s`.
     last_head_command: TickTime,
@@ -484,6 +498,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             body_active: false,
             idle_head: crate::control::IdleHead::new(robotd_params::IdleParams::default(), 0xD0C),
             idle_params: robotd_params::IdleParams::default(),
+            last_idle: crate::control::IdleOffset::default(),
+            emotions: crate::emotion::Library::default(),
+            emotion_playing: None,
             last_head_command: TickTime::default(),
             clock: SimClock::default(),
             sim_origin: Instant::now(),
@@ -571,7 +588,9 @@ impl<T: RobotIo> DuckRuntime<T> {
         // Bounded: a platform that never polls (audio unavailable) must not
         // accumulate a backlog of stale quacks.
         const PENDING: usize = 4;
-        if crate::voice::TAGS.contains(&tag) {
+        let known = crate::voice::TAGS.contains(&tag)
+            || tag.strip_prefix("emotion:").is_some_and(|name| self.emotions.get(name).is_some());
+        if known {
             if self.sounds.len() >= PENDING {
                 self.sounds.pop_front();
             }
@@ -587,6 +606,9 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// Render a tag to PCM, for a platform that wants the samples rather than
     /// the tag. `None` for an unknown tag.
     pub fn render_sound(&mut self, tag: &str) -> Option<Vec<f32>> {
+        if let Some(name) = tag.strip_prefix("emotion:") {
+            return self.emotion_pcm(name);
+        }
         self.render_tag(tag)
     }
 
@@ -819,10 +841,76 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     pub fn skill_names(&self) -> Vec<String> {
-        self.controller.skill_names()
+        let mut names = self.controller.skill_names();
+        names.extend(self.emotions.names());
+        names
+    }
+
+    /// `robot.do <emotion>` on the real duck: the emotion is a skill, so it
+    /// goes through the same `/skills` list and `/skill` verb as a kick.
+    pub fn trigger_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        if self.controller.busy() || self.controller.is_sitting() {
+            return Err("a move is running; the duck must be standing still");
+        }
+        let Some(emotion) = self.emotions.get(name) else {
+            return Err("no such emotion");
+        };
+        if emotion.duration() <= 0.0 {
+            return Err("emotion has no keyframes");
+        }
+        self.emotion_playing = Some(crate::emotion::Playing {
+            name: name.to_owned(),
+            elapsed: 0.0,
+            skill_delivered: false,
+        });
+        // The voice is the official wav, delivered through the same speaker
+        // channel as the synth: the platform only sees a tag.
+        self.sounds.push_back(format!("emotion:{name}"));
+        Ok(true)
+    }
+
+    pub fn emotion_names(&self) -> Vec<String> {
+        self.emotions.names()
+    }
+
+    /// The idle look-around's gain and the head command it last produced.
+    /// Read by `/state` so a "dumb, motionless duck" is a measurable failure
+    /// rather than a matter of opinion.
+    pub fn idle_takeover(&self) -> f64 {
+        self.last_idle.takeover
+    }
+
+    pub fn idle_head_command(&self) -> [f64; 4] {
+        self.last_idle.head
+    }
+
+    /// What an emotion is doing right now, for `/state` and the instrument
+    /// sheet. A client cannot watch a label for this: the policy still says
+    /// "walk" while a scripted timeline owns the head and beak.
+    pub fn emotion_state(&self) -> Option<(&str, f64, f64)> {
+        let playing = self.emotion_playing.as_ref()?;
+        let emotion = self.emotions.get(&playing.name)?;
+        Some((&playing.name, playing.elapsed, emotion.duration()))
+    }
+
+    /// Load robotd's emotions from the app bundle. Called once after the core
+    /// is created, like the pickup classifier.
+    pub fn load_emotions(&mut self, dir: &std::path::Path) -> Result<usize, String> {
+        let library = crate::emotion::Library::load(dir)?;
+        let count = library.0.len();
+        self.emotions = library;
+        Ok(count)
+    }
+
+    /// An emotion's voice, by tag. `render_sound` asks this first.
+    pub fn emotion_pcm(&self, name: &str) -> Option<Vec<f32>> {
+        self.emotions.get(name).map(|emotion| emotion.pcm().to_vec())
     }
 
     pub fn trigger_skill(&mut self, name: &str) -> Result<bool, &'static str> {
+        if self.emotions.get(name).is_some() {
+            return self.trigger_emotion(name);
+        }
         let index = self
             .controller
             .skill_names()
@@ -1005,6 +1093,12 @@ impl<T: RobotIo> DuckRuntime<T> {
                 Shutdown::Resting { from, .. } => Some(from.to_vec()),
                 _ => None,
             },
+            emotion_name: self.emotion_playing.as_ref().map(|p| p.name.clone()),
+            emotion_elapsed: self.emotion_playing.as_ref().map_or(0.0, |p| p.elapsed),
+            emotion_skill_delivered: self
+                .emotion_playing
+                .as_ref()
+                .is_some_and(|p| p.skill_delivered),
         })
     }
 
@@ -1088,6 +1182,11 @@ impl<T: RobotIo> DuckRuntime<T> {
             self.odometry = odometry::Odometry::alpha();
         }
         self.powered_off = checkpoint.powered_off;
+        self.emotion_playing = checkpoint.emotion_name.clone().map(|name| crate::emotion::Playing {
+            name,
+            elapsed: checkpoint.emotion_elapsed,
+            skill_delivered: checkpoint.emotion_skill_delivered,
+        });
         self.shutdown = match checkpoint.shutdown.as_str() {
             "sitting" => Shutdown::Sitting {
                 since: TickTime(checkpoint.shutdown_since),
@@ -1485,10 +1584,50 @@ impl<T: RobotIo> DuckRuntime<T> {
         command.body.roll = self.body_ema[1];
         command.body.pitch = self.body_ema[2];
 
+        // An emotion is a scripted move, not a policy: for its own ticks it
+        // replaces the client's head/body/mouth command, exactly as
+        // `emotion.rs::Frame::apply` replaces the Snapshot. A pad still
+        // sending commands cannot win half the frames, and when the timeline
+        // ends there is nothing to restore.
+        let mut emotion_frame = None;
+        if let Some(playing) = self.emotion_playing.as_mut() {
+            if let Some(emotion) = self.emotions.get(&playing.name) {
+                if playing.elapsed <= emotion.duration() {
+                    let frame = emotion.frame_at(playing.elapsed);
+                    // `devastated` sits the duck down partway through: the
+                    // controller owns sit, so deliver the request once.
+                    if !playing.skill_delivered
+                        && emotion.pending_skill(playing.elapsed).is_some()
+                    {
+                        playing.skill_delivered = true;
+                        let _ = self.controller.sit_toggle();
+                    }
+                    command.head = frame.head;
+                    command.body.z = frame.body[0];
+                    command.body.roll = frame.body[1];
+                    command.body.pitch = frame.body[2];
+                    self.head_ema = frame.head;
+                    self.body_ema = frame.body;
+                    // A fresh head command keeps IdleHead out of the way, the
+                    // same reason upstream zeroes `snapshot.head_age`.
+                    self.last_head_command = TickTime::of(&self.clock);
+                    emotion_frame = Some(frame);
+                } else {
+                    self.emotion_playing = None;
+                }
+            } else {
+                self.emotion_playing = None;
+            }
+            if let Some(playing) = self.emotion_playing.as_mut() {
+                playing.elapsed += self.dt.as_secs_f64();
+            }
+        }
+
         // The idle look-around, robotd's: a still duck glances, tilts its head
         // and breathes, and the head command it feeds is an observation input
         // (the policy's head block), exactly as on the real robot.
         let still = self.idle_params.enabled_in(self.mode)
+            && emotion_frame.is_none()
             && was_driving
             && !pickup_paused
             && matches!(self.limp_fall, LimpFall::Idle)
@@ -1501,6 +1640,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         // real time, so the duck fidgeted twice as fast as the real one.
         let idle_now = self.sim_origin + Duration::from_millis(self.clock.tick * 20);
         let idle = self.idle_head.tick(idle_now, still, self.dt);
+        self.last_idle = idle;
         for axis in 0..4 {
             command.head[axis] =
                 self.head_ema[axis] * (1.0 - idle.takeover) + idle.head[axis];
@@ -1546,8 +1686,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             // it — so the idle yawn is the whole of mouth control, exactly as
             // it is on the robot. Only while driving: a held or homing duck
             // keeps the mouth its hold pose gave it.
+            let mouth = emotion_frame.map_or(self.mouth.max(idle.mouth), |frame| frame.mouth);
             targets[duck_control::model::MOUTH_INDEX] =
-                duck_control::model::mouth_target(self.mouth.max(idle.mouth));
+                duck_control::model::mouth_target(mouth);
         }
         // One write per tick: the body steps inside `apply`, so a second call
         // would advance the physics twice as fast.
@@ -1557,7 +1698,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         report.mouth = if pickup_paused {
             0.0
         } else {
-            self.mouth.max(idle.mouth)
+            emotion_frame.map_or(self.mouth.max(idle.mouth), |frame| frame.mouth)
         };
         if let Some(watch) = self.pickup.as_mut() {
             // The next feature row pairs its reading with this command.
@@ -1716,5 +1857,30 @@ mod tests {
         // The clock came back to the same place, which is what "replay the same
         // trajectory" means for the loop's own state.
         assert_eq!(runtime.clock().tick, saved.tick + 20);
+    }
+
+    #[test]
+    fn emotions_are_data_and_checkpoint_fields() {
+        // No policy/ORT here: the library is pure data. The full play-through
+        // is asserted in CI's simulator session, where ORT 1.23 is available.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../upstream/microduck/robotd/emotions");
+        let library = crate::emotion::Library::load(&dir).expect("official emotions");
+        assert_eq!(library.names().len(), 13);
+        let curious = library.get("curious").expect("curious");
+        assert!(curious.duration() > 2.0);
+        assert!(!curious.pcm().is_empty());
+        assert!(curious.frame_at(curious.duration() / 2.0).head[2].is_finite());
+        assert!(library.get("devastated").unwrap().pending_skill(9.0).is_some());
+        // The playing state round-trips with its elapsed clock, so a
+        // checkpoint can resume the same timeline rather than dropping it.
+        let playing = crate::emotion::Playing {
+            name: "curious".into(),
+            elapsed: 1.25,
+            skill_delivered: false,
+        };
+        let json = serde_json::to_string(&playing).unwrap();
+        let back: crate::emotion::Playing = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.elapsed, 1.25);
     }
 }

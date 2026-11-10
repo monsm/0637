@@ -25,6 +25,13 @@ cp "$ROOT"/policies/*.onnx "$DST/policies/"
 # with duck-control, not with the policy set.
 PICKUP="$ROOT/upstream/microduck/duck-control/models/pickup_detector.onnx"
 [ -f "$PICKUP" ] && cp "$PICKUP" "$DST/models/pickup_detector.onnx"
+# `robotd/emotions/`: the real duck's thirteen keyframe timelines and their
+# 48 kHz voices. `robot.do curious` is a skill, so the app needs the data.
+EMOTIONS="$ROOT/upstream/microduck/robotd/emotions"
+if [ -d "$EMOTIONS" ]; then
+  mkdir -p "$DST/emotions"
+  cp "$EMOTIONS"/*.json "$EMOTIONS"/*.wav "$DST/emotions/"
+fi
 
 # The shader lives OUTSIDE $DST on purpose: the rm -rf above used to delete
 # it, so the shipped bundle had no Metal library, the renderer returned nil,

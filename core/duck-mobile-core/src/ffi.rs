@@ -337,6 +337,36 @@ pub unsafe extern "C" fn duck_core_set_performance(core: *mut DuckCore, fps: f64
     }
 }
 
+/// Load robotd's emotion timelines and voices from a directory in the app
+/// bundle. Returns the number loaded, or -1. The emotions then appear in
+/// `/skills`, `/skill`, MCP and the shell's skill ring.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_load_emotions(
+    core: *mut DuckCore,
+    dir: *const c_char,
+) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let Ok(path) = c_string(dir) else {
+        return -1;
+    };
+    match (*core).runtime.load_emotions(std::path::Path::new(&path)) {
+        Ok(count) => {
+            // `/skills` is a snapshot the intent server owns, so publish the
+            // enlarged list before a client asks for it.
+            let names = published_skills((*core).runtime.skill_names());
+            (*core).intents.set_skills(names.clone());
+            (*core).skills = names
+                .iter()
+                .map(|name| CString::new(name.clone()).unwrap_or_default())
+                .collect();
+            count as c_int
+        }
+        Err(_) => -1,
+    }
+}
+
 /// The drive mode currently loaded: "walk" or "roller".
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_mode(core: *mut DuckCore) -> *const c_char {
@@ -923,6 +953,16 @@ fn publish_state(core: &DuckCore) {
         },
         "powered_off": active.powered_off(),
         "carrying": active.carrying(),
+        "emotion": active.emotion_state().map(|(name, elapsed, duration)| {
+            json!({ "name": name, "elapsed_s": elapsed, "duration_s": duration })
+        }),
+        // How much of the head the idle look-around owns this tick, and the
+        // head command it produced. A duck that reads as "off" publishes 0
+        // forever; CI asserts a still duck really does glance.
+        "idle": {
+            "takeover": active.idle_takeover(),
+            "head": active.idle_head_command(),
+        },
         "performance": {
             "fps": core.performance.0,
             "ticks_per_second": core.performance.1,
@@ -1207,7 +1247,11 @@ pub unsafe extern "C" fn duck_core_queue_sound(core: *mut DuckCore, tag: *const 
     let Ok(tag) = c_string(tag) else {
         return -1;
     };
-    if !crate::voice::TAGS.contains(&tag.as_str()) {
+    let known = crate::voice::TAGS.contains(&tag.as_str())
+        || tag.strip_prefix("emotion:").is_some_and(|name| {
+            (*core).runtime.emotion_names().iter().any(|loaded| loaded == name)
+        });
+    if !known {
         return -1;
     }
     (*core).runtime.queue_sound(&tag);

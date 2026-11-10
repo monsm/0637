@@ -77,12 +77,20 @@ SKILLS=$(curl -sf --max-time 5 http://127.0.0.1:8765/skills || true)
 echo "$SKILLS" | tee intent-skills.json > /dev/null
 # The verbs a client can discover: the manifest's one-shots and the loop's
 # own. A verb `/skills` does not name is one nobody can find.
-for name in sit stand ground_pick; do
+for name in sit stand ground_pick curious angry laugh yes; do
   if ! echo "$SKILLS" | grep -q "\"$name\""; then
     echo "::error::/skills does not list $name"
     exit 1
   fi
 done
+# An emotion is a scripted head/beak timeline with its own voice; /state
+# publishes which one the loop is playing, so a dead loader cannot pass.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"name":"curious"}' http://127.0.0.1:8765/skill > /dev/null || true
+sleep 0.4
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -q '"name":"curious"'; then
+  echo "::error::/state.emotion does not report the curious timeline"
+  exit 1
+fi
 # The duck's own senses reach the API, not just its commands.
 for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"' '"performance"'; do
   if ! echo "$STATE" | grep -q "$needle"; then
@@ -103,6 +111,22 @@ case "$TPS" in
     ;;
 esac
 echo "performance: $TPS ticks/s"
+# A still duck must actually glance: IdleHead fades in after ~3.5 s. Check
+# its published gain, so a "motionless duck" fails CI rather than shipping.
+sleep 4
+IDLE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin).get('idle') or {}
+    print(d.get('takeover',0), max(abs(x) for x in d.get('head',[0]) or [0]))
+except Exception: print('0 0')
+" 2>/dev/null || echo "0 0")
+GAIN=${IDLE%% *}; HEAD=${IDLE##* }
+python3 -c "
+import sys
+sys.exit(0 if float('${GAIN:-0}') > 0.8 and float('${HEAD:-0}') > 0.001 else 1)
+" || { echo "::error::a still duck never looks around (idle=$IDLE)"; exit 1; }
+echo "idle: takeover=$GAIN head=$HEAD"
 # Refresh the published artifact: the first /state above can legitimately
 # predate the once-a-second report and would leave a 0.0 in ci-logs.
 echo "$PERF" > intent-state.json

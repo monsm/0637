@@ -18,7 +18,8 @@ use crate::ffi::{
     duck_core_release_body, duck_core_set_performance,
     duck_core_queue_sound, duck_core_render_sound, duck_core_set_mode,
     duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
-    duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_load_pickup,
+    duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_load_emotions,
+    duck_core_load_pickup,
     duck_core_mesh_name, duck_core_mesh_soup,
     duck_core_fork, duck_core_new, duck_core_paused, duck_core_seek, duck_core_set_paused,
     duck_core_set_speed, duck_core_speed, duck_core_step,
@@ -173,6 +174,21 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeCarry(
             i32::from(active != 0),
         )
     };
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeLoadEmotions(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    path: JString,
+) -> jint {
+    if handle == 0 {
+        return -1;
+    }
+    let Ok(dir) = env.get_string(&path) else { return -1 };
+    let Ok(cpath) = CString::new(dir.to_string_lossy().as_bytes()) else { return -1 };
+    unsafe { duck_core_load_emotions(handle as *mut DuckCore, cpath.as_ptr()) as jint }
 }
 
 #[unsafe(no_mangle)]

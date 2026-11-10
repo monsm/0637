@@ -49,6 +49,9 @@ object Copy {
     val director get() = pick("Director", "取景")
     val time get() = pick("Time", "时间")
     val skills get() = pick("Skills", "技能")
+    // Skill ring section headings: actions and robotd emotions.
+    val actions get() = pick("Actions", "动作")
+    val emotions get() = pick("Emotions", "情绪")
     val sit get() = pick("sit", "坐下")
     val pickUp get() = pick("pick", "抓取")
     val grab get() = pick("Hold", "拎起")
@@ -79,6 +82,7 @@ object Copy {
     val api get() = "AI API :8765 · MCP /mcp"
     val microphone get() = pick("microphone", "麦克风")
     val denied get() = pick("denied", "未授权")
+    val behavior get() = pick("behaviour", "此刻")
 
     fun bringup(code: Int): String = when (code) {
         0 -> pick("Limp", "软瘫")
@@ -99,6 +103,20 @@ fun skillLabel(name: String): String {
         "crouch" -> "蹲下"
         "sit" -> "坐下"
         "ground_pick" -> "贴地抓取"
+        // The 13 official robotd emotions.
+        "angry" -> "生气"
+        "curious" -> "好奇"
+        "defiant" -> "不服"
+        "devastated" -> "崩溃"
+        "excited" -> "兴奋"
+        "impatient" -> "不耐烦"
+        "laugh" -> "大笑"
+        "mmh" -> "嗯哼"
+        "mock" -> "嘲弄"
+        "no" -> "摇头"
+        "sad" -> "难过"
+        "yes" -> "点头"
+        "yes_fast" -> "快速点头"
         else -> name
     }
 }
