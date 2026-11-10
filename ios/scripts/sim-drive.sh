@@ -346,6 +346,9 @@ check $? "Chinese speech maps to a skill" "$(printf '%s' "$HEARD" | head -c 140)
 HEARD2=$(api POST /heard '{"text":"excited"}' || true)
 printf '%s' "$HEARD2" | grep -q '"skill":"excited"'
 check $? "English speech maps to the same table" "$(printf '%s' "$HEARD2" | head -c 140)"
+GREET=$(api POST /heard '{"text":"你好"}' || true)
+printf '%s' "$GREET" | grep -q '"sound":"greet"'
+check $? "a greeting answers with the duck's voice" "$(printf '%s' "$GREET" | head -c 140)"
 HEARD3=$(api POST /heard '{"text":"qwertyuiop"}' || true)
 printf '%s' "$HEARD3" | grep -q '"ok":false'
 check $? "unrecognized speech is refused, not guessed" "$(printf '%s' "$HEARD3" | head -c 140)"

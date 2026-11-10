@@ -17,6 +17,8 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Heard {
     Skill(&'static str),
+    /// A sound tag rather than a move, for greetings.
+    Sound(&'static str),
     Sit,
     GroundPick,
 }
@@ -24,6 +26,11 @@ pub enum Heard {
 /// Longest phrases first: `("快速点头", ...)` must be tested before
 /// `("点头", ...)`, and every entry is a phrase a person actually says.
 const PHRASES: &[(&str, Heard)] = &[
+    // Greetings: the duck answers with its own voice, no move.
+    ("你好", Heard::Sound("greet")),
+    ("哈喽", Heard::Sound("greet")),
+    ("hello", Heard::Sound("greet")),
+    ("hi", Heard::Sound("greet")),
     // Emotions, the ones a person would say to a duck.
     ("开心", Heard::Skill("excited")),
     ("高兴", Heard::Skill("excited")),
@@ -98,6 +105,8 @@ mod tests {
         assert_eq!(interpret("翻滚吧").unwrap().1, Heard::Skill("roulade"));
         assert_eq!(interpret("我好开心").unwrap().1, Heard::Skill("excited"));
         assert_eq!(interpret("excited").unwrap().1, Heard::Skill("excited"));
+        assert_eq!(interpret("你好呀").unwrap().1, Heard::Sound("greet"));
+        assert_eq!(interpret("hello").unwrap().1, Heard::Sound("greet"));
     }
 
     #[test]

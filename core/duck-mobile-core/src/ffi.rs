@@ -769,6 +769,10 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                     .trigger_skill(name)
                     .map(|started| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": name, "chained": !started }))
                     .map_err(str::to_owned),
+                crate::speech::Heard::Sound(tag) => {
+                    core.runtime.queue_sound(tag);
+                    Ok(json!({ "ok": true, "heard": text, "phrase": phrase, "sound": tag }))
+                }
                 crate::speech::Heard::Sit => {
                     let sitting = core.runtime.is_sitting();
                     core.runtime
