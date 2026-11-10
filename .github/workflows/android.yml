@@ -171,14 +171,20 @@ jobs:
           # the same time, and a force push silently drops the other one's
           # logs. Hang our commit off the branch head so the push fast-forwards,
           # and keep both sides' files — ours were copied last, so they win.
+          #
+          # A retry must not roll the other workflow back either: snapshot this
+          # run's ci-logs, take the branch's fresh tree, then copy ours over it.
+          cp -a ci-logs ci-logs.thisrun
           for attempt in 1 2 3 4 5; do
             git fetch --depth 1 origin ci-logs || true
-            git reset --soft FETCH_HEAD 2>/dev/null || true
+            git checkout FETCH_HEAD -- ci-logs 2>/dev/null || true
+            cp -a ci-logs.thisrun/. ci-logs/
             git add -f ci-logs
             git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
             if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             sleep 2
           done
+          rm -rf ci-logs.thisrun
 
       - uses: actions/upload-artifact@v4
         id: artifact
@@ -294,14 +300,20 @@ jobs:
           # the same time, and a force push silently drops the other one's
           # logs. Hang our commit off the branch head so the push fast-forwards,
           # and keep both sides' files — ours were copied last, so they win.
+          #
+          # A retry must not roll the other workflow back either: snapshot this
+          # run's ci-logs, take the branch's fresh tree, then copy ours over it.
+          cp -a ci-logs ci-logs.thisrun
           for attempt in 1 2 3 4 5; do
             git fetch --depth 1 origin ci-logs || true
-            git reset --soft FETCH_HEAD 2>/dev/null || true
+            git checkout FETCH_HEAD -- ci-logs 2>/dev/null || true
+            cp -a ci-logs.thisrun/. ci-logs/
             git add -f ci-logs
             git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
             if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             sleep 2
           done
+          rm -rf ci-logs.thisrun
 
       - uses: actions/upload-artifact@v4
         if: always()
