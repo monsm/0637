@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -77,6 +78,17 @@ fun Shell(
     var stick by remember { mutableStateOf("drive") }
     // Flipping this re-renders every Copy string in the shell.
     var languageTick by remember { mutableStateOf(0) }
+    // The face's flashlight: 0 is off, 1..7 are robotd's seven colours. The
+    // top-bar chip and the sheet's chip both write here, so the two never
+    // disagree about whether the light is on.
+    var flashlightState by remember { mutableStateOf(0) }
+    // One tap flips the light, exactly like `robot.flashlight` on the duck.
+    // The core takes its own lock, so this stays off the render thread's
+    // critical path.
+    val toggleFlashlight: () -> Unit = {
+        val duck = core
+        if (duck != null) flashlightState = duck.flashlight(true, false, "white")
+    }
 
     // First-launch hint: one SharedPreferences flag, shown once and never
     // again. The coroutine runs on the Compose dispatcher, so the 4 s delay
@@ -225,6 +237,12 @@ fun Shell(
                 }
                 languageTick += 1
             }
+            Spacer(Modifier.size(6.dp))
+            // The flashlight, one tap away: the face's LED, without opening
+            // the instrument sheet to find it.
+            RoundChip(Copy.flashlight, size = 40.dp, selected = flashlightState > 0) {
+                toggleFlashlight()
+            }
         }
 
         // Bottom bar: time machine and skills live one gesture away.
@@ -282,6 +300,8 @@ fun Shell(
         InstrumentSheet(
             core,
             micState = micState,
+            flashlightState = flashlightState,
+            onFlashlight = toggleFlashlight,
             onToggleMic = {
                 when (micState) {
                     MicState.Off -> {
@@ -328,15 +348,23 @@ private fun SurfaceChip(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RoundChip(label: String, onClick: () -> Unit) {
+private fun RoundChip(
+    label: String,
+    size: Dp = 52.dp,
+    selected: Boolean = false,
+    onClick: () -> Unit,
+) {
     Box(
         Modifier
-            .size(52.dp)
-            .background(Color.White.copy(alpha = 0.10f), CircleShape)
+            .size(size)
+            .background(
+                if (selected) Color.White.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.10f),
+                CircleShape,
+            )
             .pointerInput(Unit) { detectTapGestures { onClick() } },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp)
+        Text(label, color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1, softWrap = false)
     }
 }
 
@@ -442,6 +470,8 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
 private fun InstrumentSheet(
     core: DuckCore,
     micState: MicState,
+    flashlightState: Int,
+    onFlashlight: () -> Unit,
     onToggleMic: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -467,10 +497,15 @@ private fun InstrumentSheet(
     // The duck's own behaviour: an emotion timeline, or the idle look-around.
     // A static duck reads as switched off, so the sheet says what it is doing.
     var behaviorSummary by remember { mutableStateOf("—") }
+    // The face: the status LED, the four-light battery gauge, the pack
+    // percentage and the flashlight, published on /state.leds. A duck with
+    // no face is a duck that looks broken, so the sheet draws one.
+    var face by remember { mutableStateOf(FaceUi()) }
     LaunchedEffect(core) {
         while (true) {
             micSummary = fetchMicSummary()
             behaviorSummary = fetchBehaviorSummary()
+            face = fetchFace()
             delay(1000)
         }
     }
@@ -534,6 +569,54 @@ private fun InstrumentSheet(
                 Text(Copy.behavior, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
                 Text(behaviorSummary, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
             }
+            // The face: the status LED's verdict, the four-light battery gauge
+            // and the pack percentage, all read back from /state.leds.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.face, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        Copy.faceStatus(face.status),
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                    )
+                    Text(
+                        gaugeBars(face.bars),
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                    )
+                    Text(
+                        face.percent,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+            // The flashlight: the face's own LED, the same seven colours the
+            // duck has. One tap flips it; the sheet shows which one is lit.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.flashlightRow, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        face.color?.let { Copy.faceColor(it) }
+                            ?: if (flashlightState > 0) Copy.faceColor("white") else "—",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    ButtonChip(Copy.flashlight) { onFlashlight() }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(if (paused) Copy.resume else Copy.freeze) {
                     paused = !paused
@@ -578,6 +661,60 @@ private fun ButtonChip(label: String, onClick: () -> Unit) {
 }
 
 enum class MicState { Off, On, Denied }
+
+/**
+ * The duck's face, read from GET /state: the status LED's verdict, the
+ * four-light battery gauge, the pack percentage and the flashlight's colour.
+ * The default is the "no reading yet" face: no verdict, no bars, no percent.
+ */
+private data class FaceUi(
+    val status: String = "—",
+    val bars: Int = 0,
+    val percent: String = "—",
+    val color: String? = null,
+)
+
+/**
+ * The face's own numbers, from GET /state: the `leds` object the core
+ * publishes once a second. Any failure (server not up yet, no reading) gives
+ * the empty face rather than throwing, so the sheet's poll loop never breaks.
+ */
+private fun fetchFace(): FaceUi {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/state")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 1500
+        connection.readTimeout = 1500
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        // The leds block is flat: no nested braces, so `[^}]*` stops at its
+        // own end. Scoping to it keeps the pack's own battery_percent (a
+        // different object) out of the reading.
+        val leds = Regex(""""leds"\s*:\s*\{[^}]*\}""").find(text)?.value
+            ?: return FaceUi()
+        val status = Regex(""""status"\s*:\s*"([^"]+)"""")
+            .find(leds)?.groupValues?.get(1) ?: "—"
+        val bars = Regex(""""bars"\s*:\s*([0-9]+)""")
+            .find(leds)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        val raw = Regex(""""battery_percent"\s*:\s*([0-9.]+)""")
+            .find(leds)?.groupValues?.get(1)?.toDoubleOrNull()
+        val percent = if (raw == null) "—" else "%.0f%%".format(raw)
+        val color = Regex(""""color"\s*:\s*"([^"]+)"""")
+            .find(leds)?.groupValues?.get(1)
+        FaceUi(status, bars, percent, color)
+    } catch (_: Throwable) {
+        FaceUi()
+    }
+}
+
+/** The battery gauge as text: one filled circle per lit LED of the four. */
+private fun gaugeBars(bars: Int): String {
+    val lit = bars.coerceIn(0, 4)
+    return buildString {
+        repeat(4) { index -> append(if (index < lit) '●' else '○') }
+    }
+}
 
 /** One line from GET /state: the emotion playing, or the idle look-around. */
 private fun fetchBehaviorSummary(): String {

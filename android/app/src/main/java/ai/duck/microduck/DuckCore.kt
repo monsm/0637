@@ -141,6 +141,16 @@ class DuckCore(
         if (handle != 0L) nativePush(handle, vx, vy, vz) else -1
     }
 
+    /**
+     * The face's flashlight, `robot.flashlight` on a phone: [toggle] flips it,
+     * [on] sets it outright, [color] is one of robotd's seven (white, red,
+     * green, blue, yellow, cyan, magenta). Returns the new state: 0 off,
+     * 1..7 the colour's index plus one, -1 when there is no core.
+     */
+    fun flashlight(toggle: Boolean, on: Boolean, color: String): Int = synchronized(lock) {
+        if (handle != 0L) nativeFlashlight(handle, toggle, on, color) else -1
+    }
+
     fun startIntentServer(port: Int): Int = synchronized(lock) {
         if (handle != 0L) nativeStartIntentServer(handle, port) else -1
     }
@@ -248,6 +258,7 @@ class DuckCore(
         @JvmStatic private external fun nativeSit(handle: Long): Int
         @JvmStatic private external fun nativeGroundPick(handle: Long): Int
         @JvmStatic private external fun nativePush(handle: Long, vx: Double, vy: Double, vz: Double): Int
+        @JvmStatic private external fun nativeFlashlight(handle: Long, toggle: Boolean, on: Boolean, color: String): Int
         @JvmStatic private external fun nativeStartIntentServer(handle: Long, port: Int): Int
         @JvmStatic private external fun nativeReload(handle: Long, directory: String): Int
         @JvmStatic private external fun nativeStatus(handle: Long): DoubleArray?

@@ -60,6 +60,16 @@ final class DuckController: ObservableObject {
     @Published var microphoneSummary = "—"
     /// What the duck is feeling and how awake it looks, read from /state.
     @Published var behaviorSummary = "—"
+    /// The virtual face LEDs, from the same /state fetch: the verdict robotd's
+    /// status LED would show, the four-light battery gauge and the flashlight.
+    /// A phone has no I²C bus, so the semantics are the face.
+    @Published var faceStatus = "Starting"
+    @Published var faceGauge = "Unknown"
+    @Published var faceBattery = "—"
+    @Published var faceBars = 0
+    /// The flashlight's colour while lit, nil when off. A toggle publishes the
+    /// FFI's new state directly rather than waiting for the next poll.
+    @Published var flashlightColor: String?
     @Published var depthSummary = "—"
     @Published var imuSummary = "—"
     /// What the sheet's microphone row shows. Denial is a real state, not an
@@ -482,6 +492,7 @@ final class DuckController: ObservableObject {
                     } else {
                         self.behaviorSummary = "—"
                     }
+                    self.parseLeds(json["leds"])
                 }
             }.resume()
         }
@@ -512,6 +523,59 @@ final class DuckController: ObservableObject {
                 self.refreshMicSummary()
             }
         }.resume()
+    }
+
+    /// The virtual face, from the `leds` object the /state fetch already
+    /// carries. Runs on the main thread inside the poll's completion.
+    private func parseLeds(_ leds: Any?) {
+        guard let leds = leds as? [String: Any] else {
+            // The core predates the face: keep "—" rather than a stale
+            // verdict, and leave the flashlight alone.
+            faceStatus = "—"
+            faceGauge = "—"
+            faceBattery = "—"
+            faceBars = 0
+            return
+        }
+        faceStatus = leds["status"] as? String ?? "—"
+        faceGauge = leds["gauge"] as? String ?? "—"
+        faceBars = leds["bars"] as? Int ?? 0
+        if let percent = leds["battery_percent"] as? Double {
+            faceBattery = String(format: "%.0f%%", percent)
+        } else {
+            faceBattery = "—"
+        }
+        // The colour travels with the flashlight state: off publishes no
+        // colour, so `nil` here *is* the off answer.
+        flashlightColor = leds["color"] as? String
+    }
+
+    /// `robot.flashlight` on a phone: a press toggles, in white. The core is
+    /// not thread-safe, so this runs on the main thread like every other
+    /// core call; the FFI returns the new state (0 off, 1..7 colour index+1),
+    /// which publishes faster than waiting a second for /state.
+    func toggleFlashlight() {
+        guard let core else { return }
+        func toggle() {
+            let state = "white".withCString { pointer in
+                duck_core_flashlight(core, 1, 0, pointer)
+            }
+            flashlightColor = Self.flashlightColorName(state)
+        }
+        if Thread.isMainThread {
+            toggle()
+        } else {
+            DispatchQueue.main.async(execute: toggle)
+        }
+    }
+
+    /// The seven colours in `robotd`'s cycling order — the FFI's non-zero
+    /// return is the position here plus one. The names stay the wire's, like
+    /// the skill names: they are what /state publishes, not display text.
+    private static func flashlightColorName(_ state: Int32) -> String? {
+        let colors = ["white", "red", "green", "blue", "yellow", "cyan", "magenta"]
+        guard state >= 1, Int(state) <= colors.count else { return nil }
+        return colors[Int(state) - 1]
     }
 
     /// One row, three states: off shows "—", denied says so, on shows the

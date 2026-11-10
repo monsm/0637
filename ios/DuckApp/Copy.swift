@@ -87,6 +87,39 @@ enum Copy {
     static var mouth: String { pick("beak", "嘴") }
     static var battery: String { pick("pack", "电池") }
     static var branches: String { pick("branches", "分叉数") }
+    // The face: the virtual status LED, the four-light battery gauge and the
+    // flashlight, as /state.leds publishes them. The wire names (Starting,
+    // Two, white…) stay the protocol's; only these labels translate.
+    static var face: String { pick("Face", "面部") }
+    static var ledStatus: String { pick("status", "状态灯") }
+    static var gauge: String { pick("gauge", "电量灯") }
+    static var flashlight: String { pick("flashlight", "手电筒") }
+    static var flashlightOn: String { pick("on", "开") }
+    static var flashlightOff: String { pick("off", "关") }
+    /// The status LED's verdict. An unknown wire name passes through, the
+    /// way a user-manifest skill's name does.
+    static func faceStatus(_ raw: String) -> String {
+        switch raw {
+        case "Starting": return pick("starting", "启动中")
+        case "Healthy": return pick("healthy", "健康")
+        case "Degraded": return pick("degraded", "降级")
+        case "Fault": return pick("fault", "故障")
+        default: return raw
+        }
+    }
+    /// The battery gauge's level: the same five words the upstream LED
+    /// order implies, from empty to full.
+    static func faceGauge(_ raw: String) -> String {
+        switch raw {
+        case "Unknown": return pick("unknown", "未知")
+        case "Critical": return pick("critical", "耗尽")
+        case "Low": return pick("low", "偏低")
+        case "One": return pick("one light", "一格")
+        case "Two": return pick("two lights", "两格")
+        case "Three": return pick("three lights", "三格")
+        default: return raw
+        }
+    }
     static var yes: String { pick("yes", "是") }
     static var no: String { pick("no", "否") }
     static var whatPhoneSenses: String { pick("What the phone senses", "手机感知到什么") }

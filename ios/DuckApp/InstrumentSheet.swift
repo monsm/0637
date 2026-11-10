@@ -13,6 +13,7 @@ struct InstrumentSheet: View {
                 header
                 timeMachine
                 telemetry
+                face
                 sensors
                 provenance
                 footer
@@ -173,6 +174,77 @@ struct InstrumentSheet: View {
         }
         .padding(14)
         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    // MARK: - Face
+
+    /// The virtual face: the verdict a status LED would give, the four-light
+    /// battery gauge, the flashlight. A phone has no LEDs, so the sheet is
+    /// where the face lives.
+    private var face: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(Copy.face, detail: nil)
+            row(Copy.ledStatus, Copy.faceStatus(controller.faceStatus))
+            // The gauge as its four LEDs: filled bars, then hollow ones, the
+            // order the upstream gauge fills. Text keeps it monospaced like
+            // every other value in the sheet.
+            HStack {
+                Text(Copy.gauge)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(gaugeBars)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .accessibilityIdentifier("sheet-gauge-bars")
+                Text(Copy.faceGauge(controller.faceGauge))
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            row(Copy.battery, controller.faceBattery)
+            flashlightRow
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// "▮▮▯▯" for two lit LEDs of four. The core's `bars` is 0…4; an
+    /// out-of-range poll answer still renders four hollow lights.
+    private var gaugeBars: String {
+        let lit = max(0, min(4, controller.faceBars))
+        return String(repeating: "▮", count: lit) + String(repeating: "▯", count: 4 - lit)
+    }
+
+    /// The flashlight row: state in words where the other values sit, and a
+    /// toggle button at the row's right edge like the mic's toggle.
+    private var flashlightRow: some View {
+        HStack {
+            Text(Copy.flashlight)
+                .font(.system(size: 12, design: .rounded))
+                .foregroundStyle(.secondary)
+            Spacer()
+            if let color = controller.flashlightColor {
+                Text("\(color) · \(Copy.flashlightOn)")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.white)
+            } else {
+                Text(Copy.flashlightOff)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                controller.toggleFlashlight()
+            } label: {
+                Image(systemName: "flashlight.on.fill")
+                    .font(.system(size: 13))
+                    .frame(width: 28, height: 28)
+                    .background(Color.white.opacity(0.10), in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.flashlight)
+            .accessibilityIdentifier("sheet-flashlight-toggle")
+        }
     }
 
     // MARK: - Sensors

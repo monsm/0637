@@ -385,6 +385,27 @@ struct ContentView: View {
             .accessibilityLabel(Copy.quack)
             .accessibilityIdentifier("duck-quack")
 
+            // The face's flashlight, where a hand would reach: a press
+            // toggles, white, as `robot.flashlight` does.
+            Button {
+                controller.toggleFlashlight()
+            } label: {
+                Label(Copy.flashlight, systemImage: "flashlight.on.fill")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 18))
+                    .frame(width: 46, height: 46)
+                    .background(
+                        controller.flashlightColor == nil
+                            ? AnyShapeStyle(.ultraThinMaterial)
+                            : AnyShapeStyle(Color.white.opacity(0.32)),
+                        in: Circle()
+                    )
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.flashlight)
+            .accessibilityIdentifier("duck-flashlight")
+
             Button {
                 if controller.carrying {
                     controller.release()

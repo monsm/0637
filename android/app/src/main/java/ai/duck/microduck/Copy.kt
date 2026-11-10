@@ -84,6 +84,33 @@ object Copy {
     val denied get() = pick("denied", "未授权")
     val behavior get() = pick("behaviour", "此刻")
 
+    // The face: the status LED, the four-light battery gauge and the
+    // flashlight, all published on /state.leds.
+    val face get() = pick("Face", "脸")
+    val flashlight get() = pick("Flash", "手电")
+    val flashlightRow get() = pick("Flashlight", "手电筒")
+
+    /** The status LED's verdict, in the shell's language. */
+    fun faceStatus(status: String): String = when (status) {
+        "Starting" -> pick("Starting", "启动中")
+        "Healthy" -> pick("Healthy", "正常")
+        "Degraded" -> pick("Degraded", "降级")
+        "Fault" -> pick("Fault", "故障")
+        else -> status
+    }
+
+    /** The flashlight's colour, in the shell's language. */
+    fun faceColor(color: String): String = when (color) {
+        "white" -> pick("white", "白")
+        "red" -> pick("red", "红")
+        "green" -> pick("green", "绿")
+        "blue" -> pick("blue", "蓝")
+        "yellow" -> pick("yellow", "黄")
+        "cyan" -> pick("cyan", "青")
+        "magenta" -> pick("magenta", "品红")
+        else -> color
+    }
+
     fun bringup(code: Int): String = when (code) {
         0 -> pick("Limp", "软瘫")
         1 -> pick("Homing", "归位中")
