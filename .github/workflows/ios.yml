@@ -284,10 +284,9 @@ jobs:
           for attempt in 1 2 3 4 5; do
             if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             git fetch --depth 1 origin ci-logs || true
-            git reset --soft FETCH_HEAD 2>/dev/null || true
-            git checkout FETCH_HEAD -- ci-logs 2>/dev/null || true
-            git add -f ci-logs
-            git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
+            # Join the other workflow's history but keep OUR tree: the branch
+            # holds only logs, and its copy is the one that is a run older.
+            git merge --no-edit -s ours FETCH_HEAD || true
             sleep 2
           done
 
@@ -464,10 +463,9 @@ jobs:
           for attempt in 1 2 3 4 5; do
             if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             git fetch --depth 1 origin ci-logs || true
-            git reset --soft FETCH_HEAD 2>/dev/null || true
-            git checkout FETCH_HEAD -- ci-logs 2>/dev/null || true
-            git add -f ci-logs
-            git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
+            # Join the other workflow's history but keep OUR tree: the branch
+            # holds only logs, and its copy is the one that is a run older.
+            git merge --no-edit -s ours FETCH_HEAD || true
             sleep 2
           done
 
