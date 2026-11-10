@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -233,6 +234,8 @@ fun Shell(
         Row(
             Modifier
                 .align(Alignment.TopStart)
+                // Fullscreen theme: keep the menu out of the display cutout.
+                .systemBarsPadding()
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -255,7 +258,7 @@ fun Shell(
             }
             Spacer(Modifier.weight(1f))
             Box {
-                RoundChip("⋯", size = 42.dp) { menuOpen = true }
+                RoundChip("⋯", size = 48.dp) { menuOpen = true }
                 DropdownMenu(
                     expanded = menuOpen,
                     onDismissRequest = { menuOpen = false },
@@ -309,11 +312,12 @@ fun Shell(
         Row(
             Modifier
                 .align(Alignment.BottomStart)
+                .systemBarsPadding()
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            RoundChip(Copy.time, size = 44.dp) { showSheet = true }
-            RoundChip(Copy.skills, size = 44.dp) { showRing = true }
+            RoundChip(Copy.time, size = 48.dp) { showSheet = true }
+            RoundChip(Copy.skills, size = 48.dp) { showRing = true }
             core?.let { duck ->
                 WheeeChip(
                     Copy.quack,
@@ -328,6 +332,7 @@ fun Shell(
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
+                    .systemBarsPadding()
                     .padding(12.dp),
             ) {
                 RoundChip(
@@ -618,6 +623,7 @@ private fun InstrumentSheet(
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    var showDetails by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(core.paused()) }
     var speed by remember { mutableStateOf(core.speed()) }
     var branches by remember { mutableStateOf(0) }
@@ -656,9 +662,17 @@ private fun InstrumentSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // The sheet outgrew a phone screen, so its column scrolls and the
+        // dense status text collapses behind one chip.
+        Column(
+            Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text(Copy.thisDuck, color = Color.White, fontWeight = FontWeight.SemiBold)
-            if (status.size >= 14) {
+            ButtonChip(if (showDetails) Copy.showLess else Copy.showMore) { showDetails = !showDetails }
+            if (showDetails && status.size >= 14) {
                 Text(
                     buildString {
                         append(Copy.bringup(status[0].toInt()))

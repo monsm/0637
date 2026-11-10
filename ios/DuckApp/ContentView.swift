@@ -93,7 +93,9 @@ struct ContentView: View {
                         .accessibilityIdentifier("first-launch-hint")
                 }
             }
-            .ignoresSafeArea()
+            // The 3D scene fills the screen (it owns its own ignoresSafeArea),
+            // but the chrome stays inside the safe area: on a notched phone
+            // the old full-screen ignore put the buttons under the home bar.
             .sheet(isPresented: $showInstrument) {
                 InstrumentSheet(controller: controller)
                     .presentationDetents([.medium, .large])
@@ -320,7 +322,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
             }
@@ -340,7 +342,7 @@ struct ContentView: View {
                 Label(Copy.time, systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 18))
-                    .frame(width: 46, height: 46)
+                    .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
             }
@@ -354,7 +356,7 @@ struct ContentView: View {
                 Label(Copy.skills, systemImage: "sparkles")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 18))
-                    .frame(width: 46, height: 46)
+                    .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
             }
@@ -377,7 +379,7 @@ struct ContentView: View {
                 Label(Copy.quack, systemImage: "waveform")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 18))
-                    .frame(width: 46, height: 46)
+                    .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
             }
@@ -394,7 +396,7 @@ struct ContentView: View {
                 Label(Copy.flashlight, systemImage: "flashlight.on.fill")
                     .labelStyle(.iconOnly)
                     .font(.system(size: 18))
-                    .frame(width: 46, height: 46)
+                    .frame(width: 48, height: 48)
                     .background(
                         controller.flashlightColor == nil
                             ? AnyShapeStyle(.ultraThinMaterial)
@@ -420,7 +422,7 @@ struct ContentView: View {
                 )
                 .labelStyle(.iconOnly)
                 .font(.system(size: 18))
-                .frame(width: 46, height: 46)
+                .frame(width: 48, height: 48)
                 .background(
                     controller.carrying
                         ? AnyShapeStyle(Color.white.opacity(0.32))

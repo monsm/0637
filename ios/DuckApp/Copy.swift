@@ -160,6 +160,8 @@ enum Copy {
     static var behavior: String { pick("behaviour", "此刻") }
     static var menu: String { pick("Menu", "菜单") }
     static var trickBook: String { pick("Trick book", "技巧图鉴") }
+    static var showMore: String { pick("More", "更多") }
+    static var showLess: String { pick("Less", "收起") }
     static var depth: String { pick("depth", "深度") }
     static var provenance: String { pick("Provenance", "出处") }
     static var reload: String { pick("Reload AI", "重载 AI") }

@@ -7,16 +7,37 @@ struct InstrumentSheet: View {
     /// Flipping the language re-renders the sheet's computed strings.
     @State private var languageTick = 0
 
+    /// The sheet's first screen is the time machine and the living duck:
+    /// what it is doing, its face, its history. The dense telemetry, the
+    /// phone's own sensors and the provenance hash live behind "More" —
+    /// they are answers to questions a person asks rarely, and eleven
+    /// always-open rows made the sheet a wall of text on a small screen.
+    @State private var showDetails = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 timeMachine
-                telemetry
                 face
-                sensors
+                behaviorRow
+                trickRow
                 voiceCommands
-                provenance
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { showDetails.toggle() }
+                } label: {
+                    Label(
+                        showDetails ? Copy.showLess : Copy.showMore,
+                        systemImage: showDetails ? "chevron.up" : "chevron.down"
+                    )
+                    .font(.system(size: 12, design: .rounded))
+                }
+                .buttonStyle(.bordered)
+                if showDetails {
+                    telemetry
+                    sensors
+                    provenance
+                }
                 footer
             }
             .padding(20)
@@ -24,6 +45,16 @@ struct InstrumentSheet: View {
         .background(Color(red: 0.055, green: 0.075, blue: 0.10))
         .id(languageTick)
         .preferredColorScheme(.dark)
+    }
+
+    /// The behaviour row already lived in telemetry; up here it is one of the
+    /// two lines that answer "what is it doing right now".
+    private var behaviorRow: some View {
+        row(Copy.behavior, controller.behaviorSummary)
+    }
+
+    private var trickRow: some View {
+        row(Copy.trickBook, controller.trickBook)
     }
 
     private var header: some View {
@@ -156,12 +187,6 @@ struct InstrumentSheet: View {
                 .accessibilityIdentifier("drive-mode")
             }
             row(Copy.imu, controller.imuReady ? Copy.yes : Copy.no)
-            // What the duck is doing with its head when nobody is steering:
-            // an emotion timeline, or the idle look-around. The row is the
-            // evidence that this is an animal, not a frozen model.
-            row(Copy.behavior, controller.behaviorSummary)
-            // The trick book: the duck's own history, not a menu.
-            row(Copy.trickBook, controller.trickBook)
             row(Copy.held, controller.pickedUp ? Copy.yes : Copy.no)
             if controller.hasMouth {
                 row(Copy.mouth, String(format: "%.2f", controller.mouth))

@@ -88,6 +88,8 @@ object Copy {
     val unavailable get() = pick("unavailable", "不可用")
     val behavior get() = pick("behaviour", "此刻")
     val trickBook get() = pick("Trick book", "技巧图鉴")
+    val showMore get() = pick("More", "更多")
+    val showLess get() = pick("Less", "收起")
 
     // The face: the status LED, the four-light battery gauge and the
     // flashlight, all published on /state.leds.
