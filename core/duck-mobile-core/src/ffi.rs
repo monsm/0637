@@ -446,13 +446,21 @@ pub unsafe extern "C" fn duck_core_start_intent_server(
 /// one-shots; `sit`, `stand` and `ground_pick` are the loop's own verbs, and a
 /// client cannot discover what `/skills` never names. `/skill` accepts all
 /// three, so the list and the route agree.
-fn published_skills(mut names: Vec<String>) -> Vec<String> {
+fn published_skills(names: Vec<String>) -> Vec<String> {
+    // `robotd::queue_skill` resolves built-ins first, then the manifest's
+    // one-shots; the emotion timelines come from the release library, last.
+    // Keep `/skills` in that order so a client reading the list sees the
+    // same priority the scheduler uses.
+    let mut out = Vec::with_capacity(names.len() + 3);
     for builtin in ["sit", "stand", "ground_pick"] {
-        if !names.iter().any(|name| name == builtin) {
-            names.push(builtin.to_owned());
+        out.push(builtin.to_owned());
+    }
+    for name in names {
+        if !out.iter().any(|seen| seen == &name) {
+            out.push(name);
         }
     }
-    names
+    out
 }
 
 /// The scene for a mode: the roller has its own feet, so it has its own MJCF
