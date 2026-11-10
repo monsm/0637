@@ -1479,6 +1479,13 @@ pub unsafe extern "C" fn duck_core_step(core: *mut DuckCore, ticks: c_int) {
         let _ = core.runtime.tick();
     }
     core.runtime.set_paused(was_paused);
+    // The published state comes from the last report: without this the shell
+    // would keep showing the pose from before the step.
+    if let Some(report) = core.runtime.last_report() {
+        core.label = report.label.clone();
+        core.last = Some(report);
+        publish_state(core);
+    }
 }
 
 /// Step back to a saved tick. Returns 0 when the rewind landed.
@@ -1506,6 +1513,13 @@ pub unsafe extern "C" fn duck_core_seek(core: *mut DuckCore, back_ticks: c_int) 
         return -1;
     }
     core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
+    // The published state must follow the rewind: the duck is somewhere
+    // else now, and the shell would keep showing where it was.
+    if let Some(report) = core.runtime.last_report() {
+        core.label = report.label.clone();
+        core.last = Some(report);
+    }
+    publish_state(core);
     0
 }
 
