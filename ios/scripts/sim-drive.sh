@@ -375,6 +375,26 @@ printf '%s' "$BAD" | grep -q '"ok":false'
 check $? "an unknown mode is refused" "$(printf '%s' "$BAD" | head -c 120)"
 wait_idle 80 > /dev/null
 
+# ---------------------------------------------------------------- shutdown
+# The physical power-off is a sequence: sit, ease into the rest pose, cut
+# torque. The app has no systemd, so "off" is what it is physically — limp,
+# latched, and published — and /power brings it back.
+echo "--- shutdown ---"
+api POST /shutdown '{}' > /dev/null
+check $? "shutdown accepted" ""
+OFF=$(poll_state label off 30 0.5)
+[ "$OFF" = "off" ]; check $? "the duck sits, rests and powers off" "label=$OFF"
+POWERED=$(api GET /state | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('powered_off'))
+" 2>/dev/null || echo "")
+[ "$POWERED" = "True" ]; check $? "the state reports powered off" "powered_off=$POWERED"
+api POST /power '{}' > /dev/null
+check $? "power-on accepted" ""
+BACK_UP=$(poll_state bringup 2 40 0.5)
+[ "$BACK_UP" = "2" ]; check $? "the duck powers back on" "bringup=$BACK_UP"
+wait_idle 80 > /dev/null
+
 # ---------------------------------------------------------------- carry
 # A hand on the duck is an external force on the trunk, not a joint target.
 # Carrying it must lift the body and leave the policy in charge of nothing.
