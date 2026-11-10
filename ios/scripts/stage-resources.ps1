@@ -12,13 +12,21 @@ if (-not (Test-Path $src))  { throw "missing $src - clone microduck_rl into upst
 if (-not (Test-Path (Join-Path $root 'policies'))) { throw "missing policies/ - download the official ONNX set first" }
 
 if (Test-Path $dst) { Remove-Item $dst -Recurse -Force -Confirm:$false }
-New-Item -ItemType Directory -Force (Join-Path $dst 'robot\microduck\assets'), (Join-Path $dst 'policies') | Out-Null
+New-Item -ItemType Directory -Force (Join-Path $dst 'robot\microduck\assets'), (Join-Path $dst 'policies'), (Join-Path $dst 'models') | Out-Null
 
 Copy-Item (Join-Path $src '*.xml') (Join-Path $dst 'robot\microduck') -Force
 Copy-Item (Join-Path $src 'assets\*.stl') (Join-Path $dst 'robot\microduck\assets') -Force
 Copy-Item (Join-Path $root 'policies\*.onnx') (Join-Path $dst 'policies') -Force
 $manifest = Join-Path $root 'policies\manifest.json'
 if (Test-Path $manifest) { Copy-Item $manifest (Join-Path $dst 'policies') -Force }
+$pickup = Join-Path $root 'upstream\microduck\duck-control\models\pickup_detector.onnx'
+if (Test-Path $pickup) { Copy-Item $pickup (Join-Path $dst 'models\pickup_detector.onnx') -Force }
+# `robotd/emotions/`: the real duck's thirteen scripted moods and voices.
+$emotions = Join-Path $root 'upstream\microduck\robotd\emotions'
+if (Test-Path $emotions) {
+  New-Item -ItemType Directory -Force (Join-Path $dst 'emotions') | Out-Null
+  Copy-Item (Join-Path $emotions '*.json'), (Join-Path $emotions '*.wav') (Join-Path $dst 'emotions') -Force
+}
 
 # The shader lives outside $dst so the wipe above cannot delete it; the
 # renderer needs it in the bundle or the 3D view stays black.

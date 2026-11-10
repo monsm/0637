@@ -269,12 +269,20 @@ object AssetStager {
         val root = File(context.filesDir, "duck")
         val marker = File(root, "robot/microduck/scene_backlash.xml")
         val pickup = File(root, "models/pickup_detector.onnx")
-        if (marker.exists() && pickup.exists()) return root
+        // The emotion timelines are part of the marker: an install upgraded
+        // from a build without them would otherwise keep the old filesDir
+        // and silently lose all 13 skills.
+        val emotions = File(root, "emotions/curious.json")
+        if (marker.exists() && pickup.exists() && emotions.exists()) return root
         copy(context, "robot", File(root, "robot"))
         copy(context, "policies", File(root, "policies"))
         // The pickup classifier ships beside the policies but is not one.
         if (!context.assets.list("models").isNullOrEmpty()) {
             copy(context, "models", File(root, "models"))
+        }
+        // `robotd/emotions/`: thirteen keyframe timelines and their voices.
+        if (!context.assets.list("emotions").isNullOrEmpty()) {
+            copy(context, "emotions", File(root, "emotions"))
         }
         return root
     }

@@ -74,6 +74,13 @@ pub struct DuckCore {
     /// the length and then for the samples, and rendering twice would pick the
     /// next variant — a different length, and a buffer overrun.
     rendered_sound: Option<(String, Vec<f32>)>,
+    /// The tag `duck_core_next_sound` last returned. A static CStr per synth
+    /// tag cannot name an emotion loaded at runtime, so the pointer the
+    /// platform holds belongs to this owned slot (valid until the next call).
+    sound_tag: Option<CString>,
+    /// Where the emotions came from, so a mode switch can re-attach them to
+    /// the fresh runtime (the same reason `pickup_model` is carried over).
+    emotions_dir: Option<std::path::PathBuf>,
     /// Where this duck came from, so a mode switch can load the other bundle
     /// and its scene.
     scene: String,
@@ -258,6 +265,8 @@ pub unsafe extern "C" fn duck_core_new(
             sensors: crate::sensors::Sensors::default(),
             notice: None,
             rendered_sound: None,
+            sound_tag: None,
+            emotions_dir: None,
             scene: scene.clone(),
             policies: policies.clone(),
             performance: (0.0, 0.0),
@@ -351,8 +360,10 @@ pub unsafe extern "C" fn duck_core_load_emotions(
     let Ok(path) = c_string(dir) else {
         return -1;
     };
-    match (*core).runtime.load_emotions(std::path::Path::new(&path)) {
+    let dir = std::path::PathBuf::from(path.as_str());
+    match (*core).runtime.load_emotions(dir.as_path()) {
         Ok(count) => {
+            (*core).emotions_dir = Some(dir);
             // `/skills` is a snapshot the intent server owns, so publish the
             // enlarged list before a client asks for it.
             let names = published_skills((*core).runtime.skill_names());
@@ -521,6 +532,13 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     // watch on the new runtime, or it silently disappears for the session.
     if let Some(model) = core.runtime.pickup_model().map(Path::to_path_buf) {
         let _ = runtime.load_pickup(&model);
+    }
+
+    // The emotion timelines are part of the duck, not of the body: the fresh
+    // runtime above was built without them, so re-attach the same official
+    // data or `robot.do curious` vanishes after a mode switch.
+    if let Some(dir) = &core.emotions_dir {
+        let _ = runtime.load_emotions(dir);
     }
 
     // A different body is a different duck: the old timeline and branches
@@ -953,6 +971,7 @@ fn publish_state(core: &DuckCore) {
         },
         "powered_off": active.powered_off(),
         "carrying": active.carrying(),
+        "last_sound": active.last_sound(),
         "emotion": active.emotion_state().map(|(name, elapsed, duration)| {
             json!({ "name": name, "elapsed_s": elapsed, "duration_s": duration })
         }),
@@ -1165,8 +1184,8 @@ pub unsafe extern "C" fn duck_core_carry(
 }
 
 /// The next sound the duck wants played, as a tag the platform looks up.
-/// `NULL` when nothing is queued. The tag is a static string; the shell owns
-/// the speaker and the PCM.
+/// `NULL` when nothing is queued. The pointer stays valid until the next
+/// call to this function; the shell owns the speaker and the PCM.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_next_sound(core: *mut DuckCore) -> *const c_char {
     if core.is_null() {
@@ -1176,29 +1195,16 @@ pub unsafe extern "C" fn duck_core_next_sound(core: *mut DuckCore) -> *const c_c
     let Some(tag) = core.runtime.take_sound() else {
         return std::ptr::null();
     };
-    // Render here, once, so the platform's two calls (length, then samples)
-    // see the same sound. `Voice::render` advances the variant, so rendering
-    // twice would hand back a different length than the caller allocated.
-    if let Some(pcm) = core.runtime.render_sound(&tag) {
-        core.rendered_sound = Some((tag.clone(), pcm));
-    }
-    // `c"..."` is a NUL-terminated static, so the pointer stays valid for as
-    // long as the caller holds it and nothing is allocated per sound.
-    let tag: &'static std::ffi::CStr = match tag.as_str() {
-        "greet" => c"greet",
-        "chirp" => c"chirp",
-        "coo" => c"coo",
-        "peck" => c"peck",
-        "inquire" => c"inquire",
-        "alarm" => c"alarm",
-        _ => return std::ptr::null(),
-    };
-    tag.as_ptr()
+    // An emotion's voice is the official wav, rendered through the same
+    // `render_sound` cache as a synthesized chirp. The tag is dynamic, so it
+    // cannot be one of six static C string literals: keep it in an owned slot
+    // and hand out its pointer, exactly like `meshes` / `skills` do.
+    core.sound_tag = CString::new(tag).ok();
+    core.sound_tag
+        .as_ref()
+        .map_or(std::ptr::null(), |value| value.as_ptr())
 }
 
-/// Render one sound to mono f32 PCM at `duck_core_voice_rate()`. Returns the
-/// sample count; fills `out` when non-null and large enough. The duck's voice
-/// is a synth, not a sample bank: this is how a platform gets the audio.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_render_sound(
     core: *mut DuckCore,

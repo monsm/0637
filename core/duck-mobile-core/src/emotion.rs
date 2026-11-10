@@ -34,6 +34,15 @@ struct Key {
     head_roll: f64,
     #[serde(default)]
     body_pitch: f64,
+    /// Body height; `Frame::apply` puts this in the pose's z slot. All shipped
+    /// emotions leave it at zero, but the field is part of the wire format.
+    #[serde(default)]
+    body_z: Option<f64>,
+    /// An emotion holds the duck still: upstream's Frame::apply zeroes the
+    /// twist. Every shipped timeline carries [0,0,0]; parse it so a future
+    /// one that walks is not silently ignored.
+    #[serde(default)]
+    twist: Option<[f64; 3]>,
     #[serde(default)]
     mouth: f64,
     /// `devastated` sits the duck down partway through. The controller owns
@@ -54,6 +63,9 @@ struct File {
 pub struct EmotionFrame {
     pub head: [f64; 4],
     pub body: [f64; 3],
+    /// The twist this timeline asks for; `None` means "hold still", which is
+    /// what `Frame::apply` does to the Snapshot.
+    pub twist: Option<[f64; 3]>,
     pub mouth: f64,
 }
 
@@ -102,7 +114,15 @@ impl Emotion {
                 mix(a.head_yaw, b.head_yaw),
                 mix(a.head_roll, b.head_roll),
             ],
-            body: [0.0, 0.0, mix(a.body_pitch, b.body_pitch)],
+            body: [mix(a.body_z.unwrap_or(0.0), b.body_z.unwrap_or(0.0)), 0.0, mix(a.body_pitch, b.body_pitch)],
+            twist: a.twist.map(|from| {
+                let to = b.twist.unwrap_or(from);
+                [
+                    mix(from[0], to[0]),
+                    mix(from[1], to[1]),
+                    mix(from[2], to[2]),
+                ]
+            }),
             mouth: mix(a.mouth, b.mouth),
         }
     }
@@ -237,8 +257,8 @@ mod tests {
         let emotion = Emotion {
             name: "test".into(),
             keys: vec![
-                Key { t: 0.0, neck: 0.0, head_pitch: 0.0, head_yaw: 0.0, head_roll: 0.0, body_pitch: 0.0, mouth: 0.0, skill: None },
-                Key { t: 1.0, neck: 0.0, head_pitch: 0.0, head_yaw: 1.0, head_roll: 0.0, body_pitch: 0.0, mouth: 0.0, skill: None },
+                Key { t: 0.0, neck: 0.0, head_pitch: 0.0, head_yaw: 0.0, head_roll: 0.0, body_pitch: 0.0, body_z: None, twist: None, mouth: 0.0, skill: None },
+                Key { t: 1.0, neck: 0.0, head_pitch: 0.0, head_yaw: 1.0, head_roll: 0.0, body_pitch: 0.0, body_z: None, twist: None, mouth: 0.0, skill: None },
             ],
             pcm: vec![],
             sit_due: None,

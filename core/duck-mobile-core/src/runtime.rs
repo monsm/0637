@@ -418,6 +418,17 @@ pub struct DuckRuntime<T: RobotIo> {
     idle_head: crate::control::IdleHead,
     /// The last idle offset, published so a client can see the duck is alive.
     last_idle: crate::control::IdleOffset,
+    /// The last sound the core queued, published so a client can tell that an
+    /// emotion's official wav really reached the speaker channel.
+    last_sound: Option<String>,
+    /// Rising edges for the duck's own voice: robotd coos when a hand picks
+    /// it up, alarms when it falls, and inquires when motion resumes after a
+    /// long stillness. Three of the six synthesized tags were dead code.
+    last_pickup_paused: bool,
+    last_fallen: bool,
+    last_moving: bool,
+    /// Simulated clock of the last reaction, so a noisy edge cannot spam.
+    last_reaction: Option<u64>,
     /// `robotd/emotions/`: thirteen keyframe timelines with their own voices.
     /// Loaded from the app bundle, not baked in, so the data stays upstream's.
     emotions: crate::emotion::Library,
@@ -499,6 +510,11 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_head: crate::control::IdleHead::new(robotd_params::IdleParams::default(), 0xD0C),
             idle_params: robotd_params::IdleParams::default(),
             last_idle: crate::control::IdleOffset::default(),
+            last_sound: None,
+            last_pickup_paused: false,
+            last_fallen: false,
+            last_moving: false,
+            last_reaction: None,
             emotions: crate::emotion::Library::default(),
             emotion_playing: None,
             last_head_command: TickTime::default(),
@@ -595,6 +611,7 @@ impl<T: RobotIo> DuckRuntime<T> {
                 self.sounds.pop_front();
             }
             self.sounds.push_back(tag.to_owned());
+            self.last_sound = Some(tag.to_owned());
         }
     }
 
@@ -873,6 +890,10 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.emotions.names()
     }
 
+    pub fn last_sound(&self) -> Option<&str> {
+        self.last_sound.as_deref()
+    }
+
     /// The idle look-around's gain and the head command it last produced.
     /// Read by `/state` so a "dumb, motionless duck" is a measurable failure
     /// rather than a matter of opinion.
@@ -988,6 +1009,9 @@ impl<T: RobotIo> DuckRuntime<T> {
         if let Some(model) = &self.pickup_model {
             let _ = fork.load_pickup(model);
         }
+        // The emotions are data, not hardware: a fork must keep its own copy
+        // or `robot.do curious` silently vanishes on every branch.
+        fork.emotions = self.emotions.clone();
         let checkpoint = self.checkpoint()?;
         if !fork.restore(&checkpoint) {
             return None;
@@ -1606,6 +1630,11 @@ impl<T: RobotIo> DuckRuntime<T> {
                     command.body.z = frame.body[0];
                     command.body.roll = frame.body[1];
                     command.body.pitch = frame.body[2];
+                    // `Frame::apply` zeroes the Snapshot's twist: an emotion
+                    // holds the duck still. Every shipped timeline carries
+                    // [0,0,0]; honour a future one that asks to move.
+                    command.twist = frame.twist.unwrap_or([0.0; 3]);
+                    self.twist_ema = command.twist;
                     self.head_ema = frame.head;
                     self.body_ema = frame.body;
                     // A fresh head command keeps IdleHead out of the way, the
@@ -1653,6 +1682,34 @@ impl<T: RobotIo> DuckRuntime<T> {
             command.body.z += idle.body_z;
         }
 
+        // The duck's voice reacts to the world, on rising edges only. robotd
+        // coos in a hand, alarms on a fall, and inquires when the pad comes
+        // back after a long stillness; a two-second cooldown keeps a bouncing
+        // classifier from turning one pickup into a chorus.
+        let moving = command.twist.iter().any(|value| value.abs() > 1e-3);
+        let cooldown = self
+            .last_reaction
+            .is_none_or(|tick| self.clock.tick.saturating_sub(tick) >= 100);
+        let mut reaction = None;
+        if pickup_paused && !self.last_pickup_paused {
+            reaction = Some("coo");
+        } else if self.safety.fallen() && !self.last_fallen {
+            reaction = Some("alarm");
+        } else if moving && !self.last_moving && cooldown && !emotion_frame.is_some() {
+            // Only after a real stillness, so ordinary walking does not chirp
+            // at every deadman keepalive.
+            if self.last_idle.takeover > 0.5 {
+                reaction = Some("inquire");
+            }
+        }
+        if let Some(tag) = reaction {
+            self.queue_sound(tag);
+            self.last_reaction = Some(self.clock.tick);
+        }
+        self.last_pickup_paused = pickup_paused;
+        self.last_fallen = self.safety.fallen();
+        self.last_moving = moving;
+
         let mut targets = hold;
         let mut gain = 200;
         if pickup_paused {
@@ -1667,7 +1724,10 @@ impl<T: RobotIo> DuckRuntime<T> {
                 .step(
                     &sensors,
                     &command,
-                    self.body_active,
+                    // An emotion's Frame::apply sets PoseIntent.active for
+                    // this tick only; the client's own body hold is restored
+                    // untouched when the timeline ends.
+                    self.body_active || emotion_frame.is_some(),
                     self.dt.as_secs_f64(),
                     1.0,
                 )

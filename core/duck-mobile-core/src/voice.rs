@@ -12,17 +12,19 @@
 
 use crate::personality::Personality;
 
-/// The tags `robotd` plays, in its own spelling.
-pub const TAGS: [&str; 6] = ["greet", "chirp", "coo", "peck", "inquire", "alarm"];
+/// The tags `robotd` plays, in its own spelling — all seven of them.
+/// `wheee` is the held joy-ride: upstream streams start/loop/end, and the
+/// recipe also renders a finite one-shot (start + two loops + end). A phone
+/// has no pad button held down, so the finite form is what `/sound` plays;
+/// it is still the official recipe, not a stand-in.
+pub const TAGS: [&str; 7] = ["greet", "chirp", "coo", "peck", "inquire", "alarm", "wheee"];
 
-/// The recipe for a tag, from the shared table. `wheee` is the held joy-ride
-/// and is segmented (start/loop/end), so it is not a one-shot here.
+/// The recipe for a tag, from the shared table.
 fn recipe(tag: &str) -> Option<fn(&Personality, u32) -> Vec<f32>> {
     crate::TAGS
         .iter()
         .find(|(name, _)| *name == tag)
         .map(|(_, recipe)| *recipe)
-        .filter(|_| tag != "wheee")
 }
 
 /// The duck's voice: one personality, derived once from a stable seed.
@@ -39,14 +41,14 @@ pub struct Voice {
     /// the same idea without a source of entropy a replayed tick would diverge
     /// on. Per tag, because one shared counter would make a chirp after a greet
     /// start at variant 2 rather than at the tag's own first.
-    plays: [u64; 6],
+    plays: [u64; 7],
 }
 
 impl Voice {
     pub fn new(seed: u32) -> Self {
         Self {
             personality: Personality::from_seed(seed),
-            plays: [0; 6],
+            plays: [0; 7],
         }
     }
 

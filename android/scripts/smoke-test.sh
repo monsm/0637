@@ -87,11 +87,26 @@ done
 # publishes which one the loop is playing, so a dead loader cannot pass.
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"name":"curious"}' http://127.0.0.1:8765/skill > /dev/null || true
 sleep 0.4
-if ! curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -q '"name":"curious"'; then
+STATE_EMOTION=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
+if ! echo "$STATE_EMOTION" | grep -q '"name":"curious"'; then
   echo "::error::/state.emotion does not report the curious timeline"
   exit 1
 fi
+if ! echo "$STATE_EMOTION" | grep -q '"last_sound":"emotion:curious"'; then
+  echo "::error::the emotion's official wav never reached the sound queue"
+  exit 1
+fi
 # The duck's own senses reach the API, not just its commands.
+# The staged bundle must carry all 13 official timelines, not just publish
+# their names: an AssetStager that skipped the directory would otherwise
+# pass the earlier checks and fail only when a user taps an emotion.
+STAGED=$(find android/app/src/main/assets/emotions -maxdepth 1 -name '*.json' 2>/dev/null | wc -l)
+if [ "$STAGED" -lt 13 ]; then
+  echo "::error::only $STAGED emotion timelines staged in the app bundle"
+  exit 1
+fi
+echo "emotions staged: $STAGED"
+
 for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"' '"performance"'; do
   if ! echo "$STATE" | grep -q "$needle"; then
     echo "::error::/state does not publish $needle"

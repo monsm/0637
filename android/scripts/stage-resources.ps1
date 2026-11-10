@@ -18,6 +18,12 @@ $manifest = Join-Path $root 'policies\manifest.json'
 if (Test-Path $manifest) { Copy-Item $manifest (Join-Path $dst 'policies') -Force }
 $pickup = Join-Path $root 'upstream\microduck\duck-control\models\pickup_detector.onnx'
 if (Test-Path $pickup) { Copy-Item $pickup (Join-Path $dst 'models\pickup_detector.onnx') -Force }
+# `robotd/emotions/`: thirteen keyframe timelines and their 48 kHz voices.
+$emotions = Join-Path $root 'upstream\microduck\robotd\emotions'
+if (Test-Path $emotions) {
+  New-Item -ItemType Directory -Force (Join-Path $dst 'emotions') | Out-Null
+  Copy-Item (Join-Path $emotions '*.json'), (Join-Path $emotions '*.wav') (Join-Path $dst 'emotions') -Force
+}
 
 $size = (Get-ChildItem $dst -Recurse -File | Measure-Object Length -Sum).Sum
 "staged Android assets ($([math]::Round($size/1MB,1)) MB)"
