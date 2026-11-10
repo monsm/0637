@@ -219,6 +219,16 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 
 ---
 
+## 四之六、相机/AR、roller 模式与帧间插值（2026-11-10 第四批）
+
+| 项 | 实现 | 验证 |
+|---|---|---|
+| **Director 相机** | 系统预览层（iOS `AVCaptureVideoPreviewLayer` / Android CameraX `PreviewView`）放在 3D 视图**后面**，3D 视图清屏透明、跳过原来的 4 m 影棚地板；物理地面仍在 z=0。相机不进 61 维观测，也没有逐帧回调，50 Hz 循环不受影响 | 权限在进入 Director 时才请求；相机按 1 Hz 把尺寸/帧率/曝光/FOV 作为 `mode:"ar"` 发到 `/sensor`；模拟器/模拟机没有相机时保持影棚外观，UI 测试进出 Director 并断言鸭子仍在走 |
+| **roller 模式** | 按上游语义做成**整套 bundle 切换**：`roller.onnx` 作主动力网络、`stand=None` 且 `set_standing_disabled(true)`、`roller_crouch` 顶替 ground pick（周期 5.0 s / end_phase 0.7 / action_scale 0.8）、技能与 sit/stand 不变（上游对技能**不按模式过滤**）。场景换成 `scene_rollers.xml`，切换时重建运行时、bump 模型代数（两端渲染器据此重建网格）、清空时间轴与分叉、按上游习惯叫一声（roller 两声） | `/mode` 与 MCP `duck_mode`；单元测试断言 bundle 解析；本地 MuJoCo 测试断言 roller 场景可加载且仍是 14 个执行器；CI 切换 roller→walk 并断言状态、技能、未知模式拒绝 |
+| **帧间插值** | 保存最近两个 tick 的全身位姿，按 elapsed/20 ms 混合位置与四元数（双覆盖符号处理）+ 归一化；相机跟随插值后的躯干而不是 10 Hz 状态采样 | iOS 主线程快照；Android 由循环线程写入 `PoseHistory`、GL 线程读取（带锁），GL 线程从不碰 MuJoCo |
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
@@ -252,11 +262,11 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 | 项 | 状态 |
 |---|---|
 | iOS 真机 IPA | 流水线就绪，等签名凭据 |
-| 相机 / LiDAR / AR 模式 | 传感器读数与 8×8 ToF 降采样已实现（`/sensors`）；把相机画面合成进 3D 场景未实现 |
+| 相机 / LiDAR / AR 模式 | ✅ 系统相机预览层作背景（Director 模式）；LiDAR 深度读数与 8×8 ToF 降采样在 `/sensors`；未做 ARKit/ARCore 跟踪与平面锚定 |
 | 扬声器 | ✅ 官方声码合成器编译进核心，两端已接扬声器 |
 | 麦克风 | 读数通道已实现（`/sensors`，可作惊吓/咕咕的反应源）；真机常开监听未实现 |
-| roller 模式 | 需 manifest 级模式切换（换主动力网络），未实现 |
-| 渲染器 PBR / 阴影 / 帧间插值 | 当前为基础 PBR + 单光源，未做插值 |
+| roller 模式 | ✅ 整套 bundle + roller 场景切换；`/mode`、MCP `duck_mode`、两端界面切换 |
+| 渲染器 PBR / 阴影 / 帧间插值 | ✅ PBR + 接触阴影 + 两 tick 位姿插值；未做多光源/阴影贴图 |
 | Android 真机实测 | CI 仅覆盖模拟器（API 30 x86_64）；arm64 真机未跑 |
 | 性能指标（帧率/功耗） | 未采集 |
 
