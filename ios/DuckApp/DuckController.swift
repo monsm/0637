@@ -341,6 +341,7 @@ final class DuckController: ObservableObject {
 
     deinit {
         timer?.invalidate()
+        sensorTimer?.invalidate()
         motion.stopDeviceMotionUpdates()
         if let core {
             duck_core_free(core)
@@ -411,7 +412,15 @@ final class DuckController: ObservableObject {
         guard let core else { return }
         let now = Date()
         let elapsed = now.timeIntervalSince(perfAnchor)
-        guard elapsed > 0.5 else { return }
+        // A window that spans app suspension, a mode switch or a long main
+        // thread stall is not a frame rate: it would publish a false ~0 and
+        // then an inflated catch-up number. Discard it and start fresh.
+        guard elapsed > 0.5, elapsed < 2.0 else {
+            frameCount = 0
+            tickCount = 0
+            perfAnchor = now
+            return
+        }
         duck_core_set_performance(core, Double(frameCount) / elapsed, Double(tickCount) / elapsed)
         frameCount = 0
         tickCount = 0
@@ -507,10 +516,15 @@ final class DuckController: ObservableObject {
         let y = deadzone(Float(joystick.y))
         duck_core_set_twist(core, Double(-y) * 0.4, 0.0, Double(-x) * 1.0)
         // Paused or slowed: the timer keeps firing, simulation time does not.
+        // duck_core_tick returns 0 even for a paused no-op, so count the
+        // simulation clock's advance instead: at 0.5x that is 25 Hz, at 2x
+        // 100 Hz, and a frozen duck reports 0 rather than a fake 50.
         var stepped = false
+        let before = duck_core_tick_index(core)
         for _ in 0..<ticksForThisFrame() {
-            if duck_core_tick(core) == 0 { stepped = true; tickCount += 1 }
+            if duck_core_tick(core) == 0 { stepped = true }
         }
+        tickCount += Int(duck_core_tick_index(core) - before)
         // One snapshot per frame, after the steps: the renderer interpolates
         // between this and the previous one, so the duck moves at the display
         // rate rather than in 20 ms steps.

@@ -90,6 +90,11 @@ class DuckCore(
         if (handle != 0L) nativeRenderSound(handle, tag) ?: FloatArray(0) else FloatArray(0)
     }
 
+    /** The simulation clock's tick, read under the same lock as [tick]. */
+    fun tickIndex(): Long = synchronized(lock) {
+        if (handle != 0L) nativeTickIndex(handle) else 0L
+    }
+
     /** The platform's own measurements, once a second: fps and ticks/s. */
     fun setPerformance(fps: Double, tps: Double) = synchronized(lock) {
         if (handle != 0L) nativeSetPerformance(handle, fps, tps)
@@ -211,6 +216,7 @@ class DuckCore(
         @JvmStatic private external fun nativeNew(scene: String, policies: String): Long
         @JvmStatic private external fun nativeFree(handle: Long)
         @JvmStatic private external fun nativeTick(handle: Long): Int
+        @JvmStatic private external fun nativeTickIndex(handle: Long): Long
         @JvmStatic private external fun nativePaused(handle: Long): Boolean
         @JvmStatic private external fun nativeSpeed(handle: Long): Double
         @JvmStatic private external fun nativeSetPaused(handle: Long, paused: Boolean)

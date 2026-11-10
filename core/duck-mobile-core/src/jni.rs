@@ -25,6 +25,7 @@ use crate::ffi::{
     duck_core_push, duck_core_reload_policies, duck_core_render_qpos, duck_core_set_body,
     duck_core_set_head, duck_core_set_twist, duck_core_sit_toggle, duck_core_skill_count,
     duck_core_skill_name, duck_core_start_intent_server, duck_core_status, duck_core_tick,
+    duck_core_tick_index,
     duck_core_trigger_skill, DuckCore, DuckStatus,
 };
 
@@ -191,6 +192,20 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeLoadPickup(
 }
 
 /// The next sound the duck wants, as a tag; `null` when none is queued.
+/// The simulation clock's tick, so the platform can count achieved steps
+/// without mistaking a paused no-op for a step.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeTickIndex(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jlong {
+    if handle == 0 {
+        return 0;
+    }
+    unsafe { duck_core_tick_index(handle as *mut DuckCore) as jlong }
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetPerformance(
     _env: JNIEnv,

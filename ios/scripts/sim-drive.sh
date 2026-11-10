@@ -221,7 +221,17 @@ printf '%s' "$PROPRIO" | grep -q '"targets"'
 check $? "commanded joint targets are published" ""
 printf '%s' "$PROPRIO" | grep -q '"performance"'
 check $? "state publishes the platform's own performance" ""
-PERF_TPS=$(printf '%s' "$PROPRIO" | grep -oE '"ticks_per_second":[0-9.]+' | head -1 | cut -d: -f2)
+# The counters are written once a second; a single fetch taken just before
+# the first report legitimately reads 0. Poll for a real measurement rather
+# than failing a correctly wired build on a timing race.
+PERF_TPS=""
+for _ in $(seq 1 30); do
+  PERF_TPS=$(api GET /state | grep -oE '"ticks_per_second":[0-9.]+' | head -1 | cut -d: -f2)
+  case "$PERF_TPS" in
+    ''|0|0.0) sleep 1 ;;
+    *) break ;;
+  esac
+done
 case "$PERF_TPS" in
   ''|0|0.0) check 1 "performance ticks_per_second is $PERF_TPS — counters not wired" "" ;;
   *) check 0 "the control loop reports $PERF_TPS ticks/s" "" ;;

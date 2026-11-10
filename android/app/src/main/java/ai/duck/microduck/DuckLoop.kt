@@ -27,6 +27,7 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
         scheduler.scheduleAtFixedRate(
             {
                 try {
+                    val before = core.tickIndex()
                     // Keepalive: the core has robotd's 500 ms twist deadman.
                     core.setTwist(input.vx, 0.0, input.wz)
                     // Always tick at least once: the core drains the intent
@@ -49,14 +50,12 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
                     }
                     // One snapshot per frame, so the renderer can blend the
                     // last two ticks instead of showing 20 ms steps.
-                    if (stepped) {
-                        core.poses.capture(core)
-                        // Simulation ticks actually achieved: at 0.5x speed
-                        // the scheduler still fires at 50 Hz but only 25
-                        // ticks advance MuJoCo, and that is the number the
-                        // instrument should show.
-                        input.ticks.incrementAndGet()
-                    }
+                    val after = core.tickIndex()
+                    if (stepped) core.poses.capture(core)
+                    // The simulation clock's advance, not the number of
+                    // scheduler firings: at 0.5x it is 25, at 2x it is 100,
+                    // and a paused no-op is zero.
+                    input.ticks.addAndGet((after - before).toInt().coerceAtLeast(0))
                     val now = System.nanoTime()
                     if (lastReport == 0L) lastReport = now
                     val elapsed = (now - lastReport) / 1_000_000_000.0
@@ -64,7 +63,13 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
                         lastReport = now
                         val frames = input.frames.getAndSet(0)
                         val ticks = input.ticks.getAndSet(0)
-                        core.setPerformance(frames / elapsed, ticks / elapsed)
+                        // A mode switch holds the core lock across a full
+                        // model reload, and a long GC pause does the same:
+                        // neither window is a frame rate. Discard it rather
+                        // than publish a false low followed by a catch-up.
+                        if (elapsed < 3.0) {
+                            core.setPerformance(frames / elapsed, ticks / elapsed)
+                        }
                     }
                 } catch (_: Throwable) {
                     // A tick that throws must not stop the schedule; the next

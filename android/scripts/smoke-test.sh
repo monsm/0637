@@ -103,6 +103,9 @@ case "$TPS" in
     ;;
 esac
 echo "performance: $TPS ticks/s"
+# Refresh the published artifact: the first /state above can legitimately
+# predate the once-a-second report and would leave a 0.0 in ci-logs.
+echo "$PERF" > intent-state.json
 # A one-shot answers with the tick's verdict: an unknown skill is refused in
 # words rather than accepted and dropped.
 REFUSED=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"name":"fly"}' http://127.0.0.1:8765/skill || true)
