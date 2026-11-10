@@ -17,6 +17,12 @@ mod idle_head;
 
 pub use idle_head::{IdleHead, IdleOffset, IdleState};
 
+/// Is the robot standing, sitting, or lying down — judged from where it
+/// actually is. `robotd` asks once before a policy takes over at the home
+/// pose: a seated duck must rise first, or the gait walks it over backwards.
+#[path = "../../../upstream/microduck/robotd/src/posture.rs"]
+pub mod posture;
+
 #[cfg(test)]
 mod tests {
     use super::*;

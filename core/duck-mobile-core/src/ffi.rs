@@ -741,6 +741,10 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                 refuse(core, format!("no such sound: {tag}"))
             }
         }
+        Intent::Look { target, neck_pitch } => {
+            let gaze = core.runtime.look_at(target, neck_pitch);
+            json!({ "ok": true, "head": gaze.joints, "clamped": gaze.clamped })
+        }
         Intent::Heard(text) => {
             let Some((phrase, heard)) = crate::speech::interpret(&text) else {
                 // Silence is not an error the client should have to parse:

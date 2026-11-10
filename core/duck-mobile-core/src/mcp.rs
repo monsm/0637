@@ -53,6 +53,18 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_look",
+            "description": "Aim the head at a point in the duck's own frame (metres: x forward, y left, z up; the duck's position is /state.pose). Returns the joint angles and whether the aim was clamped by the servos' travel.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "x": { "type": "number" }, "y": { "type": "number" },
+                    "z": { "type": "number" }, "neck": { "type": "number" }
+                },
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "duck_hear",
             "description": "Say something to the duck in Chinese or English and it does the matching verb: 坐下/sit, 翻滚/roll, 开心/excited, 摇头/no, 捡起来/pick, ... Returns what it heard and what it did.",
             "inputSchema": {
@@ -262,6 +274,14 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             // refusal is the useful half of a skill call.
             Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
         }
+        "duck_look" => Ok(queue.request(crate::intent::Intent::Look {
+            target: [
+                number(arguments, "x"),
+                number(arguments, "y"),
+                number(arguments, "z"),
+            ],
+            neck_pitch: number(arguments, "neck"),
+        })),
         "duck_hear" => {
             let text = arguments
                 .get("text")

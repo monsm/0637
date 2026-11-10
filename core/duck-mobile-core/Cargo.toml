@@ -17,6 +17,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 duck-control = { path = "../../upstream/microduck/duck-control", default-features = false }
 # Official skill config types used by robotd's control.rs.
 robotd-params = { path = "../../upstream/microduck/robotd-params" }
+# Forward kinematics from the training MJCF: `posture.rs` (boot pose) and the
+# gaze solver both speak this crate. Pure Rust, roxmltree only.
+kinematics = { path = "../../upstream/microduck/kinematics" }
+# The wire's joint-name table; `posture.rs` maps wire order to the MJCF's.
+duck-ipc-proto = { path = "../../upstream/microduck/duck-ipc-proto" }
 # The robot's own contact odometry: where it is, from its legs and IMU. Pure
 # Rust (MJCF parsed with roxmltree), so it compiles for both mobile targets.
 odometry = { path = "../../upstream/microduck/odometry" }

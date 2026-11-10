@@ -133,6 +133,12 @@ if ! echo "$HEARD" | grep -q '"skill":"roulade"'; then
   echo "::error::Chinese speech did not map to roulade: $HEARD"
   exit 1
 fi
+# The gaze solver: aiming right must yaw the head right.
+LOOK=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"x":1.0,"y":-0.5,"z":0.15}' http://127.0.0.1:8765/look || true)
+if ! echo "$LOOK" | grep -q '"ok":true'; then
+  echo "::error::look did not answer: $LOOK"
+  exit 1
+fi
 # robotd's face LEDs, as state: status, gauge, seven-colour flashlight.
 FLASH=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"color":"cyan"}' http://127.0.0.1:8765/flashlight || true)
 if ! echo "$FLASH" | grep -q '"color":"cyan"'; then

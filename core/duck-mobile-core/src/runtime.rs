@@ -869,6 +869,17 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.api_lease.take(twist, TickTime::of(&self.clock));
     }
 
+    /// `robot.look`: aim the head at a point in the trunk frame. The gaze
+    /// solver runs against the training MJCF's own kinematics, so the answer
+    /// respects the servos' travel limits; `clamped` says the duck is looking
+    /// as close as it can. The trunk frame is what `/state.pose` publishes
+    /// against, so a client aims by subtracting the duck's own position.
+    pub fn look_at(&mut self, target: [f64; 3], neck_pitch: f64) -> kinematics::head::Gaze {
+        let gaze = kinematics::head::HeadFk::alpha().look_at(target, neck_pitch);
+        self.set_head(gaze.joints);
+        gaze
+    }
+
     pub fn set_head(&mut self, head: [f64; 4]) {
         self.command.head = head;
         // Any head command wakes the idle look-around.

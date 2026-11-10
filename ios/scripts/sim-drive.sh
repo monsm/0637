@@ -297,6 +297,27 @@ check $? "flashlight sets an official colour" "$(printf '%s' "$FLASH" | head -c 
 FLASH2=$(api POST /flashlight '{}' || true)
 printf '%s' "$FLASH2" | grep -q '"flashlight":0'
 check $? "flashlight toggles back off" "$(printf '%s' "$FLASH2" | head -c 120)"
+# Gaze: the gaze solver runs on the training MJCF's own kinematics, so
+# aiming right of the trunk must produce a positive head_yaw and the answer
+# must stay within the servo travel the MJCF declares.
+echo "--- look ---"
+LOOK=$(api POST /look '{"x":1.0,"y":-0.5,"z":0.15}' || true)
+printf '%s' "$LOOK" | grep -q '"ok":true'
+check $? "look answers" "$(printf '%s' "$LOOK" | head -c 140)"
+LOOK_YAW=$(printf '%s' "$LOOK" | python3 -c "
+import json,sys
+try:
+    g=json.load(sys.stdin)
+    print(g['head'][2], g['clamped'])
+except Exception: print('0 ?')
+" 2>/dev/null || echo "0 ?")
+YAW=${LOOK_YAW%% *}
+python3 -c "
+import sys
+sys.exit(0 if float('${YAW:-0}') > 0.2 else 1)
+" 2>/dev/null
+check $? "look aims where you asked" "head_yaw=$LOOK_YAW"
+
 # Speech: the recognizer lives on the platform, but the mapping from words
 # to verbs is the core's, and a client can post text directly. Chinese and
 # English must name the same verbs.
@@ -670,7 +691,7 @@ check $? "MCP initialize answers" "$(printf '%s' "$INIT" | head -c 100)"
 
 TOOLS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8765/mcp || true)
 echo "$TOOLS" | tee "$OUT/mcp-tools.json" > /dev/null
-for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear; do
+for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear duck_look; do
   printf '%s' "$TOOLS" | grep -q "\"$tool\""
   check $? "MCP tool listed: $tool" ""
 done

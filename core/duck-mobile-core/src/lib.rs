@@ -48,6 +48,28 @@ pub mod synth;
 #[path = "../../../upstream/microduck/sounds/src/voices.rs"]
 pub mod voices;
 
+/// robotd/src/main.rs's `SEAT_POSITION`: the sitstand policy's own SIT
+/// keyframe, quoted verbatim. `posture.rs` — compiled verbatim too — tests
+/// against `crate::SEAT_POSITION`, and in this crate `crate::` is here. Keep
+/// in step with `SITTING_TARGET_OVERRIDES` upstream.
+pub const SEAT_POSITION: [f64; duck_control::model::NUM_JOINTS] = [
+    0.0,     // left_hip_yaw
+    0.0,     // left_hip_roll
+    -0.4079, // left_hip_pitch
+    1.35,    // left_knee
+    0.0,     // left_ankle
+    duck_control::model::DEFAULT_POSITION[5],
+    duck_control::model::DEFAULT_POSITION[6],
+    duck_control::model::DEFAULT_POSITION[7],
+    duck_control::model::DEFAULT_POSITION[8],
+    duck_control::model::DEFAULT_POSITION[9],
+    0.0,    // right_hip_yaw
+    0.0,    // right_hip_roll
+    0.4079, // right_hip_pitch
+    -1.35,  // right_knee
+    0.0,    // right_ankle
+];
+
 /// Every voice tag and its recipe — `sounds/src/lib.rs`'s table, which the
 /// verbatim `voices.rs` addresses as `crate::TAGS` from its own tests.
 pub type Recipe = fn(&personality::Personality, u32) -> Vec<f32>;
