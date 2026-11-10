@@ -49,12 +49,11 @@ class Voice(private val core: DuckCore) {
         release()
     }
 
-    /** Play a tag now, whatever the queue says (the shell's own quack button). */
+    /** Ask for a tag now (the shell's quack). It goes through the core's
+     *  queue, so it is the same path as a greet and each press is a new
+     *  variant rather than the same sound twice. */
     fun play(tag: String) {
-        scheduler.execute {
-            val pcm = core.renderSound(tag)
-            if (pcm.isNotEmpty()) write(pcm)
-        }
+        core.queueSound(tag)
     }
 
     private fun poll() {

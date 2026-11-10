@@ -14,7 +14,8 @@ use jni::sys::{jboolean, jdouble, jdoubleArray, jfloatArray, jint, jlong, jstrin
 use jni::JNIEnv;
 
 use crate::ffi::{
-    duck_core_body_count, duck_core_next_sound, duck_core_render_sound, duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
+    duck_core_body_count, duck_core_next_sound, duck_core_queue_sound,
+    duck_core_render_sound, duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
     duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_load_pickup,
     duck_core_mesh_name, duck_core_mesh_soup,
     duck_core_fork, duck_core_new, duck_core_paused, duck_core_seek, duck_core_set_paused,
@@ -194,6 +195,23 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeNextSound(
         Ok(value) => value.into_raw(),
         Err(_) => std::ptr::null_mut(),
     }
+}
+
+/// Queue a sound; the voice thread plays it. 0 when the tag is known.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeQueueSound(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    tag: JString,
+) -> jint {
+    let Some(tag) = java_string(&mut env, &tag) else {
+        return -1;
+    };
+    let Ok(tag) = CString::new(tag) else {
+        return -1;
+    };
+    unsafe { duck_core_queue_sound(handle as *mut DuckCore, tag.as_ptr()) as jint }
 }
 
 /// One sound as mono f32 PCM. Returns the samples, or an empty array.

@@ -83,6 +83,7 @@ unsigned long long duck_core_oldest_tick(DuckCore* core);
    at `duck_core_voice_rate()` (48000), and the rate itself. The duck's voice
    is the robot's own synth, so a platform renders rather than ships samples. */
 const char* duck_core_next_sound(DuckCore* core);
+int duck_core_queue_sound(DuckCore* core, const char* tag);
 int duck_core_render_sound(DuckCore* core, const char* tag, float* out, int capacity);
 int duck_core_voice_rate(void);
 

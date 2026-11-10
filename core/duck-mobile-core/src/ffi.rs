@@ -66,6 +66,10 @@ pub struct DuckCore {
     /// A refusal the client should see for longer than the tick that made it:
     /// (tick, message). Published on `/state` until it goes stale.
     notice: Option<(u64, String)>,
+    /// The last sound rendered through the C ABI, by tag. The caller asks for
+    /// the length and then for the samples, and rendering twice would pick the
+    /// next variant — a different length, and a buffer overrun.
+    rendered_sound: Option<(String, Vec<f32>)>,
 }
 
 struct Branch {
@@ -239,6 +243,7 @@ pub unsafe extern "C" fn duck_core_new(
             selected: 0,
             sensors: crate::sensors::Sensors::default(),
             notice: None,
+            rendered_sound: None,
         })
     });
 
@@ -874,6 +879,12 @@ pub unsafe extern "C" fn duck_core_next_sound(core: *mut DuckCore) -> *const c_c
     let Some(tag) = core.runtime.take_sound() else {
         return std::ptr::null();
     };
+    // Render here, once, so the platform's two calls (length, then samples)
+    // see the same sound. `Voice::render` advances the variant, so rendering
+    // twice would hand back a different length than the caller allocated.
+    if let Some(pcm) = core.runtime.render_sound(&tag) {
+        core.rendered_sound = Some((tag.clone(), pcm));
+    }
     // `c"..."` is a NUL-terminated static, so the pointer stays valid for as
     // long as the caller holds it and nothing is allocated per sound.
     let tag: &'static std::ffi::CStr = match tag.as_str() {
@@ -905,13 +916,45 @@ pub unsafe extern "C" fn duck_core_render_sound(
         return 0;
     };
     let core = &mut *core;
-    let Some(pcm) = core.runtime.render_sound(&tag) else {
+    // Render once per tag and reuse it: `Voice::render` advances the variant,
+    // so a second render is a different sound with a different length.
+    let cached = core
+        .rendered_sound
+        .as_ref()
+        .is_some_and(|(name, _)| *name == tag);
+    if !cached {
+        let Some(pcm) = core.runtime.render_sound(&tag) else {
+            return 0;
+        };
+        core.rendered_sound = Some((tag.clone(), pcm));
+    }
+    let Some((_, pcm)) = core.rendered_sound.as_ref() else {
         return 0;
     };
-    if !out.is_null() && capacity as usize >= pcm.len() {
+    if !out.is_null() {
+        if capacity as usize < pcm.len() {
+            return 0;
+        }
         std::ptr::copy_nonoverlapping(pcm.as_ptr(), out, pcm.len());
     }
     pcm.len() as c_int
+}
+
+/// Queue a sound for the platform to pick up with `duck_core_next_sound`.
+/// The shell's quack button uses this so each press is a fresh variant.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_queue_sound(core: *mut DuckCore, tag: *const c_char) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let Ok(tag) = c_string(tag) else {
+        return -1;
+    };
+    if !crate::voice::TAGS.contains(&tag.as_str()) {
+        return -1;
+    }
+    (*core).runtime.queue_sound(&tag);
+    0
 }
 
 /// The voice's sample rate (48 kHz, the synth's native rate).

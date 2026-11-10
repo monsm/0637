@@ -64,6 +64,11 @@ class DuckCore(
         if (handle != 0L) nativeCarry(handle, dx, dy, dz, active)
     }
 
+    /** Ask for a sound by tag; the voice thread plays it. */
+    fun queueSound(tag: String): Int = synchronized(lock) {
+        if (handle != 0L) nativeQueueSound(handle, tag) else -1
+    }
+
     /** The next sound the duck wants, or null. The platform owns the speaker. */
     fun nextSound(): String? = synchronized(lock) {
         if (handle != 0L) nativeNextSound(handle) else null
@@ -187,6 +192,7 @@ class DuckCore(
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
         @JvmStatic private external fun nativeCarry(handle: Long, dx: Double, dy: Double, dz: Double, active: Boolean)
         @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
+        @JvmStatic private external fun nativeQueueSound(handle: Long, tag: String): Int
         @JvmStatic private external fun nativeNextSound(handle: Long): String?
         @JvmStatic private external fun nativeRenderSound(handle: Long, tag: String): FloatArray?
         @JvmStatic private external fun nativeVoiceRate(): Int

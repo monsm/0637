@@ -60,13 +60,13 @@ final class Voice {
         engine.stop()
     }
 
-    /// Play a tag now, whatever the core's queue says (the shell's quack).
+    /// Ask for a tag now (the shell's quack). It goes through the core's
+    /// queue, so it is the same path as a greet and each press is a new
+    /// variant rather than the same file twice.
     func play(_ tag: String) {
         queue.async { [weak self] in
             guard let self, let core = self.core else { return }
-            if let pcm = Voice.render(core: core, tag: tag) {
-                self.schedule(pcm)
-            }
+            _ = tag.withCString { duck_core_queue_sound(core, $0) }
         }
     }
 
