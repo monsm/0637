@@ -347,7 +347,9 @@ jobs:
             tail -n 160 ios/build/xcodebuild-test.log || true
             exit 1
           fi
-          grep -E "Test Suite|Test Case|Executed" ios/build/xcodebuild-test.log | tail -20
+          # No failure here: the tests above already decided the step. A grep
+          # that matches nothing must not turn a passing suite into a red run.
+          grep -E "Test Suite|Test Case|Executed" ios/build/xcodebuild-test.log | tail -20 || true
           xcrun simctl shutdown "$SIM_UDID" || true
 
       - name: MuJoCo iOS (device slice)
@@ -428,6 +430,10 @@ jobs:
           mkdir -p ci-logs/ios
           git fetch --depth 1 origin ci-logs \
             && git checkout FETCH_HEAD -- ci-logs || true
+          # A fresh run may not write every file. Drop what this step
+          # publishes first, so an old log cannot pass for this run's.
+          rm -f ci-logs/ios/xcodebuild.log ci-logs/ios/xcodebuild-test.log \
+                ci-logs/ios/sim-drive/session.log
           rm -f ci-logs/ios/intent-state.json ci-logs/ios/intent-skills.json
           cp sim-launch.log ci-logs/ios/ 2>/dev/null || true
           mkdir -p ci-logs/ios/sim-drive
@@ -449,7 +455,9 @@ jobs:
           cp ios/build/xcodebuild-test.log ci-logs/ios/ 2>/dev/null || true
           {
             echo "run=${{ github.run_id }}"
+            echo "sha=${{ github.sha }}"
             echo "simsmoke=${{ steps.simsmoke.outcome }}"
+            echo "uitest=${{ steps.uitest.outcome }}"
           } > ci-logs/ios/smoke.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
