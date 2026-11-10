@@ -53,6 +53,18 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_flashlight",
+            "description": "Toggle the duck's virtual face flashlight, or set it to one of robotd's seven colours: white, red, green, blue, yellow, cyan, magenta.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "on": { "type": "boolean" },
+                    "color": { "type": "string" }
+                },
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "duck_sit",
             "description": "Sit down, or stand back up if already sitting.",
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
@@ -239,6 +251,19 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             // The tool answers what the duck did, not what the queue took: a
             // refusal is the useful half of a skill call.
             Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
+        }
+        "duck_flashlight" => {
+            let on = arguments.get("on").and_then(Value::as_bool);
+            let color = arguments
+                .get("color")
+                .and_then(Value::as_str)
+                .unwrap_or("white")
+                .to_owned();
+            Ok(queue.request(crate::intent::Intent::Flashlight {
+                toggle: on.is_none(),
+                on: on.unwrap_or(false),
+                color,
+            }))
         }
         "duck_sit" => Ok(queue.request(crate::intent::Intent::Sit)),
         "duck_ground_pick" => Ok(queue.request(crate::intent::Intent::GroundPick)),

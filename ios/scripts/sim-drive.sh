@@ -285,6 +285,18 @@ sys.exit(0 if float('${IDLE_GAIN:-0}') > 0.8 and float('${IDLE_HEAD:-0}') > 0.00
 " 2>/dev/null
 check $? "a still duck looks around" "takeover=$IDLE_GAIN head=$IDLE_HEAD"
 
+# Virtual face LEDs: the phone has no I2C bus, but robotd's status verdict,
+# battery gauge and seven-colour flashlight are part of the duck.
+echo "--- face ---"
+FACESTATE=$(api GET /state)
+printf '%s' "$FACESTATE" | grep -q '"leds"'
+check $? "state publishes the virtual face" ""
+FLASH=$(api POST /flashlight '{"color":"cyan"}' || true)
+printf '%s' "$FLASH" | grep -q '"color":"cyan"'
+check $? "flashlight sets an official colour" "$(printf '%s' "$FLASH" | head -c 120)"
+FLASH2=$(api POST /flashlight '{}' || true)
+printf '%s' "$FLASH2" | grep -q '"flashlight":0'
+check $? "flashlight toggles back off" "$(printf '%s' "$FLASH2" | head -c 120)"
 echo "--- odometry ---"
 POSE=$(api GET /state | python3 -c "
 import json,sys
@@ -643,7 +655,7 @@ check $? "MCP initialize answers" "$(printf '%s' "$INIT" | head -c 100)"
 
 TOOLS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8765/mcp || true)
 echo "$TOOLS" | tee "$OUT/mcp-tools.json" > /dev/null
-for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors; do
+for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight; do
   printf '%s' "$TOOLS" | grep -q "\"$tool\""
   check $? "MCP tool listed: $tool" ""
 done

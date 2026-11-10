@@ -17,6 +17,7 @@ pub mod bam;
 pub mod control;
 pub mod emotion;
 pub mod intent;
+pub mod leds;
 
 pub mod io;
 pub mod manifest;

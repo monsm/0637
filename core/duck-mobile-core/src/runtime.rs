@@ -437,6 +437,9 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The last sound the core queued, published so a client can tell that an
     /// emotion's official wav really reached the speaker channel.
     last_sound: Option<String>,
+    /// The virtual face LEDs: status, battery gauge and flashlight. The phone
+    /// has no I²C expander, but the verdict and the colours are the duck's.
+    face: crate::leds::Face,
     /// The last emotion wav specifically. `last_sound` is overwritten by the
     /// next reaction (a coo, an alarm), so a client checking *that the
     /// emotion's voice was queued* needs a field only emotions write.
@@ -534,6 +537,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_head: crate::control::IdleHead::new(robotd_params::IdleParams::default(), 0xD0C),
             idle_params: robotd_params::IdleParams::default(),
             last_idle: crate::control::IdleOffset::default(),
+            face: crate::leds::Face::default(),
             last_sound: None,
             last_emotion_sound: None,
             last_pickup_paused: false,
@@ -923,6 +927,17 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn last_sound(&self) -> Option<&str> {
         self.last_sound.as_deref()
+    }
+
+    /// The virtual face, and `robot.flashlight`'s mobile equivalent.
+    pub fn face(&self) -> crate::leds::Face {
+        self.face
+    }
+
+    pub fn set_flashlight(&mut self, toggle: bool, on: bool, color: &str) -> crate::leds::Face {
+        self.face.flashlight =
+            crate::leds::flashlight_after(self.face.flashlight, toggle, on, color);
+        self.face
     }
 
     pub fn last_emotion_sound(&self) -> Option<&str> {
@@ -1330,6 +1345,18 @@ impl<T: RobotIo> DuckRuntime<T> {
         if self.slow_ticks % 50 == 0 {
             if let Ok(slow) = self.safety.slow_sensors() {
                 self.volts = Some(slow.volts);
+                // The BAM model reports the motor-bus voltage. robotd's soc.rs
+                // maps a 2S Li-ion pack to a percentage; a linear 6.0..8.4 V
+                // window is the same shape and honest about being an estimate.
+                let percent = ((slow.volts - 6.0) / 2.4 * 100.0).clamp(0.0, 100.0);
+                self.face.gauge = self.face.gauge.next(Some(percent));
+                self.face.battery_percent = Some(percent);
+                let healthy = self.imu_ready() && !self.safety.fallen() && self.enabled;
+                self.face.status = crate::leds::Status::of(
+                    healthy,
+                    !self.imu_ready(),
+                    self.clock.tick < 50,
+                );
                 // `BATTERY_EMA_ALPHA`: a step sag recovers between steps and
                 // must not count as a spent pack.
                 self.volts_ema = Some(

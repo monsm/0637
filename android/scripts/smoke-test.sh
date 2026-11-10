@@ -107,7 +107,7 @@ if [ "$STAGED" -lt 13 ]; then
 fi
 echo "emotions staged: $STAGED"
 
-for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"' '"performance"'; do
+for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"' '"performance"' '"leds"'; do
   if ! echo "$STATE" | grep -q "$needle"; then
     echo "::error::/state does not publish $needle"
     exit 1
@@ -126,6 +126,17 @@ case "$TPS" in
     ;;
 esac
 echo "performance: $TPS ticks/s"
+# robotd's face LEDs, as state: status, gauge, seven-colour flashlight.
+FLASH=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"color":"cyan"}' http://127.0.0.1:8765/flashlight || true)
+if ! echo "$FLASH" | grep -q '"color":"cyan"'; then
+  echo "::error::flashlight did not set cyan: $FLASH"
+  exit 1
+fi
+FLASH2=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{}' http://127.0.0.1:8765/flashlight || true)
+if ! echo "$FLASH2" | grep -q '"flashlight":0'; then
+  echo "::error::flashlight did not toggle off: $FLASH2"
+  exit 1
+fi
 # A still duck must actually glance. An emotion just ran and fades the idle
 # spell out, so it needs up to ~3.5 s of stillness to come back; a single
 # sample at a fixed 4 s races the runner. Poll for a real measurement.

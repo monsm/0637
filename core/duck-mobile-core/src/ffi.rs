@@ -346,6 +346,25 @@ pub unsafe extern "C" fn duck_core_set_performance(core: *mut DuckCore, fps: f64
     }
 }
 
+/// `robot.flashlight` on a phone: toggle or set the virtual face LED.
+/// `color` is one of white/red/green/blue/yellow/cyan/magenta. Returns the
+/// new state: 0 off, 1..7 the colour index + 1.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_flashlight(
+    core: *mut DuckCore,
+    toggle: c_int,
+    on: c_int,
+    color: *const c_char,
+) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let color = c_string(color).unwrap_or_else(|_| "white".to_owned());
+    let face = (*core).runtime.set_flashlight(toggle != 0, on != 0, &color);
+    publish_state(&mut *core);
+    i32::from(face.flashlight)
+}
+
 /// Load robotd's emotion timelines and voices from a directory in the app
 /// bundle. Returns the number loaded, or -1. The emotions then appear in
 /// `/skills`, `/skill`, MCP and the shell's skill ring.
@@ -709,12 +728,27 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             Err(reason) => refuse(core, format!("mode refused: {reason}")),
         },
         Intent::Sound(tag) => {
-            if crate::voice::TAGS.contains(&tag.as_str()) {
+            // Emotions are official voices too, loaded at runtime, so
+            // `queue_sound` is the authority on what is a valid tag.
+            let known = crate::voice::TAGS.contains(&tag.as_str())
+                || tag.strip_prefix("emotion:").is_some_and(|name| {
+                    core.runtime.emotion_names().iter().any(|loaded| loaded == name)
+                });
+            if known {
                 core.runtime.queue_sound(&tag);
                 json!({ "ok": true, "tag": tag })
             } else {
                 refuse(core, format!("no such sound: {tag}"))
             }
+        }
+        Intent::Flashlight { toggle, on, color } => {
+            let face = core.runtime.set_flashlight(toggle, on, &color);
+            publish_state(core);
+            json!({
+                "ok": true,
+                "flashlight": face.flashlight,
+                "color": face.color(),
+            })
         }
         Intent::Mouth(open) => match core.runtime.set_mouth(open) {
             Ok(()) => json!({ "ok": true, "open": open }),
@@ -981,6 +1015,14 @@ fn publish_state(core: &DuckCore) {
         "carrying": active.carrying(),
         "last_sound": active.last_sound(),
         "last_emotion_sound": active.last_emotion_sound(),
+        "leds": {
+            "status": active.face().status,
+            "gauge": active.face().gauge,
+            "battery_percent": active.face().battery_percent,
+            "bars": active.face().bars(),
+            "flashlight": active.face().flashlight,
+            "color": active.face().color(),
+        },
         "emotion": active.emotion_state().map(|(name, elapsed, duration)| {
             json!({ "name": name, "elapsed_s": elapsed, "duration_s": duration })
         }),

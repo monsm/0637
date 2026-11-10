@@ -57,6 +57,9 @@ unsigned long long duck_core_model_generation(DuckCore* core);
    control ticks achieved per second. Diagnostic, not part of the duck. */
 void duck_core_set_performance(DuckCore* core, double fps, double tps);
 
+/* robot.flashlight on a phone; returns 0 off, 1..7 the colour index + 1. */
+int duck_core_flashlight(DuckCore* core, int toggle, int on, const char* color);
+
 /* Load robotd's emotion timelines from a bundle directory; returns the count. */
 int duck_core_load_emotions(DuckCore* core, const char* dir);
 

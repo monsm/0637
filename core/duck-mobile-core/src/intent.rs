@@ -81,6 +81,8 @@ pub enum Intent {
     PowerOn,
     /// A phone sensor reading (camera, microphone, depth, IMU).
     Sensor(crate::sensors::Reading),
+    /// `robot.flashlight`: the virtual face LED, one of robotd's seven colours.
+    Flashlight { toggle: bool, on: bool, color: String },
 }
 
 /// An intent with the ticket its client is waiting on.
@@ -496,6 +498,13 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
             None => Err("missing tag"),
         },
+        ("POST", "/flashlight") => Ok(queue
+            .request(Intent::Flashlight {
+                toggle: value["toggle"].as_bool().unwrap_or(true),
+                on: value["on"].as_bool().unwrap_or(false),
+                color: value["color"].as_str().unwrap_or("white").to_owned(),
+            })
+            .to_string()),
         ("POST", "/mouth") => {
             let open = value["open"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0);
             Ok(queue.request(Intent::Mouth(open)).to_string())

@@ -310,7 +310,7 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 | iOS 真机 IPA | 流水线就绪，等签名凭据 |
 | 相机 / LiDAR / AR 模式 | ✅ 系统相机预览层作背景（Director 模式）；LiDAR 深度读数与 8×8 ToF 降采样在 `/sensors`；未做 ARKit/ARCore 跟踪与平面锚定 |
 | 扬声器 | ✅ 官方声码合成器编译进核心，两端已接扬声器 |
-| 麦克风 | 读数通道已实现（`/sensors`，可作惊吓/咕咕的反应源）；真机常开监听未实现 |
+| 麦克风 | ✅ 两端真实拾音（RMS + 主频，1 Hz 进 `/sensor`），用时才申请权限，拒绝显示「未授权」；常开监听按设计不做 |
 | roller 模式 | ✅ 整套 bundle + roller 场景切换；`/mode`、MCP `duck_mode`、两端界面切换 |
 | 电池关机 | ✅ 坐下→憩姿→断力矩；空电量（EMA ≤ 6.6 V）自动触发，`/power` 重新上电 |
 | 里程计 `/pose` | ✅ 官方接触式里程计编进核心，随 checkpoint 倒带 |
@@ -318,6 +318,10 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 | 渲染器 PBR / 阴影 / 帧间插值 | ✅ PBR + 接触阴影 + 两 tick 位姿插值；未做多光源/阴影贴图 |
 | Android 真机实测 | CI 仅覆盖模拟器（API 30 x86_64）；arm64 真机未跑 |
 | 性能指标（fps / 控制 Hz） | ✅ 两端实测并发布在 `/state.performance`，仪表表显示；CI 两端断言 `ticks_per_second > 0`，绿跑实测 iOS 55.2 fps / 50.0 Hz、Android 模拟器 14.8 fps / 50.5 Hz。功耗未采集（需真机电量计） |
+| 物理版情绪 / 人格 | ✅ 官方 `robotd/emotions/` 13 个关键帧时间线 + 48 kHz 声音原样接入，`/skills`、`/skill`、MCP、技能环可发现；50 Hz 循环按 `Frame::apply` 语义驱动头/身体/喙，声音走现有扬声器通道，checkpoint 可恢复播放。IdleHead 张望/呼吸/瞌睡随 checkpoint 精确重放 |
+| 声音反应 | ✅ 7 个官方合成音全部可用；被抱起 `coo`、持续摔倒 `alarm`、久静后重新驱动 `inquire`（上升沿 + 冷却）；情绪音为官方 wav |
+| 虚拟脸灯 | ✅ `robotd/src/leds.rs` 的纯语义（状态 4 档、电量表 5 档 + 3% 滞回、7 色手电筒）发布在 `/state.leds`，`/flashlight` 与 MCP `duck_flashlight` 可控制；无 I²C 硬件，故为状态等价 |
+| 未移植的大项 | 凝视野 IK（`robot.look`）、多鸭合唱 chorale、ToF 特雷门琴、`wheee` 按住流式分段、`robot.rest`/开机姿态判定、pad 组合摇杆模式 —— 均需硬件或超出手机范围，或为后续工作 |
 
 ---
 
