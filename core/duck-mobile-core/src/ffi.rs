@@ -654,10 +654,11 @@ fn publish_state(core: &DuckCore) {
         // parses the state should not have to care whether a tick has run yet.
         None => json!({
             "names": duck_control::model::JOINT_NAMES,
-            "positions": [0.0; duck_control::model::NUM_JOINTS],
-            "velocities": [0.0; duck_control::model::NUM_JOINTS],
-            "currents_ma": [0.0; duck_control::model::NUM_JOINTS],
-            "targets": [0.0; duck_control::model::NUM_JOINTS],
+            // `json!` has no repeat syntax; `vec!` is the same array.
+            "positions": vec![0.0; duck_control::model::NUM_JOINTS],
+            "velocities": vec![0.0; duck_control::model::NUM_JOINTS],
+            "currents_ma": vec![0.0; duck_control::model::NUM_JOINTS],
+            "targets": vec![0.0; duck_control::model::NUM_JOINTS],
             "imu": {
                 "gyro": [0.0, 0.0, 0.0],
                 "gravity": [0.0, 0.0, -1.0],
