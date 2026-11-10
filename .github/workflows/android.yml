@@ -175,16 +175,23 @@ jobs:
           # A retry must not roll the other workflow back either: snapshot this
           # run's ci-logs, take the branch's fresh tree, then copy ours over it.
           cp -a ci-logs ci-logs.thisrun
+          pushed=0
           for attempt in 1 2 3 4 5; do
             git fetch --depth 1 origin ci-logs || true
+            # Hang our commit off the branch head: without this the push is
+            # never a fast-forward and every attempt fails silently.
+            git reset --soft FETCH_HEAD 2>/dev/null || true
             git checkout FETCH_HEAD -- ci-logs 2>/dev/null || true
             cp -a ci-logs.thisrun/. ci-logs/
             git add -f ci-logs
             git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
-            if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
+            if git push "$URL" HEAD:refs/heads/ci-logs; then pushed=1; break; fi
             sleep 2
           done
           rm -rf ci-logs.thisrun
+          # Logs are diagnostic: a failed publish warns, it does not fail a
+          # green build. But it must not be silent either.
+          [ "$pushed" = "1" ] || echo "::warning::ci-logs could not be published this run"
 
       - uses: actions/upload-artifact@v4
         id: artifact
@@ -304,16 +311,23 @@ jobs:
           # A retry must not roll the other workflow back either: snapshot this
           # run's ci-logs, take the branch's fresh tree, then copy ours over it.
           cp -a ci-logs ci-logs.thisrun
+          pushed=0
           for attempt in 1 2 3 4 5; do
             git fetch --depth 1 origin ci-logs || true
+            # Hang our commit off the branch head: without this the push is
+            # never a fast-forward and every attempt fails silently.
+            git reset --soft FETCH_HEAD 2>/dev/null || true
             git checkout FETCH_HEAD -- ci-logs 2>/dev/null || true
             cp -a ci-logs.thisrun/. ci-logs/
             git add -f ci-logs
             git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
-            if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
+            if git push "$URL" HEAD:refs/heads/ci-logs; then pushed=1; break; fi
             sleep 2
           done
           rm -rf ci-logs.thisrun
+          # Logs are diagnostic: a failed publish warns, it does not fail a
+          # green build. But it must not be silent either.
+          [ "$pushed" = "1" ] || echo "::warning::ci-logs could not be published this run"
 
       - uses: actions/upload-artifact@v4
         if: always()
