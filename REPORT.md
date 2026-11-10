@@ -321,7 +321,11 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 | 物理版情绪 / 人格 | ✅ 官方 `robotd/emotions/` 13 个关键帧时间线 + 48 kHz 声音原样接入，`/skills`、`/skill`、MCP、技能环可发现；50 Hz 循环按 `Frame::apply` 语义驱动头/身体/喙，声音走现有扬声器通道，checkpoint 可恢复播放。IdleHead 张望/呼吸/瞌睡随 checkpoint 精确重放 |
 | 声音反应 | ✅ 7 个官方合成音全部可用；被抱起 `coo`、持续摔倒 `alarm`、久静后重新驱动 `inquire`（上升沿 + 冷却）；情绪音为官方 wav |
 | 虚拟脸灯 | ✅ `robotd/src/leds.rs` 的纯语义（状态 4 档、电量表 5 档 + 3% 滞回、7 色手电筒）发布在 `/state.leds`，`/flashlight` 与 MCP `duck_flashlight` 可控制；无 I²C 硬件，故为状态等价 |
-| 未移植的大项 | 凝视野 IK（`robot.look`）、多鸭合唱 chorale、ToF 特雷门琴、`wheee` 按住流式分段、`robot.rest`/开机姿态判定、pad 组合摇杆模式 —— 均需硬件或超出手机范围，或为后续工作 |
+| 中文语音 | ✅ 系统级离线识别（iOS `SFSpeechRecognizer` zh-CN / Android `SpeechRecognizer` zh-CN），用时才申请权限；文字走 `POST /heard` 映射到技能/情绪/问候，CI 直接测文字链路（模拟器无麦克风，识别本身须真机验证） |
+| 凝视野 IK | ✅ `POST /look` + MCP `duck_look`：`HeadFk::look_at` 基于训练 MJCF 的正运动学求解，受舵机行程限制；`/state.pose` 供客户端换算躯干坐标 |
+| wheee 长按 | ✅ `POST /wheee {"hold":true}`：官方 start/loop/end 三段经 `next_sound` 顺序流式播放，松开收尾；MCP `duck_wheee`、两端长按 quack 按钮 |
+| 开机姿态判定 | ✅ 上游 `posture.rs` 原样编译，其单元测试在核心里跑通；数字版 MuJoCo 永远从 HOME 启动，故没有「折叠开机」输入场景，判定作为 API 保留而不造假路径 |
+| 仍未移植 | 多鸭合唱 chorale（需多机无线电）、ToF 特雷门琴（需头部深度传感器）、pad 组合摇杆模式、`robot.rest` 的完整告别分支、渲染多光源/阴影贴图 —— 需硬件或超出手机范围 |
 
 ---
 

@@ -10,6 +10,16 @@
          user enables the mic row in the instrument sheet, never at launch. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Spoken commands: SpeechRecognizer resolves the device's recognition
+         service through package visibility. Without this <queries> entry the
+         lookup fails on API 30+ and the "Voice commands" toggle reads
+         unavailable even when a service is installed. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

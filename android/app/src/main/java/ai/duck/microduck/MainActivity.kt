@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
                     },
                     input = input,
                     onQuack = { voice?.play("chirp") },
+                    onWheee = { held -> core?.wheee(held) },
                 )
             }
         }
@@ -78,6 +79,9 @@ class MainActivity : ComponentActivity() {
         voice = null
         loop?.stop()
         loop = null
+        // A held ride must not stick past the shell: let go before the core
+        // frees, so the controller never keeps the hold it was left in.
+        core?.wheee(false)
         core?.close()
         core = null
         super.onDestroy()
@@ -90,6 +94,7 @@ private fun DuckScreen(
     onCoreCreated: (DuckCore) -> Unit,
     input: DuckInput,
     onQuack: () -> Unit,
+    onWheee: (Boolean) -> Unit,
 ) {
     val context = LocalContext.current
     var core by remember { mutableStateOf(coreProvider()) }
@@ -179,6 +184,7 @@ private fun DuckScreen(
                 surface = surface,
                 onSurface = { surface = it },
                 quack = onQuack,
+                onWheee = onWheee,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

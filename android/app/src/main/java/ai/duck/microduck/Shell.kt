@@ -24,7 +24,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -67,6 +70,7 @@ fun Shell(
     surface: Surface,
     onSurface: (Surface) -> Unit,
     quack: (() -> Unit)? = null,
+    onWheee: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -82,6 +86,8 @@ fun Shell(
     // top-bar chip and the sheet's chip both write here, so the two never
     // disagree about whether the light is on.
     var flashlightState by remember { mutableStateOf(0) }
+    // The one menu that replaced the row of chips.
+    var menuOpen by remember { mutableStateOf(false) }
     // One tap flips the light, exactly like `robot.flashlight` on the duck.
     // The core takes its own lock, so this stays off the render thread's
     // critical path.
@@ -124,12 +130,30 @@ fun Shell(
             micState = MicState.Denied
         }
     }
-    // Stop the feed only when the shell leaves composition (the activity is
+    // Spoken commands: a second, independent channel. It is a command path
+    // (the core maps 翻滚/坐下/开心 to skills), never a sense, and it is off
+    // until the toggle is tapped. The holder is created here on the main
+    // thread because SpeechRecognizer and its callbacks must live on the main
+    // Looper; the sheet reads its Compose state directly.
+    val speechFeed = remember(context) { SpeechFeed(context) }
+    val voiceLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            speechFeed.start()
+        } else {
+            speechFeed.markDenied()
+        }
+    }
+    // Stop both feeds only when the shell leaves composition (the activity is
     // going away). Toggling the mic off stops it explicitly in onToggleMic; a
     // DisposableEffect keyed on micState would fire its onDispose the instant
     // micState flips to On and kill the feed right after it started.
     DisposableEffect(Unit) {
-        onDispose { micFeed?.stop() }
+        onDispose {
+            micFeed?.stop()
+            speechFeed.stop()
+        }
     }
 
     val _unused = languageTick
@@ -201,17 +225,23 @@ fun Shell(
             DirectorOverlay(core, Modifier.fillMaxSize())
         }
 
-        // Top bar: the duck's name and what it is doing, and the surface switch.
+        // Top bar: the duck's state, and ONE menu. Six text chips in a row
+        // was a desktop panel crammed onto a phone: on a small landscape
+        // screen they ran off the edge and nothing was legible. The stick
+        // modes, the surface, the language and the flashlight now live in a
+        // menu that a thumb can open.
         Row(
             Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
-                .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
                 .padding(12.dp),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column {
-                Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+            Column(
+                Modifier
+                    .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+            ) {
+                Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                 Text(
                     when {
                         core == null -> Copy.waking
@@ -220,43 +250,91 @@ fun Shell(
                         else -> Copy.live
                     },
                     color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                 )
             }
-            Spacer(Modifier.size(14.dp))
-            SurfaceChip(Copy.stick("drive"), stick == "drive") { stick = "drive" }
-            SurfaceChip(Copy.stick("head"), stick == "head") { stick = "head" }
-            SurfaceChip(Copy.stick("body"), stick == "body") { stick = "body" }
-            SurfaceChip(Copy.live, surface == Surface.Live) { onSurface(Surface.Live) }
-            SurfaceChip(Copy.director, surface == Surface.Director) { onSurface(Surface.Director) }
-            SurfaceChip(Copy.language.label, false) {
-                Copy.language = if (Copy.language == Copy.Language.English) {
-                    Copy.Language.Chinese
-                } else {
-                    Copy.Language.English
+            Spacer(Modifier.weight(1f))
+            Box {
+                RoundChip("⋯", size = 42.dp) { menuOpen = true }
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    modifier = Modifier.background(Color(0xFF141A22)),
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(Copy.stick("drive"), color = Color.White) },
+                        onClick = { stick = "drive"; menuOpen = false },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(Copy.stick("head"), color = Color.White) },
+                        onClick = { stick = "head"; menuOpen = false },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(Copy.stick("body"), color = Color.White) },
+                        onClick = { stick = "body"; menuOpen = false },
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    DropdownMenuItem(
+                        text = { Text(Copy.live, color = Color.White) },
+                        onClick = { onSurface(Surface.Live); menuOpen = false },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(Copy.director, color = Color.White) },
+                        onClick = { onSurface(Surface.Director); menuOpen = false },
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
+                    DropdownMenuItem(
+                        text = { Text(Copy.flashlight, color = Color.White) },
+                        onClick = { toggleFlashlight(); menuOpen = false },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(Copy.language.label, color = Color.White) },
+                        onClick = {
+                            Copy.language = if (Copy.language == Copy.Language.English) {
+                                Copy.Language.Chinese
+                            } else {
+                                Copy.Language.English
+                            }
+                            languageTick += 1
+                            menuOpen = false
+                        },
+                    )
                 }
-                languageTick += 1
-            }
-            Spacer(Modifier.size(6.dp))
-            // The flashlight, one tap away: the face's LED, without opening
-            // the instrument sheet to find it.
-            RoundChip(Copy.flashlight, size = 40.dp, selected = flashlightState > 0) {
-                toggleFlashlight()
             }
         }
 
-        // Bottom bar: time machine and skills live one gesture away.
+        // Bottom bar: the duck itself is the primary control, so the one
+        // action that needs the thumb gets it — the rest are one row of
+        // small targets on the other side.
         Row(
             Modifier
                 .align(Alignment.BottomStart)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            RoundChip(Copy.time) { showSheet = true }
-            RoundChip(Copy.skills) { showRing = true }
+            RoundChip(Copy.time, size = 44.dp) { showSheet = true }
+            RoundChip(Copy.skills, size = 44.dp) { showRing = true }
             core?.let { duck ->
-                RoundChip(Copy.quack) { quack?.invoke() }
-                RoundChip(if (carrying) Copy.putDown else Copy.grab) {
+                WheeeChip(
+                    Copy.quack,
+                    onTap = { quack?.invoke() },
+                    onHold = { onWheee?.invoke(it) },
+                )
+            }
+        }
+        // Pick the duck up or put it down: the biggest target on screen, in
+        // the corner a thumb reaches first.
+        core?.let { duck ->
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(12.dp),
+            ) {
+                RoundChip(
+                    if (carrying) Copy.putDown else Copy.grab,
+                    size = 62.dp,
+                    selected = carrying,
+                ) {
                     carrying = !carrying
                     if (carrying) duck.carry(0.0, 0.0, 0.0, true) else duck.carry(0.0, 0.0, 0.0, false)
                 }
@@ -302,6 +380,23 @@ fun Shell(
             micState = micState,
             flashlightState = flashlightState,
             onFlashlight = toggleFlashlight,
+            speechFeed = speechFeed,
+            onToggleSpeech = {
+                when (speechFeed.state) {
+                    SpeechState.Off, SpeechState.Denied, SpeechState.Unavailable -> {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) {
+                            speechFeed.start()
+                        } else {
+                            voiceLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+                    SpeechState.Listening -> speechFeed.stop()
+                }
+            },
             onToggleMic = {
                 when (micState) {
                     MicState.Off -> {
@@ -362,6 +457,51 @@ private fun RoundChip(
                 CircleShape,
             )
             .pointerInput(Unit) { detectTapGestures { onClick() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1, softWrap = false)
+    }
+}
+
+/**
+ * The quack chip with a hold: tap quacks, hold rides the duck. detectTapGestures
+ * fires onLongPress while the finger is still down, so the release is awaited in
+ * onPress: tryAwaitRelease() resumes on lift or cancellation (and on disposal of
+ * the pointer input itself), and the finally always lets the ride go, so a held
+ * ride cannot outlive the gesture. A plain tap never started one, so its release
+ * sends nothing.
+ */
+@Composable
+private fun WheeeChip(
+    label: String,
+    size: Dp = 52.dp,
+    onTap: () -> Unit,
+    onHold: (Boolean) -> Unit,
+) {
+    Box(
+        Modifier
+            .size(size)
+            .background(Color.White.copy(alpha = 0.10f), CircleShape)
+            .pointerInput(Unit) {
+                var riding = false
+                detectTapGestures(
+                    onTap = { onTap() },
+                    onLongPress = {
+                        riding = true
+                        onHold(true)
+                    },
+                    onPress = {
+                        try {
+                            tryAwaitRelease()
+                        } finally {
+                            if (riding) {
+                                riding = false
+                                onHold(false)
+                            }
+                        }
+                    },
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = Color.White.copy(alpha = 0.9f), fontSize = 11.sp, maxLines = 1, softWrap = false)
@@ -472,6 +612,8 @@ private fun InstrumentSheet(
     micState: MicState,
     flashlightState: Int,
     onFlashlight: () -> Unit,
+    speechFeed: SpeechFeed,
+    onToggleSpeech: () -> Unit,
     onToggleMic: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -558,6 +700,40 @@ private fun InstrumentSheet(
                     )
                     SurfaceChip(if (micState == MicState.On) "ON" else "OFF", micState == MicState.On) {
                         onToggleMic()
+                    }
+                }
+            }
+            // Spoken commands: a separate toggle from the room mic. Off until
+            // tapped; enabling asks RECORD_AUDIO. The last final transcript is
+            // the row's reading, so what the duck heard is visible next to the
+            // skill it probably just performed. Unavailable/denied are shown,
+            // not thrown: CI has no recognizer and must still render the sheet.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    Copy.voiceCommands,
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 12.sp,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        when (speechFeed.state) {
+                            SpeechState.Off -> speechFeed.lastHeard ?: "—"
+                            SpeechState.Listening -> speechFeed.lastHeard ?: Copy.listening
+                            SpeechState.Denied -> Copy.denied
+                            SpeechState.Unavailable -> Copy.unavailable
+                        },
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                    )
+                    SurfaceChip(
+                        if (speechFeed.state == SpeechState.Listening) "ON" else "OFF",
+                        speechFeed.state == SpeechState.Listening,
+                    ) {
+                        onToggleSpeech()
                     }
                 }
             }

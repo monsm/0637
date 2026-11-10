@@ -133,7 +133,32 @@ enum Copy {
     static var microphone: String { pick("microphone", "麦克风") }
     /// A refused permission is a real state: "—" would claim no sensor exists.
     static var denied: String { pick("denied", "未授权") }
+    /// The duck's ear. The words a person says are the duck's own input, so
+    /// this has its own section rather than living with the room's sensors.
+    static var voiceCommands: String { pick("Voice commands", "语音指令") }
+    /// The toggle's own label: the duck understands spoken Chinese.
+    static var voiceEar: String { pick("Understand Chinese", "听懂中文") }
+    /// What the ear is doing, in the row's value column.
+    static var speechOff: String { pick("off", "未开启") }
+    static var speechListening: String { pick("listening", "聆听中") }
+    /// No recogniser here: the simulator, or a locale this device does not
+    /// know.
+    static var speechUnavailable: String { pick("unavailable", "不可用") }
+    /// The recogniser works, but only in the cloud: the on-device model is
+    /// not installed, and the audio would have to leave the phone.
+    static var speechOnDeviceMissing: String { pick("no local model", "无本地模型") }
+    /// The last thing the duck heard.
+    static var heard: String { pick("heard", "听到") }
+    /// The privacy note under the toggle: the audio stays on the phone and
+    /// only the words travel.
+    static var voiceNote: String {
+        pick(
+            "Chinese speech is recognised on this phone and handed to the duck as text. The audio never leaves the phone.",
+            "中文语音在本机识别成文字再交给鸭子，音频不会离开手机。"
+        )
+    }
     static var behavior: String { pick("behaviour", "此刻") }
+    static var menu: String { pick("Menu", "菜单") }
     static var depth: String { pick("depth", "深度") }
     static var provenance: String { pick("Provenance", "出处") }
     static var reload: String { pick("Reload AI", "重载 AI") }

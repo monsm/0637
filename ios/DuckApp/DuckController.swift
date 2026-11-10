@@ -78,6 +78,16 @@ final class DuckController: ObservableObject {
     /// Persisted so the room mic comes back on the next launch without a new
     /// permission prompt. Default off: nothing listens until the user asks.
     @AppStorage("mic_enabled") var micEnabled = false
+    /// The duck's ear: spoken Chinese in, the duck's own verbs out. Persisted
+    /// like the room mic, and off by default for the same reason.
+    @AppStorage("voice_commands_enabled") var voiceCommandsEnabled = false
+    /// The last thing the duck heard, in the user's own words. The words are
+    /// the duck's input; the core's word table turns them into verbs.
+    @Published var heardText = ""
+    /// What the duck's ear is doing: off, listening, denied or unavailable.
+    /// A permission answer and a missing recogniser are real states, not an
+    /// absent reading, so the sheet says which one it is.
+    @Published private(set) var speechState: SpeechState = .off
 
     private(set) var core: OpaquePointer?
     private var timer: Timer?
@@ -114,6 +124,10 @@ final class DuckController: ObservableObject {
     @Published private(set) var micDenied = false
     @Published private(set) var micAvailable = false
     private var micCancellable: AnyCancellable?
+    /// The duck's ear's answers, mirrored from the same feed: the sheet
+    /// reads these instead of importing Speech.
+    private var speechCancellable: AnyCancellable?
+    private var heardCancellable: AnyCancellable?
 
     /// The renderer's triangle soups, built on the worker queue before the
     /// first frame, keyed by MuJoCo mesh id.
@@ -229,6 +243,19 @@ final class DuckController: ObservableObject {
                 self.micAvailable = available
                 self.refreshMicSummary()
             }
+        // The duck's ear answers on its own queue: a permission answer, a
+        // recogniser that is not there, and the last thing it heard. The
+        // sheet reads these mirrors, so it never imports Speech either.
+        speechCancellable = mic.$speechState
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state in
+                self?.speechState = state
+            }
+        heardCancellable = mic.$heardText
+            .receive(on: RunLoop.main)
+            .sink { [weak self] text in
+                self?.heardText = text
+            }
         // A persisted "on" from a previous launch is resumed only when the
         // earlier grant is still valid. This is NOT a launch-time permission
         // prompt: .undetermined never prompts here, and neither does .denied.
@@ -239,6 +266,11 @@ final class DuckController: ObservableObject {
             case .undetermined: break
             @unknown default: break
             }
+        }
+        // The same rule for the duck's ear: what the user already granted
+        // comes back, and nothing is asked at launch.
+        if voiceCommandsEnabled {
+            mic.resumeSpeech()
         }
         // Creating the core loads the MuJoCo scene (215k vertices) and the
         // ONNX policies — seconds on a device. Doing that here blocked the
@@ -413,9 +445,10 @@ final class DuckController: ObservableObject {
     deinit {
         timer?.invalidate()
         sensorTimer?.invalidate()
-        // Release the input tap and the 1 Hz POST timer with the controller;
-        // the session is one per app and must not outlive its owner.
-        mic.stop()
+        // Release the input tap, the duck's ear and the 1 Hz POST timer with
+        // the controller; the session is one per app and must not outlive its
+        // owner.
+        mic.stopAll()
         motion.stopDeviceMotionUpdates()
         if let core {
             duck_core_free(core)
@@ -569,6 +602,21 @@ final class DuckController: ObservableObject {
         }
     }
 
+    /// `robotctl wheee` on a phone: holding starts the ride's segments,
+    /// releasing ends it. The core is main-thread-only, and the FFI itself
+    /// ignores a repeated hold/release, so no shell-side state is needed.
+    func setWheee(_ held: Bool) {
+        guard let core else { return }
+        func apply() {
+            duck_core_wheee(core, held ? 1 : 0)
+        }
+        if Thread.isMainThread {
+            apply()
+        } else {
+            DispatchQueue.main.async(execute: apply)
+        }
+    }
+
     /// The seven colours in `robotd`'s cycling order — the FFI's non-zero
     /// return is the position here plus one. The names stay the wire's, like
     /// the skill names: they are what /state publishes, not display text.
@@ -607,6 +655,27 @@ final class DuckController: ObservableObject {
             mic.stop()
         }
         refreshMicSummary()
+    }
+
+    /// The sheet's voice-command toggle. The speech permission is asked only
+    /// here, on the user's explicit enable — never at launch. The room's
+    /// microphone toggle is a different switch: the ear and the loudness feed
+    /// are independent, and either one keeps the one input tap alive.
+    ///
+    /// An already-refused recogniser is not re-asked from the app (the OS
+    /// refuses a second prompt); the sheet says "denied" and the user can
+    /// change it in Settings.
+    func setVoiceCommands(_ enabled: Bool) {
+        voiceCommandsEnabled = enabled
+        guard enabled else {
+            mic.stopSpeech()
+            return
+        }
+        if speechState == .denied {
+            // The OS will not ask again, so do not pretend it will.
+            return
+        }
+        mic.startSpeech()
     }
 
     /// One measurement per second: frames per second the renderer achieved

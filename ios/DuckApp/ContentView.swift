@@ -34,6 +34,10 @@ struct ContentView: View {
     @State private var lastTap = Date.distantPast
     /// Flipping this re-renders every `Copy` string.
     @State private var languageTick = 0
+    /// The held joy-ride: a long press on the quack button starts it, lifting
+    /// the finger ends it. The flag marks the gesture so the Button's release
+    /// action does not also queue a chirp on the way up.
+    @State private var wheeeHolding = false
 
     enum Surface: String, CaseIterable {
         case live = "Live"
@@ -111,6 +115,10 @@ struct ContentView: View {
                 controller.joystick = .zero
                 controller.setHead(yaw: 0, pitch: 0)
                 controller.releaseBody()
+                // SwiftUI does not report a gesture cancelled by backgrounding.
+                // End the ride here so its loops cannot outlive the finger.
+                wheeeHolding = false
+                controller.setWheee(false)
             }
         }
     }
@@ -264,77 +272,58 @@ struct ContentView: View {
                 }
             }
             Spacer()
-            HStack(spacing: 6) {
-                stickSwitch
-                languageSwitch
-                surfaceSwitch
+            // One menu, not six chips. On a landscape phone the chips ran off
+            // the edge and nothing was legible; the stick modes, the surface,
+            // the language and the flashlight now live behind one button a
+            // thumb can open.
+            Menu {
+                ForEach(StickMode.allCases, id: \.self) { option in
+                    Button {
+                        stickMode = option
+                        controller.setHead(yaw: 0, pitch: 0)
+                        controller.releaseBody()
+                    } label: {
+                        Label(Copy.stick(option.rawValue), systemImage: stickIcon(option))
+                    }
+                }
+                Divider()
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { surface = .live }
+                } label: {
+                    Label(Copy.live, systemImage: "circle.dashed")
+                }
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { surface = .director }
+                } label: {
+                    Label(Copy.director, systemImage: "viewfinder")
+                }
+                Divider()
+                Button {
+                    controller.toggleFlashlight()
+                } label: {
+                    Label(
+                        controller.flashlightColor == nil ? Copy.flashlight : Copy.flashlightOn,
+                        systemImage: "flashlight.on.fill"
+                    )
+                }
+                Button {
+                    Copy.language = Copy.language == .english ? .chinese : .english
+                    languageTick &+= 1
+                } label: {
+                    Label(Copy.language.rawValue, systemImage: "globe")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
             }
+            .accessibilityLabel(Copy.menu)
+            .accessibilityIdentifier("duck-menu")
         }
-        .padding(12)
+        .padding(10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-    }
-
-    /// The pad's D-pad, as three taps: drive, look, pose. It was the one
-    /// control the physical controller has that a touch screen did not.
-    private var stickSwitch: some View {
-        HStack(spacing: 4) {
-            ForEach(StickMode.allCases, id: \.self) { option in
-                Button {
-                    stickMode = option
-                    // Leaving a mode puts back what it moved, as the pad does.
-                    controller.setHead(yaw: 0, pitch: 0)
-                    controller.releaseBody()
-                } label: {
-                    Text(Copy.stick(option.rawValue))
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            stickMode == option ? Color.white.opacity(0.18) : Color.clear,
-                            in: Capsule()
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("stick-\(option.rawValue)")
-            }
-        }
-    }
-
-    private var languageSwitch: some View {
-        Button {
-            Copy.language = Copy.language == .english ? .chinese : .english
-            languageTick &+= 1
-        } label: {
-            Text(Copy.language.rawValue)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.10), in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Copy.languageLabel)
-        .accessibilityIdentifier("duck-language")
-    }
-
-    private var surfaceSwitch: some View {
-        HStack(spacing: 4) {
-            ForEach(Surface.allCases, id: \.self) { option in
-                Button {
-                    withAnimation(.snappy(duration: 0.2)) { surface = option }
-                } label: {
-                    Text(option == .live ? Copy.live : Copy.director)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            surface == option ? Color.white.opacity(0.18) : Color.clear,
-                            in: Capsule()
-                        )
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier(option == .live ? "surface-live" : "surface-director")
-            }
-        }
     }
 
     private var bottomBar: some View {
@@ -370,7 +359,13 @@ struct ContentView: View {
 
             // The duck's own voice: `robotctl quack` is a chirp.
             Button {
-                if let core = controller.core {
+                // Held for 0.3 s it is the joy-ride instead: `wheeeGesture`
+                // starts the ride, and the first action after it is the
+                // ride's own release, not a chirp stacked on the end segment.
+                if wheeeHolding {
+                    wheeeHolding = false
+                    controller.setWheee(false)
+                } else if let core = controller.core {
                     controller.voice.play(core: core, tag: "chirp")
                 }
             } label: {
@@ -382,6 +377,7 @@ struct ContentView: View {
                     .contentShape(Circle())
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(wheeeGesture)
             .accessibilityLabel(Copy.quack)
             .accessibilityIdentifier("duck-quack")
 
@@ -439,6 +435,42 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
                 .opacity(controller.ready ? 1 : 0)
                 .allowsHitTesting(false)
+        }
+    }
+
+    /// The held joy-ride: a long press feeds into a drag that lasts as long
+    /// as the finger stays down. `LongPressGesture.sequenced(before:)` is the
+    /// one SwiftUI primitive whose `onEnded` sees the real lift, so the ride
+    /// cannot outlive the finger.
+    private var wheeeGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.3)
+            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .local))
+            .onChanged { value in
+                // Only the sequence's second stage carries the drag; the
+                // first is just the press itself.
+                guard case .second(true, _) = value else { return }
+                if !wheeeHolding {
+                    wheeeHolding = true
+                    controller.setWheee(true)
+                }
+            }
+            .onEnded { value in
+                guard case .second(_, let drag) = value else { return }
+                // The drag's end is the finger lift this gesture exists to see.
+                if drag != nil || wheeeHolding {
+                    wheeeHolding = false
+                    controller.setWheee(false)
+                }
+            }
+    }
+
+    /// One icon per stick mode, so the menu reads at a glance instead of
+    /// being three identical words.
+    private func stickIcon(_ mode: StickMode) -> String {
+        switch mode {
+        case .drive: return "figure.walk"
+        case .head: return "eye"
+        case .body: return "arrow.up.and.down"
         }
     }
 

@@ -15,6 +15,7 @@ struct InstrumentSheet: View {
                 telemetry
                 face
                 sensors
+                voiceCommands
                 provenance
                 footer
             }
@@ -286,6 +287,65 @@ struct InstrumentSheet: View {
             ))
             .labelsHidden()
             .accessibilityIdentifier("sheet-mic-toggle")
+        }
+    }
+
+    // MARK: - Voice commands
+
+    /// The duck's ear: Mandarin in, verbs out.
+    ///
+    /// Off by default, and asking for the microphone and the speech
+    /// permission happens only when the user flips this toggle — never at
+    /// launch. The words are the duck's own input (翻滚 becomes the roulade
+    /// skill in the core), so this has its own section rather than living
+    /// with the room's sensors.
+    private var voiceCommands: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(Copy.voiceCommands, detail: nil)
+            Text(Copy.voiceNote)
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(.secondary)
+            HStack {
+                Text(Copy.voiceEar)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(speechStatus)
+                    .font(.system(size: 12, design: .monospaced))
+                    .accessibilityIdentifier("sheet-voice-status")
+                Toggle("", isOn: Binding(
+                    get: { controller.voiceCommandsEnabled },
+                    set: { controller.setVoiceCommands($0) }
+                ))
+                .labelsHidden()
+                .accessibilityIdentifier("sheet-voice-toggle")
+            }
+            // A long sentence must not push the label off the row, so the
+            // transcript is one line and truncates.
+            HStack {
+                Text(Copy.heard)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(controller.heardText.isEmpty ? "—" : controller.heardText)
+                    .font(.system(size: 12, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// What the ear is doing, in words. A refused permission and a device
+    /// with no recogniser are real states, not an absent reading.
+    private var speechStatus: String {
+        switch controller.speechState {
+        case .off: return Copy.speechOff
+        case .listening: return Copy.speechListening
+        case .denied: return Copy.denied
+        case .unavailable: return Copy.speechUnavailable
+        case .onDeviceMissing: return Copy.speechOnDeviceMissing
         }
     }
 

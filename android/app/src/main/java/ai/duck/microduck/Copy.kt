@@ -82,6 +82,10 @@ object Copy {
     val api get() = "AI API :8765 · MCP /mcp"
     val microphone get() = pick("microphone", "麦克风")
     val denied get() = pick("denied", "未授权")
+    // Spoken commands: the platform recognizer as a second, opt-in channel.
+    val voiceCommands get() = pick("Voice commands", "听懂中文")
+    val listening get() = pick("listening…", "聆听中…")
+    val unavailable get() = pick("unavailable", "不可用")
     val behavior get() = pick("behaviour", "此刻")
 
     // The face: the status LED, the four-light battery gauge and the

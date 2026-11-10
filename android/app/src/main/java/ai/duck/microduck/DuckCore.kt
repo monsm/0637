@@ -75,6 +75,11 @@ class DuckCore(
         if (handle != 0L) nativeCarry(handle, dx, dy, dz, active)
     }
 
+    /** Ride the duck: the joyride hold. [hold] true grabs it, false lets go. */
+    fun wheee(hold: Boolean) = synchronized(lock) {
+        if (handle != 0L) nativeWheee(handle, hold)
+    }
+
     /** Ask for a sound by tag; the voice thread plays it. */
     fun queueSound(tag: String): Int = synchronized(lock) {
         if (handle != 0L) nativeQueueSound(handle, tag) else -1
@@ -244,6 +249,7 @@ class DuckCore(
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
         @JvmStatic private external fun nativeReleaseBody(handle: Long)
         @JvmStatic private external fun nativeCarry(handle: Long, dx: Double, dy: Double, dz: Double, active: Boolean)
+        @JvmStatic private external fun nativeWheee(handle: Long, hold: Boolean)
         @JvmStatic private external fun nativeLoadEmotions(handle: Long, path: String): Int
         @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
         @JvmStatic private external fun nativeSetPerformance(handle: Long, fps: Double, tps: Double)

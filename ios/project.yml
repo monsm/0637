@@ -61,6 +61,11 @@ targets:
         # The microphone is the ROOM, never the duck's senses. Asked only when
         # the user enables the mic row in the instrument sheet, never at launch.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "MicroDuck listens for loud sounds in the room so your AI can react. Audio stays on your phone and never reaches the duck's senses."
+        # The duck's ear: spoken Chinese becomes the duck's own verbs. The
+        # recognition is on this phone, so the audio never leaves it. Asked
+        # only when the user enables the voice-command row in the instrument
+        # sheet, never at launch.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "MicroDuck recognises spoken Chinese on this phone and hands the duck the words. The audio stays on your phone."
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: "The local intent API lets your own AI agent drive the duck."
         SWIFT_OBJC_BRIDGING_HEADER: DuckApp/DuckCore-Bridging-Header.h
         HEADER_SEARCH_PATHS:
@@ -91,6 +96,10 @@ targets:
       - sdk: MetalKit.framework
       - sdk: CoreMotion.framework
       - sdk: AVFoundation.framework
+      # The duck's ear: SFSpeechRecognizer recognises Mandarin on the
+      # device. `import Speech` would autolink it, but the system frameworks
+      # this app uses are declared here, so this one is too.
+      - sdk: Speech.framework
     preBuildScripts:
       - name: Check Rust core
         basedOnDependencyAnalysis: false
