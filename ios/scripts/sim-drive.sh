@@ -310,6 +310,20 @@ api POST /head '{"neck":0.2,"head":0.1,"yaw":0.3,"roll":0.0}' > /dev/null
 check $? "head command accepted" ""
 api POST /body '{"z":0.0,"roll":0.05,"pitch":0.05}' > /dev/null
 check $? "body command accepted" ""
+# A held body pose zeroes the twist — the pad's body mode holds the duck
+# still. Releasing it must give the duck its legs back, or driving is dead
+# for the rest of the session.
+api POST /body '{"active":false}' > /dev/null
+check $? "body pose released" ""
+WAIT_BEFORE=$(api GET /state | field trunk)
+for _ in $(seq 1 10); do
+  api POST /twist '{"vx":0.4,"vy":0.0,"wz":0.0}' > /dev/null
+  sleep 0.3
+done
+api POST /twist '{"vx":0.0,"vy":0.0,"wz":0.0}' > /dev/null
+WAIT_AFTER=$(api GET /state | field trunk)
+[ "$WAIT_BEFORE" != "$WAIT_AFTER" ]
+check $? "the duck walks again after releasing the pose" "$WAIT_BEFORE -> $WAIT_AFTER"
 
 # ---------------------------------------------------------------- voice
 # The duck's voice is the robot's own synth, compiled into the core. A sound
