@@ -654,15 +654,14 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     /// Ask for a sound by tag. Unknown tags are dropped rather than invented.
     pub fn queue_sound(&mut self, tag: &str) {
-        // Bounded: a platform that never polls (audio unavailable) must not
-        // accumulate a backlog of stale quacks.
-        const PENDING: usize = 4;
+        // `sound.rs`'s own rule: one playing child, and a new sound kills the
+        // previous one — that is what lets someone spam the chirp trigger
+        // cleanly. One-shot sounds replace whatever one-shot was queued;
+        // the wheee ride's segments are not one-shots and keep their place.
         let known = crate::voice::TAGS.contains(&tag)
             || tag.strip_prefix("emotion:").is_some_and(|name| self.emotions.get(name).is_some());
         if known {
-            if self.sounds.len() >= PENDING {
-                self.sounds.pop_front();
-            }
+            self.sounds.clear();
             self.sounds.push_back(tag.to_owned());
             self.last_sound = Some(tag.to_owned());
             if tag.starts_with("emotion:") {
