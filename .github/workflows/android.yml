@@ -169,14 +169,14 @@ jobs:
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           # A merge, not a force: the two workflows publish to this branch at
           # the same time, and a force push silently drops the other one's
-          # logs. A non-fast-forward means the other side got there first —
-          # fetch, reapply our files, and try again.
+          # logs. Hang our commit off the branch head so the push fast-forwards,
+          # and keep both sides' files — ours were copied last, so they win.
           for attempt in 1 2 3 4 5; do
-            if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             git fetch --depth 1 origin ci-logs || true
-            # Join the other workflow's history but keep OUR tree: the branch
-            # holds only logs, and its copy is the one that is a run older.
-            git merge --no-edit -s ours --allow-unrelated-histories FETCH_HEAD               || git reset --soft HEAD || true
+            git reset --soft FETCH_HEAD 2>/dev/null || true
+            git add -f ci-logs
+            git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
+            if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             sleep 2
           done
 
@@ -279,14 +279,14 @@ jobs:
           URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
           # A merge, not a force: the two workflows publish to this branch at
           # the same time, and a force push silently drops the other one's
-          # logs. A non-fast-forward means the other side got there first —
-          # fetch, reapply our files, and try again.
+          # logs. Hang our commit off the branch head so the push fast-forwards,
+          # and keep both sides' files — ours were copied last, so they win.
           for attempt in 1 2 3 4 5; do
-            if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             git fetch --depth 1 origin ci-logs || true
-            # Join the other workflow's history but keep OUR tree: the branch
-            # holds only logs, and its copy is the one that is a run older.
-            git merge --no-edit -s ours --allow-unrelated-histories FETCH_HEAD               || git reset --soft HEAD || true
+            git reset --soft FETCH_HEAD 2>/dev/null || true
+            git add -f ci-logs
+            git commit -m "ci-logs: run ${{ github.run_id }} [skip ci]" || true
+            if git push "$URL" HEAD:refs/heads/ci-logs; then break; fi
             sleep 2
           done
 
