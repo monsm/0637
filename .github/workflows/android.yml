@@ -176,7 +176,7 @@ jobs:
             git fetch --depth 1 origin ci-logs || true
             # Join the other workflow's history but keep OUR tree: the branch
             # holds only logs, and its copy is the one that is a run older.
-            git merge --no-edit -s ours FETCH_HEAD || true
+            git merge --no-edit -s ours --allow-unrelated-histories FETCH_HEAD               || git reset --soft HEAD || true
             sleep 2
           done
 
@@ -286,7 +286,7 @@ jobs:
             git fetch --depth 1 origin ci-logs || true
             # Join the other workflow's history but keep OUR tree: the branch
             # holds only logs, and its copy is the one that is a run older.
-            git merge --no-edit -s ours FETCH_HEAD || true
+            git merge --no-edit -s ours --allow-unrelated-histories FETCH_HEAD               || git reset --soft HEAD || true
             sleep 2
           done
 
