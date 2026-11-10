@@ -297,6 +297,30 @@ check $? "flashlight sets an official colour" "$(printf '%s' "$FLASH" | head -c 
 FLASH2=$(api POST /flashlight '{}' || true)
 printf '%s' "$FLASH2" | grep -q '"flashlight":0'
 check $? "flashlight toggles back off" "$(printf '%s' "$FLASH2" | head -c 120)"
+# Petting: a stroke of the hand, the phone's stand-in for pet_detect.
+PET=$(api POST /pet '{}' || true)
+printf '%s' "$PET" | grep -q '"ok":true'
+check $? "the duck accepts a stroke" "$(printf '%s' "$PET" | head -c 120)"
+
+# The lifetime record: the same facts robotd's vet book keeps, countable on
+# a phone. A duck that has run a skill must say so.
+echo "--- life ---"
+LIFE=$(api GET /life || true)
+printf '%s' "$LIFE" | grep -q '"powered_s"'
+check $? "life publishes the record" "$(printf '%s' "$LIFE" | head -c 120)"
+printf '%s' "$LIFE" | grep -q '"roulade":1'
+check $? "life counts the skills the duck ran" "$(printf '%s' "$LIFE" | head -c 200)"
+LIFE_STATE=$(api GET /state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('life',{}).get('walking_s',0))
+except Exception: print('-1')
+" 2>/dev/null || echo "-1")
+python3 -c "
+import sys
+sys.exit(0 if float('${LIFE_STATE:--1}') >= 0 else 1)
+" 2>/dev/null
+check $? "state carries the same record" "walking_s=$LIFE_STATE"
+
 # Gaze: the gaze solver runs on the training MJCF's own kinematics, so
 # aiming right of the trunk must produce a positive head_yaw and the answer
 # must stay within the servo travel the MJCF declares.
@@ -712,7 +736,7 @@ check $? "MCP initialize answers" "$(printf '%s' "$INIT" | head -c 100)"
 
 TOOLS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8765/mcp || true)
 echo "$TOOLS" | tee "$OUT/mcp-tools.json" > /dev/null
-for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear duck_look duck_wheee; do
+for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear duck_look duck_wheee duck_life duck_pet; do
   printf '%s' "$TOOLS" | grep -q "\"$tool\""
   check $? "MCP tool listed: $tool" ""
 done

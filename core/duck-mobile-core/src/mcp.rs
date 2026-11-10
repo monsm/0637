@@ -53,6 +53,11 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_pet",
+            "description": "Stroke the duck: it counts the pet, coos, and stays lively a little longer. The phone's stand-in for pet_detect on the physical robot's shell.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        },
+        {
             "name": "duck_life",
             "description": "The duck's lifetime record: seconds powered, walking and held; falls, pickups, sit/stand counts; every skill and emotion it has run, by name; metres walked.",
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
@@ -289,6 +294,7 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             // refusal is the useful half of a skill call.
             Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
         }
+        "duck_pet" => Ok(queue.request(crate::intent::Intent::Pet)),
         "duck_life" => Ok(serde_json::json!({
             "ok": true,
             "life": serde_json::from_str::<serde_json::Value>(&queue.life_json())

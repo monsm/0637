@@ -85,6 +85,8 @@ pub enum Intent {
     Flashlight { toggle: bool, on: bool, color: String },
     /// The held wheee ride: `hold` starts it, releasing ends it.
     Wheee(bool),
+    /// A stroke of the hand on the duck.
+    Pet,
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
     Look { target: [f64; 3], neck_pitch: f64 },
     /// Recognized speech, as text. The core maps it to one of its own verbs,
@@ -525,6 +527,7 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
             None => Err("missing tag"),
         },
+        ("POST", "/pet") => Ok(queue.request(Intent::Pet).to_string()),
         ("POST", "/wheee") => Ok(queue
             .request(Intent::Wheee(value["hold"].as_bool().unwrap_or(false)))
             .to_string()),

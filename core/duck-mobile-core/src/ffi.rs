@@ -753,6 +753,10 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             core.runtime.wheee(hold);
             json!({ "ok": true, "held": hold })
         }
+        Intent::Pet => {
+            core.runtime.pet();
+            json!({ "ok": true, "pets": core.runtime.book().life.pets })
+        }
         Intent::Look { target, neck_pitch } => {
             let gaze = core.runtime.look_at(target, neck_pitch);
             json!({ "ok": true, "head": gaze.joints, "clamped": gaze.clamped })

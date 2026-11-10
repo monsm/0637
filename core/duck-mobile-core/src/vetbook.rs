@@ -166,6 +166,9 @@ mod tests {
             powered: true,
             torqued: true,
             walking: true,
+            standing: false,
+            sitting: false,
+            held: false,
             dt: 0.02,
         });
         assert!((book.life.powered_s - 0.02).abs() < 1e-9);

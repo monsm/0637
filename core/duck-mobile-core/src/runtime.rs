@@ -437,6 +437,10 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The last sound the core queued, published so a client can tell that an
     /// emotion's official wav really reached the speaker channel.
     last_sound: Option<String>,
+    /// How long a pet keeps the duck lively, in simulated seconds. Petting is
+    /// the phone's stand-in for `pet_detect`: upstream counts a stroke of the
+    /// hand as a pet, and a phone has a screen instead of a hand on the shell.
+    pet_glow_until: Option<u64>,
     /// The duck's lifetime record: seconds powered and walking, falls, picks
     /// up, skills by name. It is what makes this the same animal tomorrow.
     book: crate::vetbook::Book,
@@ -544,6 +548,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_params: robotd_params::IdleParams::default(),
             last_idle: crate::control::IdleOffset::default(),
             book: crate::vetbook::Book::default(),
+            pet_glow_until: None,
             face: crate::leds::Face::default(),
             last_sound: None,
             last_ride_segment: None,
@@ -961,6 +966,16 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn last_sound(&self) -> Option<&str> {
         self.last_sound.as_deref()
+    }
+
+    /// A stroke of the hand: the duck counts it, coos, and stays lively a
+    /// little longer than usual. `pet_detect` does the same for the physical
+    /// robot's shell.
+    pub fn pet(&mut self) {
+        self.book.life.pets += 1;
+        self.book.note("pet".to_owned());
+        self.queue_sound("coo");
+        self.pet_glow_until = Some(self.clock.tick + 150);
     }
 
     /// The lifetime record, for `/state.life` and the shell's own storage.
