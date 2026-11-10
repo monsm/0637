@@ -65,6 +65,11 @@ class DuckCore(
         if (handle != 0L) nativeSetBody(handle, z, roll, pitch)
     }
 
+    /** Let go of the body pose; while one is held the controller zeroes the twist. */
+    fun releaseBody() = synchronized(lock) {
+        if (handle != 0L) nativeReleaseBody(handle)
+    }
+
     /** A hand on the duck: metres from where it was grabbed; [active] false lets go. */
     fun carry(dx: Double, dy: Double, dz: Double, active: Boolean) = synchronized(lock) {
         if (handle != 0L) nativeCarry(handle, dx, dy, dz, active)
@@ -211,6 +216,7 @@ class DuckCore(
         @JvmStatic private external fun nativeSetTwist(handle: Long, vx: Double, vy: Double, wz: Double)
         @JvmStatic private external fun nativeSetHead(handle: Long, neck: Double, head: Double, yaw: Double, roll: Double)
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
+        @JvmStatic private external fun nativeReleaseBody(handle: Long)
         @JvmStatic private external fun nativeCarry(handle: Long, dx: Double, dy: Double, dz: Double, active: Boolean)
         @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
         @JvmStatic private external fun nativeMode(handle: Long): String?

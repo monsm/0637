@@ -18,7 +18,7 @@
 //! No authentication: it binds to the local network for a phone or a desktop
 //! agent. Treat it as a development API, not an internet-facing service.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Condvar, Mutex};
@@ -95,6 +95,10 @@ struct Commands {
     /// The core's answers, by ticket. Bounded: a route that gave up waiting
     /// must not grow this map without end.
     answers: HashMap<u64, Value>,
+    /// Tickets somebody is actually waiting on. A fire-and-forget stream
+    /// (`/twist` at 50 Hz) must not fill the answer map with results nobody
+    /// reads — and, worse, evict the result a long mode-switch is waiting for.
+    awaited: HashSet<u64>,
     next_id: u64,
 }
 
@@ -124,6 +128,7 @@ impl IntentQueue {
             commands: Mutex::new(Commands {
                 items: VecDeque::new(),
                 answers: HashMap::new(),
+                awaited: HashSet::new(),
                 next_id: 0,
             }),
             answered: Condvar::new(),
@@ -148,11 +153,19 @@ impl IntentQueue {
         }
     }
 
-    /// Enqueue an intent; the id is the ticket the core answers.
+    /// Enqueue an intent; the id is the ticket the core answers. Nobody waits
+    /// on a plain push — streams use this — so its answer is dropped.
     pub fn push(&self, intent: Intent) -> u64 {
+        self.enqueue(intent, false)
+    }
+
+    fn enqueue(&self, intent: Intent, awaited: bool) -> u64 {
         let mut commands = self.commands.lock().expect("intent queue");
         commands.next_id += 1;
         let id = commands.next_id;
+        if awaited {
+            commands.awaited.insert(id);
+        }
         commands.items.push_back(QueuedIntent { id, intent });
         id
     }
@@ -169,12 +182,11 @@ impl IntentQueue {
     /// The core's answer to one queued intent.
     pub fn answer(&self, id: u64, result: Value) {
         let mut commands = self.commands.lock().expect("intent answers");
-        commands.answers.insert(id, result);
-        while commands.answers.len() > 256 {
-            let Some(oldest) = commands.answers.keys().min().copied() else {
-                break;
-            };
-            commands.answers.remove(&oldest);
+        // Only keep an answer somebody asked for. Otherwise 50 Hz streams
+        // would grow the map (and its eviction would discard a real waiter's
+        // result).
+        if commands.awaited.remove(&id) {
+            commands.answers.insert(id, result);
         }
         drop(commands);
         self.answered.notify_all();
@@ -191,6 +203,9 @@ impl IntentQueue {
             }
             let now = Instant::now();
             if now >= deadline {
+                // Give up cleanly: the core may still answer later, and the
+                // answer would have nowhere to go.
+                commands.awaited.remove(&id);
                 return None;
             }
             let (guard, _) = self
@@ -216,7 +231,7 @@ impl IntentQueue {
     /// [`Self::request`] with an explicit budget. A mode switch loads a second
     /// MJCF and a policy set on the tick thread, which is seconds, not ticks.
     pub fn request_within(&self, intent: Intent, timeout: Duration) -> Value {
-        let id = self.push(intent);
+        let id = self.enqueue(intent, true);
         self.await_result(id, timeout).unwrap_or_else(|| {
             json!({
                 "ok": false,
@@ -378,7 +393,10 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
                 .as_str()
                 .map(str::to_owned)
                 .unwrap_or_else(|| "branch".to_owned());
-            Ok(queue.request(Intent::Fork(label)).to_string())
+            // A fork deep-copies a MuJoCo model and reloads the policy set.
+            Ok(queue
+                .request_within(Intent::Fork(label), Duration::from_secs(15))
+                .to_string())
         }
         ("POST", "/branch/drop") => match value["label"].as_str() {
             Some(label) => Ok(queue
@@ -405,7 +423,14 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         }
         ("POST", "/step") => {
             let ticks = value["ticks"].as_u64().unwrap_or(1).clamp(1, 500) as u32;
-            Ok(queue.request(Intent::Step(ticks)).to_string())
+            // Each tick is 20 ms of work plus whatever the policy costs;
+            // 500 ticks is far past the one-shot budget.
+            Ok(queue
+                .request_within(
+                    Intent::Step(ticks),
+                    Duration::from_millis(500 + u64::from(ticks) * 20),
+                )
+                .to_string())
         }
         ("POST", "/checkpoint") => Ok(queue.request(Intent::Checkpoint).to_string()),
         ("POST", "/restore") => match value["tick"].as_u64() {
@@ -484,7 +509,10 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Ok(json!({ "ok": true }).to_string())
         }
         ("POST", "/reload") => match value["dir"].as_str() {
-            Some(dir) => Ok(queue.request(Intent::Reload(dir.to_owned())).to_string()),
+            // Loading a policy set is seconds of ONNX work.
+            Some(dir) => Ok(queue
+                .request_within(Intent::Reload(dir.to_owned()), Duration::from_secs(30))
+                .to_string()),
             None => Err("missing dir"),
         },
         // A hand on the duck, for the shell's grab gesture and for an agent

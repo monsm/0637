@@ -136,9 +136,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         view.colorPixelFormat = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
         view.clearColor = MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
-        // Without a delegate the view would stay black even if the renderer
-        // failed later, so give it the scene background as a floor.
-        view.backgroundColor = UIColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+        // **Clear, not the studio colour.** The view must be able to composite
+        // over the camera in Director mode; an opaque background colour would
+        // paint the studio over the room even with a transparent clear colour.
+        // The studio look comes from `clearColor`, which is drawn every frame.
+        view.backgroundColor = .clear
         view.preferredFramesPerSecond = 60
         view.delegate = self
         buildInstances()

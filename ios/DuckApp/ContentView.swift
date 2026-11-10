@@ -19,6 +19,7 @@ struct ContentView: View {
     /// The pad's stick modes, reduced to the three a phone can express:
     /// walk/turn, look, and crouch/lean the standing body.
     @State private var stickMode = StickMode.drive
+    @Environment(\.scenePhase) private var scenePhase
 
     enum StickMode: String, CaseIterable {
         case drive, head, body
@@ -69,6 +70,16 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        // SwiftUI does not report a cancelled drag. A phone call, a
+        // notification pull or leaving the app would otherwise leave the
+        // joystick where the finger was and the duck walking by itself.
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                controller.joystick = .zero
+                controller.setHead(yaw: 0, pitch: 0)
+                controller.releaseBody()
+            }
+        }
     }
 
     // MARK: - Scene

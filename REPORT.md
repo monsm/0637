@@ -204,15 +204,16 @@
 | **本体感知发布** | `/state` 新增 `proprioception`：编码器侧关节位置与速度、电流、IMU（陀螺/重力/四元数）、本 tick 命令、`imu_ready`、`p_held`、`volts`、电量百分比。首 tick 之前形状相同，客户端不必区分 | CI 断言 `positions` / `targets` / `imu_ready` / `mouth` |
 | **即时确认语义** | 一次性动作改为**带票据**：`/skill` `/sit` `/ground_pick` `/reload` `/time` `/step` `/checkpoint` `/restore` `/seek` `/fork` `/branch/*` 等 tick 决定后再答复，拒绝会带着原因回到客户端；控制流（`/twist` `/head` `/body`）仍不等待 | 单元测试 2 条（拒绝可见、无 tick 时报 pending）；CI 断言未知技能返回 `ok:false` + `no such skill` |
 | **技能表一致** | `/skills` 补上 `sit` / `stand` / `ground_pick`，`/skill` 接受它们（`sit`/`stand` 幂等），壳里的技能环显示同一张表 | CI 逐项断言 6 个名字 |
-| **拾取检测器** | `robotd/src/pickup.rs` **原文件编译进核心**，配官方 `pickup_detector.onnx`（两端都打进包）。只看走路/站立网络；技能、坐下、limp-fall 一律让开并重置窗口 | 上游 6 条单元测试随核心一起跑 |
-| **手拎** | `/carry` + 两端的「拎起」按钮：躯干上加弹簧力（`xfrc_applied`），**不是关节目标**，所以分类器读到的和真鸭被拎起来时一样；放下后由分类器交还策略 | CI 断言拎起后躯干升高 > 3 cm |
+| **拾取检测器** | `robotd/src/pickup.rs` **原文件编译进核心**，配官方 `pickup_detector.onnx`（两端都打进包）。只看走路/站立网络；技能、坐下、limp-fall 一律让开并重置窗口。模式切换时在新运行时上**重新加载**分类器 | 上游 6 条单元测试随核心一起跑 |
+| **手拎** | `/carry` + 两端的「拎起」按钮：躯干上加弹簧力（`xfrc_applied`），**不是关节目标**，所以分类器读到的和真鸭被拎起来时一样；放下后由分类器交还策略 | CI 断言拎起后躯干升高 > 3 cm（`2001371` 实测 z 0.0593 → 0.2959 m） |
 | **IMU 预热门控** | 25 个融合样本（真机 `Imu::ready()` 的 0.5 s）之前，home 保持、策略不驱动；home→ready 的推进也等这个门 | 与上游同一常量，`imu_ready` 发布在 `/state` |
-| **电池** | 电压取 BAM 模型的端电压（`vin − 0.1×|torque|`，下限 6.0 V），不再硬编码 7.4 V；`battery_percent` 按官方 6.6–8.2 V 区间 | `/state` 的 `volts` / `battery_percent` |
+| **电池** | 电压取 BAM 模型的端电压（`vin − 0.1×|torque|`，下限 6.0 V），不再硬编码 7.4 V；`battery_percent` 按官方 6.6–8.2 V 区间；10 s EMA 后 ≤ 6.6 V 触发关机序列 | `/state` 的 `volts` / `battery_percent`。**声明**：没有电量模型（上游也没有），自动关机只可能被持续饱和负载的压降触发，模拟一块真耗尽电池需要自己发明容量参数，故不做 |
 | **嘴** | 新增 `/mouth` 与 MCP `duck_mouth`；官方走路场景没有嘴关节，所以**明确拒绝**并说明原因（`has_mouth:false`），而不是假装接受 | CI 按 `has_mouth` 分支断言：有则动，无则拒绝 |
 
 第四批（相机/roller/插值/关机/摇杆/里程计）在 iOS 模拟器上 **90 项检查全过**
 （含 roller→walk 往返、坐→憩姿→off→上电、`/state.pose`、拎起、声音、MCP），UI 测试通过；
 Android 冒烟通过（同一 `2001371` 构建，`{"mode":"roller","ok":true}`、`pose` 字段齐备）。
+相机合成本身**不在 CI 验证范围内**（模拟器无相机；CI 只验证无相机时的降级路径和 Director 模式不中断驱动）。
 
 顺带修掉的两个 CI 问题：日志发布步骤在拷贝**之后**才 checkout 旧 `ci-logs`，导致每次发布的
 都是上一次的日志（tombstone 日期早一天就是这么来的）；`patches/**` 不在 workflow 的触发路径里，
@@ -233,6 +234,35 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 | **关机序列** | `robot.shutdown` / 空电量（10 s EMA ≤ 6.6 V，官方 `BATTERY_EMPTY_V`）触发：坐下 → 从座位用 1 s 缓入 `REST_POSITION` → 保持 → 断力矩。App 没有 systemd，所以「关机」就是物理意义上的关机：力矩关闭、`powered_off` 锁存并发布，`/power` 重新上电 | `/shutdown` `/power`、MCP `duck_shutdown` / `duck_power`；CI 断言坐下→off→上电回到 ready |
 | **摇杆三种模式** | 真机手柄的三件事缩减成手机能表达的三种：走/转（原手势）、看（头 yaw/pitch）、姿态（蹲 + 侧倾）；离开模式时把头回正、把姿态释放（手柄自己的退出语义） | 两端顶栏各三个 chip；iOS 拖动分流到 `duck_core_set_head` / `duck_core_set_body` |
 | **帧间插值** | 保存最近两个 tick 的全身位姿，按 elapsed/20 ms 混合位置与四元数（双覆盖符号处理）+ 归一化；相机跟随插值后的躯干而不是 10 Hz 状态采样 | iOS 主线程快照；Android 由循环线程写入 `PoseHistory`、GL 线程读取（带锁），GL 线程从不碰 MuJoCo |
+
+---
+
+## 四之七、对第四批的地毯式对抗审核（2026-11-10）
+
+10 个视角并行找问题（含逐条核对上一条总结），每条发现再由 2 个独立审查者尝试反驳：
+57 条原始发现，取最严重的 18 条验证，**18 条全部确认、0 条被驳回**。已修复：
+
+| 严重度 | 缺陷 | 修复 |
+|---|---|---|
+| 高 | **Pose 模式退出不清 `body_active`**：`releaseBody()` 调 `set_body(0,0,0)`，而 `set_body` 只置位不清位；一旦置位，控制器每 tick 把 twist 归零——点过任意摇杆模式后**走不动**，两端都是 | 新增 `duck_core_release_body` C ABI + JNI；两端「退出模式」改调它；切到其它模式时也释放 |
+| 高 | **`/power` 后鸭子又坐下**：shutdown 的 `Sit::Sitting` 留在控制器里，`power_on` 只清 `powered_off`，复位策略不清座位；CI 只查 `bringup=2` 所以假绿（实际 trunk z 0.0593，label=sit） | `power_on`/`disable` 调上游 `Controller::forget()`（机器人重新上电时座位本就没了） |
+| 高 | **模式切换丢掉拾取分类器**：新运行时没重建 `Watch`，整场 `p_held=null` | 切换后用原模型路径重新加载 |
+| 高 | **MCP `duck_mode` 300 ms 超时**：切换要数秒 | 改用 30 s 预算（与 `/mode` 一致）；`/reload`、`/fork`、`/step` 同样按工作量给预算 |
+| 高 | **选中的分叉不被发布**：`/state`、`DuckStatus`、渲染都读原运行时；且选中分叉每帧被 tick 两次（里程计翻倍） | 新增 `active_runtime()`，所有读路径与状态发布走它；分支循环跳过选中的那个 |
+| 高 | **checkpoint 不含 `powered_off`/shutdown 相位**：倒带出不了「off」状态 | 写入并恢复；旧 checkpoint 无里程计时重启估计器而不是留在未来 |
+| 高 | **iOS MTKView 背景不透明**：清屏色透明也被不透明背景色盖住，Director 看不到相机 | 背景改 `.clear`（影棚色由每帧 clearColor 提供） |
+| 中 | 模式切换丢暂停/倍速、丢 `/reload` 加载的自定义策略目录 | 携带时钟；`/reload` 记住目录，切换按当前模式重载 |
+| 中 | roller 回退调参用了 walking 默认值 | 按上游按模式取 0.8/3.0 等回退 |
+| 中 | shutdown 的请求/空电检查在 Limp/Homing 早退之后，永远收不到 | 提到 bring-up 分支之前 |
+| 中 | shutdown 期间 `/sit`、`/skill` 能把鸭子从座位上叫起来 | 关机中拒绝移动类意图 |
+| 中 | iOS 姿态快照只读一次 body 数，roller 多出的身体永不插值 | 每帧读取 |
+| 中 | 插值 alpha 硬编码 20 ms，0.5× 时中途冻住 | 记录最近两次快照的真实间隔 |
+| 中 | Android 仪表把 `status[11]`(p_held) 当嘴；技能环重复 sit/ground_pick | 修正索引为 12；环只显示 `/skills` |
+| 中 | Android 相机：关闭 Director 后仍可能绑定泄漏、可用标志先于画面翻转、上报伪造的 1280×720/30 | 监听器检查已销毁；效果开始/销毁时置 false；只上报平台真实分辨率 |
+| 中 | CI：reload 检查只查 curl 状态；Android 冒烟从不确认循环在驱动；发布步骤会重发上一轮日志 | 检查应答 `ok`；增加 label 检查；发布前删除本轮文件 |
+
+未改的确认项：官方 roller 的里程计也用走路运动学（上游 `Odometry::alpha()` 不随模式切换），这是一致而非分歧；
+非有限值直接发布（MuJoCo 状态理论上不会出现）；iOS 相机旋转未跟随横屏左右（低）。
 
 ---
 

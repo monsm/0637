@@ -268,6 +268,9 @@ jobs:
           # the published log is yesterday's under today's commit message.
           git fetch --depth 1 origin ci-logs \
             && git checkout FETCH_HEAD -- ci-logs || true
+          # Files this run owns: remove them first, or a run that skipped the
+          # smoke test republishes the previous one's results.
+          rm -f ci-logs/android/intent-state.json ci-logs/android/intent-state-walking.json                 ci-logs/android/intent-skills.json ci-logs/android/intent-sound.json                 ci-logs/android/intent-skill-refused.json ci-logs/android/intent-mode-roller.json                 ci-logs/android/smoke-session.log
           cp android-logcat.log ci-logs/android/ 2>/dev/null || true
           cp am-start.log ci-logs/android/ 2>/dev/null || true
           cp smoke-session.log ci-logs/android/ 2>/dev/null || true

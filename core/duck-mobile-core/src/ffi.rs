@@ -309,6 +309,7 @@ pub unsafe extern "C" fn duck_core_reload_policies(
     let tuning = bundle.tuning();
     core.runtime
         .replace_policy(policy, tuning, bundle.skill_tuning);
+    core.policies = PathBuf::from(&dir);
     let names = published_skills(core.runtime.skill_names());
     core.skills = names
         .iter()
@@ -431,13 +432,16 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     if core.runtime.busy() || core.runtime.is_sitting() {
         return Err("a move is running; the duck must be standing still".to_owned());
     }
-    if core.runtime.powered_off() {
+    if core.runtime.shutting_down() {
         // A new bundle would arrive powered on, under a duck that was
-        // deliberately switched off. Upstream refuses the same way.
-        return Err("the duck is powered off; power it on first".to_owned());
+        // deliberately switched off (or is mid power-off). Upstream refuses
+        // the same way.
+        return Err("the duck is powering off; power it on first".to_owned());
     }
     let scene = scene_for(core, mode)
         .ok_or_else(|| format!("no scene for {name} beside {}", core.scene))?;
+    // Reload the set the duck is actually running — a /reload may have
+    // replaced the startup directory with a user's own policy set.
     let bundle = crate::manifest::load_mode(&core.policies, mode)?;
     let mut policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
     if bundle.standing_disabled {
@@ -453,12 +457,24 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
         bundle.skill_tuning,
         SafetyConfig::default(),
     );
+    // Carry the clock: a frozen or slowed duck stays frozen or slowed across
+    // the switch, and the cue must not be an unpause.
+    let clock = core.runtime.clock();
+    runtime.set_paused(clock.paused);
+    runtime.set_speed(clock.speed);
     runtime.enable().map_err(|error| error.to_string())?;
     runtime.set_mode(mode);
-    // The robot's cue: one chirp for walking, two for roller.
+    // `enable` queues the boot greet; a mode switch is the robot's cue instead:
+    // one chirp for walking, two for roller (robotd's own).
+    runtime.clear_sounds();
     runtime.queue_sound("chirp");
     if mode == robotd_params::Mode::Roller {
         runtime.queue_sound("chirp");
+    }
+    // The pickup classifier is part of the duck, not of the body: rebuild its
+    // watch on the new runtime, or it silently disappears for the session.
+    if let Some(model) = core.runtime.pickup_model().map(Path::to_path_buf) {
+        let _ = runtime.load_pickup(&model);
     }
 
     // A different body is a different duck: the old timeline and branches
@@ -552,6 +568,19 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
         Intent::BodyRelease => {
             core.runtime.release_body();
             json!({ "ok": true })
+        }
+        Intent::Skill(name) if core.runtime.shutting_down() => {
+            // A skill during the shutdown sit would stand the duck up out of
+            // the seat the power-off is counting on. Upstream refuses the
+            // same way (a skill needs a driving robot that is not shutting
+            // down).
+            refuse(core, "the duck is powering off".to_owned())
+        }
+        Intent::Sit if core.runtime.shutting_down() => {
+            refuse(core, "the duck is powering off".to_owned())
+        }
+        Intent::GroundPick if core.runtime.shutting_down() => {
+            refuse(core, "the duck is powering off".to_owned())
         }
         Intent::Skill(name) => {
             // The ring and `/skills` name the same verbs. `sit`/`stand` are
@@ -750,10 +779,24 @@ fn bringup_code(state: BringupState) -> c_int {
     }
 }
 
+/// The runtime the tick is actually driving: the selected branch, or the
+/// original. Every reader — `/state`, `DuckStatus`, render poses — must use
+/// this, or a selected branch drives a duck nobody can see.
+fn active_runtime(core: &DuckCore) -> &DuckRuntime<MujocoIo> {
+    if core.selected == 0 {
+        &core.runtime
+    } else {
+        core.branches
+            .get(core.selected - 1)
+            .map_or(&core.runtime, |branch| &branch.runtime)
+    }
+}
+
 fn publish_state(core: &DuckCore) {
-    let trunk = core.runtime.io().trunk();
-    let gravity = core.runtime.io().gravity();
-    let clock = core.runtime.clock();
+    let active = active_runtime(core);
+    let trunk = active.io().trunk();
+    let gravity = active.io().gravity();
+    let clock = active.clock();
     let checkpoints: Vec<u64> = core.timeline.iter().map(|saved| saved.tick).collect();
     let branches: Vec<serde_json::Value> = core
         .branches
@@ -840,25 +883,25 @@ fn publish_state(core: &DuckCore) {
     };
     core.intents.set_state(json!({
         "label": core.label,
-        "bringup": bringup_code(core.runtime.bringup()),
-        "fallen": core.runtime.fallen(),
+        "bringup": bringup_code(active.bringup()),
+        "fallen": active.fallen(),
         "gain": core.last.as_ref().map_or(200, |report| report.gain),
         "trunk": trunk,
         "gravity": gravity,
         "tick": clock.tick,
         "paused": clock.paused,
         "speed": clock.speed,
-        "mode": core.runtime.mode().as_str(),
+        "mode": active.mode().as_str(),
         // The duck's own estimate of where it is, NOT the simulator's ground
         // truth: it comes from the same legs and IMU the physical duck has.
         "pose": {
-            "position": core.runtime.position(),
-            "yaw": core.runtime.yaw(),
-            "anchor_xy": core.runtime.anchor().0,
-            "anchor_foot": core.runtime.anchor().1,
+            "position": active.position(),
+            "yaw": active.yaw(),
+            "anchor_xy": active.anchor().0,
+            "anchor_foot": active.anchor().1,
         },
-        "powered_off": core.runtime.powered_off(),
-        "carrying": core.runtime.carrying(),
+        "powered_off": active.powered_off(),
+        "carrying": active.carrying(),
         "notice": core
             .notice
             .as_ref()
@@ -927,10 +970,13 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     if core.timeline.back().is_none_or(|last| last.tick < core.runtime.clock().tick) {
         checkpoint_now(core);
     }
-    // Every branch steps too, on its own body and its own state. A branch is
-    // a separate duck from here on: nothing that happens to one reaches the
-    // other.
-    for branch in &mut core.branches {
+    // Every branch steps too, on its own body and its own state — except the
+    // selected one, which is stepped once below. Stepping it here as well ran
+    // the driven duck at double rate (and doubled its odometry).
+    for (index, branch) in core.branches.iter_mut().enumerate() {
+        if core.selected == index + 1 {
+            continue;
+        }
         if !branch.runtime.clock().paused {
             let _ = branch.runtime.tick();
             branch.tick = branch.runtime.clock().tick;
@@ -941,7 +987,11 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         core.runtime.tick()
     } else {
         match core.branches.get_mut(core.selected - 1) {
-            Some(branch) => branch.runtime.tick(),
+            Some(branch) => {
+                let report = branch.runtime.tick();
+                branch.tick = branch.runtime.clock().tick;
+                report
+            }
             None => {
                 core.selected = 0;
                 core.runtime.tick()
@@ -993,6 +1043,18 @@ pub unsafe extern "C" fn duck_core_set_body(
 ) {
     if !core.is_null() {
         (*core).runtime.set_body(z, roll, pitch);
+    }
+}
+
+/// Let go of the body pose. `set_body` starts holding a pose (`body_active`),
+/// and while that flag is set the controller zeroes the twist — a duck left
+/// holding nominal would stand still no matter what the stick said. This is
+/// the release the shells need when a pose gesture ends; it is `BodyRelease`
+/// on the intent API.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_release_body(core: *mut DuckCore) {
+    if !core.is_null() {
+        (*core).runtime.release_body();
     }
 }
 
@@ -1102,7 +1164,7 @@ pub unsafe extern "C" fn duck_core_render_sound(
         return 0;
     };
     if !out.is_null() {
-        if (capacity as usize) < pcm.len() {
+        if capacity < 0 || (capacity as usize) < pcm.len() {
             return 0;
         }
         std::ptr::copy_nonoverlapping(pcm.as_ptr(), out, pcm.len());
@@ -1236,12 +1298,13 @@ pub unsafe extern "C" fn duck_core_status(core: *mut DuckCore, out: *mut DuckSta
     }
     let core = &*core;
     let out = &mut *out;
-    out.bringup = match core.runtime.bringup() {
+    let active = active_runtime(core);
+    out.bringup = match active.bringup() {
         BringupState::Limp => 0,
         BringupState::Homing => 1,
         BringupState::Ready => 2,
     };
-    out.fallen = core.runtime.fallen() as c_int;
+    out.fallen = active.fallen() as c_int;
     out.gain = core.last.as_ref().map_or(200, |report| report.gain as c_int);
     out.label = [0; 64];
     let label = core.label.as_bytes();
@@ -1249,15 +1312,15 @@ pub unsafe extern "C" fn duck_core_status(core: *mut DuckCore, out: *mut DuckSta
     for (index, byte) in label.iter().take(count).enumerate() {
         out.label[index] = *byte as c_char;
     }
-    out.trunk = core.runtime.io().trunk();
-    out.gravity = core.runtime.io().gravity();
+    out.trunk = active.io().trunk();
+    out.gravity = active.io().gravity();
     let report = core.last.as_ref();
-    out.imu_ready = core.runtime.imu_ready() as c_int;
-    out.picked_up = core.runtime.picked_up() as c_int;
+    out.imu_ready = active.imu_ready() as c_int;
+    out.picked_up = active.picked_up() as c_int;
     out.p_held = report.and_then(|report| report.p_held).map_or(0.0, f64::from);
     out.mouth = report.map_or(0.0, |report| report.mouth);
     out.volts = report.and_then(|report| report.volts).unwrap_or(0.0);
-    out.has_mouth = core.runtime.has_mouth() as c_int;
+    out.has_mouth = active.has_mouth() as c_int;
     0
 }
 
@@ -1272,7 +1335,7 @@ pub unsafe extern "C" fn duck_core_render_qpos(
     if core.is_null() {
         return 0;
     }
-    let qpos = (*core).runtime.io().render_qpos();
+    let qpos = active_runtime(&*core).io().render_qpos();
     let count = qpos.len();
     if !out.is_null() && capacity >= 0 {
         let copy = count.min(capacity as usize);
@@ -1288,7 +1351,7 @@ pub unsafe extern "C" fn duck_core_body_count(core: *mut DuckCore) -> c_int {
     if core.is_null() {
         0
     } else {
-        (*core).runtime.io().body_count() as c_int
+        active_runtime(&*core).io().body_count() as c_int
     }
 }
 
@@ -1302,7 +1365,7 @@ pub unsafe extern "C" fn duck_core_body_pose(
     if core.is_null() || body < 0 || pos.is_null() || quat.is_null() {
         return -1;
     }
-    let (position, rotation) = (*core).runtime.io().body_pose(body as usize);
+    let (position, rotation) = active_runtime(&*core).io().body_pose(body as usize);
     for (index, value) in position.iter().enumerate() {
         *pos.add(index) = *value;
     }
@@ -1317,7 +1380,7 @@ pub unsafe extern "C" fn duck_core_geom_count(core: *mut DuckCore) -> c_int {
     if core.is_null() {
         0
     } else {
-        (*core).runtime.io().geom_count() as c_int
+        active_runtime(&*core).io().geom_count() as c_int
     }
 }
 

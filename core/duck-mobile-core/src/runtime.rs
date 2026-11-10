@@ -372,6 +372,18 @@ pub struct Checkpoint {
     /// but not the anchor would publish a pose from a future that is gone.
     #[serde(default)]
     pub odometry: Vec<f64>,
+    /// The power state, so a rewind out of a shutdown comes back with the
+    /// duck powered. Without this a restore left `powered_off` latched and the
+    /// duck could never be driven again from the UI.
+    #[serde(default)]
+    pub powered_off: bool,
+    /// "idle", "sitting" or "resting" — the shutdown phase at this tick.
+    #[serde(default)]
+    pub shutdown: String,
+    #[serde(default)]
+    pub shutdown_since: u64,
+    #[serde(default)]
+    pub shutdown_from: Option<Vec<f64>>,
 }
 
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
@@ -556,7 +568,13 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     /// Ask for a sound by tag. Unknown tags are dropped rather than invented.
     pub fn queue_sound(&mut self, tag: &str) {
+        // Bounded: a platform that never polls (audio unavailable) must not
+        // accumulate a backlog of stale quacks.
+        const PENDING: usize = 4;
         if crate::voice::TAGS.contains(&tag) {
+            if self.sounds.len() >= PENDING {
+                self.sounds.pop_front();
+            }
             self.sounds.push_back(tag.to_owned());
         }
     }
@@ -584,6 +602,17 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     /// Render a sound without queueing it, for the shell's own speaker: the
     /// core owns the synth so the PCM is the duck's, not a sample.
+    /// Where the pickup detector loads from, if one is running.
+    pub fn pickup_model(&self) -> Option<&std::path::Path> {
+        self.pickup_model.as_deref()
+    }
+
+    /// Drop queued sounds: a mode switch plays its own cue, not the greet
+    /// `enable` just queued.
+    pub fn clear_sounds(&mut self) {
+        self.sounds.clear();
+    }
+
     pub fn render_tag(&mut self, tag: &str) -> Option<Vec<f32>> {
         self.voice.render(tag).map(|(_, pcm)| pcm)
     }
@@ -598,12 +627,25 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.powered_off
     }
 
+    /// A shutdown is sitting, resting or finished. Nothing may start a move
+    /// or a bundle switch while this is true.
+    pub fn shutting_down(&self) -> bool {
+        self.powered_off || !matches!(self.shutdown, Shutdown::Idle)
+    }
+
     /// Power the duck back on after a shutdown. The battery has to have been
     /// charged (or the app restarted) for this to be a sensible request.
     pub fn power_on(&mut self) -> Result<(), RuntimeError> {
         self.powered_off = false;
         self.shutdown = Shutdown::Idle;
         self.shutdown_requested = false;
+        // **The seat did not survive the torque cut.** `begin_shutdown_sit`
+        // left `Sit::Sitting` in the controller, and `enable`'s `reset` only
+        // clears the policy — the sitting network would take the first tick
+        // after power-on and sit the duck back down. `forget` is upstream's
+        // own answer for "the robot came back limp": the seat and any move are
+        // gone, and it stands from home.
+        self.controller.forget();
         self.enable()
     }
 
@@ -714,6 +756,11 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     /// Torque off and forget the seat/move state.
     pub fn disable(&mut self) -> Result<(), RuntimeError> {
+        if !self.enabled && matches!(self.bringup, Bringup::Limp) {
+            // Already limp: torque is off and the peck would be the second
+            // one for a single request.
+            return Ok(());
+        }
         // The low "tock" the robot gives before its servos go quiet.
         self.queue_sound("peck");
         self.safety.set_torque(false)?;
@@ -727,8 +774,10 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.fall.reset();
         self.limp_fall = LimpFall::Idle;
         // Torque off means the duck is on its own: a hand still holding the
-        // trunk would be carrying a limp robot around.
+        // trunk would be carrying a limp robot around, and the seat a
+        // controller thought it had is gone with the torque.
         self.carry = None;
+        self.controller.forget();
         if let Some(watch) = self.pickup.as_mut() {
             let _ = watch.tick(false, None, self.dt);
         }
@@ -942,6 +991,20 @@ impl<T: RobotIo> DuckRuntime<T> {
             mouth: self.mouth,
             mode: self.mode.as_str().to_owned(),
             odometry: self.odometry.snapshot(),
+            powered_off: self.powered_off,
+            shutdown: match self.shutdown {
+                Shutdown::Idle => "idle".to_owned(),
+                Shutdown::Sitting { .. } => "sitting".to_owned(),
+                Shutdown::Resting { .. } => "resting".to_owned(),
+            },
+            shutdown_since: match self.shutdown {
+                Shutdown::Sitting { since } | Shutdown::Resting { since, .. } => since.0,
+                Shutdown::Idle => 0,
+            },
+            shutdown_from: match self.shutdown {
+                Shutdown::Resting { from, .. } => Some(from.to_vec()),
+                _ => None,
+            },
         })
     }
 
@@ -1015,8 +1078,27 @@ impl<T: RobotIo> DuckRuntime<T> {
         if !checkpoint.odometry.is_empty() {
             // A snapshot this build cannot read is ignored rather than
             // half-applied: the estimate restarts from the restored pose.
-            let _ = self.odometry.restore(&checkpoint.odometry);
+            if !self.odometry.restore(&checkpoint.odometry) {
+                self.odometry = odometry::Odometry::alpha();
+            }
+        } else {
+            // An older checkpoint has no estimate in it. Leaving the estimator
+            // where it was would publish a pose from a future this duck no
+            // longer has; restarting it from the restored body is honest.
+            self.odometry = odometry::Odometry::alpha();
         }
+        self.powered_off = checkpoint.powered_off;
+        self.shutdown = match checkpoint.shutdown.as_str() {
+            "sitting" => Shutdown::Sitting {
+                since: TickTime(checkpoint.shutdown_since),
+            },
+            "resting" => Shutdown::Resting {
+                from: array_of(checkpoint.shutdown_from.as_deref()),
+                since: TickTime(checkpoint.shutdown_since),
+            },
+            _ => Shutdown::Idle,
+        };
+        self.shutdown_requested = false;
         // The pickup window is a second of history from a future this duck no
         // longer had. Forget it rather than score rows against a replay.
         if let Some(watch) = self.pickup.as_mut() {
@@ -1056,6 +1138,13 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.imu_samples = self.imu_samples.saturating_add(1);
         self.safety.observe(&sensors, self.dt);
         let hold = sensors.positions;
+        // `robotd` updates odometry immediately after `safety.observe`, on
+        // fresh samples and only once the orientation filter has converged.
+        // Doing it later (behind the bring-up early returns) froze the
+        // estimate through limp, homing and a shutdown.
+        if self.imu_ready() {
+            self.odometry.update(&sensors.positions, sensors.imu.quat);
+        }
 
         // Pack voltage is a slow read on the robot (about once a second, a
         // transaction of its own), and it is the only battery measurement the
@@ -1109,6 +1198,20 @@ impl<T: RobotIo> DuckRuntime<T> {
             return Ok(report);
         }
 
+        // The shutdown request and the empty pack are checked before the
+        // bring-up early returns: a duck that is limp or still homing must
+        // still be able to power off (robotd cuts torque immediately when it
+        // cannot sit).
+        if !self.powered_off && matches!(self.shutdown, Shutdown::Idle) {
+            let empty = self
+                .volts_ema
+                .is_some_and(|volts| volts <= duck_control::model::BATTERY_EMPTY_V);
+            if empty || self.shutdown_requested {
+                self.shutdown_requested = false;
+                self.begin_shutdown(now);
+            }
+        }
+
         match self.bringup {
             Bringup::Limp => {
                 // Torque off, but still write and step: a limp duck has to
@@ -1150,15 +1253,6 @@ impl<T: RobotIo> DuckRuntime<T> {
         // The shutdown owns the robot from the moment it starts: sit, rest,
         // torque off. `robotd` runs the same sequence for `robot.shutdown`
         // and for a genuinely empty pack (a 10 s EMA at or below 6.6 V).
-        if !self.powered_off && matches!(self.shutdown, Shutdown::Idle) {
-            let empty = self
-                .volts_ema
-                .is_some_and(|volts| volts <= duck_control::model::BATTERY_EMPTY_V);
-            if empty || self.shutdown_requested {
-                self.shutdown_requested = false;
-                self.begin_shutdown(now);
-            }
-        }
         match self.shutdown {
             Shutdown::Idle => {}
             Shutdown::Sitting { since } => {
@@ -1344,14 +1438,6 @@ impl<T: RobotIo> DuckRuntime<T> {
                 report.gain = GAIN_POSE;
                 return Ok(report);
             }
-        }
-
-        // `robotd` updates odometry only on fresh samples and only once the
-        // orientation filter has converged: seeding the anchor from a
-        // quaternion that is still swinging would put the world origin
-        // somewhere the robot never was.
-        if warm && !self.powered_off {
-            self.odometry.update(&sensors.positions, sensors.imu.quat);
         }
 
         // The orientation is still a default, not a measurement: hold the pose,

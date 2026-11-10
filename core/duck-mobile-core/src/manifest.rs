@@ -157,15 +157,31 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
         None => (fallback_skills(dir), None, None),
     };
 
+    // Per-mode fallbacks, as `ResolvedPolicy` resolves them: the roller runs
+    // at a smaller action scale and its crouch is a different length.
+    let fallback_period = match mode {
+        Mode::Walk => 4.0,
+        Mode::Roller => 3.0,
+    };
+    let fallback_scale = match mode {
+        Mode::Walk => 1.0,
+        Mode::Roller => 0.8,
+    };
+    let fallback_action_scale = match mode {
+        Mode::Walk => 0.9,
+        Mode::Roller => 0.8,
+    };
+    let action_scale = action_scale.or(Some(fallback_action_scale));
+
     let skill_tuning = SkillTuning {
-        ground_pick_period: pick_timing.map_or(4.0, |timing| timing.period_s),
+        ground_pick_period: pick_timing.map_or(fallback_period, |timing| timing.period_s),
         ground_pick_end_phase: pick_timing
             .map_or(robotd_params::DEFAULT_GROUND_PICK_END_PHASE, |timing| {
                 timing.end_phase
             }),
         ground_pick_action_scale: pick_timing
             .and_then(|timing| timing.action_scale)
-            .unwrap_or(1.0),
+            .unwrap_or(fallback_scale),
         ground_pick_gain_ratio: 1.0,
         sitstand_rise_s: sit_timing
             .map_or(robotd_params::DEFAULT_SITSTAND_RISE_S, |timing| timing.rise_s),

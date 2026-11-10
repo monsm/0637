@@ -38,6 +38,9 @@ void duck_core_set_twist(DuckCore* core, double vx, double vy, double wz);
 void duck_core_set_head(DuckCore* core, double neck, double head,
                         double yaw, double roll);
 void duck_core_set_body(DuckCore* core, double z, double roll, double pitch);
+/* Let go of the body pose (the pad's pose-mode exit). While a pose is held the
+   controller zeroes the twist. */
+void duck_core_release_body(DuckCore* core);
 /* A hand on the trunk: metres from where it was grabbed; active 0 lets go. */
 void duck_core_carry(DuckCore* core, double dx, double dy, double dz, int active);
 int duck_core_push(DuckCore* core, double vx, double vy, double vz);

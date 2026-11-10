@@ -34,17 +34,19 @@ fn recipe(tag: &str) -> Option<fn(&Personality, u32) -> Vec<f32>> {
 /// which is the one thing a digital twin cannot be (FIDELITY.md, L4).
 pub struct Voice {
     personality: Personality,
-    /// Rotates through the tag's variants so the duck does not sound like a
-    /// stuck recording. The robot picks at random; a counter is the same idea
-    /// without a source of entropy a replayed tick would diverge on.
-    plays: u64,
+    /// Per-tag rotation through that tag's variants, so the duck does not
+    /// sound like a stuck recording. The robot picks at random; counters are
+    /// the same idea without a source of entropy a replayed tick would diverge
+    /// on. Per tag, because one shared counter would make a chirp after a greet
+    /// start at variant 2 rather than at the tag's own first.
+    plays: [u64; 6],
 }
 
 impl Voice {
     pub fn new(seed: u32) -> Self {
         Self {
             personality: Personality::from_seed(seed),
-            plays: 0,
+            plays: [0; 6],
         }
     }
 
@@ -60,8 +62,9 @@ impl Voice {
     pub fn render(&mut self, tag: &str) -> Option<(String, Vec<f32>)> {
         let recipe = recipe(tag)?;
         let count = crate::variant_count(tag).max(1);
-        let variant = (self.plays % u64::from(count)) as u32;
-        self.plays = self.plays.wrapping_add(1);
+        let slot = TAGS.iter().position(|name| *name == tag).unwrap_or(0);
+        let variant = (self.plays[slot] % u64::from(count)) as u32;
+        self.plays[slot] = self.plays[slot].wrapping_add(1);
         Some((tag.to_owned(), recipe(&self.personality, variant)))
     }
 }

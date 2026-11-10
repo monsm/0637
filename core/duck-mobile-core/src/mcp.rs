@@ -261,7 +261,12 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
                 .get("mode")
                 .and_then(Value::as_str)
                 .ok_or("missing mode")?;
-            Ok(queue.request(crate::intent::Intent::Mode(mode.to_owned())))
+            // A mode switch loads a second MJCF and a policy set: seconds,
+            // not the 300 ms a one-shot gets. The same budget as POST /mode.
+            Ok(queue.request_within(
+                crate::intent::Intent::Mode(mode.to_owned()),
+                std::time::Duration::from_secs(30),
+            ))
         }
         "duck_sound" => {
             let tag = arguments

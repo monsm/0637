@@ -110,9 +110,12 @@ fun Shell(
                             if (!carrying) {
                                 input.vx = 0.0
                                 input.wz = 0.0
-                                // Leaving a mode puts back what it moved.
+                                // Leaving a mode puts back what it moved. The
+                                // body release is a different call: setting
+                                // (0,0,0) starts holding nominal, and a held
+                                // pose zeroes the twist for good.
                                 duck.setHead(0.0, 0.0, 0.0, 0.0)
-                                duck.setBody(0.0, 0.0, 0.0)
+                                duck.releaseBody()
                             }
                         },
                         onDragCancel = {
@@ -120,7 +123,7 @@ fun Shell(
                                 input.vx = 0.0
                                 input.wz = 0.0
                                 duck.setHead(0.0, 0.0, 0.0, 0.0)
-                                duck.setBody(0.0, 0.0, 0.0)
+                                duck.releaseBody()
                             }
                         },
                     )
@@ -266,18 +269,8 @@ private fun SkillRing(
                     Text(skillLabel(name), color = Color.White, fontSize = 13.sp)
                 }
             }
-            Box(
-                Modifier
-                    .background(Color.White.copy(alpha = 0.16f), CircleShape)
-                    .pointerInput(Unit) { detectTapGestures { onPick("sit") } }
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-            ) { Text(Copy.sit, color = Color.White, fontSize = 13.sp) }
-            Box(
-                Modifier
-                    .background(Color.White.copy(alpha = 0.16f), CircleShape)
-                    .pointerInput(Unit) { detectTapGestures { onPick("ground_pick") } }
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
-            ) { Text(Copy.pickUp, color = Color.White, fontSize = 13.sp) }
+            // `sit` and `ground_pick` are already in the skills list (/skills
+            // publishes them now); the ring shows the list, not a second copy.
         }
     }
 }
@@ -336,7 +329,9 @@ private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
                         append(Copy.bringup(status[0].toInt()))
                         append(" · ")
                         append(if (status[9] > 0.5) "IMU warm" else "IMU warming")
-                        append(" · beak ${"%.2f".format(status[11])}")
+                        // [0 bringup, 1 fallen, 2 gain, 3..5 trunk, 6..8 gravity,
+                        //  9 imu_ready, 10 picked_up, 11 p_held, 12 mouth, 13 volts]
+                        append(" · beak ${"%.2f".format(status[12])}")
                         if (status[10] > 0.5) append(" · in a hand")
                         if (status[13] > 0.0) append(" · pack ${"%.2f".format(status[13])} V")
                     },

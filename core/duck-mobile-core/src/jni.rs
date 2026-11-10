@@ -15,6 +15,7 @@ use jni::JNIEnv;
 
 use crate::ffi::{
     duck_core_body_count, duck_core_mode, duck_core_model_generation, duck_core_next_sound,
+    duck_core_release_body,
     duck_core_queue_sound, duck_core_render_sound, duck_core_set_mode,
     duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
     duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_load_pickup,
@@ -140,6 +141,15 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetBody(
     pitch: jdouble,
 ) {
     unsafe { duck_core_set_body(handle as *mut DuckCore, z, roll, pitch) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeReleaseBody(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) {
+    unsafe { duck_core_release_body(handle as *mut DuckCore) };
 }
 
 #[unsafe(no_mangle)]

@@ -53,7 +53,7 @@ final class Voice {
 
     /// Play the next queued sound, if any. Called from the main-thread tick.
     func poll(core: OpaquePointer) {
-        if playing { return }
+        if playing || !engine.isRunning { return }
         guard let pointer = duck_core_next_sound(core) else { return }
         let tag = String(cString: pointer)
         guard let pcm = Voice.render(core: core, tag: tag) else { return }
@@ -93,6 +93,7 @@ final class Voice {
                 channel.update(from: base, count: pcm.count)
             }
         }
+        guard engine.isRunning else { return }
         playing = true
         player.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
             // Back to the main thread: `playing` is read there by `poll`, and

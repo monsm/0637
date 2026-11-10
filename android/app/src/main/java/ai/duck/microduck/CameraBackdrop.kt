@@ -75,9 +75,16 @@ fun CameraBackdrop(
     DisposableEffect(active, granted) {
         var provider: ProcessCameraProvider? = null
         var metadata: java.util.concurrent.ScheduledExecutorService? = null
+        var disposed = false
+        // The renderer must not go transparent before there is a camera image;
+        // a stale true from a previous visit would clear to black.
+        onAvailability(false)
         if (active && granted) {
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener({
+                // The provider future can resolve after Director is closed.
+                // Binding here then would leak a camera session nothing owns.
+                if (disposed) return@addListener
                 try {
                     val cameraProvider = future.get()
                     provider = cameraProvider
@@ -90,8 +97,9 @@ fun CameraBackdrop(
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
                     )
+                    val resolution = preview.resolutionInfo?.resolution
+                    metadata = startMetadata(context, resolution)
                     onAvailability(true)
-                    metadata = startMetadata(context)
                 } catch (error: Throwable) {
                     // No camera on an emulator, or the provider refused it.
                     android.util.Log.i(
@@ -101,12 +109,12 @@ fun CameraBackdrop(
                     onAvailability(false)
                 }
             }, ContextCompat.getMainExecutor(context))
-        } else {
-            onAvailability(false)
         }
         onDispose {
+            disposed = true
             metadata?.shutdownNow()
             provider?.unbindAll()
+            onAvailability(false)
         }
     }
 
@@ -119,13 +127,23 @@ fun CameraBackdrop(
 }
 
 /** One metadata post per second, on its own thread: not the control loop. */
-private fun startMetadata(context: Context): java.util.concurrent.ScheduledExecutorService {
+private fun startMetadata(
+    context: Context,
+    resolution: android.util.Size?,
+): java.util.concurrent.ScheduledExecutorService {
     val executor = Executors.newSingleThreadScheduledExecutor()
+    val (width, height) = resolution?.let { it.width to it.height } ?: (0 to 0)
     executor.scheduleAtFixedRate(
         {
             try {
-                val body = """{"sensor":"camera","mode":"ar","value":{""" +
-                    """"width":1280,"height":720,"fps":30,"position":"back"}}"""
+                // Only what the platform actually reports: a fabricated frame
+                // rate or exposure would be a number nobody measured.
+                val body = if (width > 0 && height > 0) {
+                    """{"sensor":"camera","mode":"ar","value":{""" +
+                        """"width":$width,"height":$height,"position":"back"}}"""
+                } else {
+                    """{"sensor":"camera","mode":"ar","value":{"position":"back"}}"""
+                }
                 val connection = URL("http://127.0.0.1:8765/sensor")
                     .openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"

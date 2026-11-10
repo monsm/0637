@@ -440,8 +440,12 @@ ALIVE=$(api GET /state | field bringup)
 # ---------------------------------------------------------------- reload
 echo "--- policy reload ---"
 if [ -n "$APPDIR" ]; then
-  api POST /reload "{\"dir\":\"$APPDIR/DuckResources/policies\"}" > /dev/null
-  check $? "reload the bundled policy set" "$APPDIR/DuckResources/policies"
+  RELOAD=$(api POST /reload "{\"dir\":\"$APPDIR/DuckResources/policies\"}" || true)
+  echo "$RELOAD" | tee "$OUT/reload.json" > /dev/null
+  # The route now waits for the tick's verdict: a refused reload used to pass
+  # this check because curl only reported the HTTP status.
+  printf '%s' "$RELOAD" | grep -q '"ok":true'
+  check $? "reload the bundled policy set" "$(printf '%s' "$RELOAD" | head -c 100)"
   poll_state label walk 30 0.2 > /dev/null
   SKILLS2=$(api GET /skills || true)
   state_has "$SKILLS2" roulade

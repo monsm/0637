@@ -84,12 +84,15 @@ final class DuckController: ObservableObject {
     private(set) var currentPoses: [BodyPose] = []
     /// When `currentPoses` was captured, on the same clock the renderer reads.
     private(set) var poseCapturedAt: TimeInterval = 0
+    /// Wall time between the last two captures. A fixed 20 ms would saturate
+    /// alpha halfway through a slowed tick and freeze the pose.
+    private var poseInterval: TimeInterval = 0.02
     private var bodyCount = 0
 
     /// 0…1 through the current 20 ms tick, for the renderer.
     func interpolationAlpha(now: TimeInterval = Date().timeIntervalSinceReferenceDate) -> Float {
         guard poseCapturedAt > 0 else { return 1 }
-        let alpha = (now - poseCapturedAt) / 0.02
+        let alpha = (now - poseCapturedAt) / max(poseInterval, 0.001)
         return Float(min(max(alpha, 0), 1))
     }
 
@@ -115,9 +118,10 @@ final class DuckController: ObservableObject {
 
     /// Snapshot every body's pose, after a tick. Called on the main thread.
     private func capturePoses(core: OpaquePointer) {
-        if bodyCount == 0 {
-            bodyCount = Int(duck_core_body_count(core))
-        }
+        // Read every frame: a mode switch loads a model with a different body
+        // count, and a cached one would silently drop the roller's bodies from
+        // the snapshots (no interpolation, stale poses).
+        bodyCount = Int(duck_core_body_count(core))
         guard bodyCount > 0 else { return }
         var poses = previousPoses
         poses.removeAll(keepingCapacity: true)
@@ -138,7 +142,11 @@ final class DuckController: ObservableObject {
         }
         previousPoses = currentPoses
         currentPoses = poses
-        poseCapturedAt = Date().timeIntervalSinceReferenceDate
+        let now = Date().timeIntervalSinceReferenceDate
+        if poseCapturedAt > 0 {
+            poseInterval = min(max(now - poseCapturedAt, 0.001), 0.2)
+        }
+        poseCapturedAt = now
     }
 
     init() {
@@ -563,10 +571,13 @@ final class DuckController: ObservableObject {
         duck_core_set_body(core, z, roll, 0.0)
     }
 
-    /// Let go: the pose snaps back to nominal, which is the pad's B exit.
+    /// Let go: the pose snaps back to nominal and the body-active flag that
+    /// zeroes the twist is cleared, which is the pad's B exit. `set_body` only
+    /// *starts* a pose — clearing it needs the release entry, or driving is
+    /// dead for the rest of the session.
     func releaseBody() {
         guard let core else { return }
-        duck_core_set_body(core, 0.0, 0.0, 0.0)
+        duck_core_release_body(core)
     }
 
     func carry(dx: Double, dy: Double, dz: Double) {

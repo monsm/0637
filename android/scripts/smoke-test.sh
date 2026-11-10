@@ -121,6 +121,20 @@ if curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"tag
   exit 1
 fi
 
+# The API answering is not the same as the loop driving: the label is "idle"
+# until the first tick, and a core that loaded but never ticks would answer
+# every route while standing still forever.
+LABEL=""
+for _ in $(seq 1 60); do
+  LABEL=$(curl -sf --max-time 5 http://127.0.0.1:8765/state     | grep -oE '"label":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+  [ -n "$LABEL" ] && [ "$LABEL" != "idle" ] && break
+  sleep 1
+done
+if [ -z "$LABEL" ] || [ "$LABEL" = "idle" ]; then
+  echo "::error::the control loop never drove the duck: label=$LABEL"
+  exit 1
+fi
+
 # The duck's own odometry: an estimate from its legs and IMU, not the
 # simulator's ground truth.
 if ! echo "$STATE" | grep -q '"pose"'; then

@@ -16,6 +16,10 @@ class PoseHistory {
     private var previous = DoubleArray(0)
     private var current = DoubleArray(0)
     private var capturedAtNanos = 0L
+    /// Wall time between the last two captures. The tick interval is 20 ms at
+    /// 1x but 40 ms at 0.5x (and longer on a slow frame); blending with a fixed
+    /// 20 ms would saturate alpha at 1 halfway through and freeze.
+    private var intervalNanos = 20_000_000L
     private var bodyCount = 0
 
     /** Snapshot every body after a tick. Called from the loop thread. */
@@ -38,7 +42,11 @@ class PoseHistory {
             }
             previous = current
             current = next
-            capturedAtNanos = System.nanoTime()
+            val now = System.nanoTime()
+            if (capturedAtNanos != 0L) {
+                intervalNanos = (now - capturedAtNanos).coerceIn(1_000_000L, 200_000_000L)
+            }
+            capturedAtNanos = now
         }
     }
 
@@ -56,7 +64,7 @@ class PoseHistory {
                 return b
             }
             val elapsed = (nowNanos - capturedAtNanos).coerceAtLeast(0L)
-            val alpha = (elapsed / 20_000_000.0).coerceIn(0.0, 1.0)
+            val alpha = (elapsed.toDouble() / intervalNanos.toDouble()).coerceIn(0.0, 1.0)
             val a = DoubleArray(7)
             System.arraycopy(previous, index, a, 0, 7)
             // Quaternions are double covers: q and -q are the same rotation.
