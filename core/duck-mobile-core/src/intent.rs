@@ -87,6 +87,8 @@ pub enum Intent {
     Wheee(bool),
     /// A stroke of the hand on the duck.
     Pet,
+    /// How long the duck waits before doing something by itself, in seconds.
+    IdleRitual(f64),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
     Look { target: [f64; 3], neck_pitch: f64 },
     /// Recognized speech, as text. The core maps it to one of its own verbs,
@@ -528,6 +530,11 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             None => Err("missing tag"),
         },
         ("POST", "/pet") => Ok(queue.request(Intent::Pet).to_string()),
+        ("POST", "/config") => Ok(queue
+            .request(Intent::IdleRitual(
+                value["idle_ritual_s"].as_f64().unwrap_or(30.0),
+            ))
+            .to_string()),
         ("POST", "/wheee") => Ok(queue
             .request(Intent::Wheee(value["hold"].as_bool().unwrap_or(false)))
             .to_string()),

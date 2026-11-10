@@ -753,6 +753,10 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             core.runtime.wheee(hold);
             json!({ "ok": true, "held": hold })
         }
+        Intent::IdleRitual(seconds) => {
+            core.runtime.set_idle_ritual(seconds);
+            json!({ "ok": true, "idle_ritual_s": seconds })
+        }
         Intent::Pet => {
             core.runtime.pet();
             json!({ "ok": true, "pets": core.runtime.book().life.pets })

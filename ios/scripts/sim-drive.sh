@@ -287,6 +287,29 @@ check $? "a still duck looks around" "takeover=$IDLE_GAIN head=$IDLE_HEAD"
 
 # Virtual face LEDs: the phone has no I2C bus, but robotd's status verdict,
 # battery gauge and seven-colour flashlight are part of the duck.
+# Idle ritual: left alone, the duck plays one of its own official emotions.
+# /config shortens the 30 s default so CI can watch it happen.
+echo "--- idle ritual ---"
+BEFORE=$(api GET /life | python3 -c "
+import json,sys
+try: print(sum(json.load(sys.stdin).get('emotions',{}).values()))
+except Exception: print('0')
+" 2>/dev/null || echo "0")
+api POST /config '{"idle_ritual_s":3.0}' > /dev/null || true
+sleep 9
+AFTER=$(api GET /life | python3 -c "
+import json,sys
+try: print(sum(json.load(sys.stdin).get('emotions',{}).values()))
+except Exception: print('0')
+" 2>/dev/null || echo "0")
+python3 -c "
+import sys
+sys.exit(0 if int('${AFTER:-0}') > int('${BEFORE:-0}') else 1)
+" 2>/dev/null
+check $? "a duck left alone does something by itself" "emotions $BEFORE -> $AFTER"
+# Put the default back so the rest of the session is not full of surprises.
+api POST /config '{"idle_ritual_s":30.0}' > /dev/null || true
+
 echo "--- face ---"
 FACESTATE=$(api GET /state)
 printf '%s' "$FACESTATE" | grep -q '"leds"'

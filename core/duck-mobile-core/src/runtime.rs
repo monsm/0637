@@ -437,6 +437,14 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The last sound the core queued, published so a client can tell that an
     /// emotion's official wav really reached the speaker channel.
     last_sound: Option<String>,
+    /// When an idle ritual last ran, on the simulated clock. The duck plays
+    /// one of its own official emotions when left alone long enough: a robot
+    /// standing perfectly still reads as switched off, and this is the one
+    /// behaviour that needs no tap and no screen space.
+    last_idle_ritual: Option<u64>,
+    /// How long the duck waits before it does something on its own, in
+    /// simulated ticks. The default is 30 s; a client can shorten it.
+    idle_ritual_ticks: u64,
     /// How long a pet keeps the duck lively, in simulated seconds. Petting is
     /// the phone's stand-in for `pet_detect`: upstream counts a stroke of the
     /// hand as a pet, and a phone has a screen instead of a hand on the shell.
@@ -549,6 +557,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_idle: crate::control::IdleOffset::default(),
             book: crate::vetbook::Book::default(),
             pet_glow_until: None,
+            last_idle_ritual: None,
+            idle_ritual_ticks: 1500,
             face: crate::leds::Face::default(),
             last_sound: None,
             last_ride_segment: None,
@@ -966,6 +976,15 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn last_sound(&self) -> Option<&str> {
         self.last_sound.as_deref()
+    }
+
+    /// How long the duck waits before doing something by itself. `0` disables
+    /// the idle ritual; this is the "liveliness" control a client can set.
+    pub fn set_idle_ritual(&mut self, seconds: f64) {
+        self.idle_ritual_ticks = (seconds * 50.0).max(0.0) as u64;
+        if seconds <= 0.0 {
+            self.idle_ritual_ticks = u64::MAX;
+        }
     }
 
     /// A stroke of the hand: the duck counts it, coos, and stays lively a
@@ -1864,6 +1883,30 @@ impl<T: RobotIo> DuckRuntime<T> {
             if self.last_idle.takeover > 0.5 {
                 reaction = Some("inquire");
             }
+        }
+        // The idle ritual: after a long stillness (and never during a skill,
+        // a shutdown, a hold or an emotion) the duck plays one of its own
+        // official timelines. Deterministic on the simulated clock, so a
+        // rewind replays the same choice rather than drawing a new RNG value.
+        let period = self.idle_ritual_ticks;
+        let ritual_due = self
+            .last_idle_ritual
+            .is_none_or(|tick| self.clock.tick.saturating_sub(tick) >= period);
+        if ritual_due
+            && period < u64::MAX
+            && self.last_idle.takeover > 0.9
+            && emotion_frame.is_none()
+            && !self.controller.busy()
+            && !pickup_paused
+            && !self.shutting_down()
+            && !self.powered_off
+            && !self.emotions.is_empty()
+        {
+            let names = self.emotions.names();
+            let index = (self.clock.tick / period.max(1)) as usize % names.len();
+            let _ = self.trigger_emotion(&names[index]);
+            self.last_idle_ritual = Some(self.clock.tick);
+            self.book.note("idle_ritual".to_owned());
         }
         if let Some(tag) = reaction {
             self.queue_sound(tag);
