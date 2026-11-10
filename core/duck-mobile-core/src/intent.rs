@@ -124,6 +124,8 @@ pub struct IntentQueue {
     branches: Mutex<Value>,
     /// The latest phone-sensor readings.
     sensors: Mutex<Value>,
+    /// The duck's lifetime record, shared with the loop that counts it.
+    life: Mutex<crate::vetbook::Book>,
 }
 
 impl Default for IntentQueue {
@@ -154,6 +156,7 @@ impl IntentQueue {
             fingerprint: Mutex::new("{}".to_owned()),
             branches: Mutex::new(json!({ "branches": [], "selected": "" })),
             sensors: Mutex::new(json!({ "mode": "twin" })),
+            life: Mutex::new(crate::vetbook::Book::default()),
             time: Mutex::new(json!({
                 "tick": 0,
                 "paused": false,
@@ -295,6 +298,20 @@ impl IntentQueue {
         *self.sensors.lock().expect("intent sensors") = value;
     }
 
+    /// The lifetime record as JSON. The queue owns the book so the shell can
+    /// read it without going through the core's FFI.
+    pub fn life_json(&self) -> String {
+        self.life.lock().expect("intent life").summary().to_string()
+    }
+
+    /// Hand the loop's book over, so a client sees the same numbers the
+    /// duck has been counting.
+    pub fn set_life(&self, book: &crate::vetbook::Book) {
+        if let Ok(mut slot) = self.life.lock() {
+            *slot = book.clone();
+        }
+    }
+
     pub fn sensors_json(&self) -> String {
         self.sensors.lock().expect("intent sensors").to_string()
     }
@@ -379,6 +396,8 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/timeline") => Ok(queue.time_json()),
         ("GET", "/branches") => Ok(queue.branches_json()),
         ("GET", "/sensors") => Ok(queue.sensors_json()),
+        // The lifetime record, the same counters the shell keeps in storage.
+        ("GET", "/life") => Ok(queue.life_json()),
         ("POST", "/mcp") => Ok(crate::mcp::handle(&body, &queue)),
         ("GET", "/mcp") => Ok(crate::mcp::handle(
             r#"{"jsonrpc":"2.0","id":0,"method":"tools/list"}"#,

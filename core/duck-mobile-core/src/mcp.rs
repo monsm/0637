@@ -53,6 +53,11 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_life",
+            "description": "The duck's lifetime record: seconds powered, walking and held; falls, pickups, sit/stand counts; every skill and emotion it has run, by name; metres walked.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        },
+        {
             "name": "duck_wheee",
             "description": "The duck's joy-ride: hold=true starts the official wheee (start segment + repeating loops), hold=false ends it. This is the held sound the physical duck's trigger makes.",
             "inputSchema": {
@@ -284,6 +289,11 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             // refusal is the useful half of a skill call.
             Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
         }
+        "duck_life" => Ok(serde_json::json!({
+            "ok": true,
+            "life": serde_json::from_str::<serde_json::Value>(&queue.life_json())
+                .unwrap_or(serde_json::json!({})),
+        })),
         "duck_wheee" => Ok(queue.request(crate::intent::Intent::Wheee(
             arguments.get("hold").and_then(Value::as_bool).unwrap_or(false),
         ))),

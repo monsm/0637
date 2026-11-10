@@ -1066,6 +1066,7 @@ fn publish_state(core: &DuckCore) {
         "last_sound": active.last_sound(),
         "last_emotion_sound": active.last_emotion_sound(),
         "last_ride_segment": active.last_ride_segment(),
+        "life": active.book().summary(),
         "leds": {
             "status": active.face().status,
             "gauge": active.face().gauge,
@@ -1188,6 +1189,9 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         Ok(report) => {
             core.label = report.label.clone();
             core.last = Some(report);
+            // The lifetime record travels with the state: a client reading
+            // /state sees the same counters /life serves.
+            core.intents.set_life(core.runtime.book());
             publish_state(core);
             0
         }

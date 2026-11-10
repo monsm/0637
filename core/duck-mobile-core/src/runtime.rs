@@ -437,6 +437,9 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The last sound the core queued, published so a client can tell that an
     /// emotion's official wav really reached the speaker channel.
     last_sound: Option<String>,
+    /// The duck's lifetime record: seconds powered and walking, falls, picks
+    /// up, skills by name. It is what makes this the same animal tomorrow.
+    book: crate::vetbook::Book,
     /// The virtual face LEDs: status, battery gauge and flashlight. The phone
     /// has no I²C expander, but the verdict and the colours are the duck's.
     face: crate::leds::Face,
@@ -540,6 +543,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_head: crate::control::IdleHead::new(robotd_params::IdleParams::default(), 0xD0C),
             idle_params: robotd_params::IdleParams::default(),
             last_idle: crate::control::IdleOffset::default(),
+            book: crate::vetbook::Book::default(),
             face: crate::leds::Face::default(),
             last_sound: None,
             last_ride_segment: None,
@@ -937,6 +941,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         if emotion.duration() <= 0.0 {
             return Err("emotion has no keyframes");
         }
+        self.book.emotion(name);
         self.emotion_playing = Some(crate::emotion::Playing {
             name: name.to_owned(),
             elapsed: 0.0,
@@ -956,6 +961,15 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn last_sound(&self) -> Option<&str> {
         self.last_sound.as_deref()
+    }
+
+    /// The lifetime record, for `/state.life` and the shell's own storage.
+    pub fn book(&self) -> &crate::vetbook::Book {
+        &self.book
+    }
+
+    pub fn book_mut(&mut self) -> &mut crate::vetbook::Book {
+        &mut self.book
     }
 
     /// The virtual face, and `robot.flashlight`'s mobile equivalent.
@@ -1015,6 +1029,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         if self.emotions.get(name).is_some() {
             return self.trigger_emotion(name);
         }
+        self.book.skill(name);
         let index = self
             .controller
             .skill_names()
@@ -1898,6 +1913,31 @@ impl<T: RobotIo> DuckRuntime<T> {
         report.p_held = self.p_held();
         report.imu_ready = self.imu_ready();
         report.volts = self.volts;
+        // The lifetime record, counted from what this tick actually was.
+        // `robotd` keeps the same facts in its vet book; a phone keeps them
+        // in memory and hands them to the shell to store.
+        let walking = was_driving
+            && command.twist.iter().any(|value| value.abs() > 1e-3);
+        let standing = was_driving && !walking && !pickup_paused;
+        let sitting = matches!(self.shutdown, Shutdown::Sitting { .. })
+            || (self.controller.is_sitting() && !pickup_paused);
+        self.book.tick(crate::vetbook::Facts {
+            powered: true,
+            torqued: self.enabled,
+            walking,
+            standing,
+            sitting,
+            held: pickup_paused,
+            dt: self.dt.as_secs_f64(),
+        });
+        if pickup_paused && !self.last_pickup_paused {
+            self.book.life.pickups += 1;
+            self.book.note("picked_up".to_owned());
+        }
+        if self.safety.fallen() && !self.last_fallen {
+            self.book.life.falls += 1;
+            self.book.note("fell".to_owned());
+        }
         Ok(report)
     }
 }

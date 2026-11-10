@@ -32,6 +32,7 @@ pub mod mujoco;
 pub mod runtime;
 pub mod sensors;
 pub mod speech;
+pub mod vetbook;
 pub mod voice;
 
 // The robot's voice synth, compiled verbatim. `sounds/` is a crate of pure
