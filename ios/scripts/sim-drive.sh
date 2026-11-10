@@ -308,8 +308,18 @@ echo "--- life ---"
 LIFE=$(api GET /life || true)
 printf '%s' "$LIFE" | grep -q '"powered_s"'
 check $? "life publishes the record" "$(printf '%s' "$LIFE" | head -c 120)"
-printf '%s' "$LIFE" | grep -q '"roulade":1'
-check $? "life counts the skills the duck ran" "$(printf '%s' "$LIFE" | head -c 200)"
+printf '%s' "$LIFE" | python3 -c "
+import json,sys
+b=json.load(sys.stdin)
+sys.exit(0 if b.get('skills',{}).get('roulade',0) >= 1 and b.get('emotions',{}).get('curious',0) >= 1 else 1)
+" 2>/dev/null
+check $? "life counts the skills and emotions the duck ran" ""
+printf '%s' "$LIFE" | python3 -c "
+import json,sys
+b=json.load(sys.stdin)
+sys.exit(0 if 'fly' not in b.get('skills',{}) else 1)
+" 2>/dev/null
+check $? "life does not count a refused skill" ""
 LIFE_STATE=$(api GET /state | python3 -c "
 import json,sys
 try: print(json.load(sys.stdin).get('life',{}).get('walking_s',0))
@@ -325,7 +335,8 @@ check $? "state carries the same record" "walking_s=$LIFE_STATE"
 # aiming right of the trunk must produce a positive head_yaw and the answer
 # must stay within the servo travel the MJCF declares.
 echo "--- look ---"
-LOOK=$(api POST /look '{"x":1.0,"y":-0.5,"z":0.15}' || true)
+# +y is left in the MJCF trunk frame; aiming left must yaw left (positive).
+LOOK=$(api POST /look '{"x":1.0,"y":0.5,"z":0.15}' || true)
 printf '%s' "$LOOK" | grep -q '"ok":true'
 check $? "look answers" "$(printf '%s' "$LOOK" | head -c 140)"
 LOOK_YAW=$(printf '%s' "$LOOK" | python3 -c "
@@ -353,8 +364,14 @@ case "$RIDE" in
   *) check 1 "the ride never started" "$RIDE" ;;
 esac
 api POST /wheee '{"hold":false}' > /dev/null || true
-sleep 1
-RIDE_END=$(api GET /state | field last_ride_segment)
+# The platform only pulls the next buffer when the current one finishes;
+# the end segment can take a couple of seconds to surface.
+RIDE_END=""
+for _ in $(seq 1 10); do
+  RIDE_END=$(api GET /state | field last_ride_segment)
+  case "$RIDE_END" in wheee:end:*) break ;; esac
+  sleep 1
+done
 case "$RIDE_END" in
   wheee:end:*) check 0 "the ride ends on release" "$RIDE_END" ;;
   *) check 1 "the ride never ended" "$RIDE_END" ;;
@@ -367,9 +384,12 @@ echo "--- heard ---"
 HEARD=$(api POST /heard '{"text":"翻滚"}' || true)
 printf '%s' "$HEARD" | grep -q '"skill":"roulade"'
 check $? "Chinese speech maps to a skill" "$(printf '%s' "$HEARD" | head -c 140)"
+# One move at a time: let the roll finish before the next word.
+wait_idle 100 > /dev/null
 HEARD2=$(api POST /heard '{"text":"excited"}' || true)
 printf '%s' "$HEARD2" | grep -q '"skill":"excited"'
 check $? "English speech maps to the same table" "$(printf '%s' "$HEARD2" | head -c 140)"
+wait_idle 100 > /dev/null
 GREET=$(api POST /heard '{"text":"你好"}' || true)
 printf '%s' "$GREET" | grep -q '"sound":"greet"'
 check $? "a greeting answers with the duck's voice" "$(printf '%s' "$GREET" | head -c 140)"

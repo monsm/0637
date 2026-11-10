@@ -1044,14 +1044,18 @@ impl<T: RobotIo> DuckRuntime<T> {
         if self.emotions.get(name).is_some() {
             return self.trigger_emotion(name);
         }
-        self.book.skill(name);
         let index = self
             .controller
             .skill_names()
             .iter()
             .position(|candidate| candidate == name)
             .ok_or("no such skill")?;
-        self.controller.start_skill(index)
+        // A skill the scheduler refused is not part of the duck's story: the
+        // book only records what actually started.
+        self.controller.start_skill(index).map(|started| {
+            self.book.skill(name);
+            started
+        })
     }
 
     pub fn start_ground_pick(&mut self) -> Result<(), &'static str> {

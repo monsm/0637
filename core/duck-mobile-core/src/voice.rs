@@ -85,6 +85,11 @@ impl Voice {
         if starting {
             self.enqueue_segment("start", self.wheee_variant);
         } else if stopping {
+            // The platform plays segments sequentially and only pulls the
+            // next one when a buffer finishes. Loops queued while held would
+            // still be waiting when the finger lifts, so drop them: the ride
+            // ends now, not after the backlog.
+            self.pending_segments.clear();
             self.enqueue_segment("end", self.wheee_variant);
         }
     }
@@ -116,8 +121,15 @@ impl Voice {
     }
 
     /// One more loop for a ride still held. Called from the loop's 1 Hz tick.
+    /// Never queue more than one beyond what the platform has taken: a loop
+    /// is 1.6-2.2 s of audio, and a backlog would delay the end segment.
     pub fn queue_loop(&mut self) {
-        if self.wheee_held {
+        if self.wheee_held
+            && !self
+                .pending_segments
+                .iter()
+                .any(|segment| segment.starts_with("wheee:loop:"))
+        {
             self.enqueue_segment("loop", self.wheee_variant);
         }
     }
