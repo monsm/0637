@@ -126,16 +126,25 @@ case "$TPS" in
     ;;
 esac
 echo "performance: $TPS ticks/s"
-# A still duck must actually glance: IdleHead fades in after ~3.5 s. Check
-# its published gain, so a "motionless duck" fails CI rather than shipping.
-sleep 4
-IDLE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+# A still duck must actually glance. An emotion just ran and fades the idle
+# spell out, so it needs up to ~3.5 s of stillness to come back; a single
+# sample at a fixed 4 s races the runner. Poll for a real measurement.
+IDLE="0 0"
+for _ in $(seq 1 20); do
+  IDLE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
 import json,sys
 try:
     d=json.load(sys.stdin).get('idle') or {}
     print(d.get('takeover',0), max(abs(x) for x in d.get('head',[0]) or [0]))
 except Exception: print('0 0')
 " 2>/dev/null || echo "0 0")
+  GAIN=${IDLE%% *}; HEAD=${IDLE##* }
+  python3 -c "
+import sys
+sys.exit(0 if float('${GAIN:-0}') > 0.8 and float('${HEAD:-0}') > 0.001 else 1)
+" 2>/dev/null && break
+  sleep 1
+done
 GAIN=${IDLE%% *}; HEAD=${IDLE##* }
 python3 -c "
 import sys

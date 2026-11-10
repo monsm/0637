@@ -262,14 +262,22 @@ check $? "build fingerprint is served" "$(printf '%s' "$FINGERPRINT" | grep -oE 
 # starts glancing after 2 s and fades in over 1.5 s; /state publishes its gain
 # and head command so "it looks alive" is a measurable assertion, not a hope.
 echo "--- idle look-around ---"
-sleep 5
-IDLE=$(api GET /state | python3 -c "
+IDLE=""
+for _ in $(seq 1 20); do
+  IDLE=$(api GET /state | python3 -c "
 import json,sys
 try:
     d=json.load(sys.stdin).get('idle') or {}
     print(d.get('takeover',0), max(abs(x) for x in d.get('head',[0]) or [0]))
 except Exception: print('0 0')
 " 2>/dev/null || true)
+  IDLE_GAIN=${IDLE%% *}; IDLE_HEAD=${IDLE##* }
+  python3 -c "
+import sys
+sys.exit(0 if float('${IDLE_GAIN:-0}') > 0.8 and float('${IDLE_HEAD:-0}') > 0.001 else 1)
+" 2>/dev/null && break
+  sleep 1
+done
 IDLE_GAIN=${IDLE%% *}; IDLE_HEAD=${IDLE##* }
 python3 -c "
 import sys
