@@ -309,11 +309,12 @@ jobs:
           # downloadable without admin rights, but the artifact is.
           mkdir -p sim-drive
           set -o pipefail
-          bash ios/scripts/sim-drive.sh "$APP" "$UDID" sim-drive 2>&1 | tee sim-drive/session.log
-          test "${PIPESTATUS[0]}" -eq 0 || exit 1
+          STATUS=0
+          bash ios/scripts/sim-drive.sh "$APP" "$UDID" sim-drive 2>&1 | tee sim-drive/session.log || STATUS=$?
           cp sim-drive/state-initial.json intent-state.json 2>/dev/null || true
           cp sim-drive/skills.json intent-skills.json 2>/dev/null || true
           (cd "$(dirname "$APP")" && zip -qry "$GITHUB_WORKSPACE/Duck-ios-simulator.zip" "$(basename "$APP")")
+          exit "$STATUS"
 
       - name: UI test (buttons drive the duck)
         id: uitest
