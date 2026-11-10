@@ -87,6 +87,16 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_shutdown",
+            "description": "Power the duck off the way the robot does: sit down, ease into the rest pose, cut torque. The battery EMAs to empty on its own and runs the same sequence.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        },
+        {
+            "name": "duck_power",
+            "description": "Power the duck back on after a shutdown.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        },
+        {
             "name": "duck_sound",
             "description": "Make the duck's voice: greet, chirp, coo, peck, inquire or alarm. Rendered by the robot's own synth, so it sounds like the duck and not like a sample.",
             "inputSchema": {
@@ -241,6 +251,11 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             ]));
             Ok(json!({ "ok": true, "stream": true }))
         }
+        "duck_shutdown" => Ok(queue.request_within(
+            crate::intent::Intent::Shutdown,
+            std::time::Duration::from_secs(15),
+        )),
+        "duck_power" => Ok(queue.request(crate::intent::Intent::PowerOn)),
         "duck_mode" => {
             let mode = arguments
                 .get("mode")

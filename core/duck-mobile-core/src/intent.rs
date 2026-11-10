@@ -75,6 +75,10 @@ pub enum Intent {
     /// Switch drive bundles: "walk" or "roller". A whole-policy-set switch,
     /// exactly as `robotd`'s mode line, not a per-command filter.
     Mode(String),
+    /// `robot.shutdown`: sit, ease into the rest pose, cut torque.
+    Shutdown,
+    /// Power back on after a shutdown.
+    PowerOn,
     /// A phone sensor reading (camera, microphone, depth, IMU).
     Sensor(crate::sensors::Reading),
 }
@@ -448,6 +452,11 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         },
         ("POST", "/sit") => Ok(queue.request(Intent::Sit).to_string()),
         ("POST", "/ground_pick") => Ok(queue.request(Intent::GroundPick).to_string()),
+        ("POST", "/shutdown") => Ok(queue.request_within(
+            Intent::Shutdown,
+            Duration::from_secs(15),
+        ).to_string()),
+        ("POST", "/power") => Ok(queue.request(Intent::PowerOn).to_string()),
         ("POST", "/mode") => match value["mode"].as_str() {
             // The switch rebuilds MuJoCo and the policy set: seconds, not the
             // 300 ms a one-shot gets.

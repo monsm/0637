@@ -288,6 +288,20 @@ impl Landing {
     }
 }
 
+/// `robotd`'s shutdown: sit, ease into the rest pose, hold, cut torque.
+///
+/// Used by `robot.shutdown` and by an empty pack. The app has no systemd to
+/// stop, so "powered off" here means exactly what it means physically: torque
+/// off, the duck limp and reporting `off` until it is powered back on.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Shutdown {
+    Idle,
+    /// The sitstand network is driving the seat; `since` starts the hold timer.
+    Sitting { since: TickTime },
+    /// Easing from the seat to the rest pose, then holding it.
+    Resting { from: [f64; NUM_JOINTS], since: TickTime },
+}
+
 /// robotd's limp-fall sequence.
 #[derive(Debug, Clone, Copy)]
 enum LimpFall {
@@ -406,6 +420,14 @@ pub struct DuckRuntime<T: RobotIo> {
     /// Which bundle is loaded. `robotd` asks it every tick for the idle
     /// behaviour (`IdleParams::enabled_in`), and it is what the shell shows.
     mode: robotd_params::Mode,
+    /// The shutdown sequence, and the latched off state after it ends.
+    shutdown: Shutdown,
+    powered_off: bool,
+    /// A client asked to power off; taken on the next tick.
+    shutdown_requested: bool,
+    /// The pack voltage, smoothed the way `robotd` smooths it: a step sag must
+    /// not reach the empty threshold.
+    volts_ema: Option<f64>,
     /// The duck's voice. `robotd` quacks once as the loop comes up, chirps on
     /// the mode cue and pecks before the servos go quiet; the same here.
     voice: crate::voice::Voice,
@@ -453,6 +475,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             carry: None,
             mouth: 0.0,
             mode: robotd_params::Mode::Walk,
+            shutdown: Shutdown::Idle,
+            powered_off: false,
+            shutdown_requested: false,
+            volts_ema: None,
             voice: crate::voice::Voice::new(0xD0C),
             sounds: std::collections::VecDeque::new(),
             volts: None,
@@ -538,6 +564,46 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// core owns the synth so the PCM is the duck's, not a sample.
     pub fn render_tag(&mut self, tag: &str) -> Option<Vec<f32>> {
         self.voice.render(tag).map(|(_, pcm)| pcm)
+    }
+
+    /// `robot.shutdown`: sit, rest, torque off. Taken on the next tick, so the
+    /// caller never runs it on the tick that drains the intent queue.
+    pub fn request_shutdown(&mut self) {
+        self.shutdown_requested = true;
+    }
+
+    pub fn powered_off(&self) -> bool {
+        self.powered_off
+    }
+
+    /// Power the duck back on after a shutdown. The battery has to have been
+    /// charged (or the app restarted) for this to be a sensible request.
+    pub fn power_on(&mut self) -> Result<(), RuntimeError> {
+        self.powered_off = false;
+        self.shutdown = Shutdown::Idle;
+        self.shutdown_requested = false;
+        self.enable()
+    }
+
+    fn begin_shutdown(&mut self, now: TickTime) {
+        if self.enabled
+            && matches!(self.bringup, Bringup::Ready)
+            && !self.safety.fallen()
+            && self.controller.has_sitstand()
+        {
+            tracing::warn!("shutdown: sitting down before torque off");
+            self.queue_sound("peck");
+            self.controller.begin_shutdown_sit();
+            self.shutdown = Shutdown::Sitting { since: now };
+        } else {
+            // Nothing to sit with: cut torque now, which is the last thing the
+            // sequence would have done anyway.
+            tracing::warn!("shutdown: cannot sit; cutting torque now");
+            let _ = self.safety.set_torque(false);
+            self.enabled = false;
+            self.bringup = Bringup::Limp;
+            self.powered_off = true;
+        }
     }
 
     pub fn mode(&self) -> robotd_params::Mode {
@@ -970,6 +1036,11 @@ impl<T: RobotIo> DuckRuntime<T> {
         if self.slow_ticks % 50 == 0 {
             if let Ok(slow) = self.safety.slow_sensors() {
                 self.volts = Some(slow.volts);
+                // `BATTERY_EMA_ALPHA`: a step sag recovers between steps and
+                // must not count as a spent pack.
+                self.volts_ema = Some(
+                    0.1 * slow.volts + 0.9 * self.volts_ema.unwrap_or(slow.volts),
+                );
             }
         }
 
@@ -998,6 +1069,17 @@ impl<T: RobotIo> DuckRuntime<T> {
             volts: self.volts,
             mouth: 0.0,
         };
+
+        // Off is a state of the duck, not a single tick: after the shutdown's
+        // torque cut the body is limp, and reporting "limp" would hide that the
+        // duck was deliberately powered down.
+        if self.powered_off {
+            self.safety.apply(hold, hold, 0)?;
+            report.label = "off".to_owned();
+            report.gain = 0;
+            report.targets = hold;
+            return Ok(report);
+        }
 
         match self.bringup {
             Bringup::Limp => {
@@ -1035,6 +1117,84 @@ impl<T: RobotIo> DuckRuntime<T> {
                 return Ok(report);
             }
             Bringup::Ready => {}
+        }
+
+        // The shutdown owns the robot from the moment it starts: sit, rest,
+        // torque off. `robotd` runs the same sequence for `robot.shutdown`
+        // and for a genuinely empty pack (a 10 s EMA at or below 6.6 V).
+        if !self.powered_off && matches!(self.shutdown, Shutdown::Idle) {
+            let empty = self
+                .volts_ema
+                .is_some_and(|volts| volts <= duck_control::model::BATTERY_EMPTY_V);
+            if empty || self.shutdown_requested {
+                self.shutdown_requested = false;
+                self.begin_shutdown(now);
+            }
+        }
+        match self.shutdown {
+            Shutdown::Idle => {}
+            Shutdown::Sitting { since } => {
+                // Named apart from `hold`, which is the measured pose.
+                let hold_s = self.controller.shutdown_sit_secs();
+                let target = self.controller.step(
+                    &sensors,
+                    &self.command,
+                    false,
+                    self.dt.as_secs_f64(),
+                    1.0,
+                );
+                match target {
+                    Ok(step) => {
+                        self.safety.apply(step.targets, hold, step.gain)?;
+                        report.label = "shutdown".to_owned();
+                        report.targets = step.targets;
+                        report.gain = step.gain;
+                    }
+                    Err(_) => {
+                        self.safety.apply(hold, hold, 200)?;
+                        report.targets = hold;
+                    }
+                }
+                if since.elapsed(now).as_secs_f64() >= hold_s {
+                    tracing::warn!("shutdown: sit complete, easing into the rest pose");
+                    self.shutdown = Shutdown::Resting {
+                        from: report.targets,
+                        since: now,
+                    };
+                }
+                report.fallen = self.safety.fallen();
+                return Ok(report);
+            }
+            Shutdown::Resting { from, since } => {
+                let t = (since.elapsed(now).as_secs_f64() / 1.0).min(1.0);
+                let mut target = [0.0; NUM_JOINTS];
+                for (index, slot) in target.iter_mut().enumerate() {
+                    *slot = from[index]
+                        + (duck_control::model::REST_POSITION[index] - from[index]) * t;
+                }
+                let holding = since.elapsed(now).as_secs_f64() >= 2.0;
+                if holding {
+                    // The rest is the last pose the servos see: cutting torque
+                    // from the seat let the duck sag forward; from here there
+                    // is nowhere left to sag.
+                    self.safety.apply(target, target, 200)?;
+                    self.safety.set_torque(false)?;
+                    self.enabled = false;
+                    self.powered_off = true;
+                    self.shutdown = Shutdown::Idle;
+                    self.bringup = Bringup::Limp;
+                    report.label = "off".to_owned();
+                    report.gain = 0;
+                    report.targets = target;
+                    tracing::warn!("shutdown: at rest, torque off");
+                } else {
+                    self.safety.apply(target, target, report.gain.max(200))?;
+                    report.label = "rest".to_owned();
+                    report.targets = target;
+                }
+                report.fallen = self.safety.fallen();
+                return Ok(report);
+            }
         }
 
         // Deadman: a command stream that stops leaves the robot standing, not walking off.

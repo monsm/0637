@@ -590,6 +590,14 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             Ok(()) => json!({ "ok": true }),
             Err(error) => refuse(core, format!("ground pick refused: {error}")),
         },
+        Intent::Shutdown => {
+            core.runtime.request_shutdown();
+            json!({ "ok": true, "pending": true, "shutdown": true })
+        }
+        Intent::PowerOn => match core.runtime.power_on() {
+            Ok(()) => json!({ "ok": true, "powered_off": false }),
+            Err(error) => refuse(core, format!("power-on refused: {error}")),
+        },
         Intent::Mode(name) => match switch_mode(core, &name) {
             Ok(value) => value,
             Err(reason) => refuse(core, format!("mode refused: {reason}")),
@@ -836,6 +844,7 @@ fn publish_state(core: &DuckCore) {
         "paused": clock.paused,
         "speed": clock.speed,
         "mode": core.runtime.mode().as_str(),
+        "powered_off": core.runtime.powered_off(),
         "carrying": core.runtime.carrying(),
         "notice": core
             .notice
