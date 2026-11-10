@@ -65,6 +65,8 @@ object Copy {
     val roller get() = pick("roller", "轮")
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
+    // First-launch hint: shown once above the bottom bar, then never again.
+    val dragHint get() = pick("Drag to drive · long-press the duck for skills", "拖动开车 · 长按鸭子出技能")
 
     // Instrument sheet
     val thisDuck get() = pick("This duck", "这只鸭子")
@@ -75,6 +77,8 @@ object Copy {
     val rewind get() = pick("Rewind", "倒回")
     val fork get() = pick("Fork", "分叉")
     val api get() = "AI API :8765 · MCP /mcp"
+    val microphone get() = pick("microphone", "麦克风")
+    val denied get() = pick("denied", "未授权")
 
     fun bringup(code: Int): String = when (code) {
         0 -> pick("Limp", "软瘫")
@@ -88,12 +92,13 @@ object Copy {
 fun skillLabel(name: String): String {
     if (Copy.language != Copy.Language.Chinese) return name
     return when (name) {
+        "stand" -> "站起"
         "roulade" -> "翻滚"
         "kick_left" -> "左踢"
         "kick_right" -> "右踢"
         "crouch" -> "蹲下"
         "sit" -> "坐下"
-        "ground_pick" -> "抓取"
+        "ground_pick" -> "贴地抓取"
         else -> name
     }
 }

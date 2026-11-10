@@ -34,6 +34,14 @@ enum Copy {
     static var tapHint: String {
         pick("tap ahead to walk · long-press the duck", "点前方走路 · 长按鸭子")
     }
+    /// Shown once, above the bottom bar, then never again. Distinct from the
+    /// persistent `tapHint`: this one teaches the two gestures on first launch.
+    static var firstLaunchHint: String {
+        pick(
+            "Tap ahead to walk · long-press the duck for skills",
+            "点前方走路 · 长按鸭子出技能"
+        )
+    }
     static var live: String { pick("Live", "实时") }
     static var director: String { pick("Director", "取景") }
     static var time: String { pick("Time", "时间") }
@@ -86,6 +94,8 @@ enum Copy {
     }
     static var camera: String { pick("camera", "相机") }
     static var microphone: String { pick("microphone", "麦克风") }
+    /// A refused permission is a real state: "—" would claim no sensor exists.
+    static var denied: String { pick("denied", "未授权") }
     static var depth: String { pick("depth", "深度") }
     static var provenance: String { pick("Provenance", "出处") }
     static var reload: String { pick("Reload AI", "重载 AI") }
@@ -104,17 +114,22 @@ enum Copy {
 
 /// A skill's display name. The wire name is the protocol's; the label is the
 /// shell's, so a Chinese interface can say 翻滚 while the API still says
-/// `roulade`.
+/// `roulade`. English intentionally reuses the wire name — it is already the
+/// protocol's human-readable verb, and the ring's accessibility id stays that
+/// same wire name in either language.
 enum SkillLabel {
     static func of(_ name: String) -> String {
         guard Copy.language == .chinese else { return name }
         switch name {
+        case "sit": return "坐下"
+        case "stand": return "站起"
+        case "ground_pick": return "贴地抓取"
         case "roulade": return "翻滚"
         case "kick_left": return "左踢"
         case "kick_right": return "右踢"
         case "crouch": return "蹲下"
-        case "sit": return "坐下"
-        case "ground_pick": return "抓取"
+        // A user-supplied manifest can name any skill. Showing its wire name
+        // is honest: inventing a translation would mislabel the policy.
         default: return name
         }
     }

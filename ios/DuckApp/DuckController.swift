@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import AVFoundation
 import CoreMotion
 import simd
 
@@ -52,11 +53,19 @@ final class DuckController: ObservableObject {
     @Published var branchCount = 0
     @Published var fingerprint = ""
     /// The latest phone-sensor readings, already formatted for display.
+    /// Denied permissions replace the summary (see `pollSensors`); depth keeps
+    /// "—" on devices with no LiDAR (see `hasLiDAR`).
     @Published var sensorMode = "twin"
     @Published var cameraSummary = "—"
     @Published var microphoneSummary = "—"
     @Published var depthSummary = "—"
     @Published var imuSummary = "—"
+    /// What the sheet's microphone row shows. Denial is a real state, not an
+    /// absent reading, so it takes precedence over the polled summary.
+    @Published var micSummary = "—"
+    /// Persisted so the room mic comes back on the next launch without a new
+    /// permission prompt. Default off: nothing listens until the user asks.
+    @AppStorage("mic_enabled") var micEnabled = false
 
     private(set) var core: OpaquePointer?
     private var timer: Timer?
@@ -78,8 +87,19 @@ final class DuckController: ObservableObject {
     /// Read by the renderer each frame; true only when Director is open *and*
     /// a camera actually started (the simulator has none).
     @Published var cameraActive = false
+    @Published private(set) var cameraDenied = false
     private var wantsCamera = false
     private var cameraCancellable: AnyCancellable?
+    private var cameraDeniedCancellable: AnyCancellable?
+    /// The room's microphone. It taps Voice's engine rather than making a
+    /// second one: one app, one AVAudioSession. Created at init but never
+    /// started until the sheet's toggle is switched on.
+    private let mic = MicFeed(voice: voice)
+    /// Published answers from that feed; the sheet reads these instead of
+    /// importing AVFoundation just to show "denied".
+    @Published private(set) var micDenied = false
+    @Published private(set) var micAvailable = false
+    private var micCancellable: AnyCancellable?
 
     /// The renderer's triangle soups, built on the worker queue before the
     /// first frame, keyed by MuJoCo mesh id.
@@ -176,6 +196,36 @@ final class DuckController: ObservableObject {
                 guard let self else { return }
                 self.cameraActive = self.wantsCamera && available
             }
+        // A refused camera has no readings; mirror the answer so the sheet
+        // can say "denied" without importing AVFoundation.
+        cameraDeniedCancellable = camera.$denied
+            .receive(on: RunLoop.main)
+            .sink { [weak self] denied in
+                self?.cameraDenied = denied
+            }
+        // The mic's permission answer arrives on a system callback; the sheet
+        // reads it through these published properties so it never has to know
+        // about AVFoundation. CombineLatest also catches stop()'s `available`
+        // flip, which clears a stale reading from the row.
+        micCancellable = Publishers.CombineLatest(mic.$denied, mic.$available)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] denied, available in
+                guard let self else { return }
+                self.micDenied = denied
+                self.micAvailable = available
+                self.refreshMicSummary()
+            }
+        // A persisted "on" from a previous launch is resumed only when the
+        // earlier grant is still valid. This is NOT a launch-time permission
+        // prompt: .undetermined never prompts here, and neither does .denied.
+        if micEnabled {
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted: mic.start()
+            case .denied: mic.setDenied()
+            case .undetermined: break
+            @unknown default: break
+            }
+        }
         // Creating the core loads the MuJoCo scene (215k vertices) and the
         // ONNX policies — seconds on a device. Doing that here blocked the
         // main thread, so SwiftUI never rendered a frame and the app showed a
@@ -252,7 +302,7 @@ final class DuckController: ObservableObject {
             NSLog("duck: pickup detector -> %d", pickupLoaded)
             let port = duck_core_start_intent_server(created, 8765)
             NSLog("duck: intent server -> %d", port)
-            self.voice.start(core: created)
+            self.voice.start()
             self.startTimer()
             self.startMotion()
             self.refreshDetails()
@@ -342,6 +392,9 @@ final class DuckController: ObservableObject {
     deinit {
         timer?.invalidate()
         sensorTimer?.invalidate()
+        // Release the input tap and the 1 Hz POST timer with the controller;
+        // the session is one per app and must not outlive its owner.
+        mic.stop()
         motion.stopDeviceMotionUpdates()
         if let core {
             duck_core_free(core)
@@ -398,12 +451,57 @@ final class DuckController: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.sensorMode = json["mode"] as? String ?? "twin"
-                self.cameraSummary = Self.summary(json["camera"], keys: ["width", "height", "exposure_s"])
-                self.microphoneSummary = Self.summary(json["microphone"], keys: ["rms", "peak_hz"])
-                self.depthSummary = Self.summary(json["depth"], keys: ["rows", "cols", "min_m", "max_m"])
+                // A refused camera has no reading; a refused microphone has
+                // no reading either. Both are permission answers, not absent
+                // sensors. Depth has no app-owned feed yet: it shares the
+                // camera's permission on LiDAR hardware only, so on a device
+                // without LiDAR the plain "—" stays honest.
+                self.cameraSummary = self.cameraDenied
+                    ? Copy.denied
+                    : Self.summary(json["camera"], keys: ["width", "height", "exposure_s"])
+                self.microphoneSummary = self.micDenied
+                    ? Copy.denied
+                    : Self.summary(json["microphone"], keys: ["rms", "peak_hz"])
+                self.depthSummary = Self.hasLiDAR && self.cameraDenied
+                    ? Copy.denied
+                    : Self.summary(json["depth"], keys: ["rows", "cols", "min_m", "max_m"])
                 self.imuSummary = Self.summary(json["imu"], keys: ["acceleration"])
+                // Keep the existing microphoneSummary parsing working as the
+                // live feed's source of truth; the sheet shows it only when on.
+                self.refreshMicSummary()
             }
         }.resume()
+    }
+
+    /// One row, three states: off shows "—", denied says so, on shows the
+    /// last reading the core published. Off also clears a stale reading left
+    /// by the previous second's POST.
+    private func refreshMicSummary() {
+        if micDenied {
+            micSummary = Copy.denied
+        } else if micEnabled && micAvailable {
+            micSummary = microphoneSummary
+        } else {
+            micSummary = "—"
+        }
+    }
+
+    /// The sheet's microphone toggle. Permission is asked only here, on the
+    /// user's explicit enable — never at launch. An already-denied mic is not
+    /// re-asked from the app (the OS refuses a second prompt); the sheet says
+    /// "denied" and the user can change it in Settings.
+    func setMicEnabled(_ enabled: Bool) {
+        micEnabled = enabled
+        if enabled && micDenied {
+            refreshMicSummary()
+            return
+        }
+        if enabled {
+            mic.start()
+        } else {
+            mic.stop()
+        }
+        refreshMicSummary()
     }
 
     /// One measurement per second: frames per second the renderer achieved
@@ -426,6 +524,15 @@ final class DuckController: ObservableObject {
         tickCount = 0
         perfAnchor = now
     }
+
+    /// LiDAR is a hardware capability. Devices without it must keep showing
+    /// "—" rather than "denied", which would blame the user for a sensor the
+    /// phone does not have.
+    private static let hasLiDAR = AVCaptureDevice.default(
+        .builtInLiDARDepthCamera,
+        for: .video,
+        position: .back
+    ) != nil
 
     private static func summary(_ reading: Any?, keys: [String]) -> String {
         guard let reading = reading as? [String: Any],

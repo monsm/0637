@@ -179,13 +179,38 @@ struct InstrumentSheet: View {
             Text(Copy.sensorNote)
                 .font(.system(size: 10, design: .rounded))
                 .foregroundStyle(.secondary)
-            row(Copy.camera, controller.cameraSummary)
-            row(Copy.microphone, controller.microphoneSummary)
+            // A refused camera has no reading, so "—" must not hide the denial.
+            // Depth has no app-owned feed yet and stays "—" on devices without
+            // LiDAR, which is honest; on LiDAR hardware a camera denial is a
+            // depth denial too (the controller already formats that).
+            row(Copy.camera, controller.cameraDenied ? Copy.denied : controller.cameraSummary)
+            micRow
             row(Copy.depth, controller.depthSummary)
             row("IMU", controller.imuSummary)
         }
         .padding(14)
         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// The microphone is the one sensor the user switches on. Off shows "—";
+    /// enabling asks permission (never at launch); refusal says "denied";
+    /// granted shows the live 1 Hz values read back from GET /sensors.
+    private var micRow: some View {
+        HStack {
+            Text(Copy.microphone)
+                .font(.system(size: 12, design: .rounded))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(controller.micSummary)
+                .font(.system(size: 12, design: .monospaced))
+                .accessibilityIdentifier("sheet-mic-summary")
+            Toggle("", isOn: Binding(
+                get: { controller.micEnabled },
+                set: { controller.setMicEnabled($0) }
+            ))
+            .labelsHidden()
+            .accessibilityIdentifier("sheet-mic-toggle")
+        }
     }
 
     private var provenance: some View {

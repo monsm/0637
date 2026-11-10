@@ -30,6 +30,7 @@ targets:
       - path: DuckApp/DuckResources
         type: folder
         buildPhase: resources
+      - path: DuckApp/Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck
@@ -49,10 +50,17 @@ targets:
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_CFBundleDisplayName: MicroDuck
+        # One single-size 1024 app icon (Xcode 14+): no hand-maintained
+        # size grid, the catalog ships just the 1024 PNG.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
         INFOPLIST_KEY_NSMotionUsageDescription: "Shake your phone to push the digital duck."
         # Director mode composites the 3D duck over the rear camera. Asked
         # only when Director is opened, never at launch.
         INFOPLIST_KEY_NSCameraUsageDescription: "Director mode puts the digital duck in your room. The camera image never reaches the duck's senses."
+        # The microphone is the ROOM, never the duck's senses. Asked only when
+        # the user enables the mic row in the instrument sheet, never at launch.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "MicroDuck listens for loud sounds in the room so your AI can react. Audio stays on your phone and never reaches the duck's senses."
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: "The local intent API lets your own AI agent drive the duck."
         SWIFT_OBJC_BRIDGING_HEADER: DuckApp/DuckCore-Bridging-Header.h
         HEADER_SEARCH_PATHS:

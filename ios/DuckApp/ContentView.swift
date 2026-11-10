@@ -20,6 +20,11 @@ struct ContentView: View {
     /// walk/turn, look, and crouch/lean the standing body.
     @State private var stickMode = StickMode.drive
     @Environment(\.scenePhase) private var scenePhase
+    /// The one-time gesture hint. The flag is persisted before the caption
+    /// appears, so a crash or a force-quit can never show it a second time.
+    /// `showHint` is separate so the fade-out cannot undo that write.
+    @AppStorage("first_launch_hint_shown") private var hintShown = false
+    @State private var showHint = false
 
     enum StickMode: String, CaseIterable {
         case drive, head, body
@@ -61,6 +66,23 @@ struct ContentView: View {
                         showRing = false
                     }
                 }
+                // One small caption, above the bottom bar, in the same capsule
+                // language as the rest of the chrome. It takes no touches so
+                // it cannot swallow the first walk tap.
+                if showHint {
+                    Text(Copy.firstLaunchHint)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .allowsHitTesting(false)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 74)
+                        .transition(.opacity)
+                        .zIndex(1)
+                        .accessibilityIdentifier("first-launch-hint")
+                }
             }
             .ignoresSafeArea()
             .sheet(isPresented: $showInstrument) {
@@ -70,6 +92,17 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        // A Task sleeps without blocking the 50 Hz main run loop. Cancellation
+        // keeps the persisted flag set, which is the one-time promise.
+        .task {
+            guard !hintShown else { return }
+            hintShown = true
+            withAnimation(.easeIn(duration: 0.25)) { showHint = true }
+            // `try?` so a cancelled sleep (view torn down, app backgrounded)
+            // cannot throw out of a SwiftUI modifier.
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            withAnimation(.easeOut(duration: 0.6)) { showHint = false }
+        }
         // SwiftUI does not report a cancelled drag. A phone call, a
         // notification pull or leaving the app would otherwise leave the
         // joystick where the finger was and the duck walking by itself.

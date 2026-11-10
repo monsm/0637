@@ -1,5 +1,10 @@
 package ai.duck.microduck
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -15,11 +20,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AnimatedVisibility
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,8 +38,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 
 /**
@@ -56,6 +65,7 @@ fun Shell(
     quack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     var showRing by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
     var carrying by remember { mutableStateOf(false) }
@@ -64,6 +74,48 @@ fun Shell(
     var stick by remember { mutableStateOf("drive") }
     // Flipping this re-renders every Copy string in the shell.
     var languageTick by remember { mutableStateOf(0) }
+
+    // First-launch hint: one SharedPreferences flag, shown once and never
+    // again. The coroutine runs on the Compose dispatcher, so the 4 s delay
+    // and the flip back happen on the main thread.
+    val hintPrefs = remember(context) {
+        context.getSharedPreferences("duck", Context.MODE_PRIVATE)
+    }
+    var hintDismiss by remember { mutableStateOf(!hintPrefs.getBoolean("hintShown", false)) }
+    LaunchedEffect(hintDismiss) {
+        if (hintDismiss) {
+            hintPrefs.edit().putBoolean("hintShown", true).apply()
+            delay(4000)
+            hintDismiss = false
+        }
+    }
+
+    // The microphone: a toggle in the instrument sheet. Off by default; the
+    // feed, the permission launcher and the summary live here so the sheet has
+    // one owner. The mic is the room, never the duck's senses. The state is
+    // declared before the launcher because the launcher's callback reads it.
+    var micState by remember { mutableStateOf(MicState.Off) }
+    var micFeed by remember { mutableStateOf<MicFeed?>(null) }
+    val audioLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // The feed is created here, not in onToggleMic: that path only
+            // launches the prompt, so by the time the callback runs micFeed is
+            // still null and starting it here is the one place it can begin.
+            micFeed = MicFeed().also { it.start() }
+            micState = MicState.On
+        } else {
+            micState = MicState.Denied
+        }
+    }
+    // Stop the feed only when the shell leaves composition (the activity is
+    // going away). Toggling the mic off stops it explicitly in onToggleMic; a
+    // DisposableEffect keyed on micState would fire its onDispose the instant
+    // micState flips to On and kill the feed right after it started.
+    DisposableEffect(Unit) {
+        onDispose { micFeed?.stop() }
+    }
 
     val _unused = languageTick
     Box(modifier.fillMaxSize()) {
@@ -190,6 +242,23 @@ fun Shell(
             }
         }
 
+        // First-launch hint: one small centered caption above the bottom bar,
+        // shown once (SharedPreferences flag) and fading out after 4 s.
+        // AnimatedVisibility's default enter/exit are a fade, so no explicit
+        // transition is needed; the timer only flips the flag off.
+        AnimatedVisibility(
+            visible = hintDismiss && core != null,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 92.dp),
+        ) {
+            Text(
+                Copy.dragHint,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 12.sp,
+            )
+        }
+
         if (showRing && core != null) {
             SkillRing(
                 skills = skills,
@@ -207,7 +276,33 @@ fun Shell(
     }
 
     if (showSheet && core != null) {
-        InstrumentSheet(core) { showSheet = false }
+        InstrumentSheet(
+            core,
+            micState = micState,
+            onToggleMic = {
+                when (micState) {
+                    MicState.Off -> {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO,
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) {
+                            micFeed = MicFeed()
+                            micFeed?.start()
+                            micState = MicState.On
+                        } else {
+                            audioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+                    MicState.On -> {
+                        micFeed?.stop()
+                        micFeed = null
+                        micState = MicState.Off
+                    }
+                    MicState.Denied -> audioLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            },
+        ) { showSheet = false }
     }
 }
 
@@ -305,7 +400,12 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
 /** The instrument sheet: time machine, numbers, sensors, fingerprint. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
+private fun InstrumentSheet(
+    core: DuckCore,
+    micState: MicState,
+    onToggleMic: () -> Unit,
+    onClose: () -> Unit,
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     var paused by remember { mutableStateOf(core.paused()) }
     var speed by remember { mutableStateOf(core.speed()) }
@@ -317,6 +417,18 @@ private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
         while (true) {
             status = core.status()
             delay(200)
+        }
+    }
+    // The phone sensors the core last saw, polled at 1 Hz so the microphone row
+    // shows what the server published (the same GET /sensors the iOS shell
+    // reads). The feed POSTs on its own thread; this only reads the summary
+    // back. It lives here, in the sheet's own loop, so it costs nothing while
+    // the sheet is closed.
+    var micSummary by remember { mutableStateOf("—") }
+    LaunchedEffect(core) {
+        while (true) {
+            micSummary = fetchMicSummary()
+            delay(1000)
         }
     }
 
@@ -342,6 +454,34 @@ private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
                     color = Color.White.copy(alpha = 0.65f),
                     fontSize = 11.sp,
                 )
+            }
+            // Microphone: the room, not a sense. Off (default) shows "—"; enabling
+            // asks RECORD_AUDIO first, denied shows the bilingual denial, granted
+            // starts the feed whose 1 Hz summary is read back below.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    Copy.microphone,
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 12.sp,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        when (micState) {
+                            MicState.Off -> "—"
+                            MicState.Denied -> Copy.denied
+                            MicState.On -> micSummary
+                        },
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                    )
+                    SurfaceChip(if (micState == MicState.On) "ON" else "OFF", micState == MicState.On) {
+                        onToggleMic()
+                    }
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(if (paused) Copy.resume else Copy.freeze) {
@@ -383,5 +523,34 @@ private fun ButtonChip(label: String, onClick: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 9.dp),
     ) {
         Text(label, color = Color.White, fontSize = 12.sp)
+    }
+}
+
+enum class MicState { Off, On, Denied }
+
+/**
+ * The one-line summary the core last published for the microphone, read from
+ * GET /sensors. The feed POSTs `{rms, peak_hz}` once a second; this formats
+ * them the way the iOS shell does. Any failure (server not up yet, no reading)
+ * returns "—" rather than throwing, so the sheet's poll loop never breaks.
+ */
+private fun fetchMicSummary(): String {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/sensors")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 1500
+        connection.readTimeout = 1500
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        val microphone = Regex(""""microphone"\s*:\s*\{[^}]*\}""").find(text)?.value
+            ?: return "—"
+        val rms = Regex("\"rms\"\\s*:\\s*([0-9.]+)").find(microphone)?.groupValues?.get(1)
+            ?: return "—"
+        val peak = Regex("\"peak_hz\"\\s*:\\s*([0-9.]+)").find(microphone)?.groupValues?.get(1)
+            ?: return "—"
+        "rms $rms · peak_hz $peak"
+    } catch (_: Throwable) {
+        "—"
     }
 }
