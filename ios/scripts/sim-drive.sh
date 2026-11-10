@@ -340,6 +340,41 @@ fi
 printf '%s' "$HAS_MOUTH" | grep -qE 'True|False'
 check $? "the scene says whether it has a beak" "has_mouth=$HAS_MOUTH"
 
+# ---------------------------------------------------------------- modes
+# A drive mode is a whole-bundle switch, not a filter: roller loads
+# roller.onnx as the locomotion network, drops the standing network, and
+# drives the crouch where the walking set has the ground pick. The roller
+# scene ships beside the walking one.
+echo "--- modes ---"
+# A switch is refused while a move is in flight (a controller rebuild under a
+# running skill would drop it), so wait for the duck to be idle first.
+wait_idle 80 > /dev/null
+MODE_BEFORE=$(api GET /state | field mode)
+echo "$MODE_BEFORE" | grep -q "walk"
+check $? "the duck starts in walk mode" "mode=$MODE_BEFORE"
+ROLLER=$(api POST /mode '{"mode":"roller"}' || true)
+echo "$ROLLER" | tee "$OUT/mode-roller.json" > /dev/null
+printf '%s' "$ROLLER" | grep -q '"ok":true'
+check $? "the duck can switch to roller mode" "$(printf '%s' "$ROLLER" | head -c 120)"
+sleep 3
+MODE_NOW=$(api GET /state | field mode)
+[ "$MODE_NOW" = "roller" ]; check $? "the state reports roller" "mode=$MODE_NOW"
+ROLLER_SKILLS=$(api GET /skills || true)
+for name in roulade kick_left sit; do
+  state_has "$ROLLER_SKILLS" "\"$name\""
+  check $? "roller keeps the skill: $name" ""
+done
+BACK=$(api POST /mode '{"mode":"walk"}' || true)
+printf '%s' "$BACK" | grep -q '"ok":true'
+check $? "the duck can switch back to walk" "$(printf '%s' "$BACK" | head -c 120)"
+sleep 3
+MODE_BACK=$(api GET /state | field mode)
+[ "$MODE_BACK" = "walk" ]; check $? "the state reports walk again" "mode=$MODE_BACK"
+BAD=$(api POST /mode '{"mode":"hover"}' || true)
+printf '%s' "$BAD" | grep -q '"ok":false'
+check $? "an unknown mode is refused" "$(printf '%s' "$BAD" | head -c 120)"
+wait_idle 80 > /dev/null
+
 # ---------------------------------------------------------------- carry
 # A hand on the duck is an external force on the trunk, not a joint target.
 # Carrying it must lift the body and leave the policy in charge of nothing.

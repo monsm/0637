@@ -67,6 +67,12 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var instances: [Instance] = []
     private let floor: Mesh
     private var aspect: Float = 1
+    /// The body model this renderer's meshes and instances were built for.
+    /// A mode switch loads a different MJCF, so everything cached has to go.
+    private var builtGeneration: UInt64 = 0
+    /// After a rebuild, ask the core for meshes: the controller's off-thread
+    /// parse describes the model the app started with.
+    private var meshesFromCore = false
     private let yaw: Float = .pi
     private let pitch: Float = 0.32
     private let distance: Float = 0.85
@@ -188,7 +194,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         if let cached = meshes[meshID] { return cached }
         // The controller builds every soup off the main thread while the core
         // is created; fall back to the core if one is missing.
-        if let vertices = controller.meshVertices[meshID], !vertices.isEmpty {
+        if !meshesFromCore,
+           let vertices = controller.meshVertices[meshID], !vertices.isEmpty {
             return storeMesh(id: meshID, vertices: vertices)
         }
         guard let core = controller.core else { return nil }
@@ -284,6 +291,20 @@ final class Renderer: NSObject, MTKViewDelegate {
               let buffer = queue.makeCommandBuffer(),
               let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
             return
+        }
+
+        // A roller duck has different feet and meshes. Rebuild before drawing
+        // a frame against the old model.
+        let generation = duck_core_model_generation(core)
+        if generation != builtGeneration {
+            // A different model: nothing cached describes it. (The first
+            // build happened in `init` at generation 0, so any difference
+            // here is a mode switch.)
+            instances.removeAll()
+            meshes.removeAll()
+            meshesFromCore = true
+            buildInstances()
+            builtGeneration = generation
         }
 
         encoder.setRenderPipelineState(pipeline)

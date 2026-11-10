@@ -6,7 +6,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_double, c_float, c_int};
+use std::os::raw::{c_char, c_double, c_float, c_int, c_ulonglong};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -70,6 +70,13 @@ pub struct DuckCore {
     /// the length and then for the samples, and rendering twice would pick the
     /// next variant — a different length, and a buffer overrun.
     rendered_sound: Option<(String, Vec<f32>)>,
+    /// Where this duck came from, so a mode switch can load the other bundle
+    /// and its scene.
+    scene: String,
+    policies: std::path::PathBuf,
+    /// Bumped whenever the body model changes (a mode switch). The renderer
+    /// caches geometry per model; a new generation means rebuild it.
+    model_generation: u64,
 }
 
 struct Branch {
@@ -244,6 +251,9 @@ pub unsafe extern "C" fn duck_core_new(
             sensors: crate::sensors::Sensors::default(),
             notice: None,
             rendered_sound: None,
+            scene: scene.clone(),
+            policies: policies.clone(),
+            model_generation: 0,
         })
     });
 
@@ -283,14 +293,20 @@ pub unsafe extern "C" fn duck_core_reload_policies(
     let Ok(dir) = c_string(policies_dir) else {
         return -1;
     };
-    let Ok(bundle) = crate::manifest::load(Path::new(&dir)) else {
-        return -1;
-    };
-    let Ok(policy) = Policy::load(&bundle.paths, 0.05) else {
-        return -1;
-    };
-    let tuning = bundle.tuning();
     let core = &mut *core;
+    // A reload keeps the mode the duck is running: a roller set swapped for a
+    // walking one under a standing-disabled controller would be a different
+    // robot with the same name.
+    let Ok(bundle) = crate::manifest::load_mode(Path::new(&dir), core.runtime.mode()) else {
+        return -1;
+    };
+    let Ok(mut policy) = Policy::load(&bundle.paths, 0.05) else {
+        return -1;
+    };
+    if bundle.standing_disabled {
+        policy.set_standing_disabled(true);
+    }
+    let tuning = bundle.tuning();
     core.runtime
         .replace_policy(policy, tuning, bundle.skill_tuning);
     let names = published_skills(core.runtime.skill_names());
@@ -304,6 +320,44 @@ pub unsafe extern "C" fn duck_core_reload_policies(
 }
 
 /// Start the local intent API on `0.0.0.0:port`. Idempotent.
+/// The drive mode currently loaded: "walk" or "roller".
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_mode(core: *mut DuckCore) -> *const c_char {
+    if core.is_null() {
+        return c"walk".as_ptr();
+    }
+    match (*core).runtime.mode() {
+        robotd_params::Mode::Walk => c"walk".as_ptr(),
+        robotd_params::Mode::Roller => c"roller".as_ptr(),
+    }
+}
+
+/// Bumped when the body model changed (a mode switch); a renderer that caches
+/// meshes and geoms rebuilds when this moves.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_model_generation(core: *mut DuckCore) -> c_ulonglong {
+    if core.is_null() {
+        0
+    } else {
+        (*core).model_generation
+    }
+}
+
+/// Switch drive bundles: `"walk"` or `"roller"`. 0 on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_set_mode(core: *mut DuckCore, mode: *const c_char) -> c_int {
+    if core.is_null() {
+        return -1;
+    }
+    let Ok(name) = c_string(mode) else {
+        return -1;
+    };
+    match switch_mode(&mut *core, &name) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_start_intent_server(
     core: *mut DuckCore,
@@ -343,9 +397,97 @@ fn published_skills(mut names: Vec<String>) -> Vec<String> {
     names
 }
 
+/// The scene for a mode: the roller has its own feet, so it has its own MJCF
+/// beside the walking one. The physics ground and the trunk start pose are the
+/// same; only the model does.
+fn scene_for(core: &DuckCore, mode: robotd_params::Mode) -> Option<String> {
+    let path = Path::new(&core.scene);
+    match mode {
+        robotd_params::Mode::Walk => Some(core.scene.clone()),
+        robotd_params::Mode::Roller => {
+            let dir = path.parent()?;
+            let roller = dir.join("scene_rollers.xml");
+            roller.exists().then(|| roller.to_string_lossy().into_owned())
+        }
+    }
+}
+
+/// Switch the whole bundle, the way `robotd`'s mode line does.
+///
+/// Not a filter: roller loads `roller.onnx` as the locomotion network, drops
+/// the standing network, drives the crouch where the walking set has the
+/// ground pick, and keeps the same skills and sit/stand. The duck has to be
+/// standing still and idle — a mode switch while a move is in flight would
+/// rebuild the controller under it.
+fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, String> {
+    let mode = match name {
+        "walk" => robotd_params::Mode::Walk,
+        "roller" => robotd_params::Mode::Roller,
+        other => return Err(format!("no such mode: {other}")),
+    };
+    if core.runtime.mode() == mode {
+        return Ok(json!({ "ok": true, "mode": name, "already": true }));
+    }
+    if core.runtime.busy() || core.runtime.is_sitting() {
+        return Err("a move is running; the duck must be standing still".to_owned());
+    }
+    let scene = scene_for(core, mode)
+        .ok_or_else(|| format!("no scene for {name} beside {}", core.scene))?;
+    let bundle = crate::manifest::load_mode(&core.policies, mode)?;
+    let mut policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
+    if bundle.standing_disabled {
+        // No standing network in the roller bundle: command magnitude must
+        // not select one.
+        policy.set_standing_disabled(true);
+    }
+    let body = MujocoIo::load(&scene)?;
+    let mut runtime = DuckRuntime::new(
+        body,
+        policy,
+        bundle.tuning(),
+        bundle.skill_tuning,
+        SafetyConfig::default(),
+    );
+    runtime.enable().map_err(|error| error.to_string())?;
+    runtime.set_mode(mode);
+    // The robot's cue: one chirp for walking, two for roller.
+    runtime.queue_sound("chirp");
+    if mode == robotd_params::Mode::Roller {
+        runtime.queue_sound("chirp");
+    }
+
+    // A different body is a different duck: the old timeline and branches
+    // describe a robot that no longer exists.
+    core.runtime = runtime;
+    core.model_generation = core.model_generation.wrapping_add(1);
+    core.timeline.clear();
+    core.branches.clear();
+    core.selected = 0;
+    core.last = None;
+    core.sensors = crate::sensors::Sensors::default();
+    let names = published_skills(core.runtime.skill_names());
+    core.skills = names
+        .iter()
+        .map(|skill| CString::new(skill.clone()).unwrap_or_default())
+        .collect();
+    core.intents.set_skills(names);
+    // The roller's meshes are its own; the debug name table has to move too.
+    core.meshes = (0..core.runtime.io().mesh_count())
+        .map(|mesh| {
+            CString::new(core.runtime.io().mesh_name(mesh).unwrap_or_default()).unwrap_or_default()
+        })
+        .collect();
+    core.label = format!("mode: {name}");
+    Ok(json!({ "ok": true, "mode": name }))
+}
+
 fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<(), String> {
-    let bundle = crate::manifest::load(Path::new(dir))?;
-    let policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
+    // Reload the set this duck is actually running, not always the walking one.
+    let bundle = crate::manifest::load_mode(Path::new(dir), core.runtime.mode())?;
+    let mut policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
+    if bundle.standing_disabled {
+        policy.set_standing_disabled(true);
+    }
     let tuning = bundle.tuning();
     core.runtime
         .replace_policy(policy, tuning, bundle.skill_tuning);
@@ -446,6 +588,10 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
         Intent::GroundPick => match core.runtime.start_ground_pick() {
             Ok(()) => json!({ "ok": true }),
             Err(error) => refuse(core, format!("ground pick refused: {error}")),
+        },
+        Intent::Mode(name) => match switch_mode(core, &name) {
+            Ok(value) => value,
+            Err(reason) => refuse(core, format!("mode refused: {reason}")),
         },
         Intent::Sound(tag) => {
             if crate::voice::TAGS.contains(&tag.as_str()) {
@@ -688,6 +834,7 @@ fn publish_state(core: &DuckCore) {
         "tick": clock.tick,
         "paused": clock.paused,
         "speed": clock.speed,
+        "mode": core.runtime.mode().as_str(),
         "carrying": core.runtime.carrying(),
         "notice": core
             .notice

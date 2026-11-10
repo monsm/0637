@@ -77,6 +77,16 @@ pub fn tools() -> Value {
             }
         },
         {
+            "name": "duck_mode",
+            "description": "Switch drive bundles: walk (legs) or roller (wheels). The whole policy set changes, exactly as the robot's mode line. The duck must be standing still.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "mode": { "type": "string" } },
+                "required": ["mode"],
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "duck_sound",
             "description": "Make the duck's voice: greet, chirp, coo, peck, inquire or alarm. Rendered by the robot's own synth, so it sounds like the duck and not like a sample.",
             "inputSchema": {
@@ -230,6 +240,13 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
                 number(arguments, "roll"),
             ]));
             Ok(json!({ "ok": true, "stream": true }))
+        }
+        "duck_mode" => {
+            let mode = arguments
+                .get("mode")
+                .and_then(Value::as_str)
+                .ok_or("missing mode")?;
+            Ok(queue.request(crate::intent::Intent::Mode(mode.to_owned())))
         }
         "duck_sound" => {
             let tag = arguments

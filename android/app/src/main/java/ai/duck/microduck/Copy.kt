@@ -55,6 +55,9 @@ object Copy {
     val putDown get() = pick("Drop", "放下")
     val held get() = pick("in a hand · drag to carry", "在手里 · 拖动搬运")
     val quack get() = pick("Quack", "叫一声")
+    val drive get() = pick("drive", "驱动")
+    val walk get() = pick("walk", "走")
+    val roller get() = pick("roller", "轮")
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
 

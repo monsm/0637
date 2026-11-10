@@ -62,6 +62,9 @@ enum Copy {
     static var trunkZ: String { pick("trunk z", "躯干高度") }
     static var gravityZ: String { pick("gravity z", "重力 z") }
     static var imu: String { pick("IMU warm", "IMU 预热") }
+    static var drive: String { pick("drive", "驱动") }
+    static var walk: String { pick("walk", "走") }
+    static var roller: String { pick("roller", "轮") }
     static var mouth: String { pick("beak", "嘴") }
     static var battery: String { pick("pack", "电池") }
     static var branches: String { pick("branches", "分叉数") }

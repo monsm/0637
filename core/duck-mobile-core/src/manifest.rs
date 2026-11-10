@@ -16,8 +16,13 @@ pub struct PolicyBundle {
     pub paths: PolicyPaths,
     pub skills: Vec<SkillDef>,
     pub skill_tuning: SkillTuning,
-    /// The walk entry's own action scale, when the set declares one.
+    /// The locomotion entry's own action scale, when the set declares one.
     pub action_scale: Option<f64>,
+    /// Which bundle this is. The loop reads it for the idle behaviour and the
+    /// shell publishes it so a client knows which duck it is talking to.
+    pub mode: Mode,
+    /// Roller has no standing network; see `Policy::set_standing_disabled`.
+    pub standing_disabled: bool,
 }
 
 impl PolicyBundle {
@@ -63,14 +68,45 @@ fn read_manifest(dir: &Path) -> Option<SetManifest> {
     })
 }
 
+/// The walking set. Kept as the name every caller had before modes existed.
 pub fn load(dir: &Path) -> Result<PolicyBundle, String> {
+    load_mode(dir, Mode::Walk)
+}
+
+/// The set for one drive mode, resolved the way `robotd` resolves it.
+///
+/// A mode is a whole-bundle switch, not a filter: roller keeps the same skills
+/// and sit/stand, swaps the locomotion network for `roller.onnx`, drops the
+/// standing network, and drives the crouch where the walking set has the
+/// ground pick.
+pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
     let manifest = read_manifest(dir);
 
-    let walk = ["velstand.onnx", "alpha_walking.onnx"]
-        .iter()
-        .map(|file| dir.join(file))
-        .find(|path| path.exists())
-        .ok_or_else(|| format!("no walk policy in {}", dir.display()))?;
+    // Walking keeps the app's long-standing preference: velstand is the
+    // current gait (a walking set also ships alpha_walking, which is older).
+    // A non-walking mode takes the manifest's perpetual entry tagged with it.
+    let walk = match mode {
+        Mode::Walk => ["velstand.onnx", "alpha_walking.onnx"]
+            .iter()
+            .map(|file| dir.join(file))
+            .find(|path| path.exists()),
+        Mode::Roller => manifest
+            .as_ref()
+            .and_then(|manifest| {
+                manifest
+                    .policies
+                    .iter()
+                    .find(|policy| {
+                        policy.mode() == mode
+                            && !policy.is_episodic()
+                            && !policy.is_scripted()
+                            && dir.join(&policy.file).exists()
+                    })
+                    .map(|policy| dir.join(&policy.file))
+            })
+            .or_else(|| existing(dir.join("roller.onnx"))),
+    }
+    .ok_or_else(|| format!("no {:?} locomotion policy in {}", mode, dir.display()))?;
 
     let walk_file = walk.file_name().and_then(|name| name.to_str()).unwrap_or("");
     let action_scale = manifest.as_ref().and_then(|manifest| {
@@ -98,16 +134,24 @@ pub fn load(dir: &Path) -> Result<PolicyBundle, String> {
             manifest
                 .policies
                 .iter()
-                .find(|policy| policy.mode() == Mode::Walk && policy.phase_timing().is_some())
+                .find(|policy| policy.mode() == mode && policy.phase_timing().is_some())
         })
         .map(|policy| dir.join(&policy.file))
         .filter(|path| path.exists())
-        .or_else(|| existing(dir.join("alpha_ground_pick.onnx")));
+        .or_else(|| {
+            let fallback = match mode {
+                Mode::Walk => "alpha_ground_pick.onnx",
+                Mode::Roller => "roller_crouch.onnx",
+            };
+            existing(dir.join(fallback))
+        });
 
     let (skills, pick_timing, sit_timing) = match manifest.as_ref() {
         Some(manifest) => (
+            // Skills are deliberately not filtered by mode, exactly as
+            // upstream: the roller keeps its roulade and kicks.
             skills_from(manifest, dir),
-            manifest.ground_pick(Mode::Walk),
+            manifest.ground_pick(mode),
             manifest.sitstand(),
         ),
         None => (fallback_skills(dir), None, None),
@@ -132,7 +176,12 @@ pub fn load(dir: &Path) -> Result<PolicyBundle, String> {
 
     let paths = PolicyPaths {
         walk,
-        stand: None,
+        // Roller has no standing network: command magnitude cannot select
+        // one, and `standing_disabled` makes that explicit in the policy.
+        stand: match mode {
+            Mode::Walk => existing(dir.join("alpha_stand.onnx")),
+            Mode::Roller => None,
+        },
         sitstand,
         ground_pick,
         skills: skills
@@ -146,6 +195,8 @@ pub fn load(dir: &Path) -> Result<PolicyBundle, String> {
         skills,
         skill_tuning,
         action_scale,
+        mode,
+        standing_disabled: mode == Mode::Roller,
     })
 }
 
@@ -156,7 +207,6 @@ fn existing(path: PathBuf) -> Option<PathBuf> {
 fn skills_from(manifest: &SetManifest, dir: &Path) -> Vec<SkillDef> {
     manifest
         .skills()
-        .filter(|policy| policy.mode() == Mode::Walk)
         .filter_map(|policy| {
             let path = dir.join(&policy.file);
             if !path.exists() {

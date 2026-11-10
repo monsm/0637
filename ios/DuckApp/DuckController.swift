@@ -31,6 +31,8 @@ final class DuckController: ObservableObject {
     /// The scene has a mouth joint. The official walking scene does not, so
     /// the sheet does not claim a beak the duck cannot move.
     @Published var hasMouth = false
+    /// "walk" or "roller", from /state.
+    @Published var driveMode = "walk"
     @Published var volts: Double = 0
     @Published var trunk = SIMD3<Float>(0, 0, 0.12)
     @Published var gravity = SIMD3<Float>(0, 0, -1)
@@ -499,10 +501,20 @@ final class DuckController: ObservableObject {
                 mouth = status.mouth
                 volts = status.volts
                 hasMouth = status.has_mouth != 0
+                if let pointer = duck_core_mode(core) {
+                    driveMode = String(cString: pointer)
+                }
             }
             lastStatus = Date()
             refreshClock()
         }
+    }
+
+    /// Switch drive bundles: "walk" or "roller". The whole policy set changes,
+    /// so this is refused while a move is running.
+    func setMode(_ mode: String) {
+        guard let core else { return }
+        _ = mode.withCString { duck_core_set_mode(core, $0) }
     }
 
     /// Enter or leave Director mode. Opening starts the camera; leaving stops

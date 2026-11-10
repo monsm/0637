@@ -137,6 +137,22 @@ struct InstrumentSheet: View {
             row(Copy.trunkZ, String(format: "%.4f m", controller.trunk.z))
             row(Copy.gravityZ, String(format: "%.4f", controller.gravity.z))
             row(Copy.branches, "\(controller.branchCount)")
+            HStack {
+                Text(Copy.drive)
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Picker(Copy.drive, selection: Binding(
+                    get: { controller.driveMode },
+                    set: { controller.setMode($0) }
+                )) {
+                    Text(Copy.walk).tag("walk")
+                    Text(Copy.roller).tag("roller")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 150)
+                .accessibilityIdentifier("drive-mode")
+            }
             row(Copy.imu, controller.imuReady ? Copy.yes : Copy.no)
             row(Copy.held, controller.pickedUp ? Copy.yes : Copy.no)
             if controller.hasMouth {

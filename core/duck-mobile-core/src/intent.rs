@@ -68,6 +68,9 @@ pub enum Intent {
     SelectBranch(String),
     /// Play one of the duck's sounds: greet, chirp, coo, peck, inquire, alarm.
     Sound(String),
+    /// Switch drive bundles: "walk" or "roller". A whole-policy-set switch,
+    /// exactly as `robotd`'s mode line, not a per-command filter.
+    Mode(String),
     /// A phone sensor reading (camera, microphone, depth, IMU).
     Sensor(crate::sensors::Reading),
 }
@@ -435,6 +438,10 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         },
         ("POST", "/sit") => Ok(queue.request(Intent::Sit).to_string()),
         ("POST", "/ground_pick") => Ok(queue.request(Intent::GroundPick).to_string()),
+        ("POST", "/mode") => match value["mode"].as_str() {
+            Some(mode) => Ok(queue.request(Intent::Mode(mode.to_owned())).to_string()),
+            None => Err("missing mode"),
+        },
         // The voice, by tag: `robotctl quack` is a chirp, and the others are
         // the duck's own vocabulary.
         ("POST", "/sound") => match value["tag"].as_str() {

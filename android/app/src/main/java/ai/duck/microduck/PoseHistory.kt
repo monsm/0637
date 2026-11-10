@@ -21,8 +21,13 @@ class PoseHistory {
     /** Snapshot every body after a tick. Called from the loop thread. */
     fun capture(core: DuckCore) {
         synchronized(lock) {
-            if (bodyCount == 0) {
-                bodyCount = core.bodyCount()
+            // A mode switch loads a different model with a different body
+            // count; the old snapshots describe a body that no longer exists.
+            val count = core.bodyCount()
+            if (count != bodyCount) {
+                bodyCount = count
+                previous = DoubleArray(0)
+                current = DoubleArray(0)
             }
             if (bodyCount == 0) return
             val next = DoubleArray(bodyCount * 7)

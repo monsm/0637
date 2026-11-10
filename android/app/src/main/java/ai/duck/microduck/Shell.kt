@@ -326,6 +326,11 @@ private fun InstrumentSheet(core: DuckCore, onClose: () -> Unit) {
                 ButtonChip(Copy.fork) { branches += 1 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ButtonChip(Copy.drive + ": " + if (core.mode() == "roller") Copy.roller else Copy.walk) {
+                    core.setMode(if (core.mode() == "roller") "walk" else "roller")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(0.25, 0.5, 1.0, 2.0).forEach { option ->
                     ButtonChip(if (option == 1.0) "1×" else "${option}×") {
                         speed = option

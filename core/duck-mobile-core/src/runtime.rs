@@ -351,6 +351,9 @@ pub struct Checkpoint {
     /// The client's beak intent.
     #[serde(default)]
     pub mouth: f64,
+    /// The drive mode, as a string ("walk"/"roller").
+    #[serde(default)]
+    pub mode: String,
 }
 
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
@@ -400,6 +403,9 @@ pub struct DuckRuntime<T: RobotIo> {
     carry: Option<([f64; 3], [f64; 3])>,
     /// The client's beak intent, 0..1, exactly `robotd`'s `Snapshot::mouth`.
     mouth: f64,
+    /// Which bundle is loaded. `robotd` asks it every tick for the idle
+    /// behaviour (`IdleParams::enabled_in`), and it is what the shell shows.
+    mode: robotd_params::Mode,
     /// The duck's voice. `robotd` quacks once as the loop comes up, chirps on
     /// the mode cue and pecks before the servos go quiet; the same here.
     voice: crate::voice::Voice,
@@ -446,6 +452,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             pickup_model: None,
             carry: None,
             mouth: 0.0,
+            mode: robotd_params::Mode::Walk,
             voice: crate::voice::Voice::new(0xD0C),
             sounds: std::collections::VecDeque::new(),
             volts: None,
@@ -531,6 +538,16 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// core owns the synth so the PCM is the duck's, not a sample.
     pub fn render_tag(&mut self, tag: &str) -> Option<Vec<f32>> {
         self.voice.render(tag).map(|(_, pcm)| pcm)
+    }
+
+    pub fn mode(&self) -> robotd_params::Mode {
+        self.mode
+    }
+
+    /// After a mode switch: the loop's own mode-dependent behaviour follows
+    /// the bundle that is now loaded.
+    pub fn set_mode(&mut self, mode: robotd_params::Mode) {
+        self.mode = mode;
     }
 
     /// The beak, 0..1. The idle yawn opens it further, never less.
@@ -835,6 +852,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             imu_samples: self.imu_samples,
             volts: self.volts,
             mouth: self.mouth,
+            mode: self.mode.as_str().to_owned(),
         })
     }
 
@@ -901,6 +919,10 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.imu_samples = checkpoint.imu_samples;
         self.volts = checkpoint.volts;
         self.mouth = checkpoint.mouth;
+        self.mode = match checkpoint.mode.as_str() {
+            "roller" => robotd_params::Mode::Roller,
+            _ => robotd_params::Mode::Walk,
+        };
         // The pickup window is a second of history from a future this duck no
         // longer had. Forget it rather than score rows against a replay.
         if let Some(watch) = self.pickup.as_mut() {
@@ -1184,7 +1206,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         // The idle look-around, robotd's: a still duck glances, tilts its head
         // and breathes, and the head command it feeds is an observation input
         // (the policy's head block), exactly as on the real robot.
-        let still = self.idle_params.enabled_in(robotd_params::Mode::Walk)
+        let still = self.idle_params.enabled_in(self.mode)
             && was_driving
             && !pickup_paused
             && matches!(self.limp_fall, LimpFall::Idle)

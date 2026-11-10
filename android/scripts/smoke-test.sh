@@ -121,6 +121,28 @@ if curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"tag
   exit 1
 fi
 
+# A drive mode is a whole-bundle switch: roller loads roller.onnx as the
+# locomotion network and drops the standing network. The state says which
+# bundle is loaded; the roller scene ships beside the walking one.
+MODE=$(echo "$STATE" | grep -oE '"mode":"[^"]*"' || true)
+if [ "$MODE" != '"mode":"walk"' ]; then
+  echo "::error::the duck did not start in walk mode: $MODE"
+  exit 1
+fi
+ROLLER=$(curl -sf --max-time 20 -X POST -H 'Content-Type: application/json'   -d '{"mode":"roller"}' http://127.0.0.1:8765/mode || true)
+echo "$ROLLER" | tee intent-mode-roller.json > /dev/null
+if ! echo "$ROLLER" | grep -q '"ok":true'; then
+  echo "::error::the duck could not switch to roller: $ROLLER"
+  exit 1
+fi
+sleep 3
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -q '"mode":"roller"'; then
+  echo "::error::the state does not report roller mode"
+  exit 1
+fi
+curl -sf --max-time 20 -X POST -H 'Content-Type: application/json'   -d '{"mode":"walk"}' http://127.0.0.1:8765/mode > /dev/null || true
+sleep 3
+
 # Drive the duck through its own intent API, the way an external agent
 # would: the API holds the duck for a lease, so keep the twist coming.
 for _ in $(seq 1 8); do

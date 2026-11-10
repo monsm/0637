@@ -85,6 +85,21 @@ class DuckCore(
         if (handle != 0L) nativeRenderSound(handle, tag) ?: FloatArray(0) else FloatArray(0)
     }
 
+    /** The drive mode loaded now: "walk" or "roller". */
+    fun mode(): String = synchronized(lock) {
+        if (handle != 0L) nativeMode(handle) ?: "walk" else "walk"
+    }
+
+    /** Bumped when the body model changed (a mode switch). */
+    fun modelGeneration(): Long = synchronized(lock) {
+        if (handle != 0L) nativeModelGeneration(handle) else 0L
+    }
+
+    /** Switch drive bundles; 0 on success. */
+    fun setMode(mode: String): Int = synchronized(lock) {
+        if (handle != 0L) nativeSetMode(handle, mode) else -1
+    }
+
     /** The pickup classifier `robotd` scores. Returns 0 when it loaded. */
     fun loadPickup(path: String): Int = synchronized(lock) {
         if (handle != 0L) nativeLoadPickup(handle, path) else -1
@@ -198,6 +213,9 @@ class DuckCore(
         @JvmStatic private external fun nativeSetBody(handle: Long, z: Double, roll: Double, pitch: Double)
         @JvmStatic private external fun nativeCarry(handle: Long, dx: Double, dy: Double, dz: Double, active: Boolean)
         @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
+        @JvmStatic private external fun nativeMode(handle: Long): String?
+        @JvmStatic private external fun nativeSetMode(handle: Long, mode: String): Int
+        @JvmStatic private external fun nativeModelGeneration(handle: Long): Long
         @JvmStatic private external fun nativeQueueSound(handle: Long, tag: String): Int
         @JvmStatic private external fun nativeNextSound(handle: Long): String?
         @JvmStatic private external fun nativeRenderSound(handle: Long, tag: String): FloatArray?

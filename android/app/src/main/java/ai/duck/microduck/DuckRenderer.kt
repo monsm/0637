@@ -44,6 +44,8 @@ class DuckRenderer(
     private val instances = mutableListOf<Instance>()
     private var floor: Mesh? = null
     private var aspect = 1f
+    /// The body model this renderer was built for; a mode switch changes it.
+    private var builtGeneration = -1L
     private val yaw = Math.PI.toFloat()
     private val pitch = 0.32f
     private val distance = 0.85f
@@ -69,6 +71,17 @@ class DuckRenderer(
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        // A different model means different meshes: rebuild before drawing.
+        val generation = core.modelGeneration()
+        if (generation != builtGeneration) {
+            if (builtGeneration >= 0) {
+                instances.clear()
+                meshes.clear()
+                floor = null
+            }
+            buildScene()
+            builtGeneration = generation
+        }
         // The 50 Hz loop runs on DuckLoop's own scheduler; this only draws.
         val status = core.status()
         // The camera follows the interpolated trunk, not the status sample: a

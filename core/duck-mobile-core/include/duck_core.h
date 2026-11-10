@@ -42,6 +42,16 @@ void duck_core_set_body(DuckCore* core, double z, double roll, double pitch);
 void duck_core_carry(DuckCore* core, double dx, double dy, double dz, int active);
 int duck_core_push(DuckCore* core, double vx, double vy, double vz);
 
+/* Bumped when the body model changed (a mode switch). Renderers that cache
+   geometry rebuild when it moves. */
+unsigned long long duck_core_model_generation(DuckCore* core);
+
+/* The drive mode currently loaded: "walk" or "roller". */
+const char* duck_core_mode(DuckCore* core);
+
+/* Switch drive bundles: "walk" or "roller". 0 on success. */
+int duck_core_set_mode(DuckCore* core, const char* mode);
+
 /* The pickup classifier (`pickup_detector.onnx`). 0 on success. */
 int duck_core_load_pickup(DuckCore* core, const char* model_path);
 

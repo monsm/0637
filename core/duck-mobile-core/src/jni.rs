@@ -14,8 +14,9 @@ use jni::sys::{jboolean, jdouble, jdoubleArray, jfloatArray, jint, jlong, jstrin
 use jni::JNIEnv;
 
 use crate::ffi::{
-    duck_core_body_count, duck_core_next_sound, duck_core_queue_sound,
-    duck_core_render_sound, duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
+    duck_core_body_count, duck_core_mode, duck_core_model_generation, duck_core_next_sound,
+    duck_core_queue_sound, duck_core_render_sound, duck_core_set_mode,
+    duck_core_voice_rate, duck_core_body_pose, duck_core_carry, duck_core_free,
     duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_load_pickup,
     duck_core_mesh_name, duck_core_mesh_soup,
     duck_core_fork, duck_core_new, duck_core_paused, duck_core_seek, duck_core_set_paused,
@@ -180,6 +181,45 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeLoadPickup(
 }
 
 /// The next sound the duck wants, as a tag; `null` when none is queued.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMode(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jstring {
+    let pointer = unsafe { duck_core_mode(handle as *mut DuckCore) };
+    let mode = unsafe { CStr::from_ptr(pointer) };
+    match env.new_string(mode.to_string_lossy()) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetMode(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+    mode: JString,
+) -> jint {
+    let Some(mode) = java_string(&mut env, &mode) else {
+        return -1;
+    };
+    let Ok(mode) = CString::new(mode) else {
+        return -1;
+    };
+    unsafe { duck_core_set_mode(handle as *mut DuckCore, mode.as_ptr()) as jint }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeModelGeneration(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jlong {
+    unsafe { duck_core_model_generation(handle as *mut DuckCore) as jlong }
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeNextSound(
     mut env: JNIEnv,
