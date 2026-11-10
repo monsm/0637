@@ -49,18 +49,22 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
                     }
                     // One snapshot per frame, so the renderer can blend the
                     // last two ticks instead of showing 20 ms steps.
-                    if (stepped) core.poses.capture(core)
-                    input.ticks++
+                    if (stepped) {
+                        core.poses.capture(core)
+                        // Simulation ticks actually achieved: at 0.5x speed
+                        // the scheduler still fires at 50 Hz but only 25
+                        // ticks advance MuJoCo, and that is the number the
+                        // instrument should show.
+                        input.ticks.incrementAndGet()
+                    }
                     val now = System.nanoTime()
                     if (lastReport == 0L) lastReport = now
                     val elapsed = (now - lastReport) / 1_000_000_000.0
                     if (elapsed >= 1.0) {
                         lastReport = now
-                        // Frames the renderer drew since the last report, and
-                        // the ticks this loop actually achieved.
-                        core.setPerformance(input.frames / elapsed, input.ticks / elapsed)
-                        input.frames = 0
-                        input.ticks = 0
+                        val frames = input.frames.getAndSet(0)
+                        val ticks = input.ticks.getAndSet(0)
+                        core.setPerformance(frames / elapsed, ticks / elapsed)
                     }
                 } catch (_: Throwable) {
                     // A tick that throws must not stop the schedule; the next

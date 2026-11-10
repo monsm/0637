@@ -314,10 +314,8 @@ jobs:
             echo "rustcore=${{ steps.rustcore.outcome }}"
             echo "apk=${{ steps.apk.outcome }}"
             echo "gradlesetup=${{ steps.gradlesetup.outcome }}"
-            echo "gradle=${{ steps.apk.outcome }}"
             echo "emulator=${{ steps.emulator.outcome }}"
             echo "alignment=${{ steps.alignment.outcome }}"
-            echo "publishlogs=${{ steps.publishlogs.outcome }}"
           } > ci-logs/android/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"

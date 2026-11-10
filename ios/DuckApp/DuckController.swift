@@ -234,6 +234,9 @@ final class DuckController: ObservableObject {
             self.core = created
             self.meshVertices = meshes
             self.ready = true
+            // Core loading took seconds; start the performance window here,
+            // not at object init, or the first report divides by load time.
+            self.perfAnchor = Date()
             NSLog("duck: core created")
             // The pickup classifier: the duck pauses its policy in a hand for
             // the same reason the physical one does.

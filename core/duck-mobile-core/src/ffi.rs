@@ -328,7 +328,6 @@ pub unsafe extern "C" fn duck_core_reload_policies(
     0
 }
 
-/// Start the local intent API on `0.0.0.0:port`. Idempotent.
 /// The platform's own measurements, once a second: frames drawn per second and
 /// control ticks achieved per second. Diagnostic, not part of the duck.
 #[unsafe(no_mangle)]

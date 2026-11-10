@@ -289,9 +289,10 @@ class DuckInput {
     @Volatile var wz: Double = 0.0
     /** Director mode with a live camera: the renderer goes transparent. */
     @Volatile var cameraActive: Boolean = false
-    // Performance counters, reset once a second. The loop counts ticks, the
-    // renderer counts frames; whoever ticks over the second writes them back
-    // to the core so /state reports what was actually achieved.
-    @Volatile var ticks: Int = 0
-    @Volatile var frames: Int = 0
+    // Performance counters, reset once a second. The loop counts achieved
+    // simulation ticks, the renderer counts frames on its own thread: an
+    // atomic getAndSet is needed or a frame drawn between the read and the
+    // reset is lost.
+    val ticks = java.util.concurrent.atomic.AtomicInteger(0)
+    val frames = java.util.concurrent.atomic.AtomicInteger(0)
 }
