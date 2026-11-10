@@ -31,9 +31,10 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
                     // queue and publishes state on every call, so a paused duck
                     // can still receive the request that unpauses it. When
                     // paused the core does not advance the simulation.
+                    var stepped = false
                     if (core.paused()) {
                         remainder = 0.0
-                        core.tick()
+                        if (core.tick() == 0) stepped = true
                     } else {
                         remainder += core.speed()
                         var whole = remainder.toInt()
@@ -41,9 +42,12 @@ class DuckLoop(private val core: DuckCore, private val input: DuckInput) {
                         // Zero is a real answer at 0.5x: the next frame runs
                         // the tick, and intents drain on it.
                         while (whole-- > 0) {
-                            core.tick()
+                            if (core.tick() == 0) stepped = true
                         }
                     }
+                    // One snapshot per frame, so the renderer can blend the
+                    // last two ticks instead of showing 20 ms steps.
+                    if (stepped) core.poses.capture(core)
                 } catch (_: Throwable) {
                     // A tick that throws must not stop the schedule; the next
                     // one retries.

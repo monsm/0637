@@ -71,7 +71,12 @@ class DuckRenderer(
     override fun onDrawFrame(gl: GL10?) {
         // The 50 Hz loop runs on DuckLoop's own scheduler; this only draws.
         val status = core.status()
-        val trunk = if (status.size >= 9) {
+        // The camera follows the interpolated trunk, not the status sample: a
+        // camera on a slower clock than the duck makes the room judder.
+        val trunkPose = core.poses.interpolated(1)
+        val trunk = if (trunkPose != null && trunkPose.size >= 3) {
+            floatArrayOf(trunkPose[0].toFloat(), trunkPose[1].toFloat(), trunkPose[2].toFloat())
+        } else if (status.size >= 9) {
             floatArrayOf(status[3].toFloat(), status[4].toFloat(), status[5].toFloat())
         } else {
             floatArrayOf(0f, 0f, 0.12f)
@@ -118,7 +123,11 @@ class DuckRenderer(
         }
 
         for (instance in instances) {
-            val pose = core.bodyPose(instance.body) ?: continue
+            // Interpolated between the last two ticks: MuJoCo runs at 50 Hz, a
+            // display at 60–120 Hz, and the live pose would move in steps.
+            val pose = core.poses.interpolated(instance.body)
+                ?: core.bodyPose(instance.body)
+                ?: continue
             if (pose.size < 7) continue
 
             val body = identity()

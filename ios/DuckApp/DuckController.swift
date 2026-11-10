@@ -62,6 +62,75 @@ final class DuckController: ObservableObject {
     /// first frame, keyed by MuJoCo mesh id.
     private(set) var meshVertices: [Int32: [Float]] = [:]
 
+    /// One body's pose at a tick boundary, for the renderer to interpolate
+    /// between. MuJoCo steps at 50 Hz; a display draws at 60–120 Hz, so
+    /// without this the duck moves in visible 20 ms stairs.
+    struct BodyPose {
+        var position: SIMD3<Float>
+        var rotation: SIMD4<Float>
+    }
+
+    private(set) var previousPoses: [BodyPose] = []
+    private(set) var currentPoses: [BodyPose] = []
+    /// When `currentPoses` was captured, on the same clock the renderer reads.
+    private(set) var poseCapturedAt: TimeInterval = 0
+    private var bodyCount = 0
+
+    /// 0…1 through the current 20 ms tick, for the renderer.
+    func interpolationAlpha(now: TimeInterval = Date().timeIntervalSinceReferenceDate) -> Float {
+        guard poseCapturedAt > 0 else { return 1 }
+        let alpha = (now - poseCapturedAt) / 0.02
+        return Float(min(max(alpha, 0), 1))
+    }
+
+    /// A body's pose between the last two ticks. Falls back to the latest tick
+    /// when there is no previous one yet (the first frame).
+    func interpolatedPose(body: Int, alpha: Float) -> BodyPose? {
+        guard body >= 0, body < currentPoses.count else { return nil }
+        guard body < previousPoses.count else { return currentPoses[body] }
+        let a = previousPoses[body]
+        let b = currentPoses[body]
+        var rotation = b.rotation
+        // Quaternions are double covers: q and -q are the same rotation, and
+        // lerping without the sign check takes the long way round.
+        if simd_dot(a.rotation, b.rotation) < 0 {
+            rotation = -b.rotation
+        }
+        let blended = a.rotation + (rotation - a.rotation) * alpha
+        return BodyPose(
+            position: a.position + (b.position - a.position) * alpha,
+            rotation: simd_normalize(blended)
+        )
+    }
+
+    /// Snapshot every body's pose, after a tick. Called on the main thread.
+    private func capturePoses(core: OpaquePointer) {
+        if bodyCount == 0 {
+            bodyCount = Int(duck_core_body_count(core))
+        }
+        guard bodyCount > 0 else { return }
+        var poses = previousPoses
+        poses.removeAll(keepingCapacity: true)
+        poses.reserveCapacity(bodyCount)
+        var position = [Double](repeating: 0, count: 3)
+        var rotation = [Double](repeating: 0, count: 4)
+        for body in 0..<bodyCount {
+            position.withUnsafeMutableBufferPointer { pos in
+                rotation.withUnsafeMutableBufferPointer { quat in
+                    _ = duck_core_body_pose(core, Int32(body), pos.baseAddress, quat.baseAddress)
+                }
+            }
+            poses.append(BodyPose(
+                position: SIMD3<Float>(Float(position[0]), Float(position[1]), Float(position[2])),
+                rotation: SIMD4<Float>(Float(rotation[0]), Float(rotation[1]),
+                                       Float(rotation[2]), Float(rotation[3]))
+            ))
+        }
+        previousPoses = currentPoses
+        currentPoses = poses
+        poseCapturedAt = Date().timeIntervalSinceReferenceDate
+    }
+
     init() {
         // Creating the core loads the MuJoCo scene (215k vertices) and the
         // ONNX policies — seconds on a device. Doing that here blocked the
@@ -377,8 +446,15 @@ final class DuckController: ObservableObject {
         let y = deadzone(Float(joystick.y))
         duck_core_set_twist(core, Double(-y) * 0.4, 0.0, Double(-x) * 1.0)
         // Paused or slowed: the timer keeps firing, simulation time does not.
+        var stepped = false
         for _ in 0..<ticksForThisFrame() {
-            _ = duck_core_tick(core)
+            if duck_core_tick(core) == 0 { stepped = true }
+        }
+        // One snapshot per frame, after the steps: the renderer interpolates
+        // between this and the previous one, so the duck moves at the display
+        // rate rather than in 20 ms steps.
+        if stepped {
+            capturePoses(core: core)
         }
 
         if Date().timeIntervalSince(lastStatus) > 0.1 {

@@ -13,6 +13,12 @@ class DuckCore(
     private var handle: Long = nativeNew(scenePath, policiesPath)
     private val lock = Any()
 
+    /**
+     * The last two ticks' body poses. The loop writes, the renderer reads;
+     * the GL thread never touches MuJoCo.
+     */
+    val poses = PoseHistory()
+
     val ready: Boolean get() = handle != 0L
 
     fun paused(): Boolean = synchronized(lock) {

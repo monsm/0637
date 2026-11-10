@@ -283,7 +283,12 @@ final class Renderer: NSObject, MTKViewDelegate {
         encoder.setDepthStencilState(depthState)
         encoder.setCullMode(.none)
 
-        let focus = controller.trunk
+        // The camera follows the interpolated trunk, not the 10 Hz status
+        // sample: a camera locked to a slower clock than the duck makes the
+        // whole room judder even when the duck itself is smooth.
+        let alpha = controller.interpolationAlpha()
+        let trunkPose = controller.interpolatedPose(body: 1, alpha: alpha)
+        let focus = trunkPose?.position ?? controller.trunk
         let eye = focus + SIMD3<Float>(
             distance * cos(pitch) * sin(yaw),
             distance * cos(pitch) * cos(yaw),
@@ -310,7 +315,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         var poses: [Int: (SIMD3<Float>, SIMD4<Float>)] = [:]
         for instance in instances {
             if poses[instance.body] == nil {
-                poses[instance.body] = bodyPose(core: core, body: instance.body)
+                if let sample = controller.interpolatedPose(body: instance.body, alpha: alpha) {
+                    poses[instance.body] = (sample.position, sample.rotation)
+                } else {
+                    poses[instance.body] = bodyPose(core: core, body: instance.body)
+                }
             }
             guard let (position, rotation) = poses[instance.body] else { continue }
             let model = translation(position) * quaternionMatrix(rotation) * instance.local
