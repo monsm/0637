@@ -524,7 +524,13 @@ final class DuckController: ObservableObject {
         for _ in 0..<ticksForThisFrame() {
             if duck_core_tick(core) == 0 { stepped = true }
         }
-        tickCount += Int(duck_core_tick_index(core) - before)
+        // A mode switch builds a fresh runtime whose clock starts at 0, so
+        // the next frame's index is lower than `before`. Skip that boundary
+        // frame: a UInt64 subtraction would trap and kill the app.
+        let after = duck_core_tick_index(core)
+        if after >= before {
+            tickCount += Int(after - before)
+        }
         // One snapshot per frame, after the steps: the renderer interpolates
         // between this and the previous one, so the duck moves at the display
         // rate rather than in 20 ms steps.
