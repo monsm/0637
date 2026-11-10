@@ -1410,6 +1410,12 @@ mod tests {
             label: [0; 64],
             trunk: [0.0; 3],
             gravity: [0.0; 3],
+            imu_ready: 0,
+            picked_up: 0,
+            p_held: 0.0,
+            mouth: 0.0,
+            volts: 0.0,
+            has_mouth: 0,
         };
         assert_eq!(unsafe { duck_core_status(core, &mut status) }, 0);
         assert_eq!(status.bringup, 2, "already at home -> Ready");
