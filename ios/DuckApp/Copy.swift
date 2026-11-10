@@ -63,6 +63,13 @@ enum Copy {
     static var gravityZ: String { pick("gravity z", "重力 z") }
     static var imu: String { pick("IMU warm", "IMU 预热") }
     static var drive: String { pick("drive", "驱动") }
+    static func stick(_ mode: String) -> String {
+        switch mode {
+        case "head": return pick("look", "看")
+        case "body": return pick("pose", "姿态")
+        default: return pick("drive", "驱动")
+        }
+    }
     static var walk: String { pick("walk", "走") }
     static var roller: String { pick("roller", "轮") }
     static var mouth: String { pick("beak", "嘴") }

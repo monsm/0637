@@ -59,6 +59,9 @@ fun Shell(
     var showRing by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
     var carrying by remember { mutableStateOf(false) }
+    // The pad's D-pad modes, reduced to what a phone can do: drive, look,
+    // and crouch/lean the standing body.
+    var stick by remember { mutableStateOf("drive") }
     // Flipping this re-renders every Copy string in the shell.
     var languageTick by remember { mutableStateOf(0) }
 
@@ -71,7 +74,7 @@ fun Shell(
         Box(
             Modifier
                 .fillMaxSize()
-                .pointerInput(core, carrying) {
+                .pointerInput(core, carrying, stick) {
                     val duck = core ?: return@pointerInput
                     var start = Offset.Zero
                     detectDragGestures(
@@ -88,15 +91,37 @@ fun Shell(
                             }
                             val dx = (change.position.x - width * 0.5f) / (width * 0.5f)
                             val dy = (change.position.y - height * 0.52f) / (height * 0.5f)
-                            val forward = -dy
-                            input.vx = deadzone(forward.toFloat()).toDouble() * 0.4
-                            input.wz = -deadzone(dx.toFloat()).toDouble() * 1.0
+                            when (stick) {
+                                "head" -> duck.setHead(
+                                    0.0,
+                                    dy.toDouble() * 0.6,
+                                    dx.toDouble() * 1.2,
+                                    0.0,
+                                )
+                                "body" -> duck.setBody(-dy.toDouble() * 0.05, dx.toDouble() * 0.12, 0.0)
+                                else -> {
+                                    val forward = -dy
+                                    input.vx = deadzone(forward.toFloat()).toDouble() * 0.4
+                                    input.wz = -deadzone(dx.toFloat()).toDouble() * 1.0
+                                }
+                            }
                         },
                         onDragEnd = {
-                            if (!carrying) { input.vx = 0.0; input.wz = 0.0 }
+                            if (!carrying) {
+                                input.vx = 0.0
+                                input.wz = 0.0
+                                // Leaving a mode puts back what it moved.
+                                duck.setHead(0.0, 0.0, 0.0, 0.0)
+                                duck.setBody(0.0, 0.0, 0.0)
+                            }
                         },
                         onDragCancel = {
-                            if (!carrying) { input.vx = 0.0; input.wz = 0.0 }
+                            if (!carrying) {
+                                input.vx = 0.0
+                                input.wz = 0.0
+                                duck.setHead(0.0, 0.0, 0.0, 0.0)
+                                duck.setBody(0.0, 0.0, 0.0)
+                            }
                         },
                     )
                 },
@@ -129,6 +154,9 @@ fun Shell(
                 )
             }
             Spacer(Modifier.size(14.dp))
+            SurfaceChip(Copy.stick("drive"), stick == "drive") { stick = "drive" }
+            SurfaceChip(Copy.stick("head"), stick == "head") { stick = "head" }
+            SurfaceChip(Copy.stick("body"), stick == "body") { stick = "body" }
             SurfaceChip(Copy.live, surface == Surface.Live) { onSurface(Surface.Live) }
             SurfaceChip(Copy.director, surface == Surface.Director) { onSurface(Surface.Director) }
             SurfaceChip(Copy.language.label, false) {

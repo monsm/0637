@@ -551,6 +551,24 @@ final class DuckController: ObservableObject {
         duck_core_carry(core, 0, 0, 0, 0)
     }
 
+    /// The pad's head stick: yaw and pitch, radians.
+    func setHead(yaw: Double, pitch: Double) {
+        guard let core else { return }
+        duck_core_set_head(core, 0.0, pitch, yaw, 0.0)
+    }
+
+    /// The pad's body stick: crouch (z) and sideways lean (roll).
+    func setBody(z: Double, roll: Double) {
+        guard let core else { return }
+        duck_core_set_body(core, z, roll, 0.0)
+    }
+
+    /// Let go: the pose snaps back to nominal, which is the pad's B exit.
+    func releaseBody() {
+        guard let core else { return }
+        duck_core_set_body(core, 0.0, 0.0, 0.0)
+    }
+
     func carry(dx: Double, dy: Double, dz: Double) {
         guard let core, carrying else { return }
         duck_core_carry(core, dx, dy, dz, 1)

@@ -56,6 +56,11 @@ object Copy {
     val held get() = pick("in a hand · drag to carry", "在手里 · 拖动搬运")
     val quack get() = pick("Quack", "叫一声")
     val drive get() = pick("drive", "驱动")
+    fun stick(mode: String): String = when (mode) {
+        "head" -> pick("look", "看")
+        "body" -> pick("pose", "姿态")
+        else -> pick("drive", "驱动")
+    }
     val walk get() = pick("walk", "走")
     val roller get() = pick("roller", "轮")
     val viewfinder get() = pick("VIEWFINDER", "取景器")

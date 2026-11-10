@@ -16,6 +16,13 @@ struct ContentView: View {
     @StateObject private var controller = DuckController()
     @State private var surface = Surface.live
     @State private var showRing = false
+    /// The pad's stick modes, reduced to the three a phone can express:
+    /// walk/turn, look, and crouch/lean the standing body.
+    @State private var stickMode = StickMode.drive
+
+    enum StickMode: String, CaseIterable {
+        case drive, head, body
+    }
     @State private var showInstrument = false
     @State private var tapTarget: CGPoint?
     @State private var lastTap = Date.distantPast
@@ -119,19 +126,39 @@ struct ContentView: View {
                 let center = CGPoint(x: size.width * 0.5, y: size.height * 0.52)
                 let dx = (gesture.location.x - center.x) / (size.width * 0.5)
                 let dy = (gesture.location.y - center.y) / (size.height * 0.5)
-                // Forward is up the screen: the duck walks away from you. Drag
-                // below the centre to walk backwards, the pad's stick does.
-                let forward = -dy
-                controller.joystick = CGPoint(
-                    x: abs(dx) > 0.08 ? dx : 0,
-                    y: abs(forward) > 0.08 ? -forward : 0
-                )
+                switch stickMode {
+                case .head:
+                    // The pad's head mode: up looks up, sideways turns, and
+                    // releasing puts the head back.
+                    controller.setHead(yaw: Double(dx) * 1.2, pitch: Double(dy) * 0.6)
+                case .body:
+                    // Body-pose mode: up stands tall, down crouches, sideways
+                    // leans. Releasing releases the pose rather than freezing
+                    // a lean, which is the pad's own mode exit.
+                    controller.setBody(z: Double(-dy) * 0.05, roll: Double(dx) * 0.12)
+                case .drive:
+                    // Forward is up the screen: the duck walks away from you.
+                    // Drag below the centre to walk backwards, the pad's stick
+                    // does.
+                    let forward = -dy
+                    controller.joystick = CGPoint(
+                        x: abs(dx) > 0.08 ? dx : 0,
+                        y: abs(forward) > 0.08 ? -forward : 0
+                    )
+                }
             }
             .onEnded { _ in
                 // A held duck stays in the hand where the drag left it; the
                 // walk command is what must stop with the finger.
-                if !controller.carrying {
-                    controller.joystick = .zero
+                guard !controller.carrying else { return }
+                controller.joystick = .zero
+                switch stickMode {
+                case .head:
+                    controller.setHead(yaw: 0, pitch: 0)
+                case .body:
+                    controller.releaseBody()
+                case .drive:
+                    break
                 }
             }
     }
@@ -186,12 +213,39 @@ struct ContentView: View {
             }
             Spacer()
             HStack(spacing: 6) {
+                stickSwitch
                 languageSwitch
                 surfaceSwitch
             }
         }
         .padding(12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    /// The pad's D-pad, as three taps: drive, look, pose. It was the one
+    /// control the physical controller has that a touch screen did not.
+    private var stickSwitch: some View {
+        HStack(spacing: 4) {
+            ForEach(StickMode.allCases, id: \.self) { option in
+                Button {
+                    stickMode = option
+                    // Leaving a mode puts back what it moved, as the pad does.
+                    controller.setHead(yaw: 0, pitch: 0)
+                    controller.releaseBody()
+                } label: {
+                    Text(Copy.stick(option.rawValue))
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            stickMode == option ? Color.white.opacity(0.18) : Color.clear,
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("stick-\(option.rawValue)")
+            }
+        }
     }
 
     private var languageSwitch: some View {
