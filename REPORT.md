@@ -225,6 +225,8 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 |---|---|---|
 | **Director 相机** | 系统预览层（iOS `AVCaptureVideoPreviewLayer` / Android CameraX `PreviewView`）放在 3D 视图**后面**，3D 视图清屏透明、跳过原来的 4 m 影棚地板；物理地面仍在 z=0。相机不进 61 维观测，也没有逐帧回调，50 Hz 循环不受影响 | 权限在进入 Director 时才请求；相机按 1 Hz 把尺寸/帧率/曝光/FOV 作为 `mode:"ar"` 发到 `/sensor`；模拟器/模拟机没有相机时保持影棚外观，UI 测试进出 Director 并断言鸭子仍在走 |
 | **roller 模式** | 按上游语义做成**整套 bundle 切换**：`roller.onnx` 作主动力网络、`stand=None` 且 `set_standing_disabled(true)`、`roller_crouch` 顶替 ground pick（周期 5.0 s / end_phase 0.7 / action_scale 0.8）、技能与 sit/stand 不变（上游对技能**不按模式过滤**）。场景换成 `scene_rollers.xml`，切换时重建运行时、bump 模型代数（两端渲染器据此重建网格）、清空时间轴与分叉、按上游习惯叫一声（roller 两声） | `/mode` 与 MCP `duck_mode`；单元测试断言 bundle 解析；本地 MuJoCo 测试断言 roller 场景可加载且仍是 14 个执行器；CI 切换 roller→walk 并断言状态、技能、未知模式拒绝 |
+| **关机序列** | `robot.shutdown` / 空电量（10 s EMA ≤ 6.6 V，官方 `BATTERY_EMPTY_V`）触发：坐下 → 从座位用 1 s 缓入 `REST_POSITION` → 保持 → 断力矩。App 没有 systemd，所以「关机」就是物理意义上的关机：力矩关闭、`powered_off` 锁存并发布，`/power` 重新上电 | `/shutdown` `/power`、MCP `duck_shutdown` / `duck_power`；CI 断言坐下→off→上电回到 ready |
+| **摇杆三种模式** | 真机手柄的三件事缩减成手机能表达的三种：走/转（原手势）、看（头 yaw/pitch）、姿态（蹲 + 侧倾）；离开模式时把头回正、把姿态释放（手柄自己的退出语义） | 两端顶栏各三个 chip；iOS 拖动分流到 `duck_core_set_head` / `duck_core_set_body` |
 | **帧间插值** | 保存最近两个 tick 的全身位姿，按 elapsed/20 ms 混合位置与四元数（双覆盖符号处理）+ 归一化；相机跟随插值后的躯干而不是 10 Hz 状态采样 | iOS 主线程快照；Android 由循环线程写入 `PoseHistory`、GL 线程读取（带锁），GL 线程从不碰 MuJoCo |
 
 ---
