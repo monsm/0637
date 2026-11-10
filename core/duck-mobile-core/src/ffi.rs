@@ -656,6 +656,11 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             core.runtime.set_carry(offset, active);
             json!({ "ok": true, "carrying": active })
         }
+        Intent::Reload(dir) if core.runtime.shutting_down() => {
+            // A new network under a duck that is on its way down is the same
+            // mistake as a mode switch: refused.
+            refuse(core, "the duck is powering off".to_owned())
+        }
         Intent::Reload(dir) => match reload_policies(core, &dir) {
             Ok(()) => json!({ "ok": true }),
             Err(error) => refuse(core, format!("reload failed: {error}")),
