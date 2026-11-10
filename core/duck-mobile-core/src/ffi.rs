@@ -980,6 +980,7 @@ fn publish_state(core: &DuckCore) {
         "powered_off": active.powered_off(),
         "carrying": active.carrying(),
         "last_sound": active.last_sound(),
+        "last_emotion_sound": active.last_emotion_sound(),
         "emotion": active.emotion_state().map(|(name, elapsed, duration)| {
             json!({ "name": name, "elapsed_s": elapsed, "duration_s": duration })
         }),

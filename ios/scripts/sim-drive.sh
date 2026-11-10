@@ -354,8 +354,8 @@ except Exception: print('')
 [ "$EMOTION" = "curious" ]; check $? "an emotion plays: curious" "emotion=$EMOTION"
 # The official wav must reach the platform's speaker channel. Before the
 # dynamic-tag fix this was silently dropped by next_sound's static match.
-SOUND=$(api GET /state | field last_sound)
-[ "$SOUND" = "emotion:curious" ]; check $? "an emotion's voice is queued" "last_sound=$SOUND"
+SOUND=$(api GET /state | field last_emotion_sound)
+[ "$SOUND" = "emotion:curious" ]; check $? "an emotion's voice is queued" "last_emotion_sound=$SOUND"
 sleep 0.5
 EMOTION_LATER=$(api GET /state | python3 -c "
 import json,sys

@@ -607,3 +607,73 @@ index 62c39c1..b0bce0a 100644
      pub fn carry_over(&mut self, from: &Controller) {
          self.policy.carry_over(&from.policy);
          self.last_action = from.last_action;
+diff --git a/robotd/src/idle_head.rs b/robotd/src/idle_head.rs
+index c41dadf..761c6bd 100644
+--- a/robotd/src/idle_head.rs
++++ b/robotd/src/idle_head.rs
+@@ -87,6 +87,65 @@ pub struct IdleHead {
+     phases: [f64; 4],
+ }
+ 
++/// The whole idle spell, expressed against a simulated origin so a mobile
++/// checkpoint can rewind it. Instants are wall-clock and cannot be serialized;
++/// every one is stored as 20 ms ticks since `origin`. robotd itself never
++/// rewinds, so this is a mobile-only accessor on the verbatim upstream file.
++#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
++pub struct IdleState {
++    pub rng: u64,
++    pub gain: f64,
++    /// `None` is encoded as `u64::MAX`.
++    pub still_since: u64,
++    pub started: u64,
++    pub phases: [f64; 4],
++    pub look: Option<([f64; 5], f64)>,
++    pub glance: Option<([f64; 5], [f64; 5], f64, f64, f64)>,
++    pub yawn: Option<f64>,
++}
++
++fn instant_ticks(origin: Instant, value: Instant) -> u64 {
++    value.saturating_duration_since(origin).as_millis() as u64 / 20
++}
++fn ticks_instant(origin: Instant, ticks: u64) -> Instant {
++    origin + Duration::from_millis(ticks * 20)
++}
++const NONE_TICK: u64 = u64::MAX;
++
++impl IdleHead {
++    /// Save the spell. `origin` must be the same simulated tick-0 instant the
++    /// caller passes to `tick` (`origin + tick * 20 ms`).
++    pub fn snapshot(&self, origin: Instant) -> IdleState {
++        IdleState {
++            rng: self.rng.0,
++            gain: self.gain,
++            still_since: self.still_since.map_or(NONE_TICK, |i| instant_ticks(origin, i)),
++            started: self.started.map_or(NONE_TICK, |i| instant_ticks(origin, i)),
++            phases: self.phases,
++            look: self.look.map(|l| (l.anchor, l.until)),
++            glance: self.glance.map(|g| (g.from, g.to, g.start, g.travel, g.until)),
++            yawn: self.yawn,
++        }
++    }
++
++    /// Rebuild the spell from a checkpoint. An older checkpoint without idle
++    /// state (all defaults) becomes a fresh, wide-awake IdleHead.
++    pub fn restore_state(&mut self, state: IdleState, origin: Instant) {
++        self.rng = Rng(state.rng.max(1));
++        self.gain = state.gain;
++        self.still_since = (state.still_since != NONE_TICK)
++            .then(|| ticks_instant(origin, state.still_since));
++        self.started = (state.started != NONE_TICK)
++            .then(|| ticks_instant(origin, state.started));
++        self.phases = state.phases;
++        self.look = state.look.map(|(anchor, until)| Look { anchor, until });
++        self.glance = state.glance.map(|(from, to, start, travel, until)| Glance {
++            from, to, start, travel, until,
++        });
++        self.yawn = state.yawn;
++    }
++}
++
+ impl IdleHead {
+     /// A new idle behaviour tuned by `tuning`, drawing from `seed`.
+     pub fn new(tuning: IdleParams, seed: u64) -> Self {

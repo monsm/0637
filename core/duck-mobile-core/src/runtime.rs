@@ -392,6 +392,22 @@ pub struct Checkpoint {
     pub emotion_elapsed: f64,
     #[serde(default)]
     pub emotion_skill_delivered: bool,
+    /// The whole idle look-around spell, so a rewind/fork replays the same
+    /// glances rather than a duck whose RNG and phases came from the future.
+    #[serde(default)]
+    pub idle_state: crate::control::IdleState,
+    #[serde(default)]
+    pub last_idle: IdleSnapshot,
+}
+
+/// The last idle offset, as plain numbers: `IdleOffset` is upstream's type
+/// and intentionally has no serde dependency.
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+pub struct IdleSnapshot {
+    pub head: [f64; 4],
+    pub body_z: f64,
+    pub mouth: f64,
+    pub takeover: f64,
 }
 
 /// The runtime. `T` is the body: MuJoCo in the app, `RemoteIo` on the desktop harness.
@@ -421,11 +437,19 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The last sound the core queued, published so a client can tell that an
     /// emotion's official wav really reached the speaker channel.
     last_sound: Option<String>,
+    /// The last emotion wav specifically. `last_sound` is overwritten by the
+    /// next reaction (a coo, an alarm), so a client checking *that the
+    /// emotion's voice was queued* needs a field only emotions write.
+    last_emotion_sound: Option<String>,
     /// Rising edges for the duck's own voice: robotd coos when a hand picks
     /// it up, alarms when it falls, and inquires when motion resumes after a
     /// long stillness. Three of the six synthesized tags were dead code.
     last_pickup_paused: bool,
     last_fallen: bool,
+    /// Consecutive ticks the fall predictor has said "down". A one-tick tip
+    /// while a scripted move shifts the trunk is not a fall and must not
+    /// make the duck shriek.
+    fallen_ticks: u64,
     last_moving: bool,
     /// Simulated clock of the last reaction, so a noisy edge cannot spam.
     last_reaction: Option<u64>,
@@ -511,8 +535,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_params: robotd_params::IdleParams::default(),
             last_idle: crate::control::IdleOffset::default(),
             last_sound: None,
+            last_emotion_sound: None,
             last_pickup_paused: false,
             last_fallen: false,
+            fallen_ticks: 0,
             last_moving: false,
             last_reaction: None,
             emotions: crate::emotion::Library::default(),
@@ -612,6 +638,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             }
             self.sounds.push_back(tag.to_owned());
             self.last_sound = Some(tag.to_owned());
+            if tag.starts_with("emotion:") {
+                self.last_emotion_sound = Some(tag.to_owned());
+            }
         }
     }
 
@@ -881,8 +910,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             skill_delivered: false,
         });
         // The voice is the official wav, delivered through the same speaker
-        // channel as the synth: the platform only sees a tag.
-        self.sounds.push_back(format!("emotion:{name}"));
+        // channel as the synth: the platform only sees a tag. Go through
+        // queue_sound, not a direct push, so /state.last_sound and the
+        // bounded queue see the same event as every other sound.
+        self.queue_sound(&format!("emotion:{name}"));
         Ok(true)
     }
 
@@ -892,6 +923,10 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn last_sound(&self) -> Option<&str> {
         self.last_sound.as_deref()
+    }
+
+    pub fn last_emotion_sound(&self) -> Option<&str> {
+        self.last_emotion_sound.as_deref()
     }
 
     /// The idle look-around's gain and the head command it last produced.
@@ -1123,6 +1158,13 @@ impl<T: RobotIo> DuckRuntime<T> {
                 .emotion_playing
                 .as_ref()
                 .is_some_and(|p| p.skill_delivered),
+            idle_state: self.idle_head.snapshot(self.sim_origin),
+            last_idle: IdleSnapshot {
+                head: self.last_idle.head,
+                body_z: self.last_idle.body_z,
+                mouth: self.last_idle.mouth,
+                takeover: self.last_idle.takeover,
+            },
         })
     }
 
@@ -1211,6 +1253,18 @@ impl<T: RobotIo> DuckRuntime<T> {
             elapsed: checkpoint.emotion_elapsed,
             skill_delivered: checkpoint.emotion_skill_delivered,
         });
+        // IdleHead speaks Instants; anchor it to the restored simulated clock
+        // and rebuild its RNG/phases/glance from the checkpoint so the replay
+        // is bit-identical to the original trajectory.
+        self.sim_origin = Instant::now();
+        self.idle_head
+            .restore_state(checkpoint.idle_state, self.sim_origin);
+        self.last_idle = crate::control::IdleOffset {
+            head: checkpoint.last_idle.head,
+            body_z: checkpoint.last_idle.body_z,
+            mouth: checkpoint.last_idle.mouth,
+            takeover: checkpoint.last_idle.takeover,
+        };
         self.shutdown = match checkpoint.shutdown.as_str() {
             "sitting" => Shutdown::Sitting {
                 since: TickTime(checkpoint.shutdown_since),
@@ -1693,9 +1747,18 @@ impl<T: RobotIo> DuckRuntime<T> {
         let mut reaction = None;
         if pickup_paused && !self.last_pickup_paused {
             reaction = Some("coo");
-        } else if self.safety.fallen() && !self.last_fallen {
-            reaction = Some("alarm");
-        } else if moving && !self.last_moving && cooldown && !emotion_frame.is_some() {
+        } else if self.safety.fallen() {
+            self.fallen_ticks += 1;
+            // Twenty 50 Hz ticks = 0.4 s of continuous fall. robotd's own
+            // fall predictor debounces; a scripted head move can tip the
+            // trunk for a frame or two without being a real fall.
+            if self.fallen_ticks == 20 && !self.last_fallen {
+                reaction = Some("alarm");
+            }
+        } else {
+            self.fallen_ticks = 0;
+        }
+        if reaction.is_none() && moving && !self.last_moving && cooldown && emotion_frame.is_none() {
             // Only after a real stillness, so ordinary walking does not chirp
             // at every deadman keepalive.
             if self.last_idle.takeover > 0.5 {

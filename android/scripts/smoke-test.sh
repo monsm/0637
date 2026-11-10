@@ -92,7 +92,7 @@ if ! echo "$STATE_EMOTION" | grep -q '"name":"curious"'; then
   echo "::error::/state.emotion does not report the curious timeline"
   exit 1
 fi
-if ! echo "$STATE_EMOTION" | grep -q '"last_sound":"emotion:curious"'; then
+if ! echo "$STATE_EMOTION" | grep -q '"last_emotion_sound":"emotion:curious"'; then
   echo "::error::the emotion's official wav never reached the sound queue"
   exit 1
 fi
