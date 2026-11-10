@@ -248,7 +248,9 @@ jobs:
           disable-animations: false
           emulator-boot-timeout: 900
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
-          script: bash android/scripts/smoke-test.sh
+          # The session's own lines are the only account of which check
+          # failed; the step log is not downloadable without admin rights.
+          script: bash android/scripts/smoke-test.sh 2>&1 | tee smoke-session.log; exit ${PIPESTATUS[0]}
 
       - name: Publish smoke-test logs
         id: publishlogs
@@ -262,6 +264,7 @@ jobs:
             && git checkout FETCH_HEAD -- ci-logs || true
           cp android-logcat.log ci-logs/android/ 2>/dev/null || true
           cp am-start.log ci-logs/android/ 2>/dev/null || true
+          cp smoke-session.log ci-logs/android/ 2>/dev/null || true
           cp intent-state.json ci-logs/android/ 2>/dev/null || true
           cp intent-state-walking.json ci-logs/android/ 2>/dev/null || true
           cp intent-skills.json ci-logs/android/ 2>/dev/null || true
@@ -297,6 +300,7 @@ jobs:
           path: |
             android-logcat.log
             am-start.log
+            smoke-session.log
             intent-state.json
             intent-state-walking.json
             intent-skills.json
