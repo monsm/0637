@@ -9,20 +9,18 @@ import Foundation
 /// quiet, a chirp when asked); this renders the PCM and hands it to
 /// `AVAudioEngine`.
 ///
-/// One player node, mono 48 kHz float: the synth's own rate, so nothing is
-/// resampled and a quack is bit-for-bit what the robot would have played.
+/// Everything that touches the core runs on the main thread, from the same
+/// 50 Hz tick that steps MuJoCo: the core has no lock, and a background read
+/// of MuJoCo's state while it is stepping is a data race. Only the finished
+/// PCM buffer crosses to `AVAudioEngine`.
 final class Voice {
     private let engine = AVAudioEngine()
     private let player = AVAudioPlayerNode()
     private var format: AVAudioFormat?
-    private var timer: Timer?
-    private var core: OpaquePointer?
-    private let queue = DispatchQueue(label: "duck.voice")
-    /// Read and written only on `queue`; the audio thread hops back to it.
+    /// Main-thread only: whether a buffer is still sounding.
     private var playing = false
 
     func start(core: OpaquePointer) {
-        self.core = core
         let rate = Double(duck_core_voice_rate())
         guard let format = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
@@ -45,40 +43,28 @@ final class Voice {
             NSLog("duck: voice unavailable: %@", error.localizedDescription)
             return
         }
-        // The core queues a greet when the loop comes up; poll for anything it
-        // wants played, at a rate that never lets a quack wait on a frame.
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.poll()
-        }
         NSLog("duck: voice ready at %.0f Hz", rate)
     }
 
     func stop() {
-        timer?.invalidate()
-        timer = nil
         player.stop()
         engine.stop()
     }
 
-    /// Ask for a tag now (the shell's quack). It goes through the core's
-    /// queue, so it is the same path as a greet and each press is a new
-    /// variant rather than the same file twice.
-    func play(_ tag: String) {
-        queue.async { [weak self] in
-            guard let self, let core = self.core else { return }
-            _ = tag.withCString { duck_core_queue_sound(core, $0) }
-        }
+    /// Play the next queued sound, if any. Called from the main-thread tick.
+    func poll(core: OpaquePointer) {
+        if playing { return }
+        guard let pointer = duck_core_next_sound(core) else { return }
+        let tag = String(cString: pointer)
+        guard let pcm = Voice.render(core: core, tag: tag) else { return }
+        schedule(pcm)
     }
 
-    private func poll() {
-        queue.async { [weak self] in
-            guard let self, let core = self.core, !self.playing else { return }
-            guard let pointer = duck_core_next_sound(core) else { return }
-            let tag = String(cString: pointer)
-            if let pcm = Voice.render(core: core, tag: tag) {
-                self.schedule(pcm)
-            }
-        }
+    /// Ask for a tag now (the shell's quack). It goes through the core's
+    /// queue, so it is the same path as a greet and each press is a new
+    /// variant rather than the same sound twice.
+    func play(core: OpaquePointer, tag: String) {
+        _ = tag.withCString { duck_core_queue_sound(core, $0) }
     }
 
     private static func render(core: OpaquePointer, tag: String) -> [Float]? {
@@ -94,6 +80,7 @@ final class Voice {
         return samples
     }
 
+    /// Main thread only.
     private func schedule(_ pcm: [Float]) {
         guard let format, let buffer = AVAudioPCMBuffer(
             pcmFormat: format,
@@ -107,10 +94,10 @@ final class Voice {
             }
         }
         playing = true
-        // The completion handler runs on an audio thread; the flag is read by
-        // `poll` on the voice queue, so hop back before touching it.
         player.scheduleBuffer(buffer, at: nil, options: []) { [weak self] in
-            self?.queue.async { self?.playing = false }
+            // Back to the main thread: `playing` is read there by `poll`, and
+            // a flag written on the audio thread would be a race.
+            DispatchQueue.main.async { self?.playing = false }
         }
     }
 }

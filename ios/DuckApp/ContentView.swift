@@ -248,7 +248,9 @@ struct ContentView: View {
 
             // The duck's own voice: `robotctl quack` is a chirp.
             Button {
-                controller.voice.play("chirp")
+                if let core = controller.core {
+                    controller.voice.play(core: core, tag: "chirp")
+                }
             } label: {
                 Label(Copy.quack, systemImage: "waveform")
                     .labelStyle(.iconOnly)

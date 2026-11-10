@@ -364,6 +364,10 @@ final class DuckController: ObservableObject {
 
     private func tick() {
         guard let core else { return }
+        // The core is not thread-safe, so the voice pulls its next sound from
+        // the same main-thread tick that steps MuJoCo. Only the PCM crosses
+        // to the audio queue.
+        voice.poll(core: core)
 
         // The core has robotd's 500 ms deadman: a twist must keep arriving.
         // The joystick is sent every tick, zero included.
