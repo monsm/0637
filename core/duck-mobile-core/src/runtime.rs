@@ -58,6 +58,33 @@ const HEAD_ALPHA: f64 = 0.2;
 /// screen when it stops.
 const API_LEASE: Duration = DEADMAN;
 
+/// How long a painted route may be, in kept points and in metres end to
+/// end. The route layer refuses anything over these without queueing it, so
+/// a client learns its drawing is over budget instead of watching half of it
+/// walk.
+pub const PATH_MAX_POINTS: usize = 64;
+pub const PATH_MAX_LENGTH: f64 = 20.0;
+
+/// Points closer than this to the previous kept point are the same point:
+/// the painter's own jitter, not a waypoint.
+const PATH_DEDUPE: f64 = 0.1;
+
+/// How close the trunk has to get to a waypoint for it to count as reached.
+const PATH_REACH: f64 = 0.15;
+/// Cruise speed, and the distance at which a waypoint stops slowing the
+/// duck down. The throttle is `PATH_SPEED * clamp(dist / PATH_APPROACH,
+/// 0.2..1.0)`, so the last stretch of a segment coasts instead of lunges.
+const PATH_SPEED: f64 = 0.35;
+const PATH_APPROACH: f64 = 0.4;
+/// Heading-error gain and its symmetric bound. A waypoint on the duck's
+/// left is a positive error and a positive `wz` is a left turn, the same
+/// frame the joystick and the policy use.
+const PATH_YAW_GAIN: f64 = 1.5;
+const PATH_MAX_WZ: f64 = 1.2;
+/// Past this heading error the duck turns in place before walking: lunging
+/// at a waypoint behind it is how a biped falls over.
+const PATH_TURN_FIRST: f64 = 1.1;
+
 /// Simulation time, in ticks.
 ///
 /// Every deadline in the loop is measured against this rather than the wall
@@ -146,6 +173,143 @@ impl ApiLease {
             None => None,
         }
     }
+}
+
+/// One painted route being walked: the points as accepted (they are what
+/// `/state.path` publishes) and those same points frozen into the world at
+/// the pose the walk started from.
+#[derive(Debug, Clone)]
+struct PathTask {
+    /// The accepted body-frame points, exactly as posted.
+    points: Vec<[f32; 2]>,
+    /// The same points in the world frame: `start_xy + R(yaw0) * point`.
+    world: Vec<[f64; 2]>,
+    /// Index of the next waypoint to reach.
+    next: usize,
+}
+
+impl PathTask {
+    /// Freeze the accepted body-frame points into the world. `pose` is the
+    /// duck at the route's start: each point is metres in the trunk frame
+    /// then — +x forward, +y left.
+    fn start(points: Vec<[f32; 2]>, [x, y, yaw]: [f64; 3]) -> Self {
+        let (sin, cos) = yaw.sin_cos();
+        let world = points
+            .iter()
+            .map(|[px, py]| {
+                let (px, py) = (f64::from(*px), f64::from(*py));
+                [x + cos * px - sin * py, y + sin * px + cos * py]
+            })
+            .collect();
+        Self { points, world, next: 0 }
+    }
+
+    /// One tick of following, from the duck's pose: step the cursor past
+    /// anything already reached and turn the next waypoint into a twist.
+    ///
+    /// The heading error is `atan2(left, forward)` of the waypoint in the
+    /// body frame, already normalized to [-pi, pi], so a waypoint on the
+    /// duck's left is a positive error and a positive `wz` is a left turn —
+    /// the same frame the joystick and the policy use.
+    fn drive(&mut self, [x, y, yaw]: [f64; 3]) -> PathDrive {
+        let (sin, cos) = yaw.sin_cos();
+        while let Some(target) = self.world.get(self.next) {
+            let dx = target[0] - x;
+            let dy = target[1] - y;
+            let forward = cos * dx + sin * dy;
+            let left = -sin * dx + cos * dy;
+            let dist = forward.hypot(left);
+            if dist <= PATH_REACH {
+                self.next += 1;
+                continue;
+            }
+            let error = left.atan2(forward);
+            let wz = (PATH_YAW_GAIN * error).clamp(-PATH_MAX_WZ, PATH_MAX_WZ);
+            // Turn in place first: walking towards a waypoint behind the
+            // duck would be walking backwards at it.
+            let vx = if error.abs() > PATH_TURN_FIRST {
+                0.0
+            } else {
+                PATH_SPEED * (dist / PATH_APPROACH).clamp(0.2, 1.0)
+            };
+            return PathDrive::Drive([vx, 0.0, wz]);
+        }
+        PathDrive::Done
+    }
+
+    /// The `/state.path` object for a live route.
+    fn summary(&self) -> serde_json::Value {
+        serde_json::json!({
+            "active": true,
+            "reached": self.next,
+            "total": self.points.len(),
+            "points": self.points,
+        })
+    }
+}
+
+/// What one tick of a route asks of the duck.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PathDrive {
+    /// Still walking: the twist for this tick.
+    Drive([f64; 3]),
+    /// The last waypoint is reached: the task is over.
+    Done,
+}
+
+/// Whether a client's twist is a hand on the stick rather than the shells'
+/// 50 Hz zero keepalive. A directed twist takes the duck back from a painted
+/// route; `set_twist` and `set_api_twist` both apply this rule.
+fn steers(twist: [f64; 3]) -> bool {
+    twist.iter().any(|value| value.abs() > 1e-3)
+}
+
+/// The body-frame points of a `/path` request after the wire's own rules:
+/// the duck's origin goes, points under [`PATH_DEDUPE`] from the previous
+/// kept point go, and what is left has to fit the route caps. The route
+/// layer calls this before an intent is ever queued.
+pub(crate) fn path_points(value: &serde_json::Value) -> Result<Vec<[f32; 2]>, String> {
+    let Some(items) = value.get("points").and_then(serde_json::Value::as_array) else {
+        return Err("missing points".to_owned());
+    };
+    let mut kept: Vec<[f64; 2]> = Vec::with_capacity(items.len());
+    for (index, item) in items.iter().enumerate() {
+        let (Some(x), Some(y)) = (
+            item.get(0).and_then(serde_json::Value::as_f64),
+            item.get(1).and_then(serde_json::Value::as_f64),
+        ) else {
+            return Err("points must be [x, y] pairs of metres".to_owned());
+        };
+        if !x.is_finite() || !y.is_finite() {
+            return Err("points must be finite".to_owned());
+        }
+        // The first element is the duck's own origin: that is where the body
+        // frame was defined, not somewhere to walk to.
+        if index == 0 {
+            continue;
+        }
+        if kept
+            .last()
+            .is_some_and(|last| (x - last[0]).hypot(y - last[1]) < PATH_DEDUPE)
+        {
+            continue;
+        }
+        kept.push([x, y]);
+    }
+    if kept.len() < 2 {
+        return Err("a path needs at least two points".to_owned());
+    }
+    if kept.len() > PATH_MAX_POINTS {
+        return Err(format!("a path may keep at most {PATH_MAX_POINTS} points"));
+    }
+    let mut length = 0.0;
+    for pair in kept.windows(2) {
+        length += (pair[1][0] - pair[0][0]).hypot(pair[1][1] - pair[0][1]);
+    }
+    if length > PATH_MAX_LENGTH {
+        return Err(format!("a path may be at most {PATH_MAX_LENGTH} m long"));
+    }
+    Ok(kept.into_iter().map(|[x, y]| [x as f32, y as f32]).collect())
 }
 
 #[derive(Debug)]
@@ -434,6 +598,10 @@ pub struct DuckRuntime<T: RobotIo> {
     twist_fresh: bool,
     /// The twist from the intent API, and the lease it holds on the duck.
     api_lease: ApiLease,
+    /// The painted route being walked, if any. It drives through the same
+    /// command channel as the stick, so the real walk policy executes it and
+    /// a fall is still possible — that is the point.
+    path_task: Option<PathTask>,
     /// The smoothed command, per tick, exactly as robotd keeps it.
     twist_ema: [f64; 3],
     head_ema: [f64; 4],
@@ -593,6 +761,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_twist: TickTime::default(),
             twist_fresh: false,
             api_lease: ApiLease::default(),
+            path_task: None,
             twist_ema: [0.0; 3],
             head_ema: [0.0; 4],
             body_ema: [0.0; 3],
@@ -978,14 +1147,25 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     pub fn set_twist(&mut self, twist: [f64; 3]) {
-        self.command.twist = twist;
-        self.last_twist = TickTime::of(&self.clock);
-        self.twist_fresh = true;
         // A stick with a direction is attention; the shells' 50 Hz zero
         // keepalive is not, or the duck could never doze while the app is open.
-        if twist.iter().any(|value| value.abs() > 1e-3) {
+        if steers(twist) {
+            // A hand on the stick takes the duck back: the painted path must
+            // not fight the child's hand.
+            self.cancel_path();
             self.care.touch(self.clock.tick);
         }
+        self.feed_twist(twist, TickTime::of(&self.clock));
+    }
+
+    /// Put a twist on the policy's command channel — the exact fields
+    /// [`Self::set_twist`] keeps — without its ownership rules. The path
+    /// follower drives through this too, so "drive" means the same thing
+    /// whether the stick or a painted route asked for it.
+    fn feed_twist(&mut self, twist: [f64; 3], now: TickTime) {
+        self.command.twist = twist;
+        self.last_twist = now;
+        self.twist_fresh = true;
     }
 
     /// A twist from the intent API. It takes the duck over from the
@@ -993,8 +1173,70 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// while it keeps sending twists.
     pub fn set_api_twist(&mut self, twist: [f64; 3]) {
         self.api_lease.take(twist, TickTime::of(&self.clock));
-        if twist.iter().any(|value| value.abs() > 1e-3) {
+        if steers(twist) {
+            // An external agent with a direction on the stick is a driver,
+            // not a keepalive: it takes over from a painted route too.
+            self.cancel_path();
             self.care.touch(self.clock.tick);
+        }
+    }
+
+    /// Start walking a painted route. `points` are metres in the body frame
+    /// at this instant (+x forward, +y left); they are frozen into the world
+    /// frame here, so the route stays where it was drawn. A new route
+    /// replaces one already walking.
+    pub fn start_path(&mut self, points: Vec<[f32; 2]>) {
+        let [x, y, _] = self.position();
+        self.path_task = Some(PathTask::start(points, [x, y, self.yaw()]));
+    }
+
+    /// Stop the painted route. A no-op when nothing is walking.
+    pub fn cancel_path(&mut self) {
+        if self.path_task.take().is_some() {
+            // The route was the one driving: stop with it rather than let
+            // the last twist coast until the deadman notices.
+            self.command.twist = [0.0; 3];
+        }
+    }
+
+    /// The painted route as `/state` publishes it, on every publish: the
+    /// accepted points and how far the walk has got, or the inactive shape.
+    pub fn path_summary(&self) -> serde_json::Value {
+        match &self.path_task {
+            Some(task) => task.summary(),
+            None => serde_json::json!({
+                "active": false,
+                "reached": 0,
+                "total": 0,
+                "points": [],
+            }),
+        }
+    }
+
+    /// Follow the painted route for one tick: feed its twist into the same
+    /// channel the stick uses and return it, or `None` when there is no
+    /// route (or it just finished — the duck celebrates that like a
+    /// completed quest, without counting it as a touch).
+    fn step_path(&mut self, now: TickTime) -> Option<[f64; 3]> {
+        let [x, y, _] = self.position();
+        let pose = [x, y, self.yaw()];
+        let outcome = self.path_task.as_mut()?.drive(pose);
+        match outcome {
+            PathDrive::Drive(twist) => {
+                // The real walk policy executes this, so a route can still
+                // slip and fall — which is the whole point of driving it
+                // through the walking channel.
+                self.feed_twist(twist, now);
+                // A route being walked is attention, exactly as a held stick
+                // is: a duck must not doze off mid-route.
+                self.care.touch(self.clock.tick);
+                Some(twist)
+            }
+            PathDrive::Done => {
+                self.cancel_path();
+                let _ = self.celebrate_emotion("excited");
+                None
+            }
         }
     }
 
@@ -2027,6 +2269,10 @@ impl<T: RobotIo> DuckRuntime<T> {
                 if eligible && self.safety.imu_ready() {
                     if self.fall.observe(&sensors.imu, self.dt) {
                         tracing::warn!("falling - going limp to land soft");
+                        // A fall ends the painted route: the duck is going
+                        // down, and the pose it would resume from is not the
+                        // one the route was drawn for.
+                        self.cancel_path();
                         self.limp_fall = LimpFall::Limp {
                             since: now,
                             landing: Landing::default(),
@@ -2063,6 +2309,12 @@ impl<T: RobotIo> DuckRuntime<T> {
                     self.controller.reset();
                 }
             }
+        }
+
+        // The debounced verdict is a fall too: a duck on the floor cannot walk a
+        // route, and standing back up must not resume one.
+        if self.safety.fallen() {
+            self.cancel_path();
         }
 
         // Pick-up detection, robotd's: pause the walking networks while somebody
@@ -2130,6 +2382,13 @@ impl<T: RobotIo> DuckRuntime<T> {
                 watch.commanded(&hold);
             }
             return Ok(report);
+        }
+
+        // A painted path drives through the same command channel as the
+        // stick; feeding it here gives it the same smoothing, deadman and
+        // emotion overrides the joystick's twist gets.
+        if self.path_task.is_some() {
+            self.step_path(now);
         }
 
         let mut command = self.command;
@@ -2477,6 +2736,168 @@ impl<T: RobotIo> DuckRuntime<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Heading-error sign, verified against the frame the shells and the
+    /// policy use: a waypoint on the duck's left is a positive error and a
+    /// positive `wz` is a left turn (the iOS stick maps a rightward drag to
+    /// negative `wz`, and odometry's yaw grows counter-clockwise).
+    #[test]
+    fn a_waypoint_on_the_left_turns_left() {
+        let mut task = PathTask::start(vec![[0.5, 0.5]], [0.0, 0.0, 0.0]);
+        let PathDrive::Drive(twist) = task.drive([0.0, 0.0, 0.0]) else {
+            panic!("the waypoint is seven tenths of a metre away, not reached");
+        };
+        assert!(twist[2] > 0.0, "left waypoint must turn left, got {twist:?}");
+        assert!(twist[0] > 0.0, "a reachable heading may walk, got {twist:?}");
+        assert_eq!(twist[1], 0.0, "the path never sidesteps");
+
+        let mut right = PathTask::start(vec![[0.5, -0.5]], [0.0, 0.0, 0.0]);
+        let PathDrive::Drive(twist) = right.drive([0.0, 0.0, 0.0]) else {
+            panic!("the waypoint is seven tenths of a metre away, not reached");
+        };
+        assert!(twist[2] < 0.0, "right waypoint must turn right, got {twist:?}");
+    }
+
+    /// The start pose is the body frame's origin and rotation: a route
+    /// drawn "straight ahead" stays dead ahead no matter which way the duck
+    /// was facing when it started.
+    #[test]
+    fn the_route_is_frozen_into_the_world_at_the_start_pose() {
+        // Facing +y (yaw pi/2), [1, 0] in the body frame is one metre up +y.
+        let mut task = PathTask::start(vec![[1.0, 0.0]], [2.0, 3.0, std::f64::consts::FRAC_PI_2]);
+        assert!((task.world[0][0] - 2.0).abs() < 1e-9);
+        assert!((task.world[0][1] - 4.0).abs() < 1e-9);
+        let PathDrive::Drive(twist) = task.drive([2.0, 3.0, std::f64::consts::FRAC_PI_2]) else {
+            panic!("one metre ahead is not reached");
+        };
+        assert!(twist[2].abs() < 1e-9, "dead ahead must not turn, got {twist:?}");
+        assert!(twist[0] > 0.0);
+    }
+
+    /// A waypoint is reached within 0.15 m, and passing it hands the next
+    /// one to the same tick.
+    #[test]
+    fn a_waypoint_is_reached_within_fifteen_centimetres() {
+        let mut task = PathTask::start(vec![[0.3, 0.0], [0.6, 0.0]], [0.0, 0.0, 0.0]);
+        // 0.16 m short of the first point: still walking to it.
+        let PathDrive::Drive(_) = task.drive([0.14, 0.0, 0.0]) else {
+            panic!("0.16 m away is not reached");
+        };
+        assert_eq!(task.next, 0);
+        // 0.14 m short: reached, and the same tick already steers to the
+        // second point.
+        let PathDrive::Drive(twist) = task.drive([0.16, 0.0, 0.0]) else {
+            panic!("0.14 m away is reached");
+        };
+        assert_eq!(task.next, 1);
+        assert!(twist[0] > 0.0);
+        // Reaching the last point ends the route.
+        assert_eq!(task.drive([0.5, 0.0, 0.0]), PathDrive::Done);
+        assert_eq!(task.next, 2);
+    }
+
+    /// `/state.path`'s shape is a frozen contract: the accepted points
+    /// exactly as posted, plus the reached count and the total.
+    #[test]
+    fn the_live_summary_publishes_the_accepted_points() {
+        let mut task = PathTask::start(vec![[0.5, 0.0], [1.0, 0.0]], [0.0, 0.0, 0.0]);
+        let _ = task.drive([0.45, 0.0, 0.0]);
+        let summary = task.summary();
+        assert_eq!(summary["active"], serde_json::json!(true));
+        assert_eq!(summary["reached"], serde_json::json!(1));
+        assert_eq!(summary["total"], serde_json::json!(2));
+        assert_eq!(
+            summary["points"],
+            serde_json::json!([[0.5, 0.0], [1.0, 0.0]])
+        );
+    }
+
+    /// A waypoint behind the duck withholds the throttle: turning in place
+    /// first is the whole point of the `PATH_TURN_FIRST` gate.
+    #[test]
+    fn a_waypoint_behind_turns_in_place_first() {
+        let mut task = PathTask::start(vec![[-0.5, 0.0]], [0.0, 0.0, 0.0]);
+        let PathDrive::Drive(twist) = task.drive([0.0, 0.0, 0.0]) else {
+            panic!("half a metre behind is not reached");
+        };
+        assert_eq!(twist[0], 0.0, "walking backwards is a fall, not a route");
+        assert!((twist[2].abs() - PATH_MAX_WZ).abs() < 1e-12);
+    }
+
+    /// The route layer's caps: 64 kept points and 20 m end to end fit, 65
+    /// points or one extra centimetre do not, and nothing is queued either
+    /// way the runtime sees it.
+    #[test]
+    fn a_route_over_the_caps_is_refused() {
+        let mut points: Vec<[f64; 2]> = vec![[0.0, 0.0]];
+        for step in 0..=PATH_MAX_POINTS {
+            points.push([step as f64 * 0.11, 0.0]);
+        }
+        let over = serde_json::json!({ "points": points });
+        assert!(path_points(&over).is_err(), "65 kept points must be refused");
+
+        // 64 points, each 0.11 m from its neighbour, fit exactly.
+        points.pop();
+        let kept = path_points(&serde_json::json!({ "points": points }))
+            .expect("64 points are the budget");
+        assert_eq!(kept.len(), PATH_MAX_POINTS);
+
+        // Exactly 20 m end to end is allowed; a centimetre more is refused.
+        let at_cap = path_points(&serde_json::json!({
+            "points": [[0.0, 0.0], [0.0, 0.0], [20.0, 0.0]]
+        }))
+        .expect("20 m fits");
+        assert_eq!(at_cap.len(), 2);
+        assert!(path_points(&serde_json::json!({
+            "points": [[0.0, 0.0], [0.0, 0.0], [10.0, 0.0], [20.01, 0.0]]
+        }))
+        .is_err());
+    }
+
+    /// The wire's thinning: the first element is the duck's own origin and
+    /// goes, and anything under 0.1 m from the previous *kept* point goes
+    /// too. A route that dissolves to nothing is not a route.
+    #[test]
+    fn the_origin_is_dropped_and_close_points_are_thinned() {
+        let kept = path_points(&serde_json::json!({
+            "points": [
+                [0.0, 0.0],   // the duck's own origin: dropped
+                [0.5, 0.0],   // kept
+                [0.5625, 0.0], // 6.25 cm from [0.5, 0]: dropped
+                [0.625, 0.0], // 12.5 cm from [0.5, 0]: kept
+                [0.625, 0.0625], // 6.25 cm from [0.625, 0]: dropped
+                [0.625, 0.1875], // 12.5 cm from [0.625, 0]: kept
+            ]
+        }))
+        .expect("a short route fits");
+        assert_eq!(
+            kept,
+            vec![[0.5_f32, 0.0], [0.625, 0.0], [0.625, 0.1875]]
+        );
+
+        // An origin alone, or one point, is not a route at all.
+        assert!(path_points(&serde_json::json!({ "points": [] })).is_err());
+        assert!(path_points(&serde_json::json!({ "points": [[0.0, 0.0]] })).is_err());
+        assert!(path_points(&serde_json::json!({
+            "points": [[0.0, 0.0], [0.05, 0.0]]
+        }))
+        .is_err());
+        // Malformed and missing points are refused, not silently skipped.
+        assert!(path_points(&serde_json::json!({ "points": [[0.0, 0.0], ["x", 0.0]] })).is_err());
+        assert!(path_points(&serde_json::json!({})).is_err());
+    }
+
+    /// A painted path is owned by the child's hand: any directed twist from
+    /// the stick or the API cancels it (`set_twist` and `set_api_twist`
+    /// clear the task on the same predicate), while the shells' 50 Hz zero
+    /// keepalive must not, or a route could never run while the app is open.
+    #[test]
+    fn a_directed_twist_cancels_the_path_but_a_keepalive_does_not() {
+        assert!(!steers([0.0; 3]), "the zero keepalive is not a hand");
+        assert!(steers([0.4, 0.0, 0.0]), "a forward stick takes the duck back");
+        assert!(steers([0.0, 0.0, -0.3]), "so does a yaw stick");
+        assert!(steers([0.0, 0.2, 0.0]), "and so does a sideways one");
+    }
 
     #[test]
     fn the_api_lease_outlives_the_joystick_twist() {

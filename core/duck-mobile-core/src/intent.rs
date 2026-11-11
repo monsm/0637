@@ -6,6 +6,8 @@
 //!
 //! ```text
 //! POST /twist       {"vx":0.4,"vy":0,"wz":0}
+//! POST /path        {"points":[[0,0],[0.4,0.1],...]}   body frame, metres
+//! POST /path/cancel {}
 //! POST /skill       {"name":"roulade"}
 //! POST /sit         {}
 //! POST /ground_pick {}
@@ -39,6 +41,12 @@ const MODE_TIMEOUT: Duration = Duration::from_secs(30);
 #[derive(Debug, Clone)]
 pub enum Intent {
     Twist([f64; 3]),
+    /// A painted route: body-frame points in metres at the path's start
+    /// (+x forward, +y left). The route layer has already dropped the duck's
+    /// own origin, thinned the points and checked the caps.
+    Path(Vec<[f32; 2]>),
+    /// Stop the painted route; answered ok whether or not one is walking.
+    PathCancel,
     Head([f64; 4]),
     Body(f64, f64, f64),
     BodyRelease,
@@ -674,6 +682,23 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             ]));
             Ok(json!({ "ok": true }).to_string())
         }
+        // The Path Painter: a drawn route the walk policy follows. The caps
+        // are checked here, so an over-budget drawing is refused instead of
+        // queued and half-walked.
+        ("POST", "/path") => match crate::runtime::path_points(&value) {
+            Ok(points) => {
+                let kept = points.len();
+                queue.push(Intent::Path(points));
+                Ok(json!({ "ok": true, "queued": true, "points": kept }).to_string())
+            }
+            Err(error) => Ok(json!({ "ok": false, "error": error }).to_string()),
+        },
+        // Stop the route. Fire-and-forget like /pet: the answer is always
+        // ok, exactly as it is when nothing was walking.
+        ("POST", "/path/cancel") => {
+            queue.push(Intent::PathCancel);
+            Ok(json!({ "ok": true }).to_string())
+        }
         ("POST", "/head") => {
             queue.push(Intent::Head([
                 value["neck"].as_f64().unwrap_or(0.0),
@@ -927,6 +952,42 @@ mod tests {
         let _server = start_listener(listener, queue);
         let response = request(port, "GET", "/nope", "");
         assert!(response.starts_with("HTTP/1.1 404"), "{response}");
+    }
+
+    /// A painted route is queued with its origin and thinned points, and an
+    /// over-cap drawing is refused before anything reaches the queue.
+    #[test]
+    fn http_queues_a_path_and_refuses_one_over_the_caps() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(port, "POST", "/path", r#"{"points":[[0,0],[0.5,0],[0.5,0.4]]}"#);
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        assert!(response.contains(r#""points":2"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::Path(points) => {
+                assert_eq!(points.len(), 2);
+                assert_eq!(points[0], [0.5, 0.0]);
+            }
+            other => panic!("unexpected intent: {other:?}"),
+        }
+
+        // An origin alone is not a route: refused with an error, and the
+        // queue stays empty so the duck never sees it.
+        let response = request(port, "POST", "/path", r#"{"points":[[0,0]]}"#);
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(queue.drain().is_empty(), "a refused route was queued");
+
+        // Cancel is a no-op answered ok, and it does reach the queue.
+        let response = request(port, "POST", "/path/cancel", "{}");
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        assert!(matches!(intents[0].intent, Intent::PathCancel));
     }
 
     /// A one-shot route answers with the tick's verdict, not "the queue took

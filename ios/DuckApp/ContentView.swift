@@ -18,8 +18,9 @@ struct ContentView: View {
     @StateObject private var controller = DuckController()
     @State private var surface = Surface.live
     @State private var showRing = false
-    /// The pad's stick modes, reduced to the three a phone can express:
-    /// walk/turn, look, and crouch/lean the standing body.
+    /// The pad's stick modes, reduced to the four a phone can express:
+    /// walk/turn, look, crouch/lean the standing body, and drawing a route
+    /// for the duck to walk.
     @State private var stickMode = StickMode.drive
     @Environment(\.scenePhase) private var scenePhase
     /// The one-time gesture hint. The flag is persisted before the caption
@@ -29,7 +30,7 @@ struct ContentView: View {
     @State private var showHint = false
 
     enum StickMode: String, CaseIterable {
-        case drive, head, body
+        case drive, head, body, path
     }
     @State private var showInstrument = false
     /// The child's block program, edited over the live duck.
@@ -70,6 +71,10 @@ struct ContentView: View {
     /// Which tap-pulse a pending zero belongs to: a newer touch invalidates
     /// the old timer, exactly like Android's pulse token.
     @State private var pulseToken = 0
+    /// The Path Painter's screen-space draft: the line the finger draws. Its
+    /// first point is the origin the body frame is measured from, so the
+    /// core drops it when Go posts the route.
+    @State private var pathDraft: [CGPoint] = []
     /// Flipping this re-renders every `Copy` string.
     @State private var languageTick = 0
     /// The held joy-ride: a long press on the quack button starts it, lifting
@@ -122,6 +127,12 @@ struct ContentView: View {
                             showRing = true
                         }
                     }
+                // The route being drawn, in the same screen space as the
+                // gesture that records it. It takes no touches, and it sits
+                // under the chrome and the skill ring.
+                if stickMode == .path && !pathDraft.isEmpty {
+                    PathDraftOverlay(points: pathDraft)
+                }
                 if portrait {
                     portraitChrome(in: geometry.size)
                         .zIndex(2)
@@ -162,6 +173,9 @@ struct ContentView: View {
                 controller.releaseBody()
                 wheeeHolding = false
                 controller.setWheee(false)
+                // A draft is measured in the old screen space, which the new
+                // orientation no longer means.
+                pathDraft.removeAll()
             }
             // The 3D scene fills the screen (it owns its own ignoresSafeArea),
             // but the chrome stays inside the safe area: on a notched phone
@@ -293,6 +307,24 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
+        // A painted route that ran its whole course gets the same pill the
+        // other events use; a Stop press stays quiet.
+        .onChange(of: controller.pathDoneTick) { _, tick in
+            guard tick > 0 else { return }
+            let notice = Copy.pathDone
+            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                guard moodText == notice else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
+        // The accepted walk renders from /state.path; the drawn draft has
+        // done its job the moment the route starts.
+        .onChange(of: controller.pathActive) { _, active in
+            if active {
+                pathDraft.removeAll()
+            }
+        }
         .task {
             if controller.ready {
                 presentHint()
@@ -394,6 +426,13 @@ struct ContentView: View {
                     // leans. Releasing releases the pose rather than freezing
                     // a lean, which is the pad's own mode exit.
                     controller.setBody(z: Double(-dy) * 0.05, roll: Double(dx) * 0.12)
+                case .path:
+                    // The stage is a canvas: a drag paints the draft route.
+                    // A route already walking is stopped from its own chip,
+                    // not by drawing under the duck.
+                    if !controller.pathActive {
+                        recordPathPoint(gesture.location)
+                    }
                 case .drive:
                     // Forward is up the screen: the duck walks away from you.
                     // Drag below the centre to walk backwards, the pad's stick
@@ -416,7 +455,7 @@ struct ContentView: View {
                     controller.setHead(yaw: 0, pitch: 0)
                 case .body:
                     controller.releaseBody()
-                case .drive:
+                case .drive, .path:
                     break
                 }
             }
@@ -462,6 +501,11 @@ struct ContentView: View {
                 // The stage keeps the drive gesture; the chrome above it must
                 // not swallow it.
                 .allowsHitTesting(false)
+            if stickMode == .path {
+                pathChips(in: size)
+                    .disabled(!controller.ready)
+                    .opacity(controller.ready ? 1 : 0.4)
+            }
             if showHint {
                 hintCapsule
             } else if let mood = moodText {
@@ -729,6 +773,15 @@ struct ContentView: View {
                     controller.carry(dx: Double(dx) * 0.35, dy: 0, dz: Double(-dy) * 0.30)
                     return
                 }
+                if stickMode == .path {
+                    // Drawing replaces driving: record the stroke and leave
+                    // the joystick alone. While the core walks a route the
+                    // stage is inert, and its Stop chip is the way out.
+                    if !controller.pathActive {
+                        recordPathPoint(gesture.location)
+                    }
+                    return
+                }
                 let distance = hypot(gesture.translation.width, gesture.translation.height)
                 guard distance >= 8 else { return }
                 let scale = min(distance / 90, 1)
@@ -744,12 +797,23 @@ struct ContentView: View {
                     controller.setHead(yaw: Double(nx) * 1.2, pitch: Double(ny) * 0.6)
                 case .body:
                     controller.setBody(z: Double(-ny) * 0.05, roll: Double(nx) * 0.12)
+                case .path:
+                    // Handled above: a path stroke is a draft, not a drive.
+                    break
                 }
             }
             .onEnded { gesture in
                 guard controller.ready else { return }
                 if controller.carrying {
                     carryAnchor = nil
+                    return
+                }
+                if stickMode == .path {
+                    // A stroke is a draft, not a drive: there is nothing to
+                    // release, and a tap must not become a step or a pet.
+                    // A drive drag that was live when the mode changed still
+                    // owns the stick; hand it back neutral.
+                    controller.joystick = .zero
                     return
                 }
                 let distance = hypot(gesture.translation.width, gesture.translation.height)
@@ -788,6 +852,139 @@ struct ContentView: View {
             }
     }
 
+    // MARK: - Path Painter
+
+    /// One recorded screen point of the draft. 8 pt keeps a thumb's tremor
+    /// out of the line without making it look chopped, and 64 points is the
+    /// wire's own budget.
+    private func recordPathPoint(_ point: CGPoint) {
+        if let last = pathDraft.last {
+            guard hypot(point.x - last.x, point.y - last.y) >= 8 else { return }
+        }
+        guard pathDraft.count < 64 else { return }
+        pathDraft.append(point)
+    }
+
+    /// The draft as the wire's metre frame: +x forward, +y left, measured
+    /// from the first recorded point. 2.2 m spans the stage's narrow side.
+    /// The first point becomes [0,0] (the core drops it), and points under
+    /// 0.05 m apart in screen terms are dropped so a shiver does not spend
+    /// the route's point budget.
+    private func pathBodyPoints(in size: CGSize) -> [[Double]] {
+        guard let origin = pathDraft.first, size.width > 0, size.height > 0 else {
+            return []
+        }
+        let metresPerPoint = 2.2 / Double(min(size.width, size.height))
+        let minimumSpacing = 0.05 / metresPerPoint
+        var points: [[Double]] = [[0, 0]]
+        var previous = origin
+        for point in pathDraft.dropFirst() {
+            let spacing = hypot(point.x - previous.x, point.y - previous.y)
+            guard Double(spacing) >= minimumSpacing else { continue }
+            guard points.count < 64 else { break }
+            points.append([
+                -Double(point.y - origin.y) * metresPerPoint,
+                -Double(point.x - origin.x) * metresPerPoint,
+            ])
+            previous = point
+        }
+        return points
+    }
+
+    /// What the core will keep, by its own rules: the first element is the
+    /// dropped origin and anything under 0.1 m from the previous kept point
+    /// goes. The count and the length are what Go and the 20 m cap need.
+    private func keptPath(_ points: [[Double]]) -> (count: Int, metres: Double) {
+        guard let first = points.first else { return (0, 0) }
+        var count = 0
+        var metres = 0.0
+        var previous = first
+        for point in points.dropFirst() {
+            let distance = hypot(point[0] - previous[0], point[1] - previous[1])
+            guard distance >= 0.1 else { continue }
+            count += 1
+            metres += distance
+            previous = point
+        }
+        return (count, metres)
+    }
+
+    /// The Path Painter's own deck: Go walks the drawing, Clear drops it,
+    /// and while the core walks a route it shows its step and a Stop. Same
+    /// materials and radii as the thumb deck.
+    private func pathChips(in size: CGSize) -> some View {
+        let kept = keptPath(pathBodyPoints(in: size))
+        // The core refuses a route with fewer than two real steps, and one
+        // longer than 20 m; keep the chip from posting a route it will drop.
+        let canWalk = kept.count >= 2 && kept.metres <= 20
+        // One-based: the child is walking the (reached+1)-st of total steps.
+        let progress = Copy.pathStep(controller.pathReached + 1, controller.pathTotal)
+        return HStack(spacing: 8) {
+            pathChip("path-go", Copy.pathGo, "figure.walk", enabled: canWalk) {
+                let points = pathBodyPoints(in: size)
+                guard !points.isEmpty else { return }
+                controller.postPath(points: points)
+                // The drawing stays until the core says the walk started: a
+                // refused POST must not silently eat the child's route.
+            }
+            pathChip("path-clear", Copy.pathClear, "trash", enabled: !pathDraft.isEmpty) {
+                pathDraft.removeAll()
+            }
+            Spacer(minLength: 0)
+            if controller.pathActive {
+                Text(progress)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .accessibilityLabel(progress)
+                    .accessibilityIdentifier("path-progress")
+                pathChip("path-cancel", Copy.pathCancel, "xmark", enabled: true) {
+                    controller.cancelPath()
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Color(red: 0.078, green: 0.102, blue: 0.133).opacity(0.94),
+            in: RoundedRectangle(cornerRadius: 22)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .padding(.bottom, 6)
+    }
+
+    private func pathChip(
+        _ id: String,
+        _ label: String,
+        _ icon: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(.ultraThinMaterial, in: Capsule())
+            .contentShape(Capsule())
+            .opacity(enabled ? 1 : 0.45)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
+    }
+
     @ViewBuilder
     private func chrome(in size: CGSize) -> some View {
         VStack(spacing: 0) {
@@ -800,6 +997,11 @@ struct ContentView: View {
                 Color.clear.frame(height: 0)
             }
             if showHint { hintCapsule }
+            if stickMode == .path {
+                pathChips(in: size)
+                    .disabled(!controller.ready)
+                    .opacity(controller.ready ? 1 : 0.4)
+            }
             bottomBar
                 // Until the core is ready every control is a no-op; dim and
                 // disable them rather than letting them look alive.
@@ -880,6 +1082,9 @@ struct ContentView: View {
                     } label: {
                         Label(Copy.stick(option.rawValue), systemImage: stickIcon(option))
                     }
+                    // One id per mode, path included: the UI test opens the
+                    // Path Painter through this menu entry.
+                    .accessibilityIdentifier("mode-\(option.rawValue)")
                 }
                 Divider()
                 Button {
@@ -1124,12 +1329,13 @@ struct ContentView: View {
     }
 
     /// One icon per stick mode, so the menu reads at a glance instead of
-    /// being three identical words.
+    /// being a row of identical words.
     private func stickIcon(_ mode: StickMode) -> String {
         switch mode {
         case .drive: return "figure.walk"
         case .head: return "eye"
         case .body: return "arrow.up.and.down"
+        case .path: return "scribble"
         }
     }
 
@@ -1146,6 +1352,36 @@ struct ContentView: View {
         .frame(maxWidth: 360)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .padding(.vertical, 24)
+    }
+}
+
+/// The route being drawn on the stage, in the gesture's own screen space:
+/// the shell's only drawing, since the duck and the room are Metal's.
+struct PathDraftOverlay: View {
+    let points: [CGPoint]
+
+    var body: some View {
+        Canvas { context, _ in
+            guard let first = points.first else { return }
+            var line = Path()
+            line.move(to: first)
+            for point in points.dropFirst() {
+                line.addLine(to: point)
+            }
+            context.stroke(
+                line,
+                with: .color(Color.cyan.opacity(0.85)),
+                style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+            )
+            // The origin: the duck stands here when the route starts.
+            let dot = CGRect(x: first.x - 4, y: first.y - 4, width: 8, height: 8)
+            context.fill(
+                Path(ellipseIn: dot),
+                with: .color(Color.cyan.opacity(0.85))
+            )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }
 

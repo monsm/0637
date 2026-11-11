@@ -598,6 +598,9 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     // The companion layer is the same animal across bodies: hunger, memory,
     // the child's rules and the last heard words move to the new runtime.
     runtime.carry_companion(&core.runtime);
+    // A painted route belongs to the body it was drawn against: the switch
+    // takes the duck somewhere those world waypoints never were.
+    core.runtime.cancel_path();
     // A different body is a different duck: the old timeline and branches
     // describe a robot that no longer exists.
     core.runtime = runtime;
@@ -724,6 +727,17 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         Intent::Twist(twist) => {
             core.runtime.set_api_twist(twist);
             json!({ "ok": true, "twist": twist })
+        }
+        Intent::Path(points) => {
+            // The route layer already enforced the caps and thinned the
+            // points; the runtime freezes what is left into the world frame
+            // at the pose the walk actually starts from.
+            core.runtime.start_path(points);
+            json!({ "ok": true, "queued": true })
+        }
+        Intent::PathCancel => {
+            core.runtime.cancel_path();
+            json!({ "ok": true })
         }
         Intent::Head(head) => {
             core.runtime.set_head(head);
@@ -1098,7 +1112,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         Intent::Fork(label) => {
             // Every branch is stepped every tick: cap the collection.
             if core.branches.len() >= MAX_BRANCHES {
-                refuse(core, format!("fork refused: at most {MAX_BRANCHES} branches"));
+                refuse(core, format!("fork refused: at most {MAX_BRANCHES} branches"))
             } else {
                 match core.runtime.fork() {
                     Some(fork) => {
@@ -1299,6 +1313,9 @@ fn publish_state(core: &DuckCore) {
             "anchor_xy": active.anchor().0,
             "anchor_foot": active.anchor().1,
         },
+        // The painted route, on every publish: what was accepted and how far
+        // the walk got, or the inactive shape when nothing is walking.
+        "path": active.path_summary(),
         "powered_off": active.powered_off(),
         "carrying": active.carrying(),
         "last_sound": active.last_sound(),
@@ -1993,7 +2010,8 @@ pub unsafe extern "C" fn duck_core_step(core: *mut DuckCore, ticks: c_int) {
     });
     // The published state comes from the last report: without this the shell
     // would keep showing the pose from before the step.
-    let report = on_active(core, |runtime| runtime.last_report().cloned());
+    let mut report = None;
+    on_active(core, |runtime| report = runtime.last_report());
     if let Some(report) = report {
         core.label = report.label.clone();
         core.last = Some(report);
@@ -2032,7 +2050,8 @@ pub unsafe extern "C" fn duck_core_seek(core: *mut DuckCore, back_ticks: c_int) 
     core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
     // The published state must follow the rewind: the duck is somewhere
     // else now, and the shell would keep showing where it was.
-    let report = on_active(core, |runtime| runtime.last_report().cloned());
+    let mut report = None;
+    on_active(core, |runtime| report = runtime.last_report());
     if let Some(report) = report {
         core.label = report.label.clone();
         core.last = Some(report);

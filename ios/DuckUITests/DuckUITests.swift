@@ -287,6 +287,42 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// The Path Painter: the mode opens from the shell menu, and with nothing
+    /// drawn Go must exist but wait for a route with two real steps on it.
+    func testPathModeOpensWithGoWaiting() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        let ready = waitForLabel(["walk", "stand"], timeout: 180)
+        XCTAssertTrue(
+            ["walk", "stand"].contains(ready),
+            "the 50 Hz loop never drove the duck: label=\(ready)"
+        )
+
+        let menu = app.buttons["duck-menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10), "the shell menu is missing")
+        menu.tap()
+        // The mode chooser is the shell menu; its entries carry the same
+        // mode-<name> ids. The title fallback covers either language.
+        let pathMode = menuButton("mode-path", ["Path", "画路走"])
+        XCTAssertTrue(pathMode.waitForExistence(timeout: 10), "the menu has no Path mode")
+        pathMode.tap()
+
+        let go = app.buttons["path-go"]
+        XCTAssertTrue(go.waitForExistence(timeout: 10), "path mode has no Go chip")
+        XCTAssertFalse(go.isEnabled, "Go is enabled with nothing drawn")
+        XCTAssertTrue(
+            app.buttons["path-clear"].waitForExistence(timeout: 5),
+            "path mode has no Clear chip"
+        )
+        // Nothing is walking, so no step chip may be on the stage either.
+        XCTAssertFalse(
+            app.staticTexts["path-progress"].exists,
+            "a step chip appeared with no route"
+        )
+    }
+
     /// The same duck, the wide composition: rotation must swap shells without
     /// losing the core, the controls or the skill path.
     func testLandscapeRoundTrip() throws {

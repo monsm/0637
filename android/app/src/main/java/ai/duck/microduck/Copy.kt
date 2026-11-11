@@ -72,10 +72,18 @@ val quack get() = pick("Quack", "叫一声")
     fun stick(mode: String): String = when (mode) {
         "head" -> pick("look", "看")
         "body" -> pick("pose", "姿态")
+        "path" -> pathMode
         else -> pick("drive", "驱动")
     }
     val walk get() = pick("walk", "走")
     val roller get() = pick("roller", "轮")
+    // Path mode: draw the walk on the stage, then let the duck follow it.
+    val pathMode get() = pick("Path", "画路走")
+    val pathGo get() = pick("Walk it", "走这条路")
+    val pathClear get() = pick("Clear", "清掉")
+    val pathCancel get() = pick("Stop", "不走了")
+    fun pathStep(step: Int, total: Int) = pick("Step $step of $total", "第 $step 步，共 $total 步")
+    val pathDone get() = pick("Walked the whole path", "走完全程啦")
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
     // First-launch hint: shown once above the bottom bar, then never again.

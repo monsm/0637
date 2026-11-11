@@ -82,6 +82,7 @@ enum Copy {
         switch mode {
         case "head": return pick("look", "看")
         case "body": return pick("pose", "姿态")
+        case "path": return pathMode
         default: return pick("drive", "驱动")
         }
     }
@@ -216,6 +217,16 @@ enum Copy {
     static var danceTry: String { pick("Try these while recording:", "录制时点这些：") }
     static var danceStepPet: String { pick("Pet", "摸摸") }
     static var danceStepSound: String { pick("Quack", "叫一声") }
+    // Path Painter: draw a route on the stage and the duck walks it.
+    static var pathMode: String { pick("Path", "画路走") }
+    static var pathGo: String { pick("Walk it", "走这条路") }
+    static var pathClear: String { pick("Clear", "清掉") }
+    static var pathCancel: String { pick("Stop", "不走了") }
+    /// The waypoint the duck is walking, one-based for the child.
+    static func pathStep(_ step: Int, _ total: Int) -> String {
+        String(format: pick("Step %d of %d", "第 %d 步，共 %d 步"), step, total)
+    }
+    static var pathDone: String { pick("Walked the whole path", "走完全程啦") }
     // Morning postcard.
     static var postcard: String { pick("Morning postcard", "早安明信片") }
     static var postcardKeep: String { pick("Keep", "收藏") }

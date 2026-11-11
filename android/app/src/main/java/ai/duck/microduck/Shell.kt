@@ -8,6 +8,7 @@ import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -65,8 +66,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -76,6 +82,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -171,8 +178,56 @@ fun Shell(
     }
     var carrying by remember { mutableStateOf(false) }
     // The pad's D-pad modes, reduced to what a phone can do: drive, look,
-    // and crouch/lean the standing body.
+    // crouch/lean the standing body, and draw a path.
     var stick by remember { mutableStateOf("drive") }
+    // Path mode: the stroke the child drew, in stage pixels, and the stage's
+    // own size (the mapping to metres is the stage's short side spans 2.2 m).
+    var pathPoints by remember { mutableStateOf(emptyList<Offset>()) }
+    var stagePx by remember { mutableStateOf(IntSize.Zero) }
+    // What the core says about the walk it is running, from the top-level
+    // "path" object of /state: active, the reached/total counts and the
+    // accepted body-frame waypoints as posted.
+    var pathActive by remember { mutableStateOf(false) }
+    var pathProgress by remember { mutableStateOf(0 to 0) }
+    var pathActivePoints by remember { mutableStateOf(emptyList<List<Double>>()) }
+    // The draw-time mapping, remembered when the stroke is posted so the walk
+    // can be re-projected onto the stage while it runs.
+    var pathOrigin by remember { mutableStateOf(Offset.Zero) }
+    var pathMpp by remember { mutableStateOf(0f) }
+    // A Go is on the wire; a second tap must not queue the walk twice.
+    var pathPosting by remember { mutableStateOf(false) }
+    // A Stop press makes the walk's end a stop, not a finish.
+    var pathCancelRequested by remember { mutableStateOf(false) }
+    val pathScope = rememberCoroutineScope()
+    // A stroke feeds the collector: about 0.05 m between kept points — the
+    // floor the stage's own scale gives — and 64 points at most, the cap the
+    // core walks.
+    val onPathDraw: (Offset) -> Unit = { point ->
+        val last = pathPoints.lastOrNull()
+        val spacing = 0.05f * min(stagePx.width, stagePx.height).coerceAtLeast(1) / 2.2f
+        if (last == null || hypot(point.x - last.x, point.y - last.y) >= spacing) {
+            if (pathPoints.size < 64) pathPoints = pathPoints + point
+        }
+    }
+    // Walk it: the stroke becomes metres in the duck's body frame at the
+    // stroke's start and one POST /path. A refusal (caps, server down) leaves
+    // the drawing up so the child can clear it or try again.
+    val goPath: () -> Unit = {
+        val metres = pathMetres(pathPoints, stagePx)
+        if (metres != null && pathWalkable(metres) && !pathPosting) {
+            pathPosting = true
+            // Remember the draw-time mapping for the walk's re-projection.
+            pathOrigin = pathPoints.first()
+            pathMpp = 2.2f / min(stagePx.width, stagePx.height).coerceAtLeast(1)
+            pathScope.launch {
+                val queued = withContext(Dispatchers.IO) { postPath(metres) }
+                pathPosting = false
+                // The accepted walk renders from /state.path; the drawn
+                // stroke only survives a refusal.
+                if (queued) pathPoints = emptyList()
+            }
+        }
+    }
     // Flipping this re-renders every Copy string in the shell.
     var languageTick by remember { mutableStateOf(0) }
     // The face's flashlight: 0 is off, 1..7 are robotd's seven colours. The
@@ -245,6 +300,20 @@ fun Shell(
                 lastPeerTick = peerEvent.tick
                 soundLine = peerEvent.text
             }
+            // The path runner: the same publish carries whether a walk is on,
+            // the progress through it and the waypoints as accepted.
+            val pathNow = stateText?.let(::parsePathFromState) ?: PathUi()
+            // The duck's own excited mood is the real celebration; the pill
+            // names it when a walk ended without the child's Stop. The end
+            // and the clear land on the same publish, so the transition —
+            // not the final count — is what says "finished".
+            if (!pathNow.active && pathActive && !pathCancelRequested) {
+                soundLine = Copy.pathDone
+            }
+            if (!pathNow.active) pathCancelRequested = false
+            pathProgress = pathNow.reached to pathNow.total
+            pathActive = pathNow.active
+            pathActivePoints = pathNow.points
             val now = System.currentTimeMillis()
             if (aiConfig.enabled && !aiThinking &&
                 now - lastAIThink >= maxOf(10, aiConfig.interval) * 1000L
@@ -324,6 +393,9 @@ fun Shell(
             input.wz = 0.0
             core?.setHead(0.0, 0.0, 0.0, 0.0)
             core?.releaseBody()
+            // A draft is measured in the old screen space, which the new
+            // orientation no longer means.
+            pathPoints = emptyList()
         }
         if (portrait) {
             val duck = core
@@ -366,20 +438,42 @@ fun Shell(
                     )
                     // The stage. Steering is translation-based from wherever
                     // the thumb lands: a hidden centre-origin joystick makes
-                    // a resting thumb command a reversal.
-                    Spacer(
+                    // a resting thumb command a reversal. In path mode the
+                    // same stage draws the walk instead.
+                    Box(
                         Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .portraitStageGesture(
-                                core = duck,
-                                input = input,
-                                carrying = carrying,
-                                stick = stick,
-                                ringOpen = { showRing },
-                                onLongPress = { showRing = true },
-                            ),
-                    )
+                            .onSizeChanged { stagePx = it },
+                    ) {
+                        Spacer(
+                            Modifier
+                                .fillMaxSize()
+                                .portraitStageGesture(
+                                    core = duck,
+                                    input = input,
+                                    carrying = carrying,
+                                    stick = stick,
+                                    pathActive = pathActive,
+                                    onPathDraw = onPathDraw,
+                                    ringOpen = { showRing },
+                                    onLongPress = { showRing = true },
+                                ),
+                        )
+                        // The stroke is scene, not chrome: it draws over the
+                        // stage and never takes a touch from the gesture.
+                        if (stick == "path" || pathActive) {
+                            PathOverlay(
+                                drawn = pathPoints,
+                                active = pathActive,
+                                accepted = pathActivePoints,
+                                reached = pathProgress.first,
+                                origin = pathOrigin,
+                                mpp = pathMpp,
+                                modifier = Modifier.matchParentSize(),
+                            )
+                        }
+                    }
                     // The one-time gesture hint lives in the column, above
                     // the rail: no magic bottom offset to drift onto a button.
                     AnimatedVisibility(visible = hintDismiss) {
@@ -404,6 +498,26 @@ fun Shell(
                                 .testTag(if (soundLine != null) "sound-pill" else "care-pill"),
                         )
                     }
+                    // Path mode's one row: draw, walk it, clear — or the
+                    // progress and the stop chip while the duck walks.
+                    PathBar(
+                        drawing = stick == "path" && !pathActive,
+                        canGo = !pathPosting && pathWalkable(
+                            pathMetres(pathPoints, stagePx) ?: emptyList(),
+                        ),
+                        active = pathActive,
+                        reached = pathProgress.first,
+                        total = pathProgress.second,
+                        onGo = goPath,
+                        onClear = { pathPoints = emptyList() },
+                        onCancel = {
+                            pathCancelRequested = true
+                            postPathCancel()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    )
                     PortraitTimeRail(
                         core = duck,
                         surface = surface,
@@ -435,15 +549,24 @@ fun Shell(
             // Driving: a drag on the scene becomes the twist the real pad sends.
             // While the duck is held, the same drag moves the hand — a carry is an
             // external force, and the pickup classifier decides what the policy
-            // does about it.
+            // does about it. In path mode the drag draws instead: the same
+            // collector the portrait stage feeds, one behaviour in both
+            // orientations (a stroke is a walk). The wide layout has no tap
+            // detector, so a waypoint only ever comes from a stroke here.
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pointerInput(core, carrying, stick) {
+                    .onSizeChanged { stagePx = it }
+                    .pointerInput(core, carrying, stick, pathActive) {
                         val duck = core ?: return@pointerInput
                         var start = Offset.Zero
                         detectDragGestures(
-                            onDragStart = { start = it },
+                            onDragStart = {
+                                start = it
+                                if (stick == "path" && !pathActive && !carrying && !showRing) {
+                                    onPathDraw(it)
+                                }
+                            },
                             onDrag = { change, _ ->
                                 // The skill ring is up: no carry, no drive
                                 // while it is.
@@ -463,7 +586,14 @@ fun Shell(
                                 }
                                 val dx = (change.position.x - width * 0.5f) / (width * 0.5f)
                                 val dy = (change.position.y - height * 0.52f) / (height * 0.5f)
-                                when (stick) {
+                                if (stick == "path" && !pathActive) {
+                                    // Drawing, not steering. While the duck
+                                    // walks the path the drag is an external
+                                    // twist again — the branch below runs, and
+                                    // the core hands the walk back to the
+                                    // child's hand.
+                                    onPathDraw(change.position)
+                                } else when (stick) {
                                     "head" -> duck.setHead(
                                         0.0,
                                         dy.toDouble() * 0.6,
@@ -506,9 +636,46 @@ fun Shell(
                     .sceneLongPress(enabled = core != null) { showRing = true },
             )
 
+            // The stroke the wide layout draws, and the walk it becomes —
+            // scene, not chrome, so it never takes a touch from the drag.
+            if (stick == "path" || pathActive) {
+                PathOverlay(
+                    drawn = pathPoints,
+                    active = pathActive,
+                    accepted = pathActivePoints,
+                    reached = pathProgress.first,
+                    origin = pathOrigin,
+                    mpp = pathMpp,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+
             if (surface == Surface.Director) {
                 DirectorOverlay(core, Modifier.fillMaxSize())
             }
+
+            // Path mode's row, the same one the portrait rail hosts, under the
+            // top bar so the thumb clusters in the corners keep their space.
+            PathBar(
+                drawing = stick == "path" && !pathActive,
+                canGo = !pathPosting && pathWalkable(
+                    pathMetres(pathPoints, stagePx) ?: emptyList(),
+                ),
+                active = pathActive,
+                reached = pathProgress.first,
+                total = pathProgress.second,
+                onGo = goPath,
+                onClear = { pathPoints = emptyList() },
+                onCancel = {
+                    pathCancelRequested = true
+                    postPathCancel()
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .systemBarsPadding()
+                    .padding(top = 76.dp, start = 12.dp, end = 12.dp)
+                    .fillMaxWidth(),
+            )
 
             // Top bar: the duck's state, and ONE menu. Six text chips in a row
             // was a desktop panel crammed onto a phone: on a small landscape
@@ -1286,6 +1453,11 @@ private fun TopBar(
                     text = { Text(Copy.stick("body"), color = Color.White) },
                     onClick = { onStick("body"); onMenuOpen(false) },
                 )
+                DropdownMenuItem(
+                    text = { Text(Copy.stick("path"), color = Color.White) },
+                    onClick = { onStick("path"); onMenuOpen(false) },
+                    modifier = Modifier.testTag("mode-path"),
+                )
                 HorizontalDivider(color = Color.White.copy(alpha = 0.12f))
                 DropdownMenuItem(
                     text = { Text(Copy.live, color = Color.White) },
@@ -1496,15 +1668,21 @@ internal fun CloseChip(tag: String, onClose: () -> Unit, size: Dp = 48.dp) {
  * 8 dp of slack, 90 dp for full scale, up is forward and sideways turns.
  * A tap on the duck posts /pet; a tap on the floor in drive mode nudges the
  * duck for 250 ms; a stationary 0.35 s hold opens the skill ring.
+ * In path mode the same stage draws instead: the down lays the first
+ * waypoint, the drag lays the rest, and while the duck walks its path the
+ * stage takes no stroke at all — the cancel chip is the only control, and a
+ * drag is the external twist that hands the walk back to the child's hand.
  */
 private fun Modifier.portraitStageGesture(
     core: DuckCore,
     input: DuckInput,
     carrying: Boolean,
     stick: String,
+    pathActive: Boolean,
+    onPathDraw: (Offset) -> Unit,
     ringOpen: () -> Boolean,
     onLongPress: () -> Unit,
-): Modifier = pointerInput(core, carrying, stick) {
+): Modifier = pointerInput(core, carrying, stick, pathActive) {
     val deadzone = 8.dp.toPx()
     val fullScale = 90.dp.toPx()
     val handler = Handler(Looper.getMainLooper())
@@ -1520,6 +1698,12 @@ private fun Modifier.portraitStageGesture(
         var longPressed = false
         var finished = false
         var last = down
+        // Path mode draws: the down lays the first waypoint, the ring guard
+        // comes first — nothing is collected while it is up — and a carry
+        // keeps moving the hand.
+        if (stick == "path" && !pathActive && !carrying && !ringOpen()) {
+            onPathDraw(down.position)
+        }
         // A Handler, not a coroutine: `awaitEachGesture` runs in a restricted
         // suspension scope and cannot launch on another scope.
         val hold = Runnable {
@@ -1559,6 +1743,12 @@ private fun Modifier.portraitStageGesture(
                             (-dy / halfHeight * 0.30f).toDouble(),
                             true,
                         )
+                    } else if (stick == "path" && !pathActive) {
+                        // Drawing, not steering: the collector keeps the
+                        // spacing and the cap. While the duck walks, the drag
+                        // steers below — an external twist the core answers by
+                        // handing the walk back.
+                        onPathDraw(change.position)
                     } else {
                         val scale = min(distance / fullScale, 1f)
                         val nx = if (distance > 0f) dx / distance * scale else 0f
@@ -1593,27 +1783,31 @@ private fun Modifier.portraitStageGesture(
             val heldFor = last.uptimeMillis - down.uptimeMillis
             val wasTap = last.changedToUp() && !dragged && heldFor < 300
             if (wasTap && !longPressed) {
-                val width = size.width.toFloat().coerceAtLeast(1f)
-                val height = size.height.toFloat().coerceAtLeast(1f)
-                val x = last.position.x
-                val y = last.position.y
-                val insideDuck = x > width * 0.25f && x < width * 0.75f &&
-                    y > height * 0.33f && y < height * 0.68f
-                if (insideDuck) {
-                    postDuckCommand("/pet")
-                } else if (stick == "drive") {
-                    val dx = x - width * 0.5f
-                    val dy = y - height * 0.5f
-                    val norm = maxOf(hypot(dx, dy), 1f)
-                    input.vx = (-dy / norm * 0.6f).toDouble()
-                    input.wz = (-dx / norm * 0.6f).toDouble()
-                    val token = pulseToken
-                    handler.postDelayed({
-                        if (pulseToken == token) {
-                            input.vx = 0.0
-                            input.wz = 0.0
-                        }
-                    }, 250)
+                // A path tap is the one waypoint it already laid on the down;
+                // pet and the drive pulse are other modes' words.
+                if (stick != "path") {
+                    val width = size.width.toFloat().coerceAtLeast(1f)
+                    val height = size.height.toFloat().coerceAtLeast(1f)
+                    val x = last.position.x
+                    val y = last.position.y
+                    val insideDuck = x > width * 0.25f && x < width * 0.75f &&
+                        y > height * 0.33f && y < height * 0.68f
+                    if (insideDuck) {
+                        postDuckCommand("/pet")
+                    } else if (stick == "drive") {
+                        val dx = x - width * 0.5f
+                        val dy = y - height * 0.5f
+                        val norm = maxOf(hypot(dx, dy), 1f)
+                        input.vx = (-dy / norm * 0.6f).toDouble()
+                        input.wz = (-dx / norm * 0.6f).toDouble()
+                        val token = pulseToken
+                        handler.postDelayed({
+                            if (pulseToken == token) {
+                                input.vx = 0.0
+                                input.wz = 0.0
+                            }
+                        }, 250)
+                    }
                 }
                 finished = true
             } else {
@@ -1682,6 +1876,113 @@ internal fun postDuckCommand(path: String, body: String = "{}") {
             // The loop refuses when busy; nothing to show.
         }
     }.start()
+}
+
+/**
+ * Queue a drawn walk: POST /path with the stroke in metres, body frame at the
+ * path's start (+x forward, +y left), the first element the duck's own origin
+ * — the core drops it. The answer is a queue verdict; a refusal (over the 64
+ * point or 20 m caps) comes back as {"ok":false} and nothing is queued.
+ * Synchronous on purpose: the caller owns the thread.
+ */
+internal fun postPath(points: List<List<Double>>): Boolean {
+    val array = org.json.JSONArray()
+    points.forEach { point ->
+        val pair = org.json.JSONArray()
+        pair.put(point[0])
+        pair.put(point[1])
+        array.put(pair)
+    }
+    return try {
+        postJson("/path", org.json.JSONObject().put("points", array).toString())
+    } catch (_: Throwable) {
+        false
+    }
+}
+
+/// POST /path/cancel, fire-and-forget: {"ok":true} always, a no-op when
+/// nothing is active.
+internal fun postPathCancel() {
+    Thread {
+        try {
+            postJson("/path/cancel", "{}")
+        } catch (_: Throwable) {
+        }
+    }.start()
+}
+
+/// The walk the path runner reports, from the top-level "path" object of
+/// GET /state: active, the waypoints reached and owed, and the accepted
+/// body-frame list as posted. An object nobody published (an older core, a
+/// dead server) reads as "nothing walking".
+data class PathUi(
+    val active: Boolean = false,
+    val reached: Int = 0,
+    val total: Int = 0,
+    val points: List<List<Double>> = emptyList(),
+)
+
+internal fun parsePathFromState(stateText: String): PathUi = try {
+    val path = org.json.JSONObject(stateText).optJSONObject("path") ?: return PathUi()
+    val array = path.optJSONArray("points") ?: org.json.JSONArray()
+    PathUi(
+        active = path.optBoolean("active", false),
+        reached = path.optInt("reached", 0),
+        total = path.optInt("total", 0),
+        points = (0 until array.length()).mapNotNull { index ->
+            val pair = array.optJSONArray(index) ?: return@mapNotNull null
+            listOf(pair.optDouble(0, 0.0), pair.optDouble(1, 0.0))
+        },
+    )
+} catch (_: Throwable) {
+    PathUi()
+}
+
+/// The stroke in metres, body frame at the stroke's start: screen up is
+/// forward, screen left is +y left. The stage's short side spans 2.2 m, the
+/// mapping the post assumes. Null while the stage has no size yet.
+internal fun pathMetres(points: List<Offset>, stagePx: IntSize): List<List<Double>>? {
+    val short = min(stagePx.width, stagePx.height)
+    if (points.isEmpty() || short <= 0) return null
+    val metresPerPoint = 2.2f / short
+    val x0 = points.first().x
+    val y0 = points.first().y
+    return points.map { point ->
+        listOf(
+            (-(point.y - y0) * metresPerPoint).toDouble(),
+            (-(point.x - x0) * metresPerPoint).toDouble(),
+        )
+    }
+}
+
+/// The waypoints the core would keep from a posted stroke: the origin (the
+/// first element) dropped, then anything 0.1 m or more from the last kept
+/// one. The go chip's enabled state is this count, so the UI never invites
+/// the refusal the core would answer.
+internal fun keptWaypoints(metres: List<List<Double>>): List<List<Double>> {
+    val kept = mutableListOf<List<Double>>()
+    for (point in metres.drop(1)) {
+        val last = kept.lastOrNull()
+        if (last == null || hypot(point[0] - last[0], point[1] - last[1]) >= 0.1) {
+            kept.add(point)
+        }
+    }
+    return kept
+}
+
+/// A stroke is walkable when two or more waypoints survive the thinning and
+/// the whole polyline — the duck's real walking distance, origin included —
+/// stays inside the core's 20 m budget.
+internal fun pathWalkable(metres: List<List<Double>>): Boolean {
+    if (keptWaypoints(metres).size < 2) return false
+    var total = 0.0
+    for (index in 1 until metres.size) {
+        total += hypot(
+            metres[index][0] - metres[index - 1][0],
+            metres[index][1] - metres[index - 1][1],
+        )
+    }
+    return total <= 20.0
 }
 
 @Composable
@@ -2513,6 +2814,138 @@ internal fun ButtonChip(
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = Color.White, fontSize = 12.sp)
+    }
+}
+
+/**
+ * A path chip: the ButtonChip language with an enabled face. The click stays
+ * wired (Role.Button, named) and simply does nothing while disabled, so
+ * TalkBack never loses the control.
+ */
+@Composable
+private fun PathChip(
+    label: String,
+    enabled: Boolean = true,
+    testTag: String? = null,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            // A 48 dp floor, the same one every chip got.
+            .heightIn(min = 48.dp)
+            .background(
+                Color.White.copy(alpha = if (enabled) 0.10f else 0.05f),
+                RoundedCornerShape(10.dp),
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = label,
+                role = Role.Button,
+            ) { if (enabled) onClick() }
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.4f), fontSize = 12.sp)
+    }
+}
+
+/**
+ * Path mode's one row. Drawing: walk it — real only when two or more
+ * waypoints would survive the core's own thinning — and clear. Walking: the
+ * step count and the stop chip, because drawing is off until the core says
+ * the walk is over.
+ */
+@Composable
+private fun PathBar(
+    drawing: Boolean,
+    canGo: Boolean,
+    active: Boolean,
+    reached: Int,
+    total: Int,
+    onGo: () -> Unit,
+    onClear: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!drawing && !active) return
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (active) {
+            Text(
+                // One-based, like iOS: the child is walking the
+                // (reached+1)-st of the total steps.
+                Copy.pathStep(reached + 1, total),
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = 12.sp,
+                maxLines = 1,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("path-progress"),
+            )
+            PathChip(Copy.pathCancel, testTag = "path-cancel", onClick = onCancel)
+        } else {
+            Spacer(Modifier.weight(1f))
+            PathChip(Copy.pathGo, enabled = canGo, testTag = "path-go", onClick = onGo)
+            PathChip(Copy.pathClear, testTag = "path-clear", onClick = onClear)
+        }
+    }
+}
+
+/**
+ * The stroke over the stage. Before the walk it is what the child drew; once
+ * the core is walking, it re-projects the accepted body-frame waypoints back
+ * through the draw mapping (the stroke's start and the metres-per-pixel the
+ * draw used), so a rotation mid-walk drifts until the next stroke. Reached
+ * waypoints go dim and the rest stay bright — the same reading as the
+ * progress text beside them.
+ */
+@Composable
+private fun PathOverlay(
+    drawn: List<Offset>,
+    active: Boolean,
+    accepted: List<List<Double>>,
+    reached: Int,
+    origin: Offset,
+    mpp: Float,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier) {
+        if (!active && drawn.isNotEmpty()) {
+            val stroke = Path()
+            stroke.moveTo(drawn.first().x, drawn.first().y)
+            drawn.drop(1).forEach { stroke.lineTo(it.x, it.y) }
+            drawPath(
+                stroke,
+                color = Color(0xFF4FC3F7),
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+            )
+            drawn.forEach { drawCircle(Color(0xFF4FC3F7).copy(alpha = 0.7f), 3.dp.toPx(), it) }
+        } else if (active && mpp > 0f && accepted.isNotEmpty()) {
+            // Metres back to pixels through the inverse of the draw mapping.
+            val walk = Path()
+            accepted.forEachIndexed { index, point ->
+                val here = Offset(
+                    origin.x - (point[1] / mpp).toFloat(),
+                    origin.y - (point[0] / mpp).toFloat(),
+                )
+                if (index == 0) walk.moveTo(here.x, here.y) else walk.lineTo(here.x, here.y)
+                drawCircle(
+                    if (index < reached) Color.White.copy(alpha = 0.25f) else Color(0xFF4FC3F7),
+                    3.dp.toPx(),
+                    here,
+                )
+            }
+            drawPath(
+                walk,
+                color = Color(0xFF4FC3F7).copy(alpha = 0.8f),
+                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+            )
+        }
     }
 }
 

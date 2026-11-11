@@ -205,6 +205,18 @@ final class DuckController: ObservableObject {
     /// door cannot be killed with the process like an in-flight URLSession.
     private var latestCare: [String: Any]?
     private var latestLife: [String: Any]?
+    /// Path Painter: the route the child drew on the stage, as the core
+    /// reports it. The core owns the walk; reached/total only drive the
+    /// step chip, and an inactive route always publishes zeros.
+    @Published var pathActive = false
+    @Published var pathReached = 0
+    @Published var pathTotal = 0
+    /// Increments each time a painted walk runs its whole course: the duck's
+    /// own excited mood is the celebration, the pill names it. A Stop press
+    /// is not a finish and does not tick.
+    @Published var pathDoneTick = 0
+    private var pathWasActive = false
+    private var pathCancelRequested = false
 
     /// One line for the Stage Deck's mood pill, built from the core's care
     /// numbers rather than from what the shell imagines.
@@ -1389,6 +1401,25 @@ final class DuckController: ObservableObject {
         URLSession.shared.dataTask(with: request).resume()
     }
 
+    /// Paint a route: POST /path with body-frame waypoints in metres (+x
+    /// forward, +y left at the route's start). The core drops the first
+    /// point (the duck's own origin), refuses a route over its caps without
+    /// queueing, and otherwise hands it to the walk policy. Fire-and-forget:
+    /// /state's `path` slice reports whether it started and how far it got.
+    func postPath(points: [[Double]]) {
+        guard let body = try? JSONSerialization.data(withJSONObject: ["points": points])
+        else { return }
+        post("/path", body)
+    }
+
+    /// Stop the painted route: POST /path/cancel. The core answers ok even
+    /// when nothing is walking, so the chip needs no guard here. The flag
+    /// keeps the ending from reading as a finish.
+    func cancelPath() {
+        pathCancelRequested = true
+        post("/path/cancel", Data("{}".utf8))
+    }
+
     func pollSensors() {
         reportPerformance()
         maybeThinkAI()
@@ -1422,6 +1453,7 @@ final class DuckController: ObservableObject {
                         self.behaviorSummary = "—"
                     }
                     self.parseLeds(json["leds"])
+                    self.parsePath(json["path"])
                     if let board = json["quests"] as? [String: Any] {
                         let chinese = Copy.language == .chinese
                         let list = board["quests"] as? [[String: Any]] ?? []
@@ -1566,6 +1598,35 @@ final class DuckController: ObservableObject {
         // The colour travels with the flashlight state: off publishes no
         // colour, so `nil` here *is* the off answer.
         flashlightColor = leds["color"] as? String
+    }
+
+    /// The Path Painter's slice of /state: the route's progress in the body
+    /// frame the shell posted. A core without the feature publishes no
+    /// `path` object; zeros are the same honest answer as an idle route.
+    private func parsePath(_ path: Any?) {
+        guard let path = path as? [String: Any],
+              path["active"] as? Bool == true
+        else {
+            // The walk ended on this publish: a Stop press stays quiet, a
+            // route that ran out of waypoints is a finish worth naming.
+            if pathWasActive {
+                if pathCancelRequested {
+                    pathCancelRequested = false
+                } else {
+                    pathDoneTick += 1
+                }
+            }
+            pathWasActive = false
+            pathActive = false
+            pathReached = 0
+            pathTotal = 0
+            return
+        }
+        pathWasActive = true
+        pathCancelRequested = false
+        pathActive = true
+        pathReached = path["reached"] as? Int ?? 0
+        pathTotal = path["total"] as? Int ?? 0
     }
 
     /// `robot.flashlight` on a phone: a press toggles, in white. The core is
