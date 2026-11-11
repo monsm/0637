@@ -1835,7 +1835,7 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
  * Hunger, mood and bond, drawn from the core's own numbers. Fullness fills the
  * first bar: a full bar means a fed duck. The nap is a state, not a number.
  */
-@Composable
+
 /**
  * Three quests from the core's real counters. One progress meter per row;
  * text, percent and a checkmark carry the meaning so it never relies on hue.
@@ -1845,7 +1845,7 @@ private fun QuestCard(board: QuestBoardUi) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.05f), RoundedRectangleShape(14.dp))
+            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(14.dp))
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -1925,6 +1925,7 @@ private fun QuestCard(board: QuestBoardUi) {
     }
 }
 
+@Composable
 private fun CareCard(care: CareUi) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(
