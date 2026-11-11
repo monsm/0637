@@ -721,6 +721,21 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
     }
 
+    /// The companion layer follows the animal, not the body: a drive-mode
+    /// switch replaces the MuJoCo scene and the policies but must not reset
+    /// hunger, the vet book or the child's block program.
+    pub fn carry_companion(&mut self, from: &Self) {
+        self.care = from.care;
+        self.book = from.book.clone();
+        self.rules = from.rules.clone();
+        self.last_sad = from.last_sad;
+        self.sad_grace_until = from.sad_grace_until;
+        self.last_sound_event = from.last_sound_event.clone();
+        self.last_peer_event = from.last_peer_event.clone();
+        self.last_heard = from.last_heard.clone();
+        self.book_position = None;
+    }
+
     /// Ask for a sound by tag. Unknown tags are dropped rather than invented.
     pub fn queue_sound(&mut self, tag: &str) {
         // `sound.rs`'s own rule: one playing child, and a new sound kills the
@@ -1094,6 +1109,16 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// part of it is an official move — the robot eats nothing, and this
     /// one pretends to no hardware.
     pub fn feed(&mut self) -> Result<bool, &'static str> {
+        // A treat is a real peck, not a state change. If the body is limp,
+        // homing, powered off or mid-shutdown the controller's pick can never
+        // advance, so committing hunger/fed now would feed a duck that never
+        // pecked. Refuse in words instead.
+        if self.powered_off
+            || self.shutting_down()
+            || !matches!(self.bringup, Bringup::Ready)
+        {
+            return Err("the duck is not standing");
+        }
         // `ground_pick` is the loop's own verb, not one of the controller's
         // scripted skills: `trigger_skill` cannot find it, and asking it was
         // a treat the duck never pecked. The controller refuses a second peck

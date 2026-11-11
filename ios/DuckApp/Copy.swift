@@ -262,6 +262,7 @@ enum Copy {
     static var addRule: String { pick("Add", "添加") }
     static var ruleChain: String { pick("then also", "然后再") }
     static var ruleChainAdd: String { pick("Add step", "加一步") }
+    static var ruleLimit: String { pick("Full (8/8)", "已满（8/8）") }
     static var deleteRule: String { pick("Delete", "删除") }
     static var rulesEmpty: String {
         pick("No rules yet. Build one: when I clap, roll over.",

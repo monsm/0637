@@ -883,9 +883,16 @@ final class DuckController: ObservableObject {
         request.httpBody = body
         let semaphore = DispatchSemaphore(value: 0)
         var ok = false
-        URLSession.shared.dataTask(with: request) { _, response, _ in
+        URLSession.shared.dataTask(with: request) { data, response, _ in
             if let http = response as? HTTPURLResponse {
                 ok = (200..<300).contains(http.statusCode)
+            }
+            // The intent API answers refusals with HTTP 200 and {"ok":false};
+            // only a body that did not refuse counts as delivered.
+            if let data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let accepted = json["ok"] as? Bool {
+                ok = ok && accepted
             }
             semaphore.signal()
         }.resume()

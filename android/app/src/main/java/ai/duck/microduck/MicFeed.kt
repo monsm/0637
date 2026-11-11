@@ -45,8 +45,8 @@ class MicFeed {
                 }
             },
             0,
-            1,
-            TimeUnit.SECONDS,
+            250,
+            TimeUnit.MILLISECONDS,
         )
     }
 
@@ -161,7 +161,7 @@ class MicFeed {
     private companion object {
         const val SAMPLE_RATE = 16_000
         const val READ_SAMPLES = 2048
-        const val WINDOW_READS = 2
+        const val WINDOW_READS = 1
         const val FULL_SCALE = 32768.0
     }
 }

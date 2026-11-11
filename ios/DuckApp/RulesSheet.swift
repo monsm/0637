@@ -154,11 +154,17 @@ struct RulesSheet: View {
                         controller.saveRules(next)
                         chainDraft = []
                     } label: {
-                        Label(Copy.addRule, systemImage: "plus.circle.fill")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            .frame(maxWidth: .infinity, minHeight: 50)
+                        Label(
+                            controller.rules.count >= 8 ? Copy.ruleLimit : Copy.addRule,
+                            systemImage: controller.rules.count >= 8
+                                ? "checkmark.circle"
+                                : "plus.circle.fill"
+                        )
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .frame(maxWidth: .infinity, minHeight: 50)
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(controller.rules.count >= 8)
                     .accessibilityIdentifier("rule-add")
                 }
             }

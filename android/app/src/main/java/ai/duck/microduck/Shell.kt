@@ -1122,11 +1122,28 @@ private fun RulesSheet(onClose: () -> Unit) {
                     }
                 }
             }
-            ButtonChip(Copy.addRule, "rule-add") {
-                val next = rules + RuleUi(trigger, action, value, chain)
-                rules = next
-                chain = emptyList()
-                saveRules(context, next)
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "${rules.size}/8",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Spacer(Modifier.weight(1f))
+                ButtonChip(
+                    if (rules.size >= 8) Copy.ruleLimit else Copy.addRule,
+                    "rule-add",
+                ) {
+                    if (rules.size < 8) {
+                        val next = rules + RuleUi(trigger, action, value, chain)
+                        rules = next
+                        chain = emptyList()
+                        saveRules(context, next)
+                    }
+                }
             }
         }
     }

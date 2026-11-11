@@ -174,6 +174,7 @@ val quack get() = pick("Quack", "叫一声")
     val addRule get() = pick("Add", "添加")
     val ruleChain get() = pick("then also", "然后再")
     val ruleChainAdd get() = pick("Add step", "加一步")
+    val ruleLimit get() = pick("Full (8/8)", "已满（8/8）")
     val deleteRule get() = pick("Delete", "删除")
     val rulesEmpty get() = pick(
         "No rules yet. Build one: when I clap, roll over.",

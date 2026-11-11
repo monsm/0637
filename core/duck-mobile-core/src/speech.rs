@@ -20,6 +20,7 @@ pub enum Heard {
     /// A sound tag rather than a move, for greetings.
     Sound(&'static str),
     Sit,
+    Stand,
     GroundPick,
 }
 
@@ -62,9 +63,9 @@ const PHRASES: &[(&str, Heard)] = &[
     ("踢", Heard::Skill("kick_left")),
     ("坐下", Heard::Sit),
     ("坐", Heard::Sit),
-    ("站起来", Heard::Sit),
-    ("起来", Heard::Sit),
-    ("站", Heard::Sit),
+    ("站起来", Heard::Stand),
+    ("起来", Heard::Stand),
+    ("站", Heard::Stand),
     ("捡", Heard::GroundPick),
     ("捡起来", Heard::GroundPick),
     ("抓", Heard::GroundPick),
@@ -80,7 +81,7 @@ const PHRASES: &[(&str, Heard)] = &[
     ("roll", Heard::Skill("roulade")),
     ("kick", Heard::Skill("kick_left")),
     ("sit", Heard::Sit),
-    ("stand", Heard::Sit),
+    ("stand", Heard::Stand),
     ("pick", Heard::GroundPick),
 ];
 
@@ -107,6 +108,10 @@ mod tests {
         assert_eq!(interpret("excited").unwrap().1, Heard::Skill("excited"));
         assert_eq!(interpret("你好呀").unwrap().1, Heard::Sound("greet"));
         assert_eq!(interpret("hello").unwrap().1, Heard::Sound("greet"));
+        // Standing up is its own verb: it must never toggle a standing duck
+        // back down into the seat.
+        assert_eq!(interpret("站起来").unwrap().1, Heard::Stand);
+        assert_eq!(interpret("stand").unwrap().1, Heard::Stand);
     }
 
     #[test]

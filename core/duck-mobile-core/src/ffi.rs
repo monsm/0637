@@ -593,6 +593,9 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
         let _ = runtime.load_emotions(dir);
     }
 
+    // The companion layer is the same animal across bodies: hunger, memory,
+    // the child's rules and the last heard words move to the new runtime.
+    runtime.carry_companion(&core.runtime);
     // A different body is a different duck: the old timeline and branches
     // describe a robot that no longer exists.
     core.runtime = runtime;
@@ -644,7 +647,22 @@ fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<(), String> {
 const TIMELINE_CAPACITY: usize = 3000;
 
 fn checkpoint_now(core: &mut DuckCore) {
-    let Some(checkpoint) = core.runtime.checkpoint() else {
+    let selected = core.selected;
+    let checkpoint = if selected > 0 && selected <= core.branches.len() {
+        std::mem::swap(
+            &mut core.runtime,
+            &mut core.branches[selected - 1].runtime,
+        );
+        let checkpoint = core.runtime.checkpoint();
+        std::mem::swap(
+            &mut core.runtime,
+            &mut core.branches[selected - 1].runtime,
+        );
+        checkpoint
+    } else {
+        core.runtime.checkpoint()
+    };
+    let Some(checkpoint) = checkpoint else {
         return;
     };
     // One entry per tick: a second checkpoint at the same tick replaces the
@@ -667,7 +685,39 @@ fn refuse(core: &mut DuckCore, message: String) -> serde_json::Value {
     json!({ "ok": false, "error": message })
 }
 
+/// Dispatch one intent against the duck the client is actually watching.
+///
+/// A selected branch lives in `core.branches`; the mutating arms all speak
+/// `core.runtime` because that was true before forks existed. Rather than
+/// duplicating every arm, swap the selected runtime into `core.runtime` for
+/// the duration of the dispatch and swap it back afterwards. Branch-management
+/// and mode intents act on the collection itself and are exempt.
 fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
+    let global = matches!(
+        &intent,
+        Intent::Mode(_)
+            | Intent::Fork(_)
+            | Intent::DropBranch(_)
+            | Intent::SelectBranch(_)
+            | Intent::QuestDay(_, _)
+    );
+    let selected = core.selected;
+    if global || selected == 0 || selected > core.branches.len() {
+        return apply_intent_active(core, intent);
+    }
+    std::mem::swap(
+        &mut core.runtime,
+        &mut core.branches[selected - 1].runtime,
+    );
+    let result = apply_intent_active(core, intent);
+    std::mem::swap(
+        &mut core.runtime,
+        &mut core.branches[selected - 1].runtime,
+    );
+    result
+}
+
+fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
     match intent {
         Intent::Twist(twist) => {
             core.runtime.set_api_twist(twist);
@@ -911,11 +961,24 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                     Ok(json!({ "ok": true, "heard": text, "phrase": phrase, "sound": tag }))
                 }
                 crate::speech::Heard::Sit => {
-                    let sitting = core.runtime.is_sitting();
-                    core.runtime
-                        .sit_toggle()
-                        .map(|did| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "sit", "did": did }))
-                        .map_err(str::to_owned)
+                    if core.runtime.is_sitting() {
+                        Ok(json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "sit", "did": false }))
+                    } else {
+                        core.runtime
+                            .sit_toggle()
+                            .map(|did| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "sit", "did": did }))
+                            .map_err(str::to_owned)
+                    }
+                }
+                crate::speech::Heard::Stand => {
+                    if core.runtime.is_sitting() {
+                        core.runtime
+                            .sit_toggle()
+                            .map(|did| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "stand", "did": did }))
+                            .map_err(str::to_owned)
+                    } else {
+                        Ok(json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "stand", "did": false }))
+                    }
                 }
                 crate::speech::Heard::GroundPick => core
                     .runtime
@@ -1090,6 +1153,25 @@ fn active_runtime(core: &DuckCore) -> &DuckRuntime<MujocoIo> {
         core.branches
             .get(core.selected - 1)
             .map_or(&core.runtime, |branch| &branch.runtime)
+    }
+}
+
+/// Run one runtime-only operation on the duck the client is watching,
+/// swapping a selected branch into `core.runtime` for the duration.
+fn on_active(core: &mut DuckCore, f: impl FnOnce(&mut DuckRuntime<MujocoIo>)) {
+    let selected = core.selected;
+    if selected > 0 && selected <= core.branches.len() {
+        std::mem::swap(
+            &mut core.runtime,
+            &mut core.branches[selected - 1].runtime,
+        );
+        f(&mut core.runtime);
+        std::mem::swap(
+            &mut core.runtime,
+            &mut core.branches[selected - 1].runtime,
+        );
+    } else {
+        f(&mut core.runtime);
     }
 }
 
@@ -1302,17 +1384,23 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         });
         let finished = core.quests.update(&quest_day, &values);
         if !finished.is_empty() {
-            let _ = core.runtime.trigger_emotion("excited");
+            on_active(core, |runtime| {
+                let _ = runtime.trigger_emotion("excited");
+            });
         }
         core.intents.set_quests(core.quests.summary(&values));
     }
     // Other ducks on the LAN: greetings are social events, and the peer list
     // is published with the rest of the state.
-    if let Some(lan) = &core.lan {
-        for event in lan.take_events() {
-            core.runtime.peer_event(&event);
-        }
-        core.intents.set_peers(lan.snapshot());
+    let (peer_events, peer_snapshot) = match &core.lan {
+        Some(lan) => (lan.take_events(), Some(lan.snapshot())),
+        None => (Vec::new(), None),
+    };
+    if let Some(snapshot) = peer_snapshot {
+        core.intents.set_peers(snapshot);
+    }
+    for event in peer_events {
+        on_active(core, |runtime| runtime.peer_event(&event));
     }
     for queued in core.intents.drain() {
         let result = apply_intent(core, queued.intent);
@@ -1322,23 +1410,42 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     }
     // A sudden loud sound in the room is an external event, never a sense.
     // The sensor registry is on DuckCore; hand its verdict to the loop.
-    core.runtime.set_room_loud(core.sensors.loud());
+    let loud = core.sensors.loud();
+    on_active(core, |runtime| runtime.set_room_loud(loud));
     // The phone's IMU is an external disturbance, not a sense: a shake is a
     // shove, exactly as a hand on the real duck would be. It is one impulse —
     // the reading is consumed here, or a single shake would shove the duck
     // every tick until the next sensor post.
     if let Some(push) = core.sensors.take_imu_push() {
-        let _ = core.runtime.push(push);
+        on_active(core, |runtime| {
+            let _ = runtime.push(push);
+        });
     }
     // A restore replaces the tick that was about to happen: the duck resumes
-    // at the saved tick and this tick's physics runs from there.
+    // at the saved tick and this tick's physics runs from there. It belongs to
+    // the duck the client sees, which may be a selected branch.
     if let Some(checkpoint) = core.pending_restore.take() {
-        if !core.runtime.restore(&checkpoint) {
+        let selected = core.selected;
+        if selected > 0 && selected <= core.branches.len() {
+            std::mem::swap(
+                &mut core.runtime,
+                &mut core.branches[selected - 1].runtime,
+            );
+            if !core.runtime.restore(&checkpoint) {
+                core.label = "restore refused".to_owned();
+            }
+            std::mem::swap(
+                &mut core.runtime,
+                &mut core.branches[selected - 1].runtime,
+            );
+        } else if !core.runtime.restore(&checkpoint) {
             core.label = "restore refused".to_owned();
         }
         core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
     }
-    if core.runtime.clock().paused {
+    // Frozen time freezes the duck the client is watching, including a branch.
+    let active_paused = active_runtime(core).clock().paused;
+    if active_paused {
         publish_state(core);
         return 0;
     }
@@ -1351,7 +1458,7 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         now_ms,
         core.sound_sequence,
     ) {
-        core.runtime.sound_event(kind);
+        on_active(core, |runtime| runtime.sound_event(kind));
     }
     // Record the state the tick is about to run from, so a rewind lands on a
     // tick that really happened.
@@ -1391,8 +1498,9 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
             core.label = report.label.clone();
             core.last = Some(report);
             // The lifetime record travels with the state: a client reading
-            // /state sees the same counters /life serves.
-            core.intents.set_life(core.runtime.book());
+            // /state sees the same counters /life serves, for the duck it sees.
+            let book = active_runtime(core).book().clone();
+            core.intents.set_life(&book);
             publish_state(core);
             0
         }

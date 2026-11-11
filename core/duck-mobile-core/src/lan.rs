@@ -35,6 +35,8 @@ struct Peer {
     addr: SocketAddr,
     last_seen_ms: u128,
     replied: bool,
+    /// The last greet we answered, so a flood of datagrams is one greeting.
+    last_greet_ms: u128,
 }
 
 struct Inner {
@@ -223,10 +225,21 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             if to != "all" && to != inner.id {
                 return None;
             }
+            // A LAN flood must not become a chorus of emotions. One greet
+            // per peer per second is both a greeting and a reply.
+            if let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) {
+                if now.saturating_sub(peer.last_greet_ms) < 1_000 {
+                    return None;
+                }
+                peer.last_greet_ms = now;
+            }
             inner.events.push(PeerEvent::Greeted {
                 from: from.to_owned(),
                 name: name.clone(),
             });
+            if inner.events.len() > 32 {
+                inner.events.remove(0);
+            }
             // Replying hello does not make them "answered": the flag is only
             // set when we receive their hello, below.
             Some(
@@ -249,6 +262,9 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
                 from: from.to_owned(),
                 name,
             });
+            if inner.events.len() > 32 {
+                inner.events.remove(0);
+            }
             if let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) {
                 peer.replied = true;
             }
@@ -282,6 +298,7 @@ fn upsert(inner: &mut Inner, id: &str, name: &str, source: SocketAddr, now: u128
         addr: source,
         last_seen_ms: now,
         replied: false,
+        last_greet_ms: 0,
     });
 }
 

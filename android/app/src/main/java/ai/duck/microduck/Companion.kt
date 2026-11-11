@@ -417,7 +417,12 @@ internal fun postJson(path: String, body: String): Boolean {
     connection.readTimeout = 2000
     return try {
         connection.outputStream.use { it.write(body.toByteArray()) }
-        connection.responseCode in 200..299
+        val code = connection.responseCode
+        val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
+            ?.bufferedReader()?.use { it.readText() } ?: ""
+        // Refusals travel as HTTP 200 with {"ok":false}; only a body that
+        // did not refuse counts as delivered.
+        code in 200..299 && !text.contains("\"ok\":false")
     } finally {
         connection.disconnect()
     }

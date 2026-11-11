@@ -165,6 +165,11 @@ object AIBrain {
         }
     }
 
+    private fun finite(json: JSONObject, key: String, fallback: Double): Double? {
+        val value = json.optDouble(key, fallback)
+        return value.takeIf { it.isFinite() }
+    }
+
     /** The model is asked for bare JSON; models still like fences and prose. */
     fun parse(text: String): AIDecision? {
         val start = text.indexOf('{')
@@ -180,20 +185,32 @@ object AIBrain {
                     else AIDecision(action, value = value, why = json.optString("why", ""))
                 }
                 "sit", "stand", "stop" -> AIDecision(action, why = json.optString("why", ""))
-                "look" -> AIDecision(
-                    action,
-                    x = json.optDouble("x", 1.0).coerceIn(-2.0, 2.0),
-                    y = json.optDouble("y", 0.0).coerceIn(-2.0, 2.0),
-                    z = json.optDouble("z", 0.15).coerceIn(0.0, 1.5),
-                    why = json.optString("why", ""),
-                )
-                "move" -> AIDecision(
-                    action,
-                    vx = json.optDouble("vx", 0.0).coerceIn(-0.6, 0.6),
-                    vz = json.optDouble("vz", 0.0).coerceIn(-1.0, 1.0),
-                    seconds = json.optDouble("seconds", 1.0).coerceIn(0.2, 2.0),
-                    why = json.optString("why", ""),
-                )
+                // org.json parses the string "NaN" into Double.NaN, and
+                // coerceIn happily returns NaN; only finite numbers may steer.
+                "look" -> {
+                    val x = finite(json, "x", 1.0) ?: return null
+                    val y = finite(json, "y", 0.0) ?: return null
+                    val z = finite(json, "z", 0.15) ?: return null
+                    AIDecision(
+                        action,
+                        x = x.coerceIn(-2.0, 2.0),
+                        y = y.coerceIn(-2.0, 2.0),
+                        z = z.coerceIn(0.0, 1.5),
+                        why = json.optString("why", ""),
+                    )
+                }
+                "move" -> {
+                    val vx = finite(json, "vx", 0.0) ?: return null
+                    val vz = finite(json, "vz", 0.0) ?: return null
+                    val seconds = finite(json, "seconds", 1.0) ?: return null
+                    AIDecision(
+                        action,
+                        vx = vx.coerceIn(-0.6, 0.6),
+                        vz = vz.coerceIn(-1.0, 1.0),
+                        seconds = seconds.coerceIn(0.2, 2.0),
+                        why = json.optString("why", ""),
+                    )
+                }
                 else -> null
             }
         } catch (_: Throwable) {
