@@ -87,6 +87,9 @@ pub enum Intent {
     Wheee(bool),
     /// A stroke of the hand on the duck.
     Pet,
+    /// The lifetime record a shell saved across launches, handed back so the
+    /// duck's history survives an app restart.
+    RestoreLife(serde_json::Value),
     /// How long the duck waits before doing something by itself, in seconds.
     IdleRitual(f64),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
@@ -402,6 +405,9 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/sensors") => Ok(queue.sensors_json()),
         // The lifetime record, the same counters the shell keeps in storage.
         ("GET", "/life") => Ok(queue.life_json()),
+        ("POST", "/life") => Ok(queue
+            .request(Intent::RestoreLife(value.clone()))
+            .to_string()),
         ("POST", "/mcp") => Ok(crate::mcp::handle(&body, &queue)),
         ("GET", "/mcp") => Ok(crate::mcp::handle(
             r#"{"jsonrpc":"2.0","id":0,"method":"tools/list"}"#,

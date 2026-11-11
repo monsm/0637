@@ -320,6 +320,20 @@ check $? "flashlight sets an official colour" "$(printf '%s' "$FLASH" | head -c 
 FLASH2=$(api POST /flashlight '{}' || true)
 printf '%s' "$FLASH2" | grep -q '"flashlight":0'
 check $? "flashlight toggles back off" "$(printf '%s' "$FLASH2" | head -c 120)"
+# The record survives an app restart: a shell can POST its saved book back.
+SAVED=$(api GET /life || true)
+printf '%s' "$SAVED" | python3 -c "
+import json,sys
+b=json.load(sys.stdin); b['pets']=7; print(json.dumps(b))
+" > /tmp/duck-life.json 2>/dev/null || true
+RESTORED=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   --data-binary @/tmp/duck-life.json http://127.0.0.1:8765/life || true)
+printf '%s' "$RESTORED" | grep -q '"ok":true'
+check $? "the shell can restore the duck's record" "$(printf '%s' "$RESTORED" | head -c 120)"
+LIFE_BACK=$(api GET /life || true)
+printf '%s' "$LIFE_BACK" | grep -q '"pets":7'
+check $? "the restored record is the one served" ""
+rm -f /tmp/duck-life.json
+
 # Petting: a stroke of the hand, the phone's stand-in for pet_detect.
 PET=$(api POST /pet '{}' || true)
 printf '%s' "$PET" | grep -q '"ok":true'

@@ -757,6 +757,40 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             core.runtime.set_idle_ritual(seconds);
             json!({ "ok": true, "idle_ritual_s": seconds })
         }
+        Intent::RestoreLife(saved) => {
+            // The shell saved the flat /life summary, not the Book's nested
+            // shape: rebuild it field by field rather than silently dropping
+            // an unmatched deserialization to an empty history.
+            let book = core.runtime.book_mut();
+            let life = &mut book.life;
+            let num = |key: &str| -> Option<f64> { saved.get(key).and_then(|v| v.as_f64()) };
+            if let Some(v) = num("powered_s") { life.powered_s = v; }
+            if let Some(v) = num("torqued_s") { life.torqued_s = v; }
+            if let Some(v) = num("walking_s") { life.walking_s = v; }
+            if let Some(v) = num("standing_s") { life.standing_s = v; }
+            if let Some(v) = num("sitting_s") { life.sitting_s = v; }
+            if let Some(v) = num("held_s") { life.held_s = v; }
+            if let Some(v) = num("boots") { life.boots = v as u64; }
+            if let Some(v) = num("falls") { life.falls = v as u64; }
+            if let Some(v) = num("pickups") { life.pickups = v as u64; }
+            if let Some(v) = num("sit_downs") { life.sit_downs = v as u64; }
+            if let Some(v) = num("stand_ups") { life.stand_ups = v as u64; }
+            if let Some(v) = num("wake_ups") { life.wake_ups = v as u64; }
+            if let Some(v) = num("pets") { life.pets = v as u64; }
+            if let Some(v) = num("metres") { life.metres = v; }
+            if let Some(v) = num("power_offs") { life.power_offs = v as u64; }
+            if let Some(m) = saved.get("skills").and_then(|v| v.as_object()) {
+                life.skills = m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_u64()?))).collect();
+            }
+            if let Some(m) = saved.get("emotions").and_then(|v| v.as_object()) {
+                life.emotions = m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_u64()?))).collect();
+            }
+            if let Some(a) = saved.get("events").and_then(|v| v.as_array()) {
+                book.events = a.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
+            }
+            core.intents.set_life(core.runtime.book());
+            json!({ "ok": true })
+        }
         Intent::Pet => {
             core.runtime.pet();
             json!({ "ok": true, "pets": core.runtime.book().life.pets })
