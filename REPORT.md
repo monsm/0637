@@ -300,6 +300,20 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 
 UI 同批重做（小屏批判）：顶栏 6 chip → ⋯菜单；触摸目标全 48pt；sheet 分组折叠（图鉴/此刻/更多）；图鉴行「x/13 moods · y tricks」；Android sheet 可滚动；App 图标（鸭子剪影）；首次引导提示；麦克风权限两端真实接入。
 
+### 四之八续、喂食断言揭出的三个真 bug（2026-11-11）
+
+喂食测试反复报 `busy`，逐层剥开是三个独立的计数 bug，全部在生产代码里，不在测试里：
+
+| Bug | 根因 | 修复 |
+|---|---|---|
+| 喂食永远被拒 | `ground_pick` 是 50 Hz 环的内置动词，不在 controller 的脚本技能表里；`feed()` 却用 `trigger_skill("ground_pick")` 找它，永远 `no such skill`（被路由压成 `busy`） | `feed()` 改走 `start_ground_pick()` |
+| `pickups`/`falls` 永远为 0 | vetbook 的上升沿计数块写在 `last_pickup_paused`/`last_fallen` 已被本 tick 更新之后，`!last_*` 恒假；`falls` 额外还有 `fallen_ticks==20 && !last_fallen` 的自相矛盾条件 | 计数移到真正的上升沿（`coo`/0.4 s 摔落确认处） |
+| `ground_picks` 从未增量 | 啄地状态在 controller 内部，没有任何代码观察它的上升沿 | `Controller::ground_pick_running()` 访问器 + tick 上升沿计数 |
+
+同时修正：空闲仪式只会选不带技能的官方情绪（`devastated` 的 keyframe 里含 `sit`，无人触发时会把鸭子坐地上）；life 断言原先要求 80 行后才发生的 `roulade`，拆成「此段真实发生的事实」与「技能环跑完后的三技能计数」两条；相机切换回到顶栏一键（`surface-toggle`，48 pt）——取景不该藏在菜单里，UI 测试也因此有了稳定锚点；Android CI 的 paths 补上 `upstream/**`（core 按路径编译上游源码，此前 4 个提交 Android 静默未跑）。
+
+结果：iOS `f8cf1eb` **14/14 全绿**——模拟器 141 项会话断言 141 通过 + XCUITest 通过 + 设备切片 + ipa，首次无红。
+
 ---
 
 ## 五、iOS 真机安装说明
