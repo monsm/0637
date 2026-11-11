@@ -463,7 +463,7 @@ index 2b94eaa..1121af7 100644
      /// plane the anchor defines.
      pub fn position(&self) -> [f64; 3] {
 diff --git a/robotd/src/control.rs b/robotd/src/control.rs
-index 62c39c1..b0bce0a 100644
+index 62c39c1..76bd742 100644
 --- a/robotd/src/control.rs
 +++ b/robotd/src/control.rs
 @@ -136,8 +136,8 @@ pub struct Step {
@@ -607,6 +607,19 @@ index 62c39c1..b0bce0a 100644
      pub fn carry_over(&mut self, from: &Controller) {
          self.policy.carry_over(&from.policy);
          self.last_action = from.last_action;
+@@ -399,6 +484,12 @@ impl Controller {
+         Ok(())
+     }
+ 
++    /// Whether a ground pick is mid-peck. The peck is the loop's own verb,
++    /// not a scripted skill, so this is the only way to see it from outside.
++    pub fn ground_pick_running(&self) -> bool {
++        self.ground_pick.is_some()
++    }
++
+     /// Every one-shot skill this robot has, in priority order — what a client may ask for.
+     pub fn skill_names(&self) -> Vec<String> {
+         self.skills
 diff --git a/robotd/src/idle_head.rs b/robotd/src/idle_head.rs
 index c41dadf..761c6bd 100644
 --- a/robotd/src/idle_head.rs
