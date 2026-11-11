@@ -5,6 +5,10 @@ on:
     paths:
       - "android/**"
       - "core/**"
+      # The core compiles upstream sources directly (control.rs, pickup.rs,
+      # the odometry crate), so an upstream edit is a build input even when
+      # no file under android/ or core/ moved.
+      - "upstream/**"
       # The upstream patch changes what the core compiles against, so a patch
       # edit is a build input even when no Rust file moved.
       - "patches/**"
