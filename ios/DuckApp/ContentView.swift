@@ -31,6 +31,8 @@ struct ContentView: View {
         case drive, head, body
     }
     @State private var showInstrument = false
+    /// The child's block program, edited over the live duck.
+    @State private var showRules = false
     @State private var tapTarget: CGPoint?
     @State private var lastTap = Date.distantPast
     /// Flipping this re-renders every `Copy` string.
@@ -136,6 +138,17 @@ struct ContentView: View {
                     .presentationDetents(portrait ? [.medium, .large] : [.large])
                     .presentationDragIndicator(.visible)
             }
+            // The Director photo, once the shutter has captured it. Its own
+            // sheet so it can sit over the live view without closing the
+            // instrument.
+            .sheet(item: $controller.capturedPhoto) { photo in
+                PhotoPreviewSheet(photo: photo)
+            }
+            .sheet(isPresented: $showRules) {
+                RulesSheet(controller: controller)
+                    .presentationDetents(portrait ? [.large] : [.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .preferredColorScheme(.dark)
         // The hint teaches gestures, so it must wait until gestures work:
@@ -153,6 +166,25 @@ struct ContentView: View {
             withAnimation(.easeIn(duration: 0.2)) { moodText = summary }
             DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
                 guard moodText == summary else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
+        // A clap or a whistle is answered visibly as well as audibly: the
+        // same pill the away recap uses, for a shorter spell.
+        .onChange(of: controller.roomSound) { _, sound in
+            guard let sound, !sound.isEmpty else { return }
+            withAnimation(.easeIn(duration: 0.2)) { moodText = sound }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                guard moodText == sound else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
+        // A programmed block shows its work: "拍手 → 翻滚".
+        .onChange(of: controller.ruleNotice) { _, notice in
+            guard let notice, !notice.isEmpty else { return }
+            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                guard moodText == notice else { return }
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
@@ -209,8 +241,10 @@ struct ContentView: View {
                 .ignoresSafeArea()
         }
         if surface == .director {
+            // The bars and the shutter are chrome; the stage behind them keeps
+            // the drive gesture. The old blanket `allowsHitTesting(false)` is
+            // gone because the shutter is a real control.
             DirectorOverlay(controller: controller)
-                .allowsHitTesting(false)
         }
     }
 
@@ -443,7 +477,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "waveform")
                     .font(.system(size: 19))
-                    .frame(width: 56, height: 56)
+                    .frame(width: 52, height: 52)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
             }
@@ -461,7 +495,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: controller.carrying ? "hand.raised.fill" : "hand.point.up.left.fill")
                     .font(.system(size: 20))
-                    .frame(width: 64, height: 64)
+                    .frame(width: 60, height: 60)
                     .background(
                         controller.carrying
                             ? AnyShapeStyle(Color.cyan.opacity(0.35))
@@ -473,6 +507,19 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(controller.carrying ? Copy.putDown : Copy.grab)
             .accessibilityIdentifier("duck-grab")
+
+            Button {
+                showRules = true
+            } label: {
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 16))
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.blocks)
+            .accessibilityIdentifier("duck-rules")
         }
         .frame(height: 76)
         .padding(.horizontal, 10)
@@ -494,8 +541,8 @@ struct ContentView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 19))
-                .frame(width: 52, height: 52)
+                .font(.system(size: 18))
+                .frame(width: 48, height: 48)
                 .background(.ultraThinMaterial, in: Circle())
                 .contentShape(Circle())
         }
@@ -715,6 +762,12 @@ struct ContentView: View {
                 } label: {
                     Label(Copy.language.rawValue, systemImage: "globe")
                 }
+                Button {
+                    showRules = true
+                } label: {
+                    Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
+                }
+                .accessibilityIdentifier("open-rules")
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .semibold))
@@ -840,6 +893,22 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(controller.carrying ? Copy.putDown : Copy.grab)
             .accessibilityIdentifier("duck-grab")
+
+            // The block program, one tap from the stage: a child should not
+            // have to find it in a menu.
+            Button {
+                showRules = true
+            } label: {
+                Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 17))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.blocks)
+            .accessibilityIdentifier("duck-rules")
 
             Spacer()
 
@@ -1069,6 +1138,31 @@ struct DirectorOverlay: View {
                     .foregroundStyle(.white.opacity(0.7))
                     .padding(.bottom, bar / 2 - 5)
                     .padding(.trailing, 14)
+            }
+            .overlay(alignment: .topTrailing) {
+                // The one shutter: the frame already on the screen is the photo.
+                Button {
+                    controller.captureDirectorPhoto()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.92))
+                            .frame(width: 64, height: 64)
+                            .shadow(color: .black.opacity(0.35), radius: 8, y: 2)
+                        Circle()
+                            .stroke(Color.black.opacity(0.18), lineWidth: 2)
+                            .frame(width: 52, height: 52)
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.black)
+                    }
+                    .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Copy.photoTake)
+                .accessibilityIdentifier("duck-photo")
+                .padding(.top, bar + 10)
+                .padding(.trailing, 16)
             }
         }
     }

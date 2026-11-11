@@ -244,12 +244,12 @@ final class MicFeed: ObservableObject {
         latestPeakHz = seconds > 0 ? Double(crossings) / (2 * seconds) : 0
     }
 
-    /// The 1 Hz summary of the room. A Timer needs a run loop; scheduling on
-    /// the main one costs a 1 Hz closure, and the network work is handed to
-    /// `queue` like CameraFeed's metadata path.
+    /// Ten readings a second: the room's level is also the duck's ear for a
+    /// clap or a whistle, and a one-second post cannot see a clap at all. The
+    /// JSON stays tiny and goes to localhost; this is not an audio stream.
     private func startPosting() {
         postTimer?.invalidate()
-        let timer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.queue.async { self.postReading() }
         }
@@ -273,7 +273,7 @@ final class MicFeed: ObservableObject {
                 "rms": latestRMS,
                 "peak_hz": latestPeakHz,
             ],
-            "tick_ms": 0,
+            "tick_ms": Int(Date().timeIntervalSince1970 * 1000),
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: body),
               let url = URL(string: "http://127.0.0.1:8765/sensor")

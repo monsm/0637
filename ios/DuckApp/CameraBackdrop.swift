@@ -11,7 +11,7 @@ import SwiftUI
 ///
 /// Only metadata (size, frame rate, exposure, field of view) is posted to
 /// `/sensor`, at 1 Hz, so a client can tell what the environment was.
-final class CameraFeed: ObservableObject {
+final class CameraFeed: NSObject, ObservableObject {
     /// A camera was found and started. False in the simulator, on a device
     /// without a rear camera, or when permission is denied.
     @Published private(set) var available = false
@@ -22,6 +22,11 @@ final class CameraFeed: ObservableObject {
     private let queue = DispatchQueue(label: "duck.camera")
     private var configured = false
     private var metadataTimer: Timer?
+    /// Director's still capture. The preview alone has no frames to read, and
+    /// asking the OS for a photo is the only path with the full-resolution
+    /// image the user saw behind the duck.
+    private let photoOutput = AVCapturePhotoOutput()
+    private var photoCompletion: ((UIImage?) -> Void)?
 
     func start() {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
@@ -99,6 +104,9 @@ final class CameraFeed: ObservableObject {
             NSLog("duck: camera input could not be added")
             return
         }
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+        }
         session.commitConfiguration()
         configured = true
         NSLog(
@@ -108,6 +116,20 @@ final class CameraFeed: ObservableObject {
             device.activeFormat.videoSupportedFrameRateRanges.first?.maxFrameRate ?? 0,
             device.activeFormat.videoFieldOfView
         )
+    }
+
+    /// Ask the camera for one still. Completion always runs on the main
+    /// thread; nil means no camera, not yet running, or the capture failed.
+    func capture(completion: @escaping (UIImage?) -> Void) {
+        queue.async { [weak self] in
+            guard let self, self.configured, self.session.isRunning else {
+                DispatchQueue.main.async { completion(nil) }
+                return
+            }
+            self.photoCompletion = completion
+            let settings = AVCapturePhotoSettings()
+            self.photoOutput.capturePhoto(with: settings, delegate: self)
+        }
     }
 
     private func startMetadata() {
@@ -143,6 +165,21 @@ final class CameraFeed: ObservableObject {
         request.httpBody = data
         request.timeoutInterval = 2
         URLSession.shared.dataTask(with: request).resume()
+    }
+}
+
+extension CameraFeed: AVCapturePhotoCaptureDelegate {
+    func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishProcessingPhoto photo: AVCapturePhoto,
+        error: Error?
+    ) {
+        let completion = photoCompletion
+        photoCompletion = nil
+        let image = error == nil
+            ? photo.fileDataRepresentation().flatMap(UIImage.init(data:))
+            : nil
+        DispatchQueue.main.async { completion?(image) }
     }
 }
 

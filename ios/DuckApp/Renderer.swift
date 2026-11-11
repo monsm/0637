@@ -76,6 +76,9 @@ final class Renderer: NSObject, MTKViewDelegate {
     private let yaw: Float = .pi
     private let pitch: Float = 0.32
     private let distance: Float = 0.85
+    /// Set once by the Director shutter: the next completed frame is read back
+    /// instead of simply presented.
+    private var captureCompletion: ((UIImage?) -> Void)?
 
     /// Why the last `init?` failed. A renderer that could not start used to
     /// leave a black screen with nothing to look at.
@@ -368,8 +371,78 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
 
         encoder.endEncoding()
-        buffer.present(drawable)
+        // A photo is one frame read back instead of presented: the drawable
+        // already holds exactly what the screen shows — the duck over the
+        // room, or over the studio — so the composite is the user's view, not
+        // a second rendering that could disagree with it.
+        if let completion = captureCompletion {
+            captureCompletion = nil
+            buffer.commit()
+            buffer.waitUntilCompleted()
+            let image = readTexture(drawable.texture)
+            buffer.present(drawable)
+            completion(image)
+        } else {
+            buffer.present(drawable)
+            buffer.commit()
+        }
+    }
+
+    /// Ask the next frame to hand back its pixels, once. Used by the Director
+    /// shutter; the callback runs on the main thread, where `draw` runs.
+    func snapshot(_ completion: @escaping (UIImage?) -> Void) {
+        captureCompletion = completion
+    }
+
+    /// The frame in the drawable, as an image. A blit to a shared buffer is
+    /// the portable read-back: drawable textures are private on iOS.
+    private func readTexture(_ texture: MTLTexture) -> UIImage? {
+        let width = texture.width
+        let height = texture.height
+        guard width > 0, height > 0 else { return nil }
+        let bytesPerRow = ((width * 4 + 255) / 256) * 256
+        guard let readback = device.makeBuffer(
+            length: bytesPerRow * height,
+            options: .storageModeShared
+        ),
+            let buffer = queue.makeCommandBuffer(),
+            let blit = buffer.makeBlitCommandEncoder()
+        else { return nil }
+        blit.copy(
+            from: texture,
+            sourceSlice: 0,
+            sourceLevel: 0,
+            sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+            sourceSize: MTLSize(width: width, height: height, depth: 1),
+            to: readback,
+            destinationOffset: 0,
+            destinationBytesPerRow: bytesPerRow,
+            destinationBytesPerImage: bytesPerRow * height
+        )
+        blit.endEncoding()
         buffer.commit()
+        buffer.waitUntilCompleted()
+        let data = Data(bytes: readback.contents(), count: bytesPerRow * height)
+        guard let provider = CGDataProvider(data: data as CFData),
+              let image = CGImage(
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bitsPerPixel: 32,
+                bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGBitmapInfo(
+                    rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
+                        | CGBitmapInfo.byteOrder32Little.rawValue
+                ),
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+              )
+        else { return nil }
+        // Scale 1: the file is the drawable's own pixel grid, not points.
+        return UIImage(cgImage: image, scale: 1, orientation: .up)
     }
 
     private func bodyPose(core: OpaquePointer, body: Int) -> (SIMD3<Float>, SIMD4<Float>) {
@@ -471,6 +544,9 @@ struct MetalView: UIViewRepresentable {
         // MTKView swallows the SwiftUI gestures layered over it.
         view.isUserInteractionEnabled = false
         context.coordinator.renderer = Renderer(controller: controller, view: view)
+        // The Director shutter needs the renderer: the photo is a read-back of
+        // the frame already on screen, not a second camera or a re-render.
+        controller.renderer = context.coordinator.renderer
         if context.coordinator.renderer == nil {
             // A renderer that failed to start used to leave a black screen
             // with nothing to look at. Report it instead.

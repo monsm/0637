@@ -141,7 +141,7 @@ class MicFeed {
         val seconds = total.toDouble() / SAMPLE_RATE
         val peakHz = if (seconds > 0) crossings.toDouble() / (2.0 * seconds) else 0.0
         val body =
-            """{"sensor":"microphone","mode":"twin","value":{"rms":${"%.4f".format(rms)},"peak_hz":${"%.1f".format(peakHz)}},"tick_ms":0}"""
+            """{"sensor":"microphone","mode":"twin","value":{"rms":${"%.4f".format(rms)},"peak_hz":${"%.1f".format(peakHz)}},"tick_ms":${System.currentTimeMillis()}}"""
         post(body)
     }
 
@@ -161,7 +161,7 @@ class MicFeed {
     private companion object {
         const val SAMPLE_RATE = 16_000
         const val READ_SAMPLES = 2048
-        const val WINDOW_READS = 4
+        const val WINDOW_READS = 2
         const val FULL_SCALE = 32768.0
     }
 }

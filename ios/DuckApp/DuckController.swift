@@ -10,6 +10,29 @@ import simd
 /// The renderer and the core share the main thread, so Metal never reads
 /// MuJoCo state while it is being written.
 final class DuckController: ObservableObject {
+    /// The live renderer, for the Director shutter's frame read-back. Weak:
+    /// the view owns the renderer, not the controller.
+    weak var renderer: Renderer?
+
+    /// A finished Director photo, waiting for the preview sheet. The file is
+    /// already on disk; the sheet decides save-to-Photos or share.
+    struct CapturedPhoto: Identifiable {
+        let id = UUID()
+        let image: UIImage
+        let url: URL?
+    }
+    @Published var capturedPhoto: CapturedPhoto?
+
+    /// The child's block program. The core executes it; the shell edits it and
+    /// keeps a copy in UserDefaults so it survives a launch.
+    struct DuckRule: Codable, Equatable {
+        var trigger: String
+        var action: String
+        var value: String
+    }
+    @Published var rules: [DuckRule] = []
+    private static let rulesKey = "duck_rules_v1"
+
     @Published var ready = false
     @Published var errorMessage: String?
     /// Set when the Metal renderer could not start. A failed renderer used to
@@ -71,6 +94,12 @@ final class DuckController: ObservableObject {
     /// went to the background, summed up in one line when it comes back.
     /// A duck that played by itself while nobody watched should say so.
     @Published var awaySummary: String?
+    /// The last room sound the duck answered, as one line above the rail.
+    @Published var roomSound: String?
+    private var lastSoundEventTick = -1
+    /// The last programmed block that fired, as "clap → roulade".
+    @Published var ruleNotice: String?
+    private var lastRuleTick = -1
     private var eventsAtBackground: [String] = []
     private var lastEvents: [String] = []
     /// The companion layer, from /state.care: hunger (0 fed .. 1 starving),
@@ -108,6 +137,11 @@ final class DuckController: ObservableObject {
     /// actually performed, from /state.life. A collection you fill by playing,
     /// not a list of names.
     @Published var trickBook = "—"
+    /// The three lifetime numbers the vet book is about, read from /state.life
+    /// and shown next to the export button.
+    @Published var vetbookMetres: Double = 0
+    @Published var vetbookRolls: Int = 0
+    @Published var vetbookPickups: Int = 0
     /// The flashlight's colour while lit, nil when off. A toggle publishes the
     /// FFI's new state directly rather than waiting for the next poll.
     @Published var flashlightColor: String?
@@ -632,6 +666,55 @@ final class DuckController: ObservableObject {
            let data = try? JSONSerialization.data(withJSONObject: life) {
             post("/life", data)
         }
+        if let data = UserDefaults.standard.data(forKey: Self.rulesKey),
+           let saved = try? JSONDecoder().decode([DuckRule].self, from: data) {
+            rules = saved
+            let payload = ["rules": saved.map {
+                ["trigger": $0.trigger, "action": $0.action, "value": $0.value]
+            }]
+            if let body = try? JSONSerialization.data(withJSONObject: payload) {
+                post("/rules", body)
+            }
+        }
+    }
+
+    /// The block program the core is running. A GET, because the core is the
+    /// authority; the local copy is only the editor's working set.
+    func loadRules() {
+        guard let url = URL(string: "http://127.0.0.1:8765/rules"),
+              let data = try? Data(contentsOf: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let summary = json["rules"] as? [String: Any],
+              let list = summary["rules"] as? [[String: Any]]
+        else {
+            if let data = UserDefaults.standard.data(forKey: Self.rulesKey),
+               let saved = try? JSONDecoder().decode([DuckRule].self, from: data) {
+                rules = saved
+            }
+            return
+        }
+        rules = list.compactMap { item in
+            guard let trigger = item["trigger"] as? String,
+                  let action = item["action"] as? String,
+                  let value = item["value"] as? String
+            else { return nil }
+            return DuckRule(trigger: trigger, action: action, value: value)
+        }
+    }
+
+    /// Replace the set in the core and on disk. The core validates; an
+    /// invalid block comes back refused rather than run.
+    func saveRules(_ next: [DuckRule]) {
+        rules = next
+        let payload = ["rules": next.map {
+            ["trigger": $0.trigger, "action": $0.action, "value": $0.value]
+        }]
+        if let body = try? JSONSerialization.data(withJSONObject: payload) {
+            post("/rules", body)
+        }
+        if let data = try? JSONEncoder().encode(next) {
+            UserDefaults.standard.set(data, forKey: Self.rulesKey)
+        }
     }
 
     /// The app comes back: whatever the duck logged on its own - rituals,
@@ -676,6 +759,94 @@ final class DuckController: ObservableObject {
         }
         guard !parts.isEmpty else { return }
         awaySummary = parts.joined(separator: " · ")
+    }
+
+    /// The vet book as a real file in the app's temporary directory. The core
+    /// writes the document; the shell only places it where a share sheet can
+    /// pick it up. Returns nil rather than an empty file if the core is down.
+    func vetbookFile() -> URL? {
+        guard let url = URL(string: "http://127.0.0.1:8765/export/vetbook.md"),
+              let data = try? Data(contentsOf: url),
+              !data.isEmpty else { return nil }
+        let target = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MicroDuck-vetbook.md")
+        do {
+            try data.write(to: target, options: .atomic)
+            return target
+        } catch {
+            return nil
+        }
+    }
+
+    /// The Director shutter: read the frame the screen is showing, ask the
+    /// camera for the room, and put the duck in the room. With no camera the
+    /// frame already has the studio behind it and that is the photo. The
+    /// result is written to Documents/Photos before the preview appears.
+    func captureDirectorPhoto() {
+        guard let renderer else { return }
+        renderer.snapshot { [weak self] duck in
+            guard let self, let duck else { return }
+            let finish: (UIImage) -> Void = { [weak self] image in
+                guard let self else { return }
+                let url = self.writePhoto(image)
+                self.capturedPhoto = Self.CapturedPhoto(image: image, url: url)
+            }
+            if self.cameraActive {
+                self.camera.capture { [weak self] room in
+                    guard let self else { return }
+                    if let room {
+                        finish(Self.composite(room: room, duck: duck))
+                    } else {
+                        finish(duck)
+                    }
+                }
+            } else {
+                finish(duck)
+            }
+        }
+    }
+
+    /// The camera photo behind, the duck frame over it. Both fill the screen
+    /// the user saw, so the composite matches the viewfinder (screen-space,
+    /// not a tracked AR projection — this duck has no camera pose).
+    private static func composite(room: UIImage, duck: UIImage) -> UIImage {
+        let size = duck.size
+        guard size.width > 0, size.height > 0 else { return duck }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            let target = size.width / size.height
+            let source = room.size.width / max(room.size.height, 1)
+            var rect = CGRect(origin: .zero, size: size)
+            if source > target {
+                let width = size.height * source
+                rect = CGRect(x: (size.width - width) / 2, y: 0, width: width, height: size.height)
+            } else if source < target {
+                let height = size.width / source
+                rect = CGRect(x: 0, y: (size.height - height) / 2, width: size.width, height: height)
+            }
+            room.draw(in: rect)
+            duck.draw(in: CGRect(origin: .zero, size: size))
+        }
+    }
+
+    private func writePhoto(_ image: UIImage) -> URL? {
+        guard let data = image.pngData() else { return nil }
+        let files = FileManager.default
+        guard let documents = files.urls(for: .documentDirectory, in: .userDomainMask).first
+        else { return nil }
+        let directory = documents.appendingPathComponent("Photos", isDirectory: true)
+        try? files.createDirectory(at: directory, withIntermediateDirectories: true)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let target = directory
+            .appendingPathComponent("MicroDuck-\(formatter.string(from: Date())).png")
+        do {
+            try data.write(to: target, options: .atomic)
+            return target
+        } catch {
+            return nil
+        }
     }
 
     /// A stroke of the hand: POST /pet. The core counts it, coos and stays
@@ -734,6 +905,25 @@ final class DuckController: ObservableObject {
                         self.behaviorSummary = "—"
                     }
                     self.parseLeds(json["leds"])
+                    if let event = json["sound_event"] as? [String: Any],
+                       let kind = event["kind"] as? String,
+                       let tick = event["tick"] as? Int {
+                        if tick != self.lastSoundEventTick {
+                            self.lastSoundEventTick = tick
+                            self.roomSound = Copy.heardSound(kind)
+                        }
+                    }
+                    if let rule = json["rule_event"] as? [String: Any],
+                       let trigger = rule["trigger"] as? String,
+                       let action = rule["action"] as? String,
+                       let value = rule["value"] as? String,
+                       let tick = rule["tick"] as? Int {
+                        if tick != self.lastRuleTick {
+                            self.lastRuleTick = tick
+                            let shown = action == "sound" ? value : SkillLabel.of(value)
+                            self.ruleNotice = "\(Copy.ruleTrigger(trigger)) → \(shown)"
+                        }
+                    }
                     if let care = json["care"] as? [String: Any] {
                         self.careHunger = care["hunger"] as? Double ?? 0
                         self.careMood = care["mood"] as? Double ?? 0
@@ -745,6 +935,9 @@ final class DuckController: ObservableObject {
                         let emotions = life["emotions"] as? [String: Any] ?? [:]
                         let skills = life["skills"] as? [String: Any] ?? [:]
                         self.lastEvents = life["events"] as? [String] ?? self.lastEvents
+                        self.vetbookMetres = life["metres"] as? Double ?? 0
+                        self.vetbookRolls = skills["roulade"] as? Int ?? 0
+                        self.vetbookPickups = life["pickups"] as? Int ?? 0
                         self.trickBook = String(
                             format: "%d/13 moods · %d tricks",
                             emotions.count,

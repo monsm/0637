@@ -1,10 +1,14 @@
 package ai.duck.microduck
 
+import android.graphics.Bitmap
 import android.opengl.GLSurfaceView
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -13,6 +17,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,12 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -121,6 +131,11 @@ private fun DuckScreen(
     var status by remember { mutableStateOf(DoubleArray(0)) }
     var skills by remember { mutableStateOf(emptyList<String>()) }
     var surface by remember { mutableStateOf(Surface.Live) }
+    // Director's photo path: the shutter reads the GL frame, CameraX supplies
+    // the room, and the preview sheet saves or shares the composite.
+    var renderer by remember { mutableStateOf<DuckRenderer?>(null) }
+    val cameraCapture = remember { CameraCapture() }
+    var photo by remember { mutableStateOf<Bitmap?>(null) }
     var cameraAvailable by remember { mutableStateOf(false) }
     val cameraActive = surface == Surface.Director && cameraAvailable
     LaunchedEffect(cameraActive) { input.cameraActive = cameraActive }
@@ -176,6 +191,7 @@ private fun DuckScreen(
                 CameraBackdrop(
                     active = true,
                     onAvailability = { cameraAvailable = it },
+                    capture = cameraCapture,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -188,7 +204,9 @@ private fun DuckScreen(
                         setEGLConfigChooser(8, 8, 8, 8, 16, 0)
                         holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
                         setZOrderMediaOverlay(true)
-                        setRenderer(DuckRenderer(ctx, active, input))
+                        val duckRenderer = DuckRenderer(ctx, active, input)
+                        renderer = duckRenderer
+                        setRenderer(duckRenderer)
                         renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
                     }
                 },
@@ -205,8 +223,29 @@ private fun DuckScreen(
                 quack = onQuack,
                 onWheee = onWheee,
                 onFeed = onFeed,
+                onPhoto = {
+                    val duckRenderer = renderer
+                    if (duckRenderer != null) {
+                        val main = Handler(Looper.getMainLooper())
+                        duckRenderer.captureFrame { duck ->
+                            main.post {
+                                if (duck == null) return@post
+                                if (cameraActive) {
+                                    cameraCapture.take(context) { room ->
+                                        photo = compositePhoto(room, duck)
+                                    }
+                                } else {
+                                    photo = duck
+                                }
+                            }
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxSize(),
             )
+            photo?.let { shot ->
+                PhotoPreviewDialog(shot) { photo = null }
+            }
         } else {
             Text(
                 error ?: "Loading MuJoCo + policies…",
@@ -218,6 +257,71 @@ private fun DuckScreen(
     }
 }
 
+@Composable
+private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
+    val context = LocalContext.current
+    var saved by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
+    Dialog(onDismissRequest = onClose) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF0E131A), RoundedCornerShape(20.dp))
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                Copy.photoTitle,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Image(
+                bitmap = photo.asImageBitmap(),
+                contentDescription = Copy.photoTitle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp)
+                    .testTag("photo-preview"),
+                contentScale = ContentScale.Fit,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = {
+                        saved = savePhoto(context, photo)
+                        saveFailed = !saved
+                    },
+                    enabled = !saved,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("photo-save"),
+                ) {
+                    Text(
+                        if (saved) Copy.saved else if (saveFailed) Copy.saveFailed else Copy.savePhoto,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                    )
+                }
+                Button(
+                    onClick = { sharePhoto(context, photo) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("photo-share"),
+                ) {
+                    Text(Copy.share, fontSize = 13.sp)
+                }
+            }
+            Button(
+                onClick = onClose,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("photo-close"),
+            ) {
+                Text(Copy.close, fontSize = 13.sp)
+            }
+        }
+    }
+}
 @Composable
 private fun StatusPanel(status: DoubleArray, modifier: Modifier = Modifier) {
     val bringup = status.getOrNull(0)?.toInt() ?: 0

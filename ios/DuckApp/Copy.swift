@@ -198,6 +198,54 @@ enum Copy {
     static var tiltLook: String { pick("Tilt to look", "倾斜看") }
     static var tiltLookOn: String { pick("Tilt to look: on", "倾斜看：开") }
     static var trickBook: String { pick("Trick book", "技巧图鉴") }
+    // The vet book, and the file it exports.
+    static var lifeRecord: String { pick("Life record", "终身记录") }
+    static var walked: String { pick("walked", "走过") }
+    static var rolls: String { pick("rolls", "翻滚") }
+    static var pickups: String { pick("picked up", "被抱起") }
+    static var exportVetbook: String { pick("Export vet book", "导出记录") }
+    static var shareVetbook: String { pick("Share vet book", "分享记录") }
+    // The Director photo.
+    static var photoTitle: String { pick("Your duck, in your room", "你的鸭子，在你房间") }
+    static var photoTake: String { pick("Take photo", "拍照") }
+    static var savePhoto: String { pick("Save", "保存") }
+    static var saved: String { pick("Saved", "已保存") }
+    static var saveFailed: String { pick("No photo access", "无相册权限") }
+    static var share: String { pick("Share", "分享") }
+    // What the room said, from the microphone channel.
+    static func heardSound(_ kind: String) -> String {
+        switch kind {
+        case "clap": return pick("heard a clap!", "听到拍手！")
+        case "whistle": return pick("heard a whistle!", "听到口哨！")
+        default: return kind
+        }
+    }
+    // The block rules a child programs.
+    static var blocks: String { pick("Blocks", "积木规则") }
+    static var ruleWhen: String { pick("When", "当") }
+    static var ruleThen: String { pick("then", "就") }
+    static var addRule: String { pick("Add", "添加") }
+    static var deleteRule: String { pick("Delete", "删除") }
+    static var rulesEmpty: String {
+        pick("No rules yet. Build one: when I clap, roll over.",
+             "还没有规则。拼一个：拍手，就翻滚。")
+    }
+    static func ruleTrigger(_ trigger: String) -> String {
+        switch trigger {
+        case "clap": return pick("clap", "拍手")
+        case "whistle": return pick("whistle", "吹口哨")
+        case "pet": return pick("pet me", "摸摸我")
+        default: return trigger
+        }
+    }
+    static func ruleKind(_ action: String) -> String {
+        switch action {
+        case "skill": return pick("move", "动作")
+        case "emotion": return pick("mood", "心情")
+        case "sound": return pick("sound", "声音")
+        default: return action
+        }
+    }
     static var showMore: String { pick("More", "更多") }
     static var showLess: String { pick("Less", "收起") }
     static var depth: String { pick("depth", "深度") }

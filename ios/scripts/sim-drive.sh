@@ -353,6 +353,79 @@ STARTLED=$(api GET /state | field last_sound)
 [ "$STARTLED" = "alarm" ]; check $? "a loud room startles the duck" "last_sound=$STARTLED"
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
 
+# The same RMS/zero-crossing channel, classified: a loud high-frequency
+# transient is a clap, a sustained tone is a whistle. Each must reach the
+# duck's own reaction and the published event; the microphone stays out of
+# the 61-D observation either way.
+echo "--- room sounds ---"
+SOUND_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$((SOUND_TICK))}" > /dev/null || true
+sleep 0.15
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((SOUND_TICK + 60))}" > /dev/null || true
+sleep 0.5
+CLAP=$(api GET /state | python3 -c "
+import json,sys
+e=json.load(sys.stdin)
+print((e.get('sound_event') or {}).get('kind',''), (e.get('life') or {}).get('claps',0))
+" 2>/dev/null || echo " 0")
+[ "${CLAP%% *}" = "clap" ]; check $? "a clap is heard as a clap" "event=$CLAP"
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.0,\"peak_hz\":0},\"tick_ms\":$((SOUND_TICK + 200))}" > /dev/null || true
+sleep 0.2
+WHISTLE_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":900},\"tick_ms\":$((WHISTLE_TICK))}" > /dev/null || true
+sleep 0.4
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":950},\"tick_ms\":$((WHISTLE_TICK + 450))}" > /dev/null || true
+sleep 0.5
+WHISTLE=$(api GET /state | python3 -c "
+import json,sys
+e=json.load(sys.stdin)
+print((e.get('sound_event') or {}).get('kind',''), (e.get('life') or {}).get('whistles',0))
+" 2>/dev/null || echo " 0")
+[ "${WHISTLE%% *}" = "whistle" ]; check $? "a sustained tone is heard as a whistle" "event=$WHISTLE"
+api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
+
+# A child's block rule: "when I clap, roll over". The core executes it in the
+# loop, and the action is the duck's real official roulade, counted in the
+# book. The rule replaces the default laugh for that trigger, so the roulade
+# is not fighting an emotion for the duck.
+echo "--- block rules ---"
+RULES=$(api POST /rules '{"rules":[{"trigger":"clap","action":"skill","value":"roulade"}]}' || true)
+printf '%s' "$RULES" | grep -q '"ok":true'
+check $? "a child can program a rule" "$(printf '%s' "$RULES" | head -c 140)"
+RULES_GET=$(api GET /rules || true)
+printf '%s' "$RULES_GET" | grep -q '"trigger":"clap"'
+check $? "the program is read back from the core" ""
+# The previous whistle's curious timeline may still own the duck; only the
+# engine's readiness matters, so give it a moment.
+sleep 4
+ROLLS_BEFORE=$(api GET /life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('skills',{}).get('roulade',0))
+" 2>/dev/null || echo 0)
+RULE_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$RULE_TICK}" > /dev/null || true
+sleep 0.15
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((RULE_TICK + 60))}" > /dev/null || true
+ROLLS_AFTER=$ROLLS_BEFORE
+for _ in $(seq 1 40); do
+  ROLLS_AFTER=$(api GET /life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('skills',{}).get('roulade',0))
+" 2>/dev/null || echo "$ROLLS_BEFORE")
+  [ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ] && break
+  sleep 0.25
+done
+[ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ]
+check $? "a clap runs the programmed roulade" "rolls $ROLLS_BEFORE -> $ROLLS_AFTER"
+FIRED=$(api GET /state | python3 -c "
+import json,sys
+e=json.load(sys.stdin).get('rule_event') or {}
+print(e.get('trigger',''), e.get('value',''))
+" 2>/dev/null || echo " ")
+[ "$FIRED" = "clap roulade" ]; check $? "state publishes the block that fired" "event=$FIRED"
+api POST /rules '{"rules":[]}' > /dev/null || true
+api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
+
 # A treat on the floor: the official ground-pick peck, counted in the
 # life record. Nothing about food exists on the robot; the ritual is
 # digital-only and made of official moves.
@@ -429,11 +502,12 @@ CARE_TICK=$(api GET /state | python3 -c "
 import json,sys
 print(json.load(sys.stdin).get('tick',0))
 " 2>/dev/null || echo 0)
-# Twelve minutes of neglect, expressed honestly: the last touch was 800 s
-# ago on the simulated clock. The duck must doze without anyone waiting 12
-# real minutes.
-api POST /care "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 40000))}" > /dev/null || true
-sleep 0.4
+# Twelve minutes of neglect, on a care clock running 200x: the last touch was
+# 400 ticks (8 simulated seconds) ago, which is 1600 care-seconds. No test
+# waits twelve real minutes, and a user can speed the same dial.
+api POST /config '{"care_time_scale":200}' > /dev/null || true
+api POST /care "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 400))}" > /dev/null || true
+sleep 0.5
 DOZING=$(api GET /care | python3 -c "
 import json,sys
 print('yes' if (json.load(sys.stdin).get('care') or {}).get('asleep') else 'no')
@@ -449,6 +523,8 @@ print('awake' if not (json.load(sys.stdin).get('care') or {}).get('asleep') else
 [ "$WOKEN" = "awake" ]; check $? "a stroke wakes it" "$WOKEN"
 WOKE_SOUND=$(api GET /state | field last_sound)
 [ "$WOKE_SOUND" = "coo" ]; check $? "the duck coos when a hand wakes it" "last_sound=$WOKE_SOUND"
+# Back to real time for the rest of the session.
+api POST /config '{"care_time_scale":1}' > /dev/null || true
 
 # A foul mood is not a number in a menu: the official sad timeline plays.
 CARE_TICK=$(api GET /state | python3 -c "
@@ -470,6 +546,23 @@ done
 
 # Leave a distinctive state for the restart check at the end of the run.
 api POST /care '{"hunger":0.42,"mood":0.6,"bond":0.33,"asleep":false}' > /dev/null || true
+
+# The lifetime record as a file: the core writes it, the sheet shares it.
+echo "--- vet book export ---"
+VETBOOK_MD=$(api GET /export/vetbook.md || true)
+printf '%s' "$VETBOOK_MD" | grep -q "走过 / walked"
+printf '%s' "$VETBOOK_MD" | grep -q "翻滚 / rolls"
+printf '%s' "$VETBOOK_MD" | grep -q "被抱起 / picked up"
+printf '%s' "$VETBOOK_MD" | grep -q "build:"
+check $? "the vet book is a readable document" "$(printf '%s' "$VETBOOK_MD" | head -c 100)"
+VETBOOK_JSON=$(api GET /export/vetbook.json || true)
+printf '%s' "$VETBOOK_JSON" | grep -q '"format":"microduck-vetbook/1"'
+printf '%s' "$VETBOOK_JSON" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+sys.exit(0 if d.get('highlights',{}).get('rolls') is not None and 'care' in d else 1)
+" 2>/dev/null
+check $? "the vet book has a canonical JSON shape" "$(printf '%s' "$VETBOOK_JSON" | head -c 120)"
 
 # Gaze: the gaze solver runs on the training MJCF's own kinematics, so
 # aiming right of the trunk must produce a positive head_yaw and the answer

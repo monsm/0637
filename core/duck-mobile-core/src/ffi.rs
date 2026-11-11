@@ -67,6 +67,10 @@ pub struct DuckCore {
     selected: usize,
     /// The latest phone-sensor readings, and the mode they were taken in.
     sensors: crate::sensors::Sensors,
+    /// Clap/whistle detection over the microphone channel, and the sequence
+    /// that changes with each new reading so one post is heard once.
+    sound_watch: crate::sensors::SoundWatch,
+    sound_sequence: u64,
     /// A refusal the client should see for longer than the tick that made it:
     /// (tick, message). Published on `/state` until it goes stale.
     notice: Option<(u64, String)>,
@@ -263,6 +267,8 @@ pub unsafe extern "C" fn duck_core_new(
             branches: Vec::new(),
             selected: 0,
             sensors: crate::sensors::Sensors::default(),
+            sound_watch: crate::sensors::SoundWatch::default(),
+            sound_sequence: 0,
             notice: None,
             rendered_sound: None,
             sound_tag: None,
@@ -778,6 +784,8 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             if let Some(v) = num("wake_ups") { life.wake_ups = v as u64; }
             if let Some(v) = num("pets") { life.pets = v as u64; }
             if let Some(v) = num("fed") { life.fed = v as u64; }
+            if let Some(v) = num("claps") { life.claps = v as u64; }
+            if let Some(v) = num("whistles") { life.whistles = v as u64; }
             if let Some(v) = num("metres") { life.metres = v; }
             if let Some(v) = num("power_offs") { life.power_offs = v as u64; }
             if let Some(m) = saved.get("skills").and_then(|v| v.as_object()) {
@@ -820,6 +828,11 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             core.runtime.set_care_scale(scale);
             json!({ "ok": true, "care_time_scale": core.runtime.care_scale() })
         }
+        Intent::SetRules(rules) => match core.runtime.set_rules(&rules) {
+            Ok(()) => json!({ "ok": true, "rules": core.runtime.rules_summary() }),
+            Err(reason) => refuse(core, format!("rules refused: {reason}")),
+        },
+        Intent::GetRules => json!({ "ok": true, "rules": core.runtime.rules_summary() }),
         Intent::Look { target, neck_pitch } => {
             let gaze = core.runtime.look_at(target, neck_pitch);
             json!({ "ok": true, "head": gaze.joints, "clamped": gaze.clamped })
@@ -944,7 +957,10 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             match reading.sensor.as_str() {
                 "imu" => core.sensors.imu = Some(reading),
                 "camera" => core.sensors.camera = Some(reading),
-                "microphone" => core.sensors.microphone = Some(reading),
+                "microphone" => {
+                    core.sensors.microphone = Some(reading);
+                    core.sound_sequence = core.sound_sequence.wrapping_add(1);
+                }
                 "depth" => core.sensors.depth = Some(reading),
                 _ => {}
             }
@@ -1133,6 +1149,14 @@ fn publish_state(core: &DuckCore) {
         "last_sound": active.last_sound(),
         "last_emotion_sound": active.last_emotion_sound(),
         "last_ride_segment": active.last_ride_segment(),
+        // The last room sound the duck answered, with the tick it happened.
+        // The microphone itself is never part of the observation.
+        "sound_event": active.last_sound_event().map(|(kind, tick)| {
+            json!({ "kind": kind, "tick": tick })
+        }),
+        // The last programmed block that fired, so the child can see their
+        // rule run even when the action's own label is gone.
+        "rule_event": active.last_rule(),
         "life": active.book().summary(),
         // Hunger, mood and bond: the companion layer's three numbers, plus
         // whether the duck has dozed off. `asleep` is a pose overlay, not a
@@ -1226,6 +1250,17 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     if core.runtime.clock().paused {
         publish_state(core);
         return 0;
+    }
+    // The same microphone channel, classified into a clap or a whistle so a
+    // kid's rule can listen for one. Frozen time hears nothing: this runs
+    // after the pause gate, so a paused duck does not act on a sound.
+    let now_ms = core.runtime.clock().tick.saturating_mul(20);
+    if let Some(kind) = core.sound_watch.observe(
+        core.sensors.microphone.as_ref(),
+        now_ms,
+        core.sound_sequence,
+    ) {
+        core.runtime.sound_event(kind);
     }
     // Record the state the tick is about to run from, so a rewind lands on a
     // tick that really happened.

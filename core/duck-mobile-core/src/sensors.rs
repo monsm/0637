@@ -132,6 +132,100 @@ impl Sensors {
 /// a 4 m range. A phone's LiDAR is denser and wider, so a client asking what
 /// the duck would see gets the grid resampled and clipped to that envelope —
 /// an approximation, labelled as one.
+/// A sound the room made that the duck can answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SoundKind {
+    Clap,
+    Whistle,
+}
+
+impl SoundKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SoundKind::Clap => "clap",
+            SoundKind::Whistle => "whistle",
+        }
+    }
+}
+
+/// Clap and whistle, from the same RMS/zero-crossing channel the shell already
+/// posts. The microphone is the room, not a sense: this only decides which of
+/// the duck's own reactions to play, and what a kid's rule can listen for.
+///
+/// The classifier uses what this channel can actually see: a clap is a loud
+/// broadband transient whose zero-crossing peak is high; a whistle is a
+/// sustained tone with a stable peak in the musical band. A shout is neither
+/// and keeps the old startle path.
+#[derive(Debug, Default)]
+pub struct SoundWatch {
+    last_sequence: u64,
+    loud_since: Option<u64>,
+    peak_max: f64,
+    emitted: bool,
+    seen_reading: bool,
+}
+
+impl SoundWatch {
+    /// One observation, at most one event. `sequence` changes only when a new
+    /// reading arrives, so a reading held across ticks is not heard twice;
+    /// `now` is its wall clock in milliseconds, for the spell's duration.
+    pub fn observe(
+        &mut self,
+        reading: Option<&Reading>,
+        now: u64,
+        sequence: u64,
+    ) -> Option<SoundKind> {
+        let reading = reading?;
+        if self.seen_reading && sequence == self.last_sequence {
+            return None;
+        }
+        self.seen_reading = true;
+        self.last_sequence = sequence;
+        let stamp = if reading.tick_ms > 0 { reading.tick_ms } else { now };
+        let rms = reading.value.get("rms").and_then(Value::as_f64).unwrap_or(0.0);
+        let peak = reading
+            .value
+            .get("peak_hz")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0);
+        if rms > 0.30 {
+            let since = *self.loud_since.get_or_insert(stamp);
+            self.peak_max = self.peak_max.max(peak);
+            let duration = stamp.saturating_sub(since);
+            if !self.emitted {
+                // A sustained pure tone: whistle.
+                if duration >= 200
+                    && (400.0..=1800.0).contains(&self.peak_max)
+                {
+                    self.emitted = true;
+                    return Some(SoundKind::Whistle);
+                }
+                // A clap's energy is high and broad; waiting for it to end
+                // would miss the moment the duck should answer.
+                if peak >= 2200.0 {
+                    self.emitted = true;
+                    return Some(SoundKind::Clap);
+                }
+            }
+        } else {
+            // A short loud spell that ended is a clap even if its peak was
+            // middling; a long, low-frequency spell was speech.
+            let clap = self
+                .loud_since
+                .map(|since| stamp.saturating_sub(since) <= 350 && self.peak_max >= 900.0)
+                .unwrap_or(false)
+                && !self.emitted;
+            self.loud_since = None;
+            self.peak_max = 0.0;
+            self.emitted = false;
+            if clap {
+                return Some(SoundKind::Clap);
+            }
+        }
+        None
+    }
+}
+
 pub fn to_tof_grid(depth: &[f64], rows: usize, cols: usize) -> Vec<f64> {
     if depth.is_empty() || rows == 0 || cols == 0 {
         return Vec::new();
@@ -171,6 +265,32 @@ mod tests {
         });
         let push = sensors.imu_push().expect("a shake is a push");
         assert!((push[0] - 1.6).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_short_loud_high_transient_is_a_clap_and_a_tone_is_a_whistle() {
+        let mic = |rms: f64, peak: f64, tick: u64| Reading {
+            sensor: "microphone".to_owned(),
+            mode: "twin".to_owned(),
+            value: json!({ "rms": rms, "peak_hz": peak }),
+            tick_ms: tick,
+            in_observation: false,
+        };
+        let mut watch = SoundWatch::default();
+        assert_eq!(watch.observe(Some(&mic(0.02, 300.0, 1000)), 1000, 1), None);
+        assert_eq!(
+            watch.observe(Some(&mic(0.6, 2800.0, 1050)), 1050, 2),
+            Some(SoundKind::Clap)
+        );
+        // The same reading held across ticks is not a second clap.
+        assert_eq!(watch.observe(Some(&mic(0.6, 2800.0, 1050)), 1100, 2), None);
+
+        let mut watch = SoundWatch::default();
+        assert_eq!(watch.observe(Some(&mic(0.4, 900.0, 2000)), 2000, 1), None);
+        assert_eq!(
+            watch.observe(Some(&mic(0.4, 950.0, 2400)), 2400, 2),
+            Some(SoundKind::Whistle)
+        );
     }
 
     #[test]

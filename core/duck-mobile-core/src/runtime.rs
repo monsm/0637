@@ -405,6 +405,10 @@ pub struct Checkpoint {
     pub care: Option<crate::care::Care>,
     #[serde(default)]
     pub last_sad: Option<u64>,
+    /// The last room sound answered at this tick, for the same reason: a
+    /// rewind should not carry a clap from a future the duck no longer has.
+    #[serde(default)]
+    pub last_sound_event: Option<(String, u64)>,
 }
 
 /// The last idle offset, as plain numbers: `IdleOffset` is upstream's type
@@ -469,6 +473,11 @@ pub struct DuckRuntime<T: RobotIo> {
     /// Last time the duck showed sadness, so a low mood is one scene a
     /// minute rather than a loop.
     last_sad: Option<u64>,
+    /// The last room sound the duck answered: ("clap"/"whistle", tick).
+    last_sound_event: Option<(String, u64)>,
+    /// The child's block program. Configuration, not simulation state: a
+    /// rewind replays the duck under the same rules it has now.
+    rules: crate::rules::Rules,
     /// The virtual face LEDs: status, battery gauge and flashlight. The phone
     /// has no I²C expander, but the verdict and the colours are the duck's.
     face: crate::leds::Face,
@@ -583,6 +592,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             care: crate::care::Care::default(),
             care_scale: 1.0,
             last_sad: None,
+            last_sound_event: None,
+            rules: crate::rules::Rules::default(),
             pet_glow_until: None,
             last_idle_ritual: None,
             idle_ritual_ticks: 1500,
@@ -932,6 +943,11 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.command.twist = twist;
         self.last_twist = TickTime::of(&self.clock);
         self.twist_fresh = true;
+        // A stick with a direction is attention; the shells' 50 Hz zero
+        // keepalive is not, or the duck could never doze while the app is open.
+        if twist.iter().any(|value| value.abs() > 1e-3) {
+            self.care.touch(self.clock.tick);
+        }
     }
 
     /// A twist from the intent API. It takes the duck over from the
@@ -939,6 +955,9 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// while it keeps sending twists.
     pub fn set_api_twist(&mut self, twist: [f64; 3]) {
         self.api_lease.take(twist, TickTime::of(&self.clock));
+        if twist.iter().any(|value| value.abs() > 1e-3) {
+            self.care.touch(self.clock.tick);
+        }
     }
 
     /// `robot.look`: aim the head at a point in the trunk frame. The gaze
@@ -956,6 +975,11 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.command.head = head;
         // Any head command wakes the idle look-around.
         self.last_head_command = TickTime::of(&self.clock);
+        // A person steering the head is paying attention; the idle sweep does
+        // not come through here, so it cannot keep the duck awake by itself.
+        if head.iter().any(|value| value.abs() > 1e-3) {
+            self.care.touch(self.clock.tick);
+        }
     }
 
     pub fn set_body(&mut self, z: f64, roll: f64, pitch: f64) {
@@ -982,6 +1006,7 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// `robot.do <emotion>` on the real duck: the emotion is a skill, so it
     /// goes through the same `/skills` list and `/skill` verb as a kick.
     pub fn trigger_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        self.care.touch(self.clock.tick);
         if self.controller.busy() || self.controller.is_sitting() {
             return Err("a move is running; the duck must be standing still");
         }
@@ -1036,6 +1061,9 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.queue_sound("coo");
         self.pet_glow_until = Some(self.clock.tick + 150);
         self.care.pet(self.clock.tick);
+        // A child can program "when I pet you, nod". The coo is still the
+        // duck's answer; the rule is what this person taught it.
+        self.fire_rules("pet");
     }
 
     /// A treat on the floor: the official ground-pick peck serves as the
@@ -1074,6 +1102,95 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// Hand back the care numbers a shell saved across launches.
     pub fn restore_care(&mut self, saved: &serde_json::Value) {
         self.care.restore(saved);
+    }
+
+    /// A clap or a whistle from the room. The duck answers with its own
+    /// official emotion; the count and the event are published so a shell or
+    /// a kid's rule can see what was heard. The microphone is never a sense.
+    pub fn sound_event(&mut self, kind: crate::sensors::SoundKind) {
+        self.last_sound_event = Some((kind.as_str().to_owned(), self.clock.tick));
+        // Someone made that sound at the duck; it is attention either way.
+        self.care.touch(self.clock.tick);
+        match kind {
+            crate::sensors::SoundKind::Clap => {
+                self.book.life.claps += 1;
+                self.book.note("clap".to_owned());
+            }
+            crate::sensors::SoundKind::Whistle => {
+                self.book.life.whistles += 1;
+                self.book.note("whistle".to_owned());
+            }
+        }
+        // A programmed rule owns the moment: the child built this to see it,
+        // so the duck must not also play its default reaction over the top.
+        if self.fire_rules(kind.as_str()) {
+            return;
+        }
+        let emotion = match kind {
+            crate::sensors::SoundKind::Clap => "laugh",
+            crate::sensors::SoundKind::Whistle => "curious",
+        };
+        // An emotion can be refused while a skill or a hold owns the duck;
+        // the event still happened, so answer with a voice instead of
+        // pretending nothing was heard.
+        if self.emotions.get(emotion).is_none() || self.trigger_emotion(emotion).is_err() {
+            self.queue_sound(match kind {
+                crate::sensors::SoundKind::Clap => "coo",
+                crate::sensors::SoundKind::Whistle => "inquire",
+            });
+        }
+    }
+
+    /// Run every block whose trigger just happened. Returns whether any rule
+    /// matched, which is also "the default reaction should stand down".
+    fn fire_rules(&mut self, trigger: &str) -> bool {
+        let rules = self.rules.matching(trigger);
+        if rules.is_empty() {
+            return false;
+        }
+        for rule in &rules {
+            match rule.action.as_str() {
+                "skill" => {
+                    // `sit` is the loop's verb, not a manifest skill.
+                    if rule.value == "sit" {
+                        let _ = self.sit_toggle();
+                    } else {
+                        let _ = self.trigger_skill(&rule.value);
+                    }
+                }
+                "emotion" => {
+                    let _ = self.trigger_emotion(&rule.value);
+                }
+                "sound" => self.queue_sound(&rule.value),
+                _ => {}
+            }
+            self.rules.last = Some(crate::rules::Fired {
+                trigger: trigger.to_owned(),
+                action: rule.action.clone(),
+                value: rule.value.clone(),
+                tick: self.clock.tick,
+            });
+        }
+        true
+    }
+
+    /// Replace the child's block program from the wire.
+    pub fn set_rules(&mut self, value: &serde_json::Value) -> Result<(), String> {
+        self.rules.set(value)
+    }
+
+    pub fn rules_summary(&self) -> serde_json::Value {
+        self.rules.summary()
+    }
+
+    pub fn last_rule(&self) -> Option<&crate::rules::Fired> {
+        self.rules.last.as_ref()
+    }
+
+    pub fn last_sound_event(&self) -> Option<(&str, u64)> {
+        self.last_sound_event
+            .as_ref()
+            .map(|(kind, tick)| (kind.as_str(), *tick))
     }
 
     /// The lifetime record, for `/state.life` and the shell's own storage.
@@ -1139,6 +1256,7 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     pub fn trigger_skill(&mut self, name: &str) -> Result<bool, &'static str> {
+        self.care.touch(self.clock.tick);
         if self.emotions.get(name).is_some() {
             return self.trigger_emotion(name);
         }
@@ -1157,10 +1275,12 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     pub fn start_ground_pick(&mut self) -> Result<(), &'static str> {
+        self.care.touch(self.clock.tick);
         self.controller.start_ground_pick()
     }
 
     pub fn sit_toggle(&mut self) -> Result<&'static str, &'static str> {
+        self.care.touch(self.clock.tick);
         self.controller.sit_toggle()
     }
 
@@ -1347,6 +1467,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             },
             care: Some(self.care),
             last_sad: self.last_sad,
+            last_sound_event: self.last_sound_event.clone(),
         })
     }
 
@@ -1451,6 +1572,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             self.care = care;
         }
         self.last_sad = checkpoint.last_sad;
+        self.last_sound_event = checkpoint.last_sound_event.clone();
         self.shutdown = match checkpoint.shutdown.as_str() {
             "sitting" => Shutdown::Sitting {
                 since: TickTime(checkpoint.shutdown_since),
@@ -1874,11 +1996,9 @@ impl<T: RobotIo> DuckRuntime<T> {
 
         // Whoever is steering the head, the body or the stick is paying the
         // duck attention. It keeps a hand on the duck from counting as
-        // neglect, and it wakes a dozing one.
-        let attended = self.twist_ema.iter().any(|value| value.abs() > 1e-3)
-            || self.head_ema.iter().any(|value| value.abs() > 1e-3)
-            || self.body_active;
-        if attended {
+        // neglect, and it wakes a dozing one. (The per-tick zero keepalives
+        // are filtered at the entry points, not here.)
+        if self.body_active {
             self.care.touch(self.clock.tick);
         }
 

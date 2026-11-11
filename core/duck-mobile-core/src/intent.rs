@@ -95,6 +95,9 @@ pub enum Intent {
     RestoreCare(serde_json::Value),
     /// How fast care ages against real time; 1.0 is normal.
     CareScale(f64),
+    /// A child's block program: triggers and actions in the duck's own verbs.
+    SetRules(serde_json::Value),
+    GetRules,
     /// How long the duck waits before doing something by itself, in seconds.
     IdleRitual(f64),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
@@ -338,6 +341,35 @@ impl IntentQueue {
         })
         .to_string()
     }
+
+    /// The duck's care numbers as the core's own value, for an export.
+    fn care_snapshot(&self) -> crate::care::Care {
+        let state = self.state.lock().expect("intent state");
+        let mut care = crate::care::Care::default();
+        if let Some(value) = state.get("care") {
+            care.restore(value);
+        }
+        care
+    }
+
+    fn build_fingerprint(&self) -> String {
+        let document = self.fingerprint.lock().expect("intent fingerprint");
+        serde_json::from_str::<Value>(&document)
+            .ok()
+            .and_then(|value| value.get("fingerprint").and_then(Value::as_str).map(str::to_owned))
+            .unwrap_or_default()
+    }
+
+    /// A shareable document, built from the same counters /life serves.
+    pub fn vetbook_markdown(&self) -> String {
+        let book = self.life.lock().expect("intent life").clone();
+        crate::export::markdown(&book.life, &self.care_snapshot(), &self.build_fingerprint())
+    }
+
+    pub fn vetbook_json(&self) -> String {
+        let book = self.life.lock().expect("intent life").clone();
+        crate::export::json(&book.life, &self.care_snapshot(), &self.build_fingerprint()).to_string()
+    }
 }
 
 /// Start the server on `0.0.0.0:port`.
@@ -421,6 +453,10 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/sensors") => Ok(queue.sensors_json()),
         // The lifetime record, the same counters the shell keeps in storage.
         ("GET", "/life") => Ok(queue.life_json()),
+        // The same record as a file a person can share, in the two shapes a
+        // share sheet wants. No new counting path: both call vetbook/export.
+        ("GET", "/export/vetbook.md") => Ok(queue.vetbook_markdown()),
+        ("GET", "/export/vetbook.json") => Ok(queue.vetbook_json()),
         ("POST", "/life") => Ok(queue
             .request(Intent::RestoreLife(value.clone()))
             .to_string()),
@@ -556,7 +592,10 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         // The companion state is public read / restore-only write: a client
         // can hand back what it saved, but cannot claim the duck loves it.
         ("GET", "/care") => Ok(queue.care_json()),
-        ("POST", "/care") => {
+        ("GET", "/rules") => Ok(queue.request(Intent::GetRules).to_string()),
+        ("POST", "/rules") => Ok(queue
+            .request(Intent::SetRules(value.clone()))
+            .to_string()),        ("POST", "/care") => {
             let saved = value.get("care").cloned().unwrap_or(value);
             Ok(queue.request(Intent::RestoreCare(saved)).to_string())
         }

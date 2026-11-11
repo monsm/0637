@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -42,6 +44,7 @@ import java.util.concurrent.TimeUnit
 fun CameraBackdrop(
     active: Boolean,
     onAvailability: (Boolean) -> Unit,
+    capture: CameraCapture? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -108,11 +111,18 @@ fun CameraBackdrop(
                             previewUseCase = it
                         }
                     cameraProvider.unbindAll()
+                    // The still capture shares the bound session with the
+                    // preview; a second bind would tear the preview down.
+                    val still = ImageCapture.Builder()
+                        .setTargetRotation(rotation)
+                        .build()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
+                        still,
                     )
+                    capture?.imageCapture = still
                     val resolution = preview.resolutionInfo?.resolution
                     metadata = startMetadata(context, resolution)
                     onAvailability(true)
@@ -129,6 +139,7 @@ fun CameraBackdrop(
         onDispose {
             disposed = true
             previewUseCase = null
+            capture?.imageCapture = null
             metadata?.shutdownNow()
             provider?.unbindAll()
             onAvailability(false)
@@ -153,6 +164,43 @@ fun CameraBackdrop(
 private fun displayRotation(context: Context): Int {
     val activity = context as? android.app.Activity ?: return android.view.Surface.ROTATION_0
     return activity.windowManager.defaultDisplay.rotation
+}
+
+/**
+ * The still-capture half of Director. The preview's session owns the camera;
+ * this borrows the bound ImageCapture for one photo. No capture has to be
+ * active for the duck alone: with no camera the renderer's studio frame is
+ * the picture.
+ */
+class CameraCapture {
+    @Volatile var imageCapture: ImageCapture? = null
+
+    fun take(context: Context, onImage: (android.graphics.Bitmap?) -> Unit) {
+        val capture = imageCapture
+        if (capture == null) {
+            onImage(null)
+            return
+        }
+        val directory = java.io.File(context.cacheDir, "captures").apply { mkdirs() }
+        val file = java.io.File(directory, "room-${System.currentTimeMillis()}.jpg")
+        val options = ImageCapture.OutputFileOptions.Builder(file).build()
+        capture.takePicture(
+            options,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                    file.delete()
+                    onImage(bitmap)
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    file.delete()
+                    onImage(null)
+                }
+            },
+        )
+    }
 }
 
 /** One metadata post per second, on its own thread: not the control loop. */

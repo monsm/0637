@@ -55,7 +55,7 @@ impl Care {
         let dt = dt * scale;
         self.hunger = (self.hunger + dt / HUNGER_SECONDS).min(1.0);
 
-        let idle_s = now.saturating_sub(self.last_touch) as f64 * 0.02;
+        let idle_s = now.saturating_sub(self.last_touch) as f64 * 0.02 * scale;
         let neglected = (idle_s - NEGLECT_AFTER_S).max(0.0);
         // Hunger drags the mood down; neglect drags it further; a bond lifts
         // the floor. The mood follows its target over about two minutes.

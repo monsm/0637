@@ -17,6 +17,7 @@ pub mod bam;
 pub mod care;
 pub mod control;
 pub mod emotion;
+pub mod export;
 pub mod intent;
 pub mod leds;
 
@@ -26,6 +27,7 @@ pub mod mcp;
 pub mod params;
 pub mod pickup;
 pub mod provenance;
+pub mod rules;
 #[cfg(feature = "mujoco")]
 pub mod ffi;
 #[cfg(feature = "mujoco")]

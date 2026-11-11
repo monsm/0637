@@ -14,6 +14,9 @@ struct InstrumentSheet: View {
     /// they are answers to questions a person asks rarely, and eleven
     /// always-open rows made the sheet a wall of text on a small screen.
     @State private var showDetails = false
+    /// The vet book file the export button produced. Non-nil presents the
+    /// system share sheet for exactly that file.
+    @State private var shareURL: URL?
 
     var body: some View {
         ScrollView {
@@ -24,6 +27,7 @@ struct InstrumentSheet: View {
                 careCard
                 behaviorRow
                 trickRow
+                lifeRecord
                 awayRow
                 voiceCommands
                 Button {
@@ -48,6 +52,52 @@ struct InstrumentSheet: View {
         .background(Color(red: 0.055, green: 0.075, blue: 0.10))
         .id(languageTick)
         .preferredColorScheme(.dark)
+        .sheet(
+            isPresented: Binding(
+                get: { shareURL != nil },
+                set: { if !$0 { shareURL = nil } }
+            )
+        ) {
+            if let shareURL {
+                ShareSheet(items: [shareURL])
+            }
+        }
+    }
+
+    /// The lifetime record's three headline numbers, and the file. The numbers
+    /// are the core's own counters; the button writes the core's own document.
+    private var lifeRecord: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(Copy.lifeRecord, detail: nil)
+            HStack(spacing: 10) {
+                lifeStat("\(Int(controller.vetbookMetres.rounded())) m", Copy.walked)
+                lifeStat("\(controller.vetbookRolls)", Copy.rolls)
+                lifeStat("\(controller.vetbookPickups)", Copy.pickups)
+            }
+            Button {
+                shareURL = controller.vetbookFile()
+            } label: {
+                Label(Copy.exportVetbook, systemImage: "square.and.arrow.up")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("export-vetbook")
+        }
+    }
+
+    private func lifeStat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+            Text(label)
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
     }
 
     /// The companion's three numbers. Fullness, not hunger, fills the bar:

@@ -127,6 +127,16 @@ final class DuckUITests: XCTestCase {
         )
         app.buttons["time-play.fill"].tap()
 
+        // The companion card and the vet book's export are real controls on
+        // the first screen, not hidden behind More.
+        XCTAssertTrue(
+            app.progressIndicators["care-hunger"].waitForExistence(timeout: 5),
+            "the companion card has no hunger bar"
+        )
+        let export = app.buttons["export-vetbook"]
+        XCTAssertTrue(export.waitForExistence(timeout: 5), "the vet book export is missing")
+        XCTAssertTrue(export.isHittable, "the vet book export is not tappable")
+
         // Close the sheet with its own button: in a portrait medium detent a
         // swipe scrolls the sheet's ScrollView instead of dismissing it.
         let sheetClose = app.buttons["sheet-close"]
@@ -140,6 +150,34 @@ final class DuckUITests: XCTestCase {
             XCTWaiter.wait(for: [gone], timeout: 5),
             .completed,
             "the sheet did not close"
+        )
+        // The block program: add "when clap, roll over" through the editor and
+        // see the block it created. The engine itself is exercised by
+        // sim-drive's clap test; this proves the control is wired to it.
+        let rulesButton = app.buttons["duck-rules"]
+        XCTAssertTrue(rulesButton.waitForExistence(timeout: 5), "the Blocks button is missing")
+        rulesButton.tap()
+        XCTAssertTrue(
+            app.staticTexts["rules-title"].waitForExistence(timeout: 10),
+            "the block editor did not open"
+        )
+        let addRule = app.buttons["rule-add"]
+        XCTAssertTrue(addRule.waitForExistence(timeout: 5), "the Add block button is missing")
+        addRule.tap()
+        XCTAssertTrue(
+            app.otherElements["rule-0"].waitForExistence(timeout: 5)
+                || app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "roulade")).firstMatch.waitForExistence(timeout: 5),
+            "the rule was not added to the list"
+        )
+        app.buttons["rules-close"].tap()
+        let rulesGone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: app.staticTexts["rules-title"]
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [rulesGone], timeout: 5),
+            .completed,
+            "the block editor did not close"
         )
         let after = waitForLabel(["walk", "stand"], timeout: 30)
         XCTAssertTrue(
@@ -161,6 +199,22 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(
             ["walk", "stand"].contains(inDirector),
             "the duck stopped in Director mode: label=\(inDirector)"
+        )
+        // The shutter is real: it reads the frame back, writes a PNG and opens
+        // the preview, even with no camera (the studio is the room then).
+        let shutter = app.buttons["duck-photo"]
+        XCTAssertTrue(shutter.waitForExistence(timeout: 10), "no Director shutter")
+        shutter.tap()
+        let preview = app.descendants(matching: .any)
+            .matching(identifier: "photo-preview")
+            .firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 15), "the Director photo never reached a preview")
+        let photoClose = app.buttons["photo-close"]
+        XCTAssertTrue(photoClose.waitForExistence(timeout: 5), "the photo preview has no close button")
+        photoClose.tap()
+        XCTAssertTrue(
+            shutter.waitForExistence(timeout: 10),
+            "the shutter did not return after the photo preview closed"
         )
         app.buttons["surface-toggle"].tap()
         let backLive = waitForLabel(["walk", "stand"], timeout: 20)

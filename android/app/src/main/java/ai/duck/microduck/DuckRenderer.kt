@@ -50,6 +50,17 @@ class DuckRenderer(
     private val pitch = 0.32f
     private val distance = 0.85f
 
+    private var viewportWidth = 0
+    private var viewportHeight = 0
+    /// Set by the Director shutter: the next finished frame is read back and
+    /// handed over instead of only being presented.
+    @Volatile private var captureCallback: ((android.graphics.Bitmap?) -> Unit)? = null
+
+    /** One frame, read from the GL surface. The callback runs on the GL thread. */
+    fun captureFrame(callback: (android.graphics.Bitmap?) -> Unit) {
+        captureCallback = callback
+    }
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.055f, 0.075f, 0.10f, 1f)
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
@@ -70,6 +81,8 @@ class DuckRenderer(
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES30.glViewport(0, 0, width, height)
+        viewportWidth = width
+        viewportHeight = height
         aspect = width.toFloat() / height.coerceAtLeast(1).toFloat()
     }
 
@@ -175,6 +188,39 @@ class DuckRenderer(
             Matrix.multiplyMM(model, 0, world, 0, instance.local, 0)
             draw(instance.mesh, model, instance.color, headlight, 0f, viewProjection)
         }
+        // The Director photo is the frame the user is looking at, read back
+        // from the same default framebuffer. In Director the clear is
+        // transparent, so the result is the duck with an alpha channel; the
+        // activity composites it over the camera still.
+        captureCallback?.let { callback ->
+            captureCallback = null
+            GLES30.glFinish()
+            callback(readFrame())
+        }
+    }
+
+    private fun readFrame(): android.graphics.Bitmap? {
+        val width = viewportWidth
+        val height = viewportHeight
+        if (width <= 0 || height <= 0) return null
+        val pixels = ByteBuffer.allocateDirect(width * height * 4)
+            .order(ByteOrder.nativeOrder())
+        GLES30.glReadPixels(
+            0, 0, width, height,
+            GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, pixels,
+        )
+        pixels.rewind()
+        val raw = android.graphics.Bitmap.createBitmap(
+            width, height, android.graphics.Bitmap.Config.ARGB_8888,
+        )
+        raw.copyPixelsFromBuffer(pixels)
+        // GL's origin is bottom-left; a bitmap's is top-left.
+        val flip = android.graphics.Matrix().apply { postScale(1f, -1f) }
+        val upright = android.graphics.Bitmap.createBitmap(
+            raw, 0, 0, width, height, flip, true,
+        )
+        if (upright !== raw) raw.recycle()
+        return upright
     }
 
     private fun buildScene() {

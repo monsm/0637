@@ -119,6 +119,48 @@ val quack get() = pick("Quack", "叫一声")
         return pick("content · mood $moodPercent%", "心情不错 · 心情 $moodPercent%")
     }
     val trickBook get() = pick("Trick book", "技巧图鉴")
+    // The vet book, and the file it exports.
+    val lifeRecord get() = pick("Life record", "终身记录")
+    val walked get() = pick("walked", "走过")
+    val rolls get() = pick("rolls", "翻滚")
+    val pickups get() = pick("picked up", "被抱起")
+    val exportVetbook get() = pick("Export vet book", "导出记录")
+    val shareVetbook get() = pick("Share vet book", "分享记录")
+    // The Director photo.
+    val photoTitle get() = pick("Your duck, in your room", "你的鸭子，在你房间")
+    val photoTake get() = pick("Take photo", "拍照")
+    val savePhoto get() = pick("Save", "保存")
+    val saved get() = pick("Saved", "已保存")
+    val saveFailed get() = pick("No photo access", "无相册权限")
+    val share get() = pick("Share", "分享")
+    fun heardSound(kind: String): String = when (kind) {
+        "clap" -> pick("heard a clap!", "听到拍手！")
+        "whistle" -> pick("heard a whistle!", "听到口哨！")
+        else -> kind
+    }
+    // The block rules a child programs.
+    val blocks get() = pick("Blocks", "积木规则")
+    val blocksShort get() = pick("Blocks", "积木")
+    val ruleWhen get() = pick("When", "当")
+    val ruleThen get() = pick("then", "就")
+    val addRule get() = pick("Add", "添加")
+    val deleteRule get() = pick("Delete", "删除")
+    val rulesEmpty get() = pick(
+        "No rules yet. Build one: when I clap, roll over.",
+        "还没有规则。拼一个：拍手，就翻滚。",
+    )
+    fun ruleTrigger(trigger: String): String = when (trigger) {
+        "clap" -> pick("clap", "拍手")
+        "whistle" -> pick("whistle", "吹口哨")
+        "pet" -> pick("pet me", "摸摸我")
+        else -> trigger
+    }
+    fun ruleKind(action: String): String = when (action) {
+        "skill" -> pick("move", "动作")
+        "emotion" -> pick("mood", "心情")
+        "sound" -> pick("sound", "声音")
+        else -> action
+    }
     val showMore get() = pick("More", "更多")
     val showLess get() = pick("Less", "收起")
 

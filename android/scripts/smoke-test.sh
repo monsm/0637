@@ -222,11 +222,13 @@ python3 -c "
 import sys
 sys.exit(0 if float('${CARE_BOND_AFTER}') > float('${CARE_BOND_BEFORE}') else 1)
 " || { echo "::error::a stroke did not warm the bond: $CARE_BOND_BEFORE -> $CARE_BOND_AFTER"; exit 1; }
-# Twelve minutes of neglect, expressed on the simulated clock: the last
-# touch was 800 s ago. A doze, then a hand wakes it.
+# Twelve minutes of neglect, with the care clock at 200x: 8 simulated seconds
+# since the last touch is 1600 care-seconds, so no test waits twelve minutes.
 CARE_TICK=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -oE '"tick":[0-9]+' | head -1 | cut -d: -f2)
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-  -d "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 40000))}" \
+  -d '{"care_time_scale":200}' http://127.0.0.1:8765/config > /dev/null || true
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 400))}" \
   http://127.0.0.1:8765/care > /dev/null || true
 sleep 0.5
 if ! curl -sf --max-time 5 http://127.0.0.1:8765/care | grep -q '"asleep":true'; then
@@ -239,11 +241,106 @@ if ! curl -sf --max-time 5 http://127.0.0.1:8765/care | grep -q '"asleep":false'
   echo "::error::a stroke did not wake the duck"
   exit 1
 fi
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null || true
 echo "care: hunger $CARE_HUNGER_BEFORE -> $CARE_HUNGER_AFTER, bond $CARE_BOND_BEFORE -> $CARE_BOND_AFTER, doze and wake ok"
+# The microphone channel, classified: clap and whistle reach the duck's own
+# reaction and the published event. The RMS is the room, never a sense.
+sound_tick() { python3 -c 'import time; print(int(time.time()*1000))'; }
+ST=$(sound_tick)
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$ST}" \
+  http://127.0.0.1:8765/sensor > /dev/null || true
+sleep 0.15
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((ST + 60))}" \
+  http://127.0.0.1:8765/sensor > /dev/null || true
+sleep 0.5
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -q '"kind":"clap"'; then
+  echo "::error::a clap was not classified as a clap"
+  exit 1
+fi
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.0,\"peak_hz\":0},\"tick_ms\":$((ST + 250))}" \
+  http://127.0.0.1:8765/sensor > /dev/null || true
+sleep 0.2
+WT=$(sound_tick)
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":900},\"tick_ms\":$WT}" \
+  http://127.0.0.1:8765/sensor > /dev/null || true
+sleep 0.45
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":950},\"tick_ms\":$((WT + 500))}" \
+  http://127.0.0.1:8765/sensor > /dev/null || true
+sleep 0.5
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -q '"kind":"whistle"'; then
+  echo "::error::a sustained tone was not classified as a whistle"
+  exit 1
+fi
+echo "room sounds: clap and whistle ok"
+
+# A child's block rule, end to end: program "when clap, roll over", make the
+# clap, and the duck's real roulade must run and be counted.
+echo "--- block rules ---"
+if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"rules":[{"trigger":"clap","action":"skill","value":"roulade"}]}' \
+  http://127.0.0.1:8765/rules | grep -q '"ok":true'; then
+  echo "::error::the core refused a valid block rule"
+  exit 1
+fi
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/rules | grep -q '"trigger":"clap"'; then
+  echo "::error::the block rule was not read back"
+  exit 1
+fi
+sleep 4
+rolls_of() {
+  curl -sf --max-time 5 http://127.0.0.1:8765/life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('skills',{}).get('roulade',0))
+" 2>/dev/null || echo 0
+}
+ROLLS_BEFORE=$(rolls_of)
+RT=$(sound_tick)
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$RT}" \
+  http://127.0.0.1:8765/sensor > /dev/null || true
+sleep 0.15
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((RT + 60))}" \
+  http://127.0.0.1:8765/sensor > /dev/null || true
+ROLLS_AFTER=$ROLLS_BEFORE
+for _ in $(seq 1 40); do
+  ROLLS_AFTER=$(rolls_of)
+  [ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ] && break
+  sleep 0.25
+done
+if [ "$ROLLS_AFTER" -le "$ROLLS_BEFORE" ]; then
+  echo "::error::a clap did not run the programmed roulade: $ROLLS_BEFORE -> $ROLLS_AFTER"
+  exit 1
+fi
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -q '"value":"roulade"'; then
+  echo "::error::/state does not publish the block that fired"
+  exit 1
+fi
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"rules":[]}' \
+  http://127.0.0.1:8765/rules > /dev/null || true
+echo "block rules: clap -> roulade ok ($ROLLS_BEFORE -> $ROLLS_AFTER)"
 # Leave a calm, awake duck for the walk and screenshots.
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"hunger":0.15,"mood":0.35,"bond":0.2,"asleep":false}' \
   http://127.0.0.1:8765/care > /dev/null || true
+
+# The lifetime record as a shareable document: the core writes it, the sheet
+# saves it to cache and hands it to the chooser.
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/export/vetbook.md | grep -q "walked"; then
+  echo "::error::the vet book Markdown export is missing or empty"
+  exit 1
+fi
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/export/vetbook.json | grep -q '"format":"microduck-vetbook/1"'; then
+  echo "::error::the vet book JSON export has no format tag"
+  exit 1
+fi
+echo "vet book export: markdown and json ok"
 
 # The build proves which scene, meshes and policies it is running.
 FINGERPRINT=$(curl -sf --max-time 5 http://127.0.0.1:8765/fingerprint || true)
@@ -375,4 +472,67 @@ h,b=map(float,'${RESTORED_CARE:-0 0}'.split())
 sys.exit(0 if 0.38 <= h <= 0.50 and b >= 0.28 else 1)
 " || { echo "::error::the companion state did not survive a restart: $RESTORED_CARE"; exit 1; }
 echo "care survived restart: hunger/bond=$RESTORED_CARE"
+
+# Director's shutter, end to end: enter Director, tap the shutter, and the
+# photo preview must appear. The emulator has no camera, so the frame is the
+# duck over the studio — the same path a denied-camera device takes. The
+# preview, Save and Share are Compose controls; nothing here is a fake button.
+echo "--- Director photo ---"
+adb shell pm grant ai.duck.microduck android.permission.CAMERA > /dev/null 2>&1 || true
+tap_text() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || return 1
+  coords=$(python3 - "$1" <<'PY'
+import sys, xml.etree.ElementTree as ET
+want = sys.argv[1]
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+for node in root.iter('node'):
+    if node.get('text') == want:
+        bounds = node.get('bounds', '')
+        parts = bounds.replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4:
+            x = (int(parts[0]) + int(parts[2])) // 2
+            y = (int(parts[1]) + int(parts[3])) // 2
+            print(x, y)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+)
+  [ -n "$coords" ] || return 1
+  adb shell input tap $coords > /dev/null 2>&1
+}
+tap_text "Director" || tap_text "取景" || { echo "::error::no Director switch in the shell"; exit 1; }
+SHUTTER_OK=0
+for _ in $(seq 1 10); do
+  if tap_text "Take photo" || tap_text "拍照"; then SHUTTER_OK=1; break; fi
+  sleep 1
+done
+[ "$SHUTTER_OK" = "1" ] || { echo "::error::no shutter in Director"; exit 1; }
+PHOTO_OK=0
+for _ in $(seq 1 30); do
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  if python3 - <<'PY'
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = [n.get('text') or '' for n in root.iter('node')]
+titles = {'Your duck, in your room', '你的鸭子，在你房间'}
+save = {'Save', '保存'}
+share = {'Share', '分享'}
+raise SystemExit(0 if titles.intersection(texts) and save.intersection(texts) and share.intersection(texts) else 1)
+PY
+  then
+    PHOTO_OK=1
+    break
+  fi
+  sleep 1
+done
+[ "$PHOTO_OK" = "1" ] || { echo "::error::the Director photo never reached its preview"; exit 1; }
+echo "Director photo reached the preview with Save and Share"
 echo "smoke test passed"

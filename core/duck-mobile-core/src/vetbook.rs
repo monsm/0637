@@ -49,6 +49,9 @@ pub struct Life {
     pub pets: u64,
     /// Breadcrumb rituals: a treat dropped on the floor for the peck.
     pub fed: u64,
+    /// Room sounds the duck answered: claps and whistles.
+    pub claps: u64,
+    pub whistles: u64,
     /// One-shot skills, by name: rolls, kicks, emotions.
     pub skills: BTreeMap<String, u64>,
     /// Emotions played, by name.

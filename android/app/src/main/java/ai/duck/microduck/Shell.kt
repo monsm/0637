@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -99,11 +100,13 @@ fun Shell(
     quack: (() -> Unit)? = null,
     onFeed: (() -> Unit)? = null,
     onWheee: ((Boolean) -> Unit)? = null,
+    onPhoto: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     var showRing by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
+    var showRules by remember { mutableStateOf(false) }
     var carrying by remember { mutableStateOf(false) }
     // The pad's D-pad modes, reduced to what a phone can do: drive, look,
     // and crouch/lean the standing body.
@@ -146,13 +149,35 @@ fun Shell(
     // second, and the prefs save is handed back on the first frame the core
     // is alive. Both are cheap; neither touches the tick thread.
     var careLine by remember { mutableStateOf("") }
+    var soundLine by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(core) {
         val duck = core ?: return@LaunchedEffect
         withContext(Dispatchers.IO) { restoreCompanion(context) }
+        var lastSoundTick = -1
+        var lastRuleTick = -1
         while (true) {
             val line = withContext(Dispatchers.IO) { fetchCare()?.line() }
             if (line != null) careLine = line
+            val event = withContext(Dispatchers.IO) { fetchSoundEvent() }
+            if (event != null && event.kind.isNotEmpty() && event.tick != lastSoundTick) {
+                lastSoundTick = event.tick
+                soundLine = Copy.heardSound(event.kind)
+            }
+            val rule = withContext(Dispatchers.IO) { fetchRuleEvent() }
+            if (rule != null && rule.tick != lastRuleTick) {
+                lastRuleTick = rule.tick
+                soundLine = rule.text
+            }
             delay(1500)
+        }
+    }
+
+    // A clap or a whistle stays on screen for a moment, then the care line
+    // has the slot back.
+    LaunchedEffect(soundLine) {
+        if (soundLine != null) {
+            delay(4000)
+            soundLine = null
         }
     }
 
@@ -239,6 +264,7 @@ fun Shell(
                         onStick = { stick = it },
                         onSurface = onSurface,
                         onFlashlight = toggleFlashlight,
+                        onRules = { showRules = true },
                         onLanguage = {
                             Copy.language = if (Copy.language == Copy.Language.English) {
                                 Copy.Language.Chinese
@@ -277,15 +303,17 @@ fun Shell(
                         )
                     }
                     // Once the hint is gone, the same slot answers "how is it
-                    // doing": fullness, mood and a nap, from /state.care.
-                    if (!hintDismiss && careLine.isNotEmpty()) {
+                    // doing": fullness, mood and a nap, from /state.care — or,
+                    // for a moment, what a clap or a whistle just did.
+                    val pill = soundLine ?: careLine
+                    if (!hintDismiss && pill.isNotEmpty()) {
                         Text(
-                            careLine,
+                            pill,
                             color = Color.White.copy(alpha = 0.72f),
                             fontSize = 11.sp,
                             modifier = Modifier
                                 .padding(bottom = 6.dp)
-                                .testTag("care-pill"),
+                                .testTag(if (soundLine != null) "sound-pill" else "care-pill"),
                         )
                     }
                     PortraitTimeRail(
@@ -293,6 +321,7 @@ fun Shell(
                         surface = surface,
                         onSurface = onSurface,
                         onOpenSheet = { showSheet = true },
+                        onRules = { showRules = true },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
@@ -397,6 +426,7 @@ fun Shell(
                 onStick = { stick = it },
                 onSurface = onSurface,
                 onFlashlight = toggleFlashlight,
+                onRules = { showRules = true },
                 onLanguage = {
                     Copy.language = if (Copy.language == Copy.Language.English) {
                         Copy.Language.Chinese
@@ -474,6 +504,27 @@ fun Shell(
             )
         }
 
+        // The Director shutter: one tap reads the frame on screen back, puts
+        // it over the camera still (or over the studio when there is no
+        // camera) and opens the preview. Top-end so it never covers the duck.
+        if (surface == Surface.Director && core != null && onPhoto != null) {
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .systemBarsPadding()
+                    .padding(top = 56.dp, end = 16.dp),
+            ) {
+                RoundChip(
+                    Copy.photoTake,
+                    size = 64.dp,
+                    selected = true,
+                    selectedColor = Color.White.copy(alpha = 0.28f),
+                    testTag = "duck-photo",
+                    onClick = onPhoto,
+                )
+            }
+        }
+
         }
 
         // The ring is shell-wide: portrait anchors it to the bottom (the duck
@@ -544,6 +595,173 @@ fun Shell(
             },
         ) { showSheet = false }
     }
+
+    if (showRules && core != null) {
+        RulesSheet(onClose = { showRules = false })
+    }
+}
+
+/**
+ * The block program, edited as big chips: when a clap/whistle/pet happens,
+ * make the duck do one of its own moves, moods or sounds. Every edit is POSTed
+ * to the core, which runs it; the shell keeps the copy across launches.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RulesSheet(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var rules by remember { mutableStateOf(emptyList<RuleUi>()) }
+    var trigger by remember { mutableStateOf("clap") }
+    var action by remember { mutableStateOf("skill") }
+    var value by remember { mutableStateOf("roulade") }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { fetchRules() }?.let { rules = it }
+    }
+    val triggers = listOf("clap", "whistle", "pet")
+    val kinds = listOf("skill", "emotion", "sound")
+    val values = when (action) {
+        "skill" -> listOf("roulade", "kick_left", "kick_right", "sit", "ground_pick")
+        "emotion" -> listOf(
+            "excited", "laugh", "curious", "yes", "no", "sad", "angry",
+            "defiant", "impatient", "mock", "mmh", "yes_fast", "devastated",
+        )
+        else -> listOf("chirp", "coo", "greet", "inquire", "peck", "alarm")
+    }
+    LaunchedEffect(action) { value = values.first() }
+
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+        Column(
+            Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    Copy.blocks,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("rules-title"),
+                )
+                CloseChip("rules-close", onClose)
+            }
+            if (rules.isEmpty()) {
+                Text(
+                    Copy.rulesEmpty,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                )
+            }
+            rules.forEachIndexed { index, rule ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color(0xFF2A4A5E),
+                            RoundedCornerShape(12.dp),
+                        )
+                        .padding(horizontal = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        "${Copy.ruleWhen} ${Copy.ruleTrigger(rule.trigger)} → " +
+                            if (rule.action == "sound") rule.value else Copy.skillLabel(rule.value),
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(vertical = 12.dp)
+                            .testTag("rule-$index"),
+                    )
+                    CloseChip("rule-delete-$index", {
+                        val next = rules.filterIndexed { at, _ -> at != index }
+                        rules = next
+                        saveRules(context, next)
+                    })
+                }
+            }
+            Text(Copy.ruleWhen, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                triggers.forEach { option ->
+                    RuleChip(
+                        Copy.ruleTrigger(option),
+                        "rule-trigger-$option",
+                        trigger == option,
+                    ) { trigger = option }
+                }
+            }
+            Text(Copy.ruleThen, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                kinds.forEach { option ->
+                    RuleChip(
+                        Copy.ruleKind(option),
+                        "rule-kind-$option",
+                        action == option,
+                    ) { action = option }
+                }
+            }
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                values.forEach { option ->
+                    RuleChip(
+                        if (action == "sound") option else Copy.skillLabel(option),
+                        "rule-value-$option",
+                        value == option,
+                    ) { value = option }
+                }
+            }
+            ButtonChip(Copy.addRule, "rule-add") {
+                val next = rules + RuleUi(trigger, action, value)
+                rules = next
+                saveRules(context, next)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RuleChip(
+    label: String,
+    tag: String,
+    selected: Boolean,
+    onPick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .heightIn(min = 44.dp)
+            .background(
+                if (selected) Color.White.copy(alpha = 0.92f)
+                else Color.White.copy(alpha = 0.10f),
+                RoundedCornerShape(22.dp),
+            )
+            .pointerInput(Unit) { detectTapGestures { onPick() } }
+            .testTag(tag)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (selected) Color.Black else Color.White.copy(alpha = 0.85f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
 }
 
 enum class Surface { Live, Director }
@@ -564,6 +782,7 @@ private fun TopBar(
     onStick: (String) -> Unit,
     onSurface: (Surface) -> Unit,
     onFlashlight: () -> Unit,
+    onRules: () -> Unit,
     onLanguage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -632,6 +851,10 @@ private fun TopBar(
                     onClick = { onFlashlight(); onMenuOpen(false) },
                 )
                 DropdownMenuItem(
+                    text = { Text(Copy.blocks, color = Color.White) },
+                    onClick = { onRules(); onMenuOpen(false) },
+                )
+                DropdownMenuItem(
                     text = { Text(Copy.language.label, color = Color.White) },
                     onClick = { onLanguage(); onMenuOpen(false) },
                 )
@@ -651,6 +874,7 @@ private fun PortraitTimeRail(
     surface: Surface,
     onSurface: (Surface) -> Unit,
     onOpenSheet: () -> Unit,
+    onRules: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var tick by remember { mutableStateOf(core.tickIndex()) }
@@ -709,6 +933,11 @@ private fun PortraitTimeRail(
                 )
             }
         }
+        RoundChip(
+            Copy.blocksShort,
+            size = 48.dp,
+            testTag = "duck-rules",
+        ) { onRules() }
         RoundChip(
             if (paused) Copy.resume else Copy.freeze,
             size = 48.dp,
@@ -1289,6 +1518,43 @@ private fun CareBar(
     }
 }
 
+/**
+ * The lifetime record's three headline numbers, and the export. The button
+ * writes the core's own Markdown document and hands it to the system chooser;
+ * there is no separate counting path in the shell.
+ */
+@Composable
+private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            Copy.lifeRecord,
+            color = Color.White,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LifeStat("${life.metres.roundToInt()} m", Copy.walked, Modifier.weight(1f))
+            LifeStat("${life.rolls}", Copy.rolls, Modifier.weight(1f))
+            LifeStat("${life.pickups}", Copy.pickups, Modifier.weight(1f))
+        }
+        ButtonChip(Copy.exportVetbook, "export-vetbook", onExport)
+    }
+}
+
+@Composable
+private fun LifeStat(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+            .padding(vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(value, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+        Text(label, color = Color.White.copy(alpha = 0.65f), fontSize = 10.sp)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InstrumentSheet(
@@ -1302,6 +1568,7 @@ private fun InstrumentSheet(
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val context = LocalContext.current
     var showDetails by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(core.paused()) }
     var speed by remember { mutableStateOf(core.speed()) }
@@ -1332,6 +1599,8 @@ private fun InstrumentSheet(
     var trickBook by remember { mutableStateOf("—") }
     // The companion layer, read from /state.care on the same 1 Hz loop.
     var care by remember { mutableStateOf(CareUi()) }
+    // The vet book's three headline numbers, from the same /state.life.
+    var lifeRecord by remember { mutableStateOf(LifeUi()) }
     // What the duck logged while the app was away; remembered across closes
     // by hoisting it to the activity's state via a remembered ref.
     var awaySummary by remember { mutableStateOf<String?>(null) }
@@ -1366,6 +1635,7 @@ private fun InstrumentSheet(
             face = fetchFace()
             trickBook = fetchTrickBook()
             fetchCare()?.let { care = it }
+            fetchLifeRecord()?.let { lifeRecord = it }
             delay(1000)
         }
     }
@@ -1516,6 +1786,7 @@ private fun InstrumentSheet(
                     modifier = Modifier.weight(1f, fill = false),
                 )
             }
+            LifeCard(lifeRecord) { shareVetbook(context) }
             awaySummary?.let { summary ->
                 Row(
                     Modifier.fillMaxWidth(),
