@@ -352,10 +352,12 @@ check $? "the duck accepts a stroke" "$(printf '%s' "$PET" | head -c 120)"
 # 100-tick reaction cooldown, and 0.4 s later the alarm is still blocked.
 echo "--- startle ---"
 # The pet's coo and the alarm share the 100-tick reaction cooldown; give
-# it time to lapse before the bang, or the alarm is silently swallowed.
-sleep 2.5
+# it time to lapse before the bang. The margin is wall-clock against a
+# 50 Hz loop that sags under CI load: four seconds covers 100 ticks down
+# to 25 Hz, or the alarm is silently swallowed by the cooldown.
+sleep 4
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.9,"peak_hz":440},"tick_ms":0}' > /dev/null || true
-sleep 0.4
+sleep 0.6
 STARTLED=$(api GET /state | field last_sound)
 [ "$STARTLED" = "alarm" ]; check $? "a loud room startles the duck" "last_sound=$STARTLED"
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
@@ -1303,7 +1305,7 @@ NEWEST=$(api GET /time | field newest)
 [ -n "$NEWEST" ] && [ "$NEWEST" != "None" ]
 check $? "a selected branch keeps recording checkpoints" "newest=$NEWEST"
 api POST /restore "{\"tick\":$NEWEST}" > "$OUT/branch-restore.json" 2>&1 || true
-printf '%s' "$(cat "$OUT/branch-restore.json")" | grep -q '"ok":true'
+grep -q '"ok":true' "$OUT/branch-restore.json"
 check $? "the branch's newest checkpoint is rewindable" "$(head -c 120 "$OUT/branch-restore.json")"
 
 api POST /branch/select '{"label":""}' > /dev/null
@@ -1313,7 +1315,7 @@ sleep 0.3
 for b in b1 b2 b3 b4 b5 b6 b7 b8 b9; do
   api POST /fork "{\"label\":\"$b\"}" > "$OUT/fork-cap.json" 2>&1 || true
 done
-printf '%s' "$(cat "$OUT/fork-cap.json")" | grep -q '"ok":true'
+grep -q '"ok":true' "$OUT/fork-cap.json"
 [ $? -ne 0 ]; check $? "the ninth branch is refused (cap 8)" "$(head -c 120 "$OUT/fork-cap.json")"
 for b in b1 b2 b3 b4 b5 b6 b7 b8; do
   api POST /branch/drop "{\"label\":\"$b\"}" > /dev/null
