@@ -285,6 +285,22 @@ struct ContentView: View {
                 }
             }
             Spacer()
+            // The camera is one tap, not one menu deep: framing the duck with
+            // the phone is the whole point of Director, and it was the one
+            // chip worth keeping on the bar.
+            Button {
+                withAnimation(.snappy(duration: 0.2)) {
+                    surface = surface == .live ? .director : .live
+                }
+            } label: {
+                Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .accessibilityLabel(surface == .live ? Copy.director : Copy.live)
+            .accessibilityIdentifier("surface-toggle")
             // One menu, not six chips. On a landscape phone the chips ran off
             // the edge and nothing was legible; the stick modes, the surface,
             // the language and the flashlight now live behind one button a

@@ -123,13 +123,10 @@ final class DuckUITests: XCTestCase {
         // Director mode: the camera is unavailable in the simulator, and the
         // app must keep rendering the studio view and driving the duck rather
         // than prompt, block, or go black.
-        // The surface switch lives behind the top bar's one menu: on a
-        // landscape phone six chips ran off the edge, so the shell has a
-        // single 48 pt button now.
-        let menu = app.buttons["duck-menu"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 10), "no shell menu")
-        menu.tap()
-        let director = menuButton("surface-director", ["Director", "取景"])
+        // The camera is one tap on the top bar (the rest of the old chips
+        // live behind the shell menu). Entering Director must not stop the
+        // duck even though the simulator has no camera.
+        let director = app.buttons["surface-toggle"]
         XCTAssertTrue(director.waitForExistence(timeout: 10), "no Director switch")
         director.tap()
         usleep(1_500_000)
@@ -138,10 +135,7 @@ final class DuckUITests: XCTestCase {
             ["walk", "stand"].contains(inDirector),
             "the duck stopped in Director mode: label=\(inDirector)"
         )
-        app.buttons["duck-menu"].tap()
-        let live = menuButton("surface-live", ["Live", "实时"])
-        XCTAssertTrue(live.waitForExistence(timeout: 10), "no Live switch")
-        live.tap()
+        app.buttons["surface-toggle"].tap()
         let backLive = waitForLabel(["walk", "stand"], timeout: 20)
         XCTAssertTrue(
             ["walk", "stand"].contains(backLive),
