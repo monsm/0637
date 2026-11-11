@@ -68,10 +68,9 @@ impl Care {
         if !self.asleep && idle_s >= DOZE_AFTER_S {
             self.asleep = true;
         }
-        if self.asleep && idle_s < 1.0 {
-            // Any touch (recorded this tick) wakes it.
-            self.asleep = false;
-        }
+        // Waking is an interaction (pet/feed/touch) and is handled there.
+        // Deciding it from the idle span would make a restored nap look like
+        // a fresh touch, because a new process's tick starts at zero.
     }
 
     /// A hand: pets are the strongest bond signal.

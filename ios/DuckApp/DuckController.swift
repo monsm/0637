@@ -118,6 +118,10 @@ final class DuckController: ObservableObject {
     @Published var aiError: String?
     private let aiBrain = AIBrain()
     private var lastAIThink = Date.distantPast
+    private var aiRequestInFlight = false
+    /// Bumped by every decision so an old move chain cannot keep steering
+    /// after a stop, a look or a newer move.
+    private var moveGeneration = 0
     private var eventsAtBackground: [String] = []
     private var lastEvents: [String] = []
     /// The companion layer, from /state.care: hunger (0 fed .. 1 starving),
@@ -788,7 +792,10 @@ final class DuckController: ObservableObject {
     func saveAIConfig(_ config: AIConfig) {
         aiConfig = config
         config.save()
-        lastAIThink = .distantPast
+        // Do not rewind the clock here: "Think now" calls save then think,
+        // and a rewound stamp made the 1 Hz poll fire a second request right
+        // after the first.
+        lastAIThink = Date()
         aiStatus = config.enabled ? Copy.aiOn : Copy.aiOff
         aiError = nil
     }
@@ -798,6 +805,7 @@ final class DuckController: ObservableObject {
     private func maybeThinkAI() {
         guard aiConfig.enabled, ready,
               !aiConfig.endpoint.trimmingCharacters(in: .whitespaces).isEmpty,
+              !aiRequestInFlight,
               Date().timeIntervalSince(lastAIThink) >= max(10, aiConfig.interval)
         else { return }
         lastAIThink = Date()
@@ -806,10 +814,13 @@ final class DuckController: ObservableObject {
 
     /// One decision now, whether or not the loop is on.
     func aiThinkNow() {
+        guard !aiRequestInFlight else { return }
         guard !aiConfig.endpoint.trimmingCharacters(in: .whitespaces).isEmpty else {
             aiError = Copy.aiNeedEndpoint
             return
         }
+        aiRequestInFlight = true
+        lastAIThink = Date()
         aiStatus = Copy.aiThinking
         aiError = nil
         let group = DispatchGroup()
@@ -838,6 +849,7 @@ final class DuckController: ObservableObject {
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
             guard let state else {
+                self.aiRequestInFlight = false
                 self.aiError = "the duck did not answer /state"
                 self.aiStatus = Copy.aiOffline
                 return
@@ -851,6 +863,7 @@ final class DuckController: ObservableObject {
                 heard: heard
             ) { [weak self] decision, error in
                 guard let self else { return }
+                self.aiRequestInFlight = false
                 if let error {
                     self.aiError = error
                     self.aiStatus = Copy.aiOffline
@@ -868,13 +881,23 @@ final class DuckController: ObservableObject {
             ? decision.action
             : "\(decision.action) · \(decision.value)"
         aiDecision = decision.why.isEmpty ? "AI · \(shown)" : "AI · \(shown) — \(decision.why)"
+        // Every decision cancels a previous bounded move. Otherwise an old
+        // twist chain would keep posting after a stop or a new look.
+        moveGeneration &+= 1
+        if decision.action != "move" {
+            // Cancel any bounded walk before a new verb owns the duck; its
+            // last twist otherwise keeps the 500 ms lease alive.
+            postJSON("/twist", ["vx": 0.0, "vy": 0.0, "wz": 0.0])
+        }
         switch decision.action {
         case "skill":
             postJSON("/skill", ["name": decision.value])
         case "sound":
             postJSON("/sound", ["tag": decision.value])
-        case "sit", "stand":
-            postJSON("/sit", [:])
+        case "sit":
+            postJSON("/posture", ["sit": true])
+        case "stand":
+            postJSON("/posture", ["sit": false])
         case "stop":
             postJSON("/twist", ["vx": 0.0, "vy": 0.0, "wz": 0.0])
         case "look":
@@ -890,7 +913,9 @@ final class DuckController: ObservableObject {
     /// loop stops it even if the app forgets. The deadman would too.
     private func moveAI(vx: Double, vz: Double, seconds: Double) {
         let frames = max(1, Int(seconds * 10))
+        let generation = moveGeneration
         func step(_ remaining: Int) {
+            guard generation == moveGeneration else { return }
             guard remaining > 0 else {
                 postJSON("/twist", ["vx": 0.0, "vy": 0.0, "wz": 0.0])
                 return

@@ -156,7 +156,10 @@ object AIBrain {
                 ?.optString("content")
                 ?: json.optJSONObject("message")?.optString("content")
                 ?: return null to "The model did not answer with a message"
-            parse(content) to null
+            val decision = parse(content)
+            decision to (
+                if (decision == null) "The model's answer was not a valid action" else null
+                )
         } catch (error: Throwable) {
             null to (error.message ?: "The model did not answer")
         }
@@ -199,6 +202,16 @@ object AIBrain {
     }
 }
 
+/** The generation of the newest decision; an older move chain must stop. */
+object AIMotion {
+    @Volatile var generation = 0
+
+    fun next(): Int = synchronized(this) {
+        generation += 1
+        generation
+    }
+}
+
 /**
  * Run one validated decision through the same intent API a person uses.
  * Returns the line the shell shows. Only the duck's own verbs are possible;
@@ -206,6 +219,15 @@ object AIBrain {
  */
 fun executeAIDecision(decision: AIDecision): String {
     val shown = if (decision.value.isEmpty()) decision.action else "${decision.action} · ${decision.value}"
+    val generation = AIMotion.next()
+    if (decision.action != "move") {
+        // Cancel any bounded walk before a new verb owns the duck; its last
+        // twist otherwise keeps the 500 ms lease alive.
+        postDuckCommand(
+            "/twist",
+            JSONObject().put("vx", 0.0).put("vy", 0.0).put("wz", 0.0).toString(),
+        )
+    }
     when (decision.action) {
         "skill" -> postDuckCommand(
             "/skill",
@@ -215,7 +237,14 @@ fun executeAIDecision(decision: AIDecision): String {
             "/sound",
             JSONObject().put("tag", decision.value).toString(),
         )
-        "sit", "stand" -> postDuckCommand("/sit")
+        "sit" -> postDuckCommand(
+            "/posture",
+            JSONObject().put("sit", true).toString(),
+        )
+        "stand" -> postDuckCommand(
+            "/posture",
+            JSONObject().put("sit", false).toString(),
+        )
         "stop" -> postDuckCommand(
             "/twist",
             JSONObject().put("vx", 0.0).put("vy", 0.0).put("wz", 0.0).toString(),
@@ -236,6 +265,7 @@ fun executeAIDecision(decision: AIDecision): String {
                 .put("wz", decision.vz)
                 .toString()
             for (frame in 0 until frames) {
+                if (AIMotion.generation != generation) return@Thread
                 postDuckCommand("/twist", body)
                 try {
                     Thread.sleep(100)
@@ -243,10 +273,12 @@ fun executeAIDecision(decision: AIDecision): String {
                     break
                 }
             }
-            postDuckCommand(
-                "/twist",
-                JSONObject().put("vx", 0.0).put("vy", 0.0).put("wz", 0.0).toString(),
-            )
+            if (AIMotion.generation == generation) {
+                postDuckCommand(
+                    "/twist",
+                    JSONObject().put("vx", 0.0).put("vy", 0.0).put("wz", 0.0).toString(),
+                )
+            }
         }.start()
     }
     return if (decision.why.isEmpty()) "AI · $shown" else "AI · $shown — ${decision.why}"

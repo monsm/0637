@@ -742,6 +742,17 @@ AFTER=$(api GET /state | field trunk)
 echo "trunk while walking: $BEFORE -> $AFTER"
 [ "$BEFORE" != "$AFTER" ]; check $? "twist moves the duck" "$BEFORE -> $AFTER"
 api POST /twist '{"vx":0.0,"vy":0.0,"wz":0.0}' > /dev/null
+# The vet book counts the distance the duck's own odometry estimates, not
+# the simulator's ground truth.
+METRES=$(api GET /life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('metres', 0))
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if float('${METRES:-0}') > 0.01 else 1)
+" 2>/dev/null
+check $? "the vet book counts the metres walked" "metres=$METRES"
 
 # ---------------------------------------------------------------- sit/stand
 echo "--- sit and stand ---"
@@ -944,6 +955,15 @@ import json,sys
 print(json.load(sys.stdin).get('powered_off'))
 " 2>/dev/null || echo "")
 [ "$POWERED" = "True" ]; check $? "the state reports powered off" "powered_off=$POWERED"
+POFFS=$(api GET /life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('power_offs', 0))
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if int('${POFFS:-0}') >= 1 else 1)
+" 2>/dev/null
+check $? "the vet book counts the power-off" "power_offs=$POFFS"
 api POST /power '{}' > /dev/null
 check $? "power-on accepted" ""
 BACK_UP=$(poll_state bringup 2 40 0.5)

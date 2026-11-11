@@ -480,6 +480,10 @@ pub struct DuckRuntime<T: RobotIo> {
     rules: crate::rules::Rules,
     /// The last LAN greeting or reply, for the peers sheet and /state.
     last_peer_event: Option<serde_json::Value>,
+    /// The odometry position the vet book last counted, for metres walked.
+    /// A rewind or mode switch can jump the estimate; a step that large is a
+    /// teleport, not walking.
+    book_position: Option<[f64; 3]>,
     /// The last words a person said to the duck, and the tick. A user's own
     /// model reads this with /state to decide what to do next.
     last_heard: Option<(String, u64)>,
@@ -593,13 +597,20 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_head: crate::control::IdleHead::new(robotd_params::IdleParams::default(), 0xD0C),
             idle_params: robotd_params::IdleParams::default(),
             last_idle: crate::control::IdleOffset::default(),
-            book: crate::vetbook::Book::default(),
+            book: {
+                let mut book = crate::vetbook::Book::default();
+                // This launch is a boot; a shell restore adds its saved count
+                // on top instead of replacing this one.
+                book.life.boots = 1;
+                book
+            },
             care: crate::care::Care::default(),
             care_scale: 1.0,
             last_sad: None,
             last_sound_event: None,
             rules: crate::rules::Rules::default(),
             last_peer_event: None,
+            book_position: None,
             last_heard: None,
             pet_glow_until: None,
             last_idle_ritual: None,
@@ -829,6 +840,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             self.enabled = false;
             self.bringup = Bringup::Limp;
             self.powered_off = true;
+            self.book.life.power_offs += 1;
         }
     }
 
@@ -1109,6 +1121,27 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// Hand back the care numbers a shell saved across launches.
     pub fn restore_care(&mut self, saved: &serde_json::Value) {
         self.care.restore(saved);
+        if let Some(idle) = saved.get("idle_s").and_then(serde_json::Value::as_f64) {
+            // Ticks restart at zero in a new process. Persist the idle span,
+            // not the old absolute tick, so twelve minutes of neglect (or a
+            // nap) survive a restart instead of looking like a fresh touch.
+            let ticks = (idle.max(0.0) / 0.02) as u64;
+            self.care.last_touch = self.clock.tick.saturating_sub(ticks);
+        } else if self.care.last_touch > self.clock.tick {
+            // Legacy payload from another boot: its tick cannot be mapped.
+            // Treat it as long ago rather than as "touched now".
+            self.care.last_touch = 0;
+        }
+    }
+
+    /// The care numbers plus the idle span, for persistence and /state.
+    pub fn care_summary(&self) -> serde_json::Value {
+        let mut value = self.care.summary();
+        let idle = self.clock.tick.saturating_sub(self.care.last_touch) as f64 * 0.02;
+        if let Some(object) = value.as_object_mut() {
+            object.insert("idle_s".to_owned(), serde_json::json!(idle));
+        }
+        value
     }
 
     /// A clap or a whistle from the room. The duck answers with its own
@@ -1155,30 +1188,53 @@ impl<T: RobotIo> DuckRuntime<T> {
         if rules.is_empty() {
             return false;
         }
+        let mut executed = false;
         for rule in &rules {
-            match rule.action.as_str() {
-                "skill" => {
-                    // `sit` is the loop's verb, not a manifest skill.
-                    if rule.value == "sit" {
-                        let _ = self.sit_toggle();
+            let ok = match rule.action.as_str() {
+                "skill" => match rule.value.as_str() {
+                    // The loop owns sit/stand and ground-pick; send them to
+                    // their idempotent entries instead of the skill table.
+                    "sit" => {
+                        if self.is_sitting() {
+                            true
+                        } else {
+                            self.sit_toggle().is_ok()
+                        }
+                    }
+                    "stand" => {
+                        if self.is_sitting() {
+                            self.sit_toggle().is_ok()
+                        } else {
+                            true
+                        }
+                    }
+                    "ground_pick" => self.start_ground_pick().is_ok(),
+                    _ => self.trigger_skill(&rule.value).is_ok(),
+                },
+                "emotion" => self.trigger_emotion(&rule.value).is_ok(),
+                "sound" => {
+                    if crate::voice::TAGS.contains(&rule.value.as_str()) {
+                        self.queue_sound(&rule.value);
+                        true
                     } else {
-                        let _ = self.trigger_skill(&rule.value);
+                        false
                     }
                 }
-                "emotion" => {
-                    let _ = self.trigger_emotion(&rule.value);
-                }
-                "sound" => self.queue_sound(&rule.value),
-                _ => {}
+                _ => false,
+            };
+            if ok {
+                executed = true;
+                self.rules.last = Some(crate::rules::Fired {
+                    trigger: trigger.to_owned(),
+                    action: rule.action.clone(),
+                    value: rule.value.clone(),
+                    tick: self.clock.tick,
+                });
             }
-            self.rules.last = Some(crate::rules::Fired {
-                trigger: trigger.to_owned(),
-                action: rule.action.clone(),
-                value: rule.value.clone(),
-                tick: self.clock.tick,
-            });
         }
-        true
+        // If nothing could run (busy, unknown value), let the duck's default
+        // reaction have the moment rather than suppressing it silently.
+        executed
     }
 
     pub fn last_peer_event(&self) -> Option<&serde_json::Value> {
@@ -1315,9 +1371,13 @@ impl<T: RobotIo> DuckRuntime<T> {
             .ok_or("no such skill")?;
         // A skill the scheduler refused is not part of the duck's story: the
         // book only records what actually started.
-        self.controller.start_skill(index).map(|started| {
-            self.book.skill(name);
-            started
+        self.controller.start_skill(index).and_then(|started| {
+            // A chaining move that only refreshed is not a new move: the vet
+            // book counts starts, not held-button frames.
+            if started {
+                self.book.skill(name);
+            }
+            Ok(started)
         })
     }
 
@@ -1598,6 +1658,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             self.odometry = odometry::Odometry::alpha();
         }
         self.powered_off = checkpoint.powered_off;
+        self.book_position = Some(self.position());
         self.emotion_playing = checkpoint.emotion_name.clone().map(|name| crate::emotion::Playing {
             name,
             elapsed: checkpoint.emotion_elapsed,
@@ -1859,6 +1920,7 @@ impl<T: RobotIo> DuckRuntime<T> {
                     self.safety.set_torque(false)?;
                     self.enabled = false;
                     self.powered_off = true;
+                    self.book.life.power_offs += 1;
                     self.shutdown = Shutdown::Idle;
                     self.bringup = Bringup::Limp;
                     report.label = "off".to_owned();
@@ -2142,7 +2204,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         let just_heard = self
             .last_sound_event
             .as_ref()
-            .is_some_and(|(_, tick)| *tick == self.clock.tick);
+            .is_some_and(|(_, tick)| tick.saturating_add(1) == self.clock.tick);
         let moving = command.twist.iter().any(|value| value.abs() > 1e-3);
         let cooldown = self
             .last_reaction
@@ -2310,6 +2372,18 @@ impl<T: RobotIo> DuckRuntime<T> {
         // The lifetime record, counted from what this tick actually was.
         // `robotd` keeps the same facts in its vet book; a phone keeps them
         // in memory and hands them to the shell to store.
+        let position = self.position();
+        if let Some(last) = self.book_position {
+            let dx = position[0] - last[0];
+            let dy = position[1] - last[1];
+            let step = (dx * dx + dy * dy).sqrt();
+            // 5 cm in 20 ms is 2.5 m/s: faster than any gait, slower than a
+            // checkpoint restore or a mode switch teleport.
+            if step < 0.05 {
+                self.book.life.metres += step;
+            }
+        }
+        self.book_position = Some(position);
         let walking = was_driving
             && command.twist.iter().any(|value| value.abs() > 1e-3);
         let standing = was_driving && !walking && !pickup_paused;

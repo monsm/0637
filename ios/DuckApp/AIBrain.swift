@@ -74,7 +74,10 @@ final class AIBrain {
         heard: String,
         completion: @escaping (AIDecision?, String?) -> Void
     ) {
-        guard !busy else { return }
+        guard !busy else {
+            completion(nil, "a request is already running")
+            return
+        }
         guard var endpoint = URL(string: config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)),
               endpoint.scheme != nil
         else {
@@ -120,6 +123,10 @@ final class AIBrain {
         request.httpBody = payload
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             defer { self?.busy = false }
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                DispatchQueue.main.async { completion(nil, "HTTP \(http.statusCode)") }
+                return
+            }
             guard let data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else {
@@ -140,7 +147,9 @@ final class AIBrain {
                 return nil
             }()
             guard let content, let decision = Self.parse(content) else {
-                DispatchQueue.main.async { completion(nil, "could not read the model's decision") }
+                DispatchQueue.main.async {
+                    completion(nil, "The model's answer was not a valid action")
+                }
                 return
             }
             DispatchQueue.main.async { completion(decision, nil) }

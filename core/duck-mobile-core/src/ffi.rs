@@ -783,7 +783,7 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             if let Some(v) = num("standing_s") { life.standing_s = v; }
             if let Some(v) = num("sitting_s") { life.sitting_s = v; }
             if let Some(v) = num("held_s") { life.held_s = v; }
-            if let Some(v) = num("boots") { life.boots = v as u64; }
+            if let Some(v) = num("boots") { life.boots = v as u64 + 1; }
             if let Some(v) = num("falls") { life.falls = v as u64; }
             if let Some(v) = num("pickups") { life.pickups = v as u64; }
             if let Some(v) = num("sit_downs") { life.sit_downs = v as u64; }
@@ -812,7 +812,7 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             json!({
                 "ok": true,
                 "pets": core.runtime.book().life.pets,
-                "care": core.runtime.care().summary(),
+                "care": core.runtime.care_summary(),
             })
         }
         Intent::Feed => match core.runtime.feed() {
@@ -821,7 +821,7 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                 json!({
                     "ok": true,
                     "fed": core.runtime.book().life.fed,
-                    "care": core.runtime.care().summary(),
+                    "care": core.runtime.care_summary(),
                 })
             }
             Ok(false) => refuse(core, "the duck is already pecking".to_owned()),
@@ -829,7 +829,7 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
         },
         Intent::RestoreCare(saved) => {
             core.runtime.restore_care(&saved);
-            json!({ "ok": true, "care": core.runtime.care().summary() })
+            json!({ "ok": true, "care": core.runtime.care_summary() })
         }
         Intent::CareScale(scale) => {
             core.runtime.set_care_scale(scale);
@@ -839,6 +839,16 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             Ok(()) => json!({ "ok": true, "rules": core.runtime.rules_summary() }),
             Err(reason) => refuse(core, format!("rules refused: {reason}")),
         },
+        Intent::Posture(sit) => {
+            if core.runtime.is_sitting() == sit {
+                json!({ "ok": true, "sitting": sit, "unchanged": true })
+            } else {
+                match core.runtime.sit_toggle() {
+                    Ok(_) => json!({ "ok": true, "sitting": sit }),
+                    Err(reason) => refuse(core, format!("posture refused: {reason}")),
+                }
+            }
+        }
         Intent::GetRules => json!({ "ok": true, "rules": core.runtime.rules_summary() }),
         Intent::GreetPeer(target) => match &core.lan {
             Some(lan) => {
@@ -1203,7 +1213,7 @@ fn publish_state(core: &DuckCore) {
         // Hunger, mood and bond: the companion layer's three numbers, plus
         // whether the duck has dozed off. `asleep` is a pose overlay, not a
         // power state — the control loop is running either way.
-        "care": active.care().summary(),
+        "care": active.care_summary(),
         "care_time_scale": active.care_scale(),
         "leds": {
             "status": active.face().status,

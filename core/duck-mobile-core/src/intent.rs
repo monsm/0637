@@ -98,6 +98,9 @@ pub enum Intent {
     /// A child's block program: triggers and actions in the duck's own verbs.
     SetRules(serde_json::Value),
     GetRules,
+    /// Sit down (`true`) or stand up (`false`), idempotently. `/sit` is the
+    /// button's toggle; a model must not invert its own request.
+    Posture(bool),
     /// Say hello to another duck on the LAN (None = every duck).
     GreetPeer(Option<String>),
     /// The name this duck announces.
@@ -598,6 +601,9 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             None => Err("missing name"),
         },
         ("POST", "/sit") => Ok(queue.request(Intent::Sit).to_string()),
+        ("POST", "/posture") => Ok(queue
+            .request(Intent::Posture(value["sit"].as_bool().unwrap_or(true)))
+            .to_string()),
         ("POST", "/ground_pick") => Ok(queue.request(Intent::GroundPick).to_string()),
         ("POST", "/shutdown") => Ok(queue.request_within(
             Intent::Shutdown,

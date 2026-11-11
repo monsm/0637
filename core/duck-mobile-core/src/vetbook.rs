@@ -152,6 +152,8 @@ impl Book {
             "wake_ups": self.life.wake_ups,
             "pets": self.life.pets,
             "fed": self.life.fed,
+            "claps": self.life.claps,
+            "whistles": self.life.whistles,
             "metres": self.life.metres,
             "power_offs": self.life.power_offs,
             "skills": self.life.skills,

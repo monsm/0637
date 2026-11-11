@@ -444,6 +444,16 @@ for _ in $(seq 1 8); do
   sleep 0.3
 done
 curl -sf --max-time 5 http://127.0.0.1:8765/state | tee intent-state-walking.json || true
+# The vet book counts the distance the duck's own odometry estimates.
+WALKED=$(curl -sf --max-time 5 http://127.0.0.1:8765/life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('metres', 0))
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if float('${WALKED:-0}') > 0.01 else 1)
+" 2>/dev/null || { echo "::error::the vet book never counted the walk: metres=$WALKED"; exit 1; }
+echo "walk counted: $WALKED m"
 
 # A black screen is the failure this app is prone to (the core load used to
 # block the main thread). Catch it in CI instead of on the user's device.

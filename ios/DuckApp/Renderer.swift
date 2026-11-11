@@ -138,6 +138,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         view.device = device
         view.colorPixelFormat = .bgra8Unorm
         view.depthStencilPixelFormat = .depth32Float
+        // The Director shutter reads the drawable back with a blit. A
+        // framebuffer-only drawable cannot be used as a copy source on device.
+        view.framebufferOnly = false
         view.clearColor = MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
         // **Clear, not the studio colour.** The view must be able to composite
         // over the camera in Director mode; an opaque background colour would

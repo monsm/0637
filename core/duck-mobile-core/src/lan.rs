@@ -227,9 +227,8 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
                 from: from.to_owned(),
                 name: name.clone(),
             });
-            if let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) {
-                peer.replied = true;
-            }
+            // Replying hello does not make them "answered": the flag is only
+            // set when we receive their hello, below.
             Some(
                 json!({
                     "v": VERSION,
