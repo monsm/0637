@@ -54,6 +54,19 @@ final class DuckUITests: XCTestCase {
         option.tap()
     }
 
+    /// A menu item, found wherever SwiftUI put it. The popup's container
+    /// element type varies by iOS version, so this searches every button
+    /// descendant by identifier and falls back to the visible label.
+    private func menuButton(_ id: String, _ titles: [String]) -> XCUIElement {
+        let byId = app.descendants(matching: .button)[id]
+        if byId.waitForExistence(timeout: 8) { return byId }
+        let predicate = NSPredicate(
+            format: titles.map { _ in "label BEGINSWITH %@" }.joined(separator: " OR "),
+            argumentArray: titles
+        )
+        return app.descendants(matching: .button).matching(predicate).firstMatch
+    }
+
     func testTheShellDrivesTheCore() throws {
         XCTAssertTrue(
             labelElement().waitForExistence(timeout: 120),
@@ -116,7 +129,7 @@ final class DuckUITests: XCTestCase {
         let menu = app.buttons["duck-menu"]
         XCTAssertTrue(menu.waitForExistence(timeout: 10), "no shell menu")
         menu.tap()
-        let director = app.buttons["surface-director"]
+        let director = menuButton("surface-director", ["Director", "取景"])
         XCTAssertTrue(director.waitForExistence(timeout: 10), "no Director switch")
         director.tap()
         usleep(1_500_000)
@@ -126,7 +139,7 @@ final class DuckUITests: XCTestCase {
             "the duck stopped in Director mode: label=\(inDirector)"
         )
         app.buttons["duck-menu"].tap()
-        let live = app.buttons["surface-live"]
+        let live = menuButton("surface-live", ["Live", "实时"])
         XCTAssertTrue(live.waitForExistence(timeout: 10), "no Live switch")
         live.tap()
         let backLive = waitForLabel(["walk", "stand"], timeout: 20)
