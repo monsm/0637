@@ -357,7 +357,16 @@ api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_
 # life record. Nothing about food exists on the robot; the ritual is
 # digital-only and made of official moves.
 echo "--- feed ---"
-FED=$(api POST /feed '{}' || true)
+# The idle ritual may be mid-emotion; a skill cannot start while it is.
+# Wait for it to finish, then retry the treat a few times if it still
+# refuses (a ritual can start again between the check and the post).
+FED=""
+for _ in $(seq 1 30); do
+  wait_idle 40 > /dev/null
+  FED=$(api POST /feed '{}' || true)
+  case "$FED" in *'"ok":true'*) break ;; esac
+  sleep 0.5
+done
 printf '%s' "$FED" | grep -q '"ok":true'
 check $? "a treat starts the peck" "$(printf '%s' "$FED" | head -c 120)"
 
