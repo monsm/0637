@@ -471,6 +471,9 @@ pub struct DuckRuntime<T: RobotIo> {
     last_loud: bool,
     last_pickup_paused: bool,
     last_fallen: bool,
+    /// Whether a ground pick was running last tick, so the book counts the
+    /// start of each peck exactly once.
+    last_ground_pick: bool,
     /// Consecutive ticks the fall predictor has said "down". A one-tick tip
     /// while a scripted move shifts the trunk is not a fall and must not
     /// make the duck shriek.
@@ -571,6 +574,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_loud: false,
             last_pickup_paused: false,
             last_fallen: false,
+            last_ground_pick: false,
             fallen_ticks: 0,
             last_moving: false,
             last_reaction: None,
@@ -1012,13 +1016,15 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// part of it is an official move — the robot eats nothing, and this
     /// one pretends to no hardware.
     pub fn feed(&mut self) -> Result<bool, &'static str> {
-        let started = self.trigger_skill("ground_pick")?;
-        if started {
-            self.book.life.fed += 1;
-            self.book.note("feed".to_owned());
-            self.queue_sound("yes");
-        }
-        Ok(started)
+        // `ground_pick` is the loop's own verb, not one of the controller's
+        // scripted skills: `trigger_skill` cannot find it, and asking it was
+        // a treat the duck never pecked. The controller refuses a second peck
+        // while one runs, so a held feed button cannot double-count.
+        self.start_ground_pick()?;
+        self.book.life.fed += 1;
+        self.book.note("feed".to_owned());
+        self.queue_sound("yes");
+        Ok(true)
     }
 
     /// The lifetime record, for `/state.life` and the shell's own storage.
@@ -1897,13 +1903,18 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
         if pickup_paused && !self.last_pickup_paused {
             reaction = Some("coo");
+            self.book.life.pickups += 1;
+            self.book.note("picked_up".to_owned());
         } else if self.safety.fallen() {
             self.fallen_ticks += 1;
             // Twenty 50 Hz ticks = 0.4 s of continuous fall. robotd's own
             // fall predictor debounces; a scripted head move can tip the
-            // trunk for a frame or two without being a real fall.
-            if self.fallen_ticks == 20 && !self.last_fallen {
+            // trunk for a frame or two without being a real fall. One spell
+            // of lying down is one fall, however long it lasts.
+            if self.fallen_ticks == 20 {
                 reaction = Some("alarm");
+                self.book.life.falls += 1;
+                self.book.note("fell".to_owned());
             }
         } else {
             self.fallen_ticks = 0;
@@ -2029,14 +2040,14 @@ impl<T: RobotIo> DuckRuntime<T> {
             held: pickup_paused,
             dt: self.dt.as_secs_f64(),
         });
-        if pickup_paused && !self.last_pickup_paused {
-            self.book.life.pickups += 1;
-            self.book.note("picked_up".to_owned());
+        // A ground pick is the controller's own state, not a scripted skill,
+        // so its rising edge is the only place the book can count it.
+        let picking = self.controller.ground_pick_running();
+        if picking && !self.last_ground_pick {
+            self.book.life.ground_picks += 1;
+            self.book.note("ground_pick".to_owned());
         }
-        if self.safety.fallen() && !self.last_fallen {
-            self.book.life.falls += 1;
-            self.book.note("fell".to_owned());
-        }
+        self.last_ground_pick = picking;
         Ok(report)
     }
 }

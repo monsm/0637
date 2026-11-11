@@ -366,7 +366,7 @@ for _ in $(seq 1 20); do
   case "$FED" in *'"ok":true'*) break ;; esac
   # Only "already pecking" is worth retrying: the previous peck is still
   # running. Any other refusal is a state the script must not paper over.
-  case "$FED" in *"already pecking"*) sleep 0.8 ;; *) break ;; esac
+  case "$FED" in *"ground pick is running"*) sleep 0.8 ;; *) break ;; esac
 done
 if ! printf '%s' "$FED" | grep -q '"ok":true'; then
   echo "feed refused: $FED"
