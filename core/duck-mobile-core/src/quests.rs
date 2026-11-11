@@ -188,19 +188,117 @@ impl QuestBoard {
             "streak": self.streak,
             "best_streak": self.best_streak,
             "completed_today": self.completed_today,
+            "last_completed_day": self.last_completed_day,
         })
     }
 
     /// A shell-saved board, clamped: a corrupt file cannot invent a streak.
-    pub fn restore(&mut self, saved: &Value) {
-        if let Ok(board) = serde_json::from_value::<QuestBoard>(saved.clone()) {
-            if board.day.len() == 10 && board.quests.len() <= 3 {
-                *self = board;
-                self.streak = self.streak.min(3650);
-                self.best_streak = self.best_streak.min(3650);
-                self.completed_today = self.completed_today.min(3);
-            }
+    ///
+    /// Shells save what /state publishes — the summary shape, without a
+    /// quest's metric or baseline — so the summary is rehydrated: the metric
+    /// comes from the quest's blueprint id and the baseline is rebuilt from
+    /// the saved progress fraction against the live counters. A board that
+    /// claims impossible goals (a target of zero completes itself) or
+    /// bookkeeping that disagrees with itself is refused wholesale.
+    pub fn restore(&mut self, saved: &Value, values: &Value) {
+        let day = saved.get("day").and_then(Value::as_str).unwrap_or("");
+        if day.len() != 10 || !is_plausible_day(day) {
+            return;
         }
+        let saved_quests = match saved.get("quests").and_then(Value::as_array) {
+            Some(quests) if !quests.is_empty() && quests.len() <= 3 => quests,
+            _ => return,
+        };
+        let mut quests = Vec::with_capacity(saved_quests.len());
+        for saved in saved_quests {
+            let id = saved.get("id").and_then(Value::as_str).unwrap_or("");
+            let target = saved.get("target").and_then(Value::as_f64).unwrap_or(0.0);
+            if !target.is_finite() || target <= 0.0 {
+                return;
+            }
+            let Some((_, metric, _, title_en, title_zh)) =
+                BLUEPRINTS.iter().find(|(blueprint_id, ..)| *blueprint_id == id)
+            else {
+                return;
+            };
+            // A full board carries its own baseline; a summary board is
+            // rehydrated from the progress fraction the shell saw.
+            let mut baseline = saved
+                .get("baseline")
+                .and_then(Value::as_f64)
+                .filter(|value| value.is_finite() && *value >= 0.0);
+            if baseline.is_none() {
+                let progress = saved
+                    .get("progress")
+                    .and_then(Value::as_f64)
+                    .filter(|value| value.is_finite())
+                    .unwrap_or(0.0)
+                    .clamp(0.0, 1.0);
+                baseline = Some((metric_value(*metric, values) - progress * target).max(0.0));
+            }
+            let done = saved.get("done").and_then(Value::as_bool).unwrap_or(false);
+            quests.push(Quest {
+                id: id.to_owned(),
+                metric: *metric,
+                target,
+                title_en: saved
+                    .get("title_en")
+                    .and_then(Value::as_str)
+                    .unwrap_or(title_en)
+                    .to_owned(),
+                title_zh: saved
+                    .get("title_zh")
+                    .and_then(Value::as_str)
+                    .unwrap_or(title_zh)
+                    .to_owned(),
+                baseline: baseline.unwrap_or(0.0),
+                done,
+                celebrated: done,
+            });
+        }
+        // The bookkeeping must agree with itself: completions come from the
+        // quests, a claimed last-completed day is a real past date, and a
+        // streak without one is nothing.
+        let completed = quests.iter().filter(|quest| quest.done).count() as u32;
+        let mut streak = saved
+            .get("streak")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            .min(3650) as u32;
+        let mut last = saved
+            .get("last_completed_day")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned();
+        if (completed < 3 && last == day) || (!last.is_empty() && !is_plausible_day(&last))
+            || last.as_str() > day
+        {
+            last.clear();
+            streak = 0;
+        }
+        // Older saves (the summary shape) do not carry the last-completed
+        // day. Rebuild the only value consistent with the rest: all three
+        // finished means today, and a live streak was completed no earlier
+        // than yesterday — which is exactly the day a next-day roll compares.
+        if last.is_empty() && streak > 0 {
+            last = if completed >= 3 {
+                day.to_owned()
+            } else {
+                previous_day(day)
+            };
+        }
+        let best_saved = saved
+            .get("best_streak")
+            .and_then(Value::as_u64)
+            .unwrap_or(streak as u64)
+            .min(3650) as u32;
+        let best = best_saved.max(streak);
+        self.day = day.to_owned();
+        self.quests = quests;
+        self.streak = streak;
+        self.best_streak = best;
+        self.last_completed_day = last;
+        self.completed_today = completed.min(3);
     }
 
     pub fn json(&self) -> Value {
@@ -242,27 +340,43 @@ fn metric_value(metric: Metric, values: &Value) -> f64 {
     }
 }
 
-fn previous_day(day: &str) -> String {
-    // A conservative approximation: any board whose last completed day is
-    // not exactly yesterday loses its streak. Date arithmetic is the shell's
-    // calendar's job; it passes ISO yyyy-mm-dd here.
-    let mut parts: Vec<i32> = day
-        .split('-')
-        .filter_map(|part| part.parse().ok())
-        .collect();
+fn days_in_month(year: i32, month: i32) -> i32 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 => 29,
+        2 => 28,
+        _ => 0,
+    }
+}
+
+fn is_plausible_day(day: &str) -> bool {
+    let parts: Vec<i32> = day.split('-').filter_map(|part| part.parse().ok()).collect();
     if parts.len() != 3 {
+        return false;
+    }
+    let (year, month, day_num) = (parts[0], parts[1], parts[2]);
+    day_num >= 1 && day_num <= days_in_month(year, month)
+}
+
+fn previous_day(day: &str) -> String {
+    // The day before an ISO yyyy-mm-dd: real month lengths, leap years and
+    // year rolls. A streak must survive the first of every month.
+    let parts: Vec<i32> = day.split('-').filter_map(|part| part.parse().ok()).collect();
+    if parts.len() != 3 || !is_plausible_day(day) {
         return String::new();
     }
-    parts[2] -= 1;
-    if parts[2] < 1 {
-        parts[1] -= 1;
-        if parts[1] < 1 {
-            parts[0] -= 1;
-            parts[1] = 12;
+    let (mut year, mut month, day_num) = (parts[0], parts[1], parts[2]);
+    let mut previous = day_num - 1;
+    if previous < 1 {
+        month -= 1;
+        if month < 1 {
+            month = 12;
+            year -= 1;
         }
-        parts[2] = 30;
+        previous = days_in_month(year, month);
     }
-    format!("{:04}-{:02}-{:02}", parts[0], parts[1], parts[2])
+    format!("{:04}-{:02}-{:02}", year, month, previous)
 }
 
 #[cfg(test)]
@@ -306,5 +420,116 @@ mod tests {
         assert_eq!(board.completed_today, 3);
         assert_eq!(board.streak, 1);
         assert!(board.update("2026-11-11", &state(9, 0, 0.0)).is_empty());
+    }
+
+    #[test]
+    fn yesterday_is_the_real_calendar_day() {
+        assert_eq!(previous_day("2026-11-12"), "2026-11-11");
+        assert_eq!(previous_day("2026-03-01"), "2026-02-28");
+        assert_eq!(previous_day("2026-01-01"), "2025-12-31");
+        assert_eq!(previous_day("2026-04-01"), "2026-03-31");
+        assert_eq!(previous_day("2026-08-01"), "2026-07-31");
+        assert_eq!(previous_day("2024-03-01"), "2024-02-29", "leap February");
+        assert_eq!(previous_day("2026-02-30"), "", "impossible day");
+    }
+
+    #[test]
+    fn a_streak_survives_a_month_boundary() {
+        let mut board = QuestBoard::default();
+        board.day = "2026-02-28".to_owned();
+        board.last_completed_day = "2026-02-28".to_owned();
+        board.streak = 3;
+        board.best_streak = 3;
+        // The next calendar day is the first of March, not February 30th.
+        board.update("2026-03-01", &state(0, 0, 0.0));
+        assert_eq!(board.day, "2026-03-01");
+        assert_eq!(board.streak, 3, "February 28th's work carries over");
+        // Finishing the new day extends the streak.
+        for quest in &mut board.quests {
+            quest.metric = Metric::Pets;
+            quest.target = 1.0;
+            quest.baseline = 0.0;
+        }
+        board.update("2026-03-01", &state(3, 0, 0.0));
+        assert_eq!(board.streak, 4);
+    }
+
+    #[test]
+    fn a_summary_board_rehydrates_with_its_progress() {
+        let mut board = QuestBoard::default();
+        // What a shell saves: /state.quests' summary, no metric or baseline.
+        let summary = json!({
+            "day": "2026-11-12",
+            "quests": [
+                { "id": "pet", "title_en": "Pet the duck 3 times", "title_zh": "摸摸鸭子 3 次",
+                  "target": 3.0, "done": false, "progress": 2.0 / 3.0 },
+                { "id": "roll", "title_en": "Roll over twice", "title_zh": "翻两个滚",
+                  "target": 2.0, "done": true, "progress": 1.0 },
+            ],
+            "streak": 2,
+            "best_streak": 4,
+            "completed_today": 0,
+        });
+        let values = state(2, 0, 0.0); // two pets done so far today
+        board.restore(&summary, &values);
+        assert_eq!(board.day, "2026-11-12");
+        assert_eq!(board.quests.len(), 2);
+        assert_eq!(board.streak, 2);
+        assert_eq!(board.best_streak, 4);
+        let pet = board.quests.iter().find(|quest| quest.id == "pet").unwrap();
+        assert_eq!(pet.metric, Metric::Pets);
+        assert!((pet.baseline - 0.0).abs() < 1e-9, "progress 2/3 of 3 = the 2 pets already done");
+        let roll = board.quests.iter().find(|quest| quest.id == "roll").unwrap();
+        assert!(roll.done && roll.celebrated, "a done quest does not celebrate twice");
+    }
+
+    #[test]
+    fn a_corrupt_board_cannot_invent_a_streak() {
+        // A target of zero would complete itself on the next tick.
+        let zero = json!({
+            "day": "2026-11-12",
+            "quests": [
+                { "id": "pet", "target": 0.0, "done": false, "progress": 0.0 },
+                { "id": "roll", "target": 2.0, "done": false, "progress": 0.0 },
+            ],
+            "streak": 0,
+        });
+        let mut board = QuestBoard::default();
+        board.restore(&zero, &state(0, 0, 0.0));
+        assert!(board.quests.is_empty(), "a zero target is not a goal");
+        // Completions the bookkeeping disagrees with.
+        let liar = json!({
+            "day": "2026-11-12",
+            "quests": [
+                { "id": "pet", "target": 3.0, "done": false, "progress": 0.5 },
+                { "id": "roll", "target": 2.0, "done": false, "progress": 0.0 },
+            ],
+            "streak": 9,
+            "last_completed_day": "2026-11-12",
+            "completed_today": 3,
+        });
+        let mut board = QuestBoard::default();
+        board.restore(&liar, &state(0, 0, 0.0));
+        assert_eq!(board.streak, 0, "two unfinished quests cannot claim today");
+        assert_eq!(board.completed_today, 0);
+        // A last-completed day that never existed.
+        let phantom = json!({
+            "day": "2026-11-12",
+            "quests": [{ "id": "pet", "target": 3.0, "done": false, "progress": 0.0 }],
+            "streak": 5,
+            "last_completed_day": "2026-02-30",
+        });
+        let mut board = QuestBoard::default();
+        board.restore(&phantom, &state(0, 0, 0.0));
+        assert_eq!(board.streak, 0);
+        assert!(board.last_completed_day.is_empty());
+        // An unknown quest id cannot be measured.
+        let stranger = json!({
+            "day": "2026-11-12",
+            "quests": [{ "id": "fly", "target": 3.0, "done": false, "progress": 0.0 }],
+        });
+        let mut board = QuestBoard::default();
+        board.restore(&stranger, &state(0, 0, 0.0));
+        assert!(board.quests.is_empty());
     }
 }

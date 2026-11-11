@@ -324,7 +324,7 @@ check $? "flashlight toggles back off" "$(printf '%s' "$FLASH2" | head -c 120)"
 SAVED=$(api GET /life || true)
 printf '%s' "$SAVED" | python3 -c "
 import json,sys
-b=json.load(sys.stdin); b['pets']=7; print(json.dumps(b))
+b=json.load(sys.stdin); b['pets']=7; b['ground_picks']=5; print(json.dumps(b))
 " > /tmp/duck-life.json 2>/dev/null || true
 RESTORED=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   --data-binary @/tmp/duck-life.json http://127.0.0.1:8765/life || true)
 printf '%s' "$RESTORED" | grep -q '"ok":true'
@@ -337,6 +337,8 @@ for _ in $(seq 1 30); do
 done
 printf '%s' "$LIFE_BACK" | grep -q '"pets":7'
 check $? "the restored record is the one served" ""
+printf '%s' "$LIFE_BACK" | grep -q '"ground_picks":5'
+check $? "the restored record keeps the ground picks" "$(printf '%s' "$LIFE_BACK" | head -c 120)"
 rm -f /tmp/duck-life.json
 
 # Petting: a stroke of the hand, the phone's stand-in for pet_detect.
@@ -701,6 +703,22 @@ q=d.get('quests',[])
 sys.exit(0 if d.get('day') == '$QUEST_DAY' and len(q)==3 and all('title_en' in x and 'progress' in x for x in q) else 1)
 " 2>/dev/null
 check $? "a calendar day creates three real quests" "$(printf '%s' "$QUESTS" | head -c 160)"
+
+# The calendar is real: a board completed on February 28th keeps its streak
+# on March 1st — February 30th does not exist, and a "yesterday" that is
+# wrong must not silently zero a child's work.
+MONTH_BOARD='{"day":"2026-02-28","quests":[{"id":"pet","target":3,"done":true,"progress":1.0},{"id":"roll","target":2,"done":true,"progress":1.0},{"id":"walk","target":2,"done":true,"progress":1.0}],"streak":3,"best_streak":4,"completed_today":3,"last_completed_day":"2026-02-28"}'
+api POST /quests/day "{\"day\":\"2026-03-01\",\"board\":$MONTH_BOARD}" > /dev/null || true
+sleep 0.5
+MONTH_STREAK=$(api GET /quests | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('streak'))
+except Exception: print('0')
+" 2>/dev/null || echo "0")
+[ "$MONTH_STREAK" = "3" ]; check $? "a completed February board keeps its streak on March 1" "streak=$MONTH_STREAK"
+# And the rolled board is a real one for March, measured from now.
+api POST /quests/day "{\"day\":\"$QUEST_DAY\",\"board\":{}}" > /dev/null || true
+sleep 0.3
 
 # Gaze: the gaze solver runs on the training MJCF's own kinematics, so
 # aiming right of the trunk must produce a positive head_yaw and the answer
@@ -1277,8 +1295,29 @@ api POST /branch/select '{"label":"a"}' > /dev/null
 sleep 0.5
 SELECTED=$(api GET /branches | field selected)
 [ "$SELECTED" = "a" ]; check $? "a branch can be selected" "selected=$SELECTED"
+
+# A selected branch is the duck being driven: its checkpoints must keep
+# flowing, or its own last minute is not rewindable.
+sleep 1
+NEWEST=$(api GET /time | field newest)
+[ -n "$NEWEST" ] && [ "$NEWEST" != "None" ]
+check $? "a selected branch keeps recording checkpoints" "newest=$NEWEST"
+api POST /restore "{\"tick\":$NEWEST}" > "$OUT/branch-restore.json" 2>&1 || true
+printf '%s' "$(cat "$OUT/branch-restore.json")" | grep -q '"ok":true'
+check $? "the branch's newest checkpoint is rewindable" "$(head -c 120 "$OUT/branch-restore.json")"
+
 api POST /branch/select '{"label":""}' > /dev/null
 sleep 0.3
+
+# Every branch is stepped every tick: the collection must cap, not grow.
+for b in b1 b2 b3 b4 b5 b6 b7 b8 b9; do
+  api POST /fork "{\"label\":\"$b\"}" > "$OUT/fork-cap.json" 2>&1 || true
+done
+printf '%s' "$(cat "$OUT/fork-cap.json")" | grep -q '"ok":true'
+[ $? -ne 0 ]; check $? "the ninth branch is refused (cap 8)" "$(head -c 120 "$OUT/fork-cap.json")"
+for b in b1 b2 b3 b4 b5 b6 b7 b8; do
+  api POST /branch/drop "{\"label\":\"$b\"}" > /dev/null
+done
 
 api POST /branch/drop '{"label":"a"}' > /dev/null
 sleep 0.5

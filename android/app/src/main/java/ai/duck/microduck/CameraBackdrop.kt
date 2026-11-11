@@ -182,47 +182,67 @@ class CameraCapture {
             onImage(null)
             return
         }
+        // Decode and rotate on a worker: a camera still decoded full size,
+        // rotated into a second bitmap and composited into a third blocked
+        // the UI thread for whole seconds. The callback keeps its old
+        // contract and lands on the main looper.
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        val executor = Executors.newSingleThreadExecutor()
         capture.takePicture(
-            ContextCompat.getMainExecutor(context),
+            executor,
             object : ImageCapture.OnImageCapturedCallback() {
                 override fun onCaptureSuccess(image: ImageProxy) {
+                    val degrees = image.imageInfo.rotationDegrees
                     val bitmap = try {
                         val buffer = image.planes[0].buffer
                         val bytes = ByteArray(buffer.remaining())
                         buffer.get(bytes)
-                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        decodeUpright(context, bytes, degrees)
                     } catch (_: Throwable) {
                         null
+                    } finally {
+                        image.close()
                     }
-                    val degrees = image.imageInfo.rotationDegrees
-                    image.close()
-                    if (bitmap == null) {
-                        onImage(null)
-                        return
-                    }
-                    // CameraX records the display rotation in EXIF rather
-                    // than rotating pixels; apply it so the room is upright
-                    // in the screen-space composite.
-                    if (degrees != 0) {
-                        val matrix = android.graphics.Matrix().apply {
-                            postRotate(degrees.toFloat())
-                        }
-                        val rotated = android.graphics.Bitmap.createBitmap(
-                            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true,
-                        )
-                        if (rotated !== bitmap) bitmap.recycle()
-                        onImage(rotated)
-                    } else {
-                        onImage(bitmap)
-                    }
+                    executor.shutdown()
+                    main.post { onImage(bitmap) }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
-                    onImage(null)
+                    executor.shutdown()
+                    main.post { onImage(null) }
                 }
             },
         )
     }
+}
+
+/**
+ * The JPEG decoded once, downsampled to roughly what the composite actually
+ * is (the screen — compositePhoto draws at the GL frame's size), and rotated
+ * upright: CameraX records the display rotation in EXIF rather than rotating
+ * pixels, and the room must be upright in the screen-space composite.
+ */
+private fun decodeUpright(
+    context: Context,
+    bytes: ByteArray,
+    degrees: Int,
+): android.graphics.Bitmap? {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    val metrics = context.resources.displayMetrics
+    val target = maxOf(metrics.widthPixels, metrics.heightPixels)
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= target) sample *= 2
+    val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+    val decoded = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        ?: return null
+    if (degrees == 0) return decoded
+    val matrix = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+    val rotated = android.graphics.Bitmap.createBitmap(
+        decoded, 0, 0, decoded.width, decoded.height, matrix, true,
+    )
+    if (rotated !== decoded) decoded.recycle()
+    return rotated
 }
 
 /** One metadata post per second, on its own thread: not the control loop. */

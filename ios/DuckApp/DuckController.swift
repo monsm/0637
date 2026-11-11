@@ -80,6 +80,9 @@ final class DuckController: ObservableObject {
     @Published var quests: [QuestCard] = []
     @Published var questStreak = 0
     @Published var questDay = ""
+    /// The calendar day the core was last told about, so a midnight that
+    /// happens while the app is open still rolls the board.
+    private var lastQuestDayPosted = ""
     /// The collection page: every official move and emotion with its real
     /// lifetime count, and the first day this phone saw the duck do it.
     struct DexEntry: Identifiable {
@@ -742,6 +745,9 @@ final class DuckController: ObservableObject {
     }
 
     private func saveCompanionNow() {
+        // The same gate as the cadence save: until the saved payload has been
+        // handed back, a poll's fresh-process defaults must not overwrite it.
+        guard companionRestored else { return }
         guard let url = URL(string: "http://127.0.0.1:8765/state") else { return }
         var request = URLRequest(url: url)
         request.timeoutInterval = 1.5
@@ -767,6 +773,7 @@ final class DuckController: ObservableObject {
         var savedRules: [DuckRule] = []
         let questSaved = defaults.dictionary(forKey: Self.questKey) as? [String: Any]
         let day = Self.isoDay()
+        lastQuestDayPosted = day
         // Tell the core whose calendar day it is, with the board we saved.
         // This is independent of care/rules restore: a fresh install still
         // gets three quests today.
@@ -780,8 +787,21 @@ final class DuckController: ObservableObject {
         if let data = defaults.data(forKey: Self.rulesKey),
            let decoded = try? JSONDecoder().decode([DuckRule].self, from: data) {
             savedRules = decoded
-            let payload = ["rules": decoded.map {
-                ["trigger": $0.trigger, "action": $0.action, "value": $0.value]
+            // The same payload saveRules builds, follow-up steps included:
+            // a restore that drops `then` silently truncates the child's
+            // program, and the next Blocks edit writes the truncation back.
+            let payload = ["rules": decoded.map { rule -> [String: Any] in
+                var item: [String: Any] = [
+                    "trigger": rule.trigger,
+                    "action": rule.action,
+                    "value": rule.value,
+                ]
+                if !rule.then.isEmpty {
+                    item["then"] = rule.then.map {
+                        ["action": $0.action, "value": $0.value]
+                    }
+                }
+                return item
             }]
             rulesPayload = try? JSONSerialization.data(withJSONObject: payload)
         }
@@ -892,6 +912,19 @@ final class DuckController: ObservableObject {
         formatter.timeZone = .current
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: Date())
+    }
+
+    /// Tell the core whose calendar day it is — but only when it changed.
+    /// The board travels with the post so a relaunch keeps today's progress.
+    private func postQuestDayIfRollover() {
+        let day = Self.isoDay()
+        guard day != lastQuestDayPosted else { return }
+        lastQuestDayPosted = day
+        let board = UserDefaults.standard.dictionary(forKey: Self.questKey) ?? [:]
+        let payload: [String: Any] = ["day": day, "board": board]
+        if let body = try? JSONSerialization.data(withJSONObject: payload) {
+            post("/quests/day", body)
+        }
     }
 
     /// A blocking POST for the restore path only: it must know whether the
@@ -1303,10 +1336,22 @@ final class DuckController: ObservableObject {
     private func writePhoto(_ image: UIImage) -> URL? {
         guard let data = image.pngData() else { return nil }
         let files = FileManager.default
-        guard let documents = files.urls(for: .documentDirectory, in: .userDomainMask).first
+        // Caches, not Documents: a preview is a look, not a keepsake. What
+        // the family keeps is copied into Documents/Postcards or the photo
+        // library; an un-kept shot must not pile up in the iCloud backup.
+        guard let caches = files.urls(for: .cachesDirectory, in: .userDomainMask).first
         else { return nil }
-        let directory = documents.appendingPathComponent("Photos", isDirectory: true)
+        let directory = caches.appendingPathComponent("Photos", isDirectory: true)
         try? files.createDirectory(at: directory, withIntermediateDirectories: true)
+        // Housekeeping: yesterday's leftovers go, whatever dismissed them.
+        let dayAgo = Date().addingTimeInterval(-86_400)
+        if let stale = try? files.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
+            for file in stale where (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate.map({ $0 < dayAgo }) == true
+            {
+                try? files.removeItem(at: file)
+            }
+        }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         let target = directory
@@ -1396,6 +1441,10 @@ final class DuckController: ObservableObject {
                         if !list.isEmpty {
                             UserDefaults.standard.set(board, forKey: Self.questKey)
                         }
+                        // The phone owns the calendar: when its day has
+                        // rolled over since the core was last told, tell it
+                        // again, or the board never advances past launch day.
+                        self.postQuestDayIfRollover()
                     }
                     if let event = json["sound_event"] as? [String: Any],
                        let kind = event["kind"] as? String,

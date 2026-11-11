@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -67,6 +69,9 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -371,6 +376,7 @@ fun Shell(
                                 input = input,
                                 carrying = carrying,
                                 stick = stick,
+                                ringOpen = { showRing },
                                 onLongPress = { showRing = true },
                             ),
                     )
@@ -439,6 +445,13 @@ fun Shell(
                         detectDragGestures(
                             onDragStart = { start = it },
                             onDrag = { change, _ ->
+                                // The skill ring is up: no carry, no drive
+                                // while it is.
+                                if (showRing) {
+                                    input.vx = 0.0
+                                    input.wz = 0.0
+                                    return@detectDragGestures
+                                }
                                 change.consume()
                                 val width = size.width.toFloat().coerceAtLeast(1f)
                                 val height = size.height.toFloat().coerceAtLeast(1f)
@@ -711,6 +724,10 @@ fun Shell(
             onSound = { tag ->
                 dance.record("sound", tag, tag)
                 quack?.invoke()
+            },
+            onFeed = {
+                dance.record("feed", label = Copy.feed)
+                onFeed?.invoke()
             },
             onClose = { showDance = false },
         )
@@ -1175,7 +1192,12 @@ private fun RuleChip(
                 else Color.White.copy(alpha = 0.10f),
                 RoundedCornerShape(22.dp),
             )
-            .pointerInput(Unit) { detectTapGestures { onPick() } }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = label,
+                role = Role.Button,
+            ) { onPick() }
             .testTag(tag)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
@@ -1453,7 +1475,15 @@ internal fun CloseChip(tag: String, onClose: () -> Unit, size: Dp = 48.dp) {
         Modifier
             .size(size.coerceAtLeast(48.dp))
             .background(Color.White.copy(alpha = 0.10f), CircleShape)
-            .pointerInput(Unit) { detectTapGestures { onClose() } }
+            // The glyph alone is noise to TalkBack: name the action, and let
+            // a double-tap run the same close the finger tap does.
+            .semantics { contentDescription = Copy.close }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = Copy.close,
+                role = Role.Button,
+            ) { onClose() }
             .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
@@ -1472,6 +1502,7 @@ private fun Modifier.portraitStageGesture(
     input: DuckInput,
     carrying: Boolean,
     stick: String,
+    ringOpen: () -> Boolean,
     onLongPress: () -> Unit,
 ): Modifier = pointerInput(core, carrying, stick) {
     val deadzone = 8.dp.toPx()
@@ -1511,6 +1542,13 @@ private fun Modifier.portraitStageGesture(
                     handler.removeCallbacks(hold)
                 }
                 if (dragged && !longPressed) {
+                    // The skill ring is up: no carry, no drive while it is —
+                    // the gesture that opened it must not steer underneath.
+                    if (ringOpen()) {
+                        input.vx = 0.0
+                        input.wz = 0.0
+                        return@awaitEachGesture
+                    }
                     change.consume()
                     if (carrying) {
                         val halfWidth = size.width.toFloat().coerceAtLeast(1f) * 0.5f
@@ -1662,7 +1700,12 @@ private fun SurfaceChip(
                 if (selected) Color.White.copy(alpha = 0.18f) else Color.Transparent,
                 CircleShape,
             )
-            .pointerInput(Unit) { detectTapGestures { onClick() } }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = label,
+                role = Role.Button,
+            ) { onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
@@ -1688,7 +1731,12 @@ private fun RoundChip(
                 if (selected) selectedColor else Color.White.copy(alpha = 0.10f),
                 CircleShape,
             )
-            .pointerInput(Unit) { detectTapGestures { onClick() } }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = label,
+                role = Role.Button,
+            ) { onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
@@ -1798,6 +1846,10 @@ private fun SkillRing(
                     )
                     .padding(horizontal = 12.dp)
                     .background(Color(0xFF141A22).copy(alpha = 0.96f), RoundedCornerShape(22.dp))
+                    // Taps on the panel itself (headings, padding) must not
+                    // bubble to the scrim's dismissal: consuming them here
+                    // keeps only taps outside the panel closing the ring.
+                    .pointerInput(Unit) { detectTapGestures { } }
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -1858,7 +1910,12 @@ private fun SkillChip(name: String, onPick: (String) -> Unit) {
         Modifier
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .background(Color.White.copy(alpha = 0.16f), CircleShape)
-            .pointerInput(Unit) { detectTapGestures { onPick(name) } }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = skillLabel(name),
+                role = Role.Button,
+            ) { onPick(name) }
             .testTag("ring-$name")
             .padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
@@ -2103,6 +2160,7 @@ private fun InstrumentSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var showDetails by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(core.paused()) }
     var speed by remember { mutableStateOf(core.speed()) }
@@ -2113,6 +2171,9 @@ private fun InstrumentSheet(
     LaunchedEffect(core) {
         while (true) {
             status = core.status()
+            // A rewind or the rail's chip changes the pause elsewhere; the
+            // sheet's label must follow, not stay at its composition value.
+            paused = core.paused()
             delay(200)
         }
     }
@@ -2170,6 +2231,7 @@ private fun InstrumentSheet(
             trickBook = fetchTrickBook()
             fetchCare()?.let { care = it }
             fetchLifeRecord()?.let { lifeRecord = it }
+            branches = withContext(Dispatchers.IO) { fetchBranchCount() }
             delay(1000)
         }
     }
@@ -2399,7 +2461,13 @@ private fun InstrumentSheet(
                 }
                 ButtonChip(Copy.step) { core.step() }
                 ButtonChip(Copy.rewind) { core.seek(200) }
-                ButtonChip(Copy.fork) { branches += 1 }
+                ButtonChip(Copy.fork) {
+                    core.fork()
+                    // The JNI call gives no verdict; the count is the truth.
+                    scope.launch {
+                        branches = withContext(Dispatchers.IO) { fetchBranchCount() }
+                    }
+                }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(Copy.drive + ": " + if (core.mode() == "roller") Copy.roller else Copy.walk) {
@@ -2434,7 +2502,12 @@ internal fun ButtonChip(
             // A 48 dp floor: the sheet's controls were ~34 dp tall.
             .heightIn(min = 48.dp)
             .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
-            .pointerInput(Unit) { detectTapGestures { onClick() } }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = label,
+                role = Role.Button,
+            ) { onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
@@ -2483,6 +2556,23 @@ internal fun fetchLifeEvents(): List<String> {
             } ?: emptyList()
     } catch (_: Exception) {
         emptyList()
+    }
+}
+
+/// The duck's branch count, from GET /branches. Zero when the server is not
+/// up.
+internal fun fetchBranchCount(): Int {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/branches")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 1500
+        connection.readTimeout = 1500
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        org.json.JSONObject(text).optJSONArray("branches")?.length() ?: 0
+    } catch (_: Exception) {
+        0
     }
 }
 

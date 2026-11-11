@@ -417,6 +417,42 @@ import sys
 sys.exit(0 if float('${QUEST_SUM_AFTER:-0}') >= float('${QUEST_SUM_BEFORE:-0}') else 1)
 " 2>/dev/null || { echo "::error::the quest board went backwards after a pet"; exit 1; }
 echo "daily quests: progress stays honest after an action"
+# The calendar is real: a board completed on February 28th keeps its streak
+# on March 1st (February 30th does not exist), and a summary-shaped board —
+# what the shell actually saves — restores with its progress intact.
+MONTH_BOARD='{"day":"2026-02-28","quests":[{"id":"pet","target":3,"done":true,"progress":1.0},{"id":"roll","target":2,"done":true,"progress":1.0},{"id":"walk","target":2,"done":true,"progress":1.0}],"streak":3,"best_streak":4,"completed_today":3,"last_completed_day":"2026-02-28"}'
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"day\":\"2026-03-01\",\"board\":$MONTH_BOARD}" http://127.0.0.1:8765/quests/day > /dev/null || true
+sleep 0.5
+MONTH_STREAK=$(curl -sf --max-time 5 http://127.0.0.1:8765/quests | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('streak'))
+except Exception: print('0')
+" 2>/dev/null || echo 0)
+if [ "$MONTH_STREAK" != "3" ]; then
+  echo "::error::a February 28th board lost its streak on March 1st: streak=$MONTH_STREAK"
+  exit 1
+fi
+echo "daily quests: a February streak survives March 1st (streak=$MONTH_STREAK)"
+SAVE_BOARD='{"day":"2026-11-11","quests":[{"id":"pet","target":3,"done":false,"progress":0.5},{"id":"roll","target":2,"done":false,"progress":0.0},{"id":"walk","target":2,"done":false,"progress":0.0}],"streak":1,"best_streak":1,"completed_today":0,"last_completed_day":"2026-11-10"}'
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"day\":\"$QUEST_DAY\",\"board\":$SAVE_BOARD}" http://127.0.0.1:8765/quests/day > /dev/null || true
+sleep 0.4
+PET_PROGRESS=$(curl -sf --max-time 5 http://127.0.0.1:8765/quests | python3 -c "
+import json,sys
+try:
+    q=[x for x in json.load(sys.stdin).get('quests',[]) if x.get('id')=='pet']
+    print(round(q[0].get('progress',0),2) if q else 0)
+except Exception: print('0')
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if 0.3 <= float('${PET_PROGRESS:-0}') <= 1.0 else 1)
+" 2>/dev/null || { echo "::error::a summary-shaped saved board lost its progress on restore (pet=$PET_PROGRESS)"; exit 1; }
+echo "daily quests: the shell's saved board restores with its progress (pet=$PET_PROGRESS)"
+# Hand the day back so the rest of the session measures the real calendar.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"day\":\"$QUEST_DAY\",\"board\":{}}" http://127.0.0.1:8765/quests/day > /dev/null || true
 
 # The build proves which scene, meshes and policies it is running.
 FINGERPRINT=$(curl -sf --max-time 5 http://127.0.0.1:8765/fingerprint || true)

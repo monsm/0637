@@ -43,7 +43,13 @@ object PostcardShelf {
     fun save(context: Context, card: Postcard) {
         val cards = load(context).toMutableList()
         cards.add(0, card)
-        while (cards.size > MAX) cards.removeAt(cards.size - 1)
+        // Evicting the metadata alone would orphan the PNG in filesDir
+        // forever; the picture goes with the entry, the way the iOS shelf
+        // deletes on eviction.
+        while (cards.size > MAX) {
+            val evicted = cards.removeAt(cards.size - 1)
+            File(dir(context), evicted.file).delete()
+        }
         val array = JSONArray()
         cards.forEach { card ->
             array.put(

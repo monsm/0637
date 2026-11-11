@@ -64,6 +64,12 @@ struct ContentView: View {
     @State private var modal: Modal?
     @State private var tapTarget: CGPoint?
     @State private var lastTap = Date.distantPast
+    /// Where the hand was when the grab engaged: a carry measures from the
+    /// grab, not from a drag that may have been walking the duck for 150 pt.
+    @State private var carryAnchor: CGPoint?
+    /// Which tap-pulse a pending zero belongs to: a newer touch invalidates
+    /// the old timer, exactly like Android's pulse token.
+    @State private var pulseToken = 0
     /// Flipping this re-renders every `Copy` string.
     @State private var languageTick = 0
     /// The held joy-ride: a long press on the quack button starts it, lifting
@@ -362,10 +368,16 @@ struct ContentView: View {
     private func driveGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { gesture in
-                guard controller.ready else { return }
+                // Portrait's own guard, for its landscape twin: a ring open
+                // on top means no driving underneath it.
+                guard controller.ready, !showRing else { return }
                 if controller.carrying {
-                    let dx = (gesture.location.x - gesture.startLocation.x) / (size.width * 0.5)
-                    let dy = (gesture.location.y - gesture.startLocation.y) / (size.height * 0.5)
+                    // Measure from the grab, not from a drag that started
+                    // while the duck was still on the floor.
+                    let start = carryAnchor ?? gesture.startLocation
+                    carryAnchor = start
+                    let dx = (gesture.location.x - start.x) / (size.width * 0.5)
+                    let dy = (gesture.location.y - start.y) / (size.height * 0.5)
                     controller.carry(dx: Double(dx) * 0.35, dy: 0, dz: Double(-dy) * 0.30)
                     return
                 }
@@ -396,6 +408,7 @@ struct ContentView: View {
             .onEnded { _ in
                 // A held duck stays in the hand where the drag left it; the
                 // walk command is what must stop with the finger.
+                carryAnchor = nil
                 guard !controller.carrying else { return }
                 controller.joystick = .zero
                 switch stickMode {
@@ -705,9 +718,14 @@ struct ContentView: View {
         DragGesture(minimumDistance: 0)
             .onChanged { gesture in
                 guard controller.ready, !showRing else { return }
+                pulseToken += 1
                 if controller.carrying {
-                    let dx = gesture.translation.width / (size.width * 0.5)
-                    let dy = gesture.translation.height / (size.height * 0.5)
+                    // First change after the grab is the anchor: the drag
+                    // that was walking the duck must not teleport the hand.
+                    let start = carryAnchor ?? gesture.startLocation
+                    carryAnchor = start
+                    let dx = (gesture.location.x - start.x) / (size.width * 0.5)
+                    let dy = (gesture.location.y - start.y) / (size.height * 0.5)
                     controller.carry(dx: Double(dx) * 0.35, dy: 0, dz: Double(-dy) * 0.30)
                     return
                 }
@@ -722,14 +740,18 @@ struct ContentView: View {
                     // joystick.y into vx and joystick.x into -wz.
                     controller.joystick = CGPoint(x: nx, y: -ny)
                 case .head:
-                    controller.setHead(yaw: Double(nx) * 1.2, pitch: Double(-ny) * 0.6)
+                    // Same sign as landscape and Android: up looks up.
+                    controller.setHead(yaw: Double(nx) * 1.2, pitch: Double(ny) * 0.6)
                 case .body:
                     controller.setBody(z: Double(-ny) * 0.05, roll: Double(nx) * 0.12)
                 }
             }
             .onEnded { gesture in
                 guard controller.ready else { return }
-                if controller.carrying { return }
+                if controller.carrying {
+                    carryAnchor = nil
+                    return
+                }
                 let distance = hypot(gesture.translation.width, gesture.translation.height)
                 let wasTap = distance < 8
                 if wasTap && !showRing {
@@ -750,7 +772,11 @@ struct ContentView: View {
                             x: dx / norm * 0.6,
                             y: -dy / norm * 0.6
                         )
+                        let token = pulseToken
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            // A newer touch (a drive drag holding a direction)
+                            // owns the joystick now: leave it alone.
+                            guard pulseToken == token else { return }
                             controller.joystick = .zero
                         }
                     }

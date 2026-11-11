@@ -35,6 +35,9 @@ struct Peer {
     addr: SocketAddr,
     last_seen_ms: u128,
     replied: bool,
+    /// Set when we greeted this duck, consumed by their hello: only a duck
+    /// we actually greeted can be marked replied.
+    awaiting: bool,
     /// The last greet we answered, so a flood of datagrams is one greeting.
     last_greet_ms: u128,
 }
@@ -88,11 +91,27 @@ impl Lan {
     /// Say hello to one peer, or to every duck when `target` is None.
     pub fn greet(&self, target: Option<&str>) {
         let (from, name, peer) = match self.inner.lock() {
-            Ok(inner) => (
-                inner.id.clone(),
-                inner.name.clone(),
-                target.and_then(|id| inner.peers.iter().find(|peer| peer.id == id).map(|peer| peer.addr)),
-            ),
+            Ok(mut inner) => {
+                // Mark who we asked, so their hello is the only thing that
+                // can flip the replied flag.
+                match target {
+                    Some(id) => {
+                        if let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == id) {
+                            peer.awaiting = true;
+                        }
+                    }
+                    None => {
+                        for peer in inner.peers.iter_mut() {
+                            peer.awaiting = true;
+                        }
+                    }
+                }
+                (
+                    inner.id.clone(),
+                    inner.name.clone(),
+                    target.and_then(|id| inner.peers.iter().find(|peer| peer.id == id).map(|peer| peer.addr)),
+                )
+            }
             Err(_) => return,
         };
         let message = json!({
@@ -209,6 +228,11 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
         return None;
     }
     let kind = message.get("type").and_then(Value::as_str)?;
+    // Only the three real verbs may touch the peer table: any other type is
+    // noise, and noise must not create peers or evict the ducks we know.
+    if !matches!(kind, "announce" | "greet" | "hello") {
+        return None;
+    }
     let from = message
         .get("from")
         .and_then(Value::as_str)
@@ -217,10 +241,13 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
         return None;
     }
     let name = clean_name(message.get("name").and_then(Value::as_str).unwrap_or("Duck"));
-    upsert(inner, from, &name, source, now);
     match kind {
-        "announce" => None,
+        "announce" => {
+            upsert(inner, from, &name, source, now);
+            None
+        }
         "greet" => {
+            upsert(inner, from, &name, source, now);
             let to = message.get("to").and_then(Value::as_str).unwrap_or("all");
             if to != "all" && to != inner.id {
                 return None;
@@ -254,19 +281,28 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             )
         }
         "hello" => {
+            // A hello only counts from a duck we greeted: the awaiting flag
+            // is set by greet() and consumed here. A forged or flooded hello
+            // can neither forge "replied" nor crowd the emotion queue.
             let to = message.get("to").and_then(Value::as_str).unwrap_or("all");
             if to != "all" && to != inner.id {
                 return None;
             }
+            let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) else {
+                return None;
+            };
+            if !peer.awaiting {
+                return None;
+            }
+            peer.awaiting = false;
+            peer.last_seen_ms = now;
+            peer.replied = true;
             inner.events.push(PeerEvent::Replied {
                 from: from.to_owned(),
                 name,
             });
             if inner.events.len() > 32 {
                 inner.events.remove(0);
-            }
-            if let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) {
-                peer.replied = true;
             }
             None
         }
@@ -298,6 +334,7 @@ fn upsert(inner: &mut Inner, id: &str, name: &str, source: SocketAddr, now: u128
         addr: source,
         last_seen_ms: now,
         replied: false,
+        awaiting: false,
         last_greet_ms: 0,
     });
 }
@@ -387,6 +424,9 @@ mod tests {
             source(8767),
             1000,
         );
+        // We greeted them (Lan::greet marks the peer): only then can their
+        // hello be an answer.
+        duck.peers[0].awaiting = true;
         ingest(
             &mut duck,
             &json!({ "v": 1, "type": "hello", "from": "peer01", "name": "Sunny", "to": "self0001" }),
@@ -395,6 +435,67 @@ mod tests {
         );
         assert!(duck.peers[0].replied);
         assert!(matches!(duck.events.first(), Some(PeerEvent::Replied { .. })));
+    }
+
+    #[test]
+    fn a_stranger_hello_forges_nothing() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        // Nobody greeted them: a hello cannot claim to be an answer.
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "hello", "from": "peer01", "name": "Sunny", "to": "self0001" }),
+            source(8767),
+            1200,
+        );
+        assert!(!duck.peers[0].replied);
+        assert!(duck.events.is_empty());
+    }
+
+    #[test]
+    fn a_flood_of_junk_creates_no_peers() {
+        let mut duck = inner();
+        for index in 0..50 {
+            ingest(
+                &mut duck,
+                &json!({ "v": 1, "type": format!("junk{index}"), "from": format!("f{index:02}"), "name": "spoof" }),
+                source(9000 + index as u16),
+                1000 + index,
+            );
+        }
+        assert!(duck.peers.is_empty(), "noise must not crowd the table");
+        assert!(duck.events.is_empty());
+    }
+
+    #[test]
+    fn a_hello_flood_becomes_one_answer() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        duck.peers[0].awaiting = true;
+        for index in 0..50 {
+            ingest(
+                &mut duck,
+                &json!({ "v": 1, "type": "hello", "from": "peer01", "name": "Sunny", "to": "all" }),
+                source(8767),
+                1100 + index,
+            );
+        }
+        let replies = duck
+            .events
+            .iter()
+            .filter(|event| matches!(event, PeerEvent::Replied { .. }))
+            .count();
+        assert_eq!(replies, 1, "one greet, one answer, however many hellos");
     }
 
     #[test]

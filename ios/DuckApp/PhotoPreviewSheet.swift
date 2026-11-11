@@ -2,8 +2,9 @@ import Photos
 import SwiftUI
 
 /// The Director photo, before it leaves the phone: one look at the framed
-/// shot, then Save to Photos or Share. The PNG is already in Documents; Save
-/// copies it into the photo library, Share hands the file to the system.
+/// shot, then Save to Photos or Share. The PNG is a cache file; Save copies
+/// it into the photo library, Keep into Documents/Postcards, Share hands the
+/// file to the system, and dismissing deletes it.
 struct PhotoPreviewSheet: View {
     let photo: DuckController.CapturedPhoto
     @ObservedObject var shelf: PostcardShelf
@@ -96,6 +97,14 @@ struct PhotoPreviewSheet: View {
         }
         .padding(20)
         .preferredColorScheme(.dark)
+        .onDisappear {
+            // A preview is not a keepsake: an un-kept shot's PNG (a cache
+            // file) goes with it. Keep copied it into Postcards already;
+            // Share has handed the file to the system by now.
+            if !kept, let url = photo.url {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
         .task {
             // The away recap's own counters, read once for this caption.
             guard let url = URL(string: "http://127.0.0.1:8765/state"),

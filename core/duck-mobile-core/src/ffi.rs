@@ -51,7 +51,9 @@ pub struct DuckCore {
     last: Option<TickReport>,
     label: String,
     intents: Arc<IntentQueue>,
-    server_started: bool,
+    /// The HTTP API's own handle: dropping the core stops the listener, so a
+    /// freed duck cannot leave :8765 bound to a queue nobody drains.
+    server: Option<crate::intent::IntentServer>,
     /// What this build is: a hash over every asset that decides behaviour.
     provenance: crate::provenance::Provenance,
     fingerprint: CString,
@@ -264,7 +266,7 @@ pub unsafe extern "C" fn duck_core_new(
             last: None,
             label: "idle".to_owned(),
             intents,
-            server_started: false,
+            server: None,
             provenance,
             fingerprint,
             timeline: VecDeque::new(),
@@ -469,12 +471,12 @@ pub unsafe extern "C" fn duck_core_start_intent_server(
         return -1;
     }
     let core = &mut *core;
-    if core.server_started {
+    if core.server.is_some() {
         return 0;
     }
     match crate::intent::start(port as u16, core.intents.clone()) {
-        Ok(()) => {
-            core.server_started = true;
+        Ok(server) => {
+            core.server = Some(server);
             publish_state(core);
             stage("intent server listening");
             0
@@ -840,6 +842,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             if let Some(v) = num("boots") { life.boots = v as u64 + 1; }
             if let Some(v) = num("falls") { life.falls = v as u64; }
             if let Some(v) = num("pickups") { life.pickups = v as u64; }
+            if let Some(v) = num("ground_picks") { life.ground_picks = v as u64; }
             if let Some(v) = num("sit_downs") { life.sit_downs = v as u64; }
             if let Some(v) = num("stand_ups") { life.stand_ups = v as u64; }
             if let Some(v) = num("wake_ups") { life.wake_ups = v as u64; }
@@ -905,7 +908,13 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         }
         Intent::QuestDay(day, board) => {
             if day.len() == 10 {
-                core.quests.restore(&board);
+                // Rehydrating a saved board measures it against the duck the
+                // client is watching, which may be a selected branch.
+                let values = json!({
+                    "care": active_runtime(core).care_summary(),
+                    "life": active_runtime(core).book().summary(),
+                });
+                core.quests.restore(&board, &values);
                 core.intents.set_day(day.clone());
                 json!({ "ok": true, "day": day })
             } else {
@@ -1086,18 +1095,25 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             json!({ "ok": true })
         }
-        Intent::Fork(label) => match core.runtime.fork() {
-            Some(fork) => {
-                let tick = fork.clock().tick;
-                core.branches.push(Branch {
-                    label: label.clone(),
-                    tick,
-                    runtime: fork,
-                });
-                json!({ "ok": true, "label": label, "tick": tick })
+        Intent::Fork(label) => {
+            // Every branch is stepped every tick: cap the collection.
+            if core.branches.len() >= MAX_BRANCHES {
+                refuse(core, format!("fork refused: at most {MAX_BRANCHES} branches"));
+            } else {
+                match core.runtime.fork() {
+                    Some(fork) => {
+                        let tick = fork.clock().tick;
+                        core.branches.push(Branch {
+                            label: label.clone(),
+                            tick,
+                            runtime: fork,
+                        });
+                        json!({ "ok": true, "label": label, "tick": tick })
+                    }
+                    None => refuse(core, "fork refused: the body cannot be cloned".to_owned()),
+                }
             }
-            None => refuse(core, "fork refused: the body cannot be cloned".to_owned()),
-        },
+        }
         Intent::DropBranch(label) => {
             core.branches.retain(|branch| branch.label != label);
             if core.selected > core.branches.len() {
@@ -1378,9 +1394,11 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     // own official emotions rather than a fake notification.
     let quest_day = core.intents.day();
     if quest_day.len() == 10 {
+        // Measure the duck the client is driving: a selected branch's own
+        // counters, not the original the branch forked from.
         let values = json!({
-            "care": core.runtime.care_summary(),
-            "life": core.runtime.book().summary(),
+            "care": active_runtime(core).care_summary(),
+            "life": active_runtime(core).book().summary(),
         });
         let finished = core.quests.update(&quest_day, &values);
         if !finished.is_empty() {
@@ -1452,7 +1470,7 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     // The same microphone channel, classified into a clap or a whistle so a
     // kid's rule can listen for one. Frozen time hears nothing: this runs
     // after the pause gate, so a paused duck does not act on a sound.
-    let now_ms = core.runtime.clock().tick.saturating_mul(20);
+    let now_ms = active_runtime(core).clock().tick.saturating_mul(20);
     if let Some(kind) = core.sound_watch.observe(
         core.sensors.microphone.as_ref(),
         now_ms,
@@ -1460,9 +1478,13 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     ) {
         on_active(core, |runtime| runtime.sound_event(kind));
     }
-    // Record the state the tick is about to run from, so a rewind lands on a
-    // tick that really happened.
-    if core.timeline.back().is_none_or(|last| last.tick < core.runtime.clock().tick) {
+    // Record the state the tick is about to run from, so a rewind lands on
+    // the tick the watched duck (original or selected branch) really ran.
+    if core
+        .timeline
+        .back()
+        .is_none_or(|last| last.tick < active_runtime(core).clock().tick)
+    {
         checkpoint_now(core);
     }
     // Every branch steps too, on its own body and its own state — except the
@@ -1939,18 +1961,19 @@ pub unsafe extern "C" fn duck_core_mesh_name(
         .map_or(std::ptr::null(), |name| name.as_ptr())
 }
 
-/// Time-machine controls for the shell. They take effect on the next tick.
+/// Time-machine controls for the shell. They take effect on the next tick,
+/// on the duck the shell is watching (a selected branch, not the original).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_set_paused(core: *mut DuckCore, paused: c_int) {
     if !core.is_null() {
-        (*core).runtime.set_paused(paused != 0);
+        on_active(&mut *core, |runtime| runtime.set_paused(paused != 0));
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_set_speed(core: *mut DuckCore, speed: c_double) {
     if !core.is_null() {
-        (*core).runtime.set_speed(speed);
+        on_active(&mut *core, |runtime| runtime.set_speed(speed));
     }
 }
 
@@ -1960,33 +1983,34 @@ pub unsafe extern "C" fn duck_core_step(core: *mut DuckCore, ticks: c_int) {
         return;
     }
     let core = &mut *core;
-    let was_paused = core.runtime.clock().paused;
-    core.runtime.set_paused(false);
-    for _ in 0..ticks.clamp(1, 500) {
-        let _ = core.runtime.tick();
-    }
-    core.runtime.set_paused(was_paused);
+    on_active(core, |runtime| {
+        let was_paused = runtime.clock().paused;
+        runtime.set_paused(false);
+        for _ in 0..ticks.clamp(1, 500) {
+            let _ = runtime.tick();
+        }
+        runtime.set_paused(was_paused);
+    });
     // The published state comes from the last report: without this the shell
     // would keep showing the pose from before the step.
-    if let Some(report) = core.runtime.last_report() {
+    let report = on_active(core, |runtime| runtime.last_report().cloned());
+    if let Some(report) = report {
         core.label = report.label.clone();
         core.last = Some(report);
         publish_state(core);
     }
 }
 
-/// Step back to a saved tick. Returns 0 when the rewind landed.
+/// Step back to a saved tick. Returns 0 when the rewind landed. The rewind
+/// lands on the duck the shell is watching.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_seek(core: *mut DuckCore, back_ticks: c_int) -> c_int {
     if core.is_null() {
         return -1;
     }
     let core = &mut *core;
-    let target = core
-        .runtime
-        .clock()
-        .tick
-        .saturating_sub(back_ticks.max(0) as u64);
+    let active_tick = active_runtime(core).clock().tick;
+    let target = active_tick.saturating_sub(back_ticks.max(0) as u64);
     let Some(checkpoint) = core
         .timeline
         .iter()
@@ -1996,13 +2020,20 @@ pub unsafe extern "C" fn duck_core_seek(core: *mut DuckCore, back_ticks: c_int) 
     else {
         return -1;
     };
-    if !core.runtime.restore(&checkpoint) {
+    let mut landed = false;
+    on_active(core, |runtime| {
+        if runtime.restore(&checkpoint) {
+            landed = true;
+        }
+    });
+    if !landed {
         return -1;
     }
     core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
     // The published state must follow the rewind: the duck is somewhere
     // else now, and the shell would keep showing where it was.
-    if let Some(report) = core.runtime.last_report() {
+    let report = on_active(core, |runtime| runtime.last_report().cloned());
+    if let Some(report) = report {
         core.label = report.label.clone();
         core.last = Some(report);
     }
@@ -2010,13 +2041,20 @@ pub unsafe extern "C" fn duck_core_seek(core: *mut DuckCore, back_ticks: c_int) 
     0
 }
 
-/// Fork the duck at this instant. Returns 0 on success.
+/// Fork the duck at this instant. Returns 0 on success. A room only needs a
+/// handful of parallel stories, and every branch is stepped every tick: cap
+/// them so one client cannot grow the CPU without bound.
+pub const MAX_BRANCHES: usize = 8;
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_fork(core: *mut DuckCore, label: *const c_char) -> c_int {
     if core.is_null() {
         return -1;
     }
     let core = &mut *core;
+    if core.branches.len() >= MAX_BRANCHES {
+        return -1;
+    }
     let Some(fork) = core.runtime.fork() else {
         return -1;
     };
@@ -2035,12 +2073,13 @@ pub unsafe extern "C" fn duck_core_fork(core: *mut DuckCore, label: *const c_cha
 
 /// The time machine, for a shell that drives the loop itself: whether the
 /// duck is frozen, and how many ticks one wall-clock frame should advance.
+/// Both read the duck the shell is watching.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn duck_core_paused(core: *mut DuckCore) -> c_int {
     if core.is_null() {
         return 0;
     }
-    (*core).runtime.clock().paused as c_int
+    active_runtime(&*core).clock().paused as c_int
 }
 
 #[unsafe(no_mangle)]
@@ -2048,7 +2087,7 @@ pub unsafe extern "C" fn duck_core_speed(core: *mut DuckCore) -> c_double {
     if core.is_null() {
         return 1.0;
     }
-    (*core).runtime.clock().speed
+    active_runtime(&*core).clock().speed
 }
 
 /// The oldest checkpoint the core still holds, for the scrubber's span.
@@ -2068,7 +2107,7 @@ pub unsafe extern "C" fn duck_core_tick_index(core: *mut DuckCore) -> u64 {
     if core.is_null() {
         return 0;
     }
-    (*core).runtime.clock().tick
+    active_runtime(&*core).clock().tick
 }
 
 /// What this build is: one hash over the scene, meshes, policies and

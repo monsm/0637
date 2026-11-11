@@ -555,6 +555,7 @@ struct InstrumentSheet: View {
                 set: { controller.setMicEnabled($0) }
             ))
             .labelsHidden()
+            .accessibilityLabel(Copy.microphone)
             .accessibilityIdentifier("sheet-mic-toggle")
         }
     }
@@ -587,6 +588,7 @@ struct InstrumentSheet: View {
                     set: { controller.setVoiceCommands($0) }
                 ))
                 .labelsHidden()
+                .accessibilityLabel(Copy.voiceEar)
                 .accessibilityIdentifier("sheet-voice-toggle")
             }
             // A long sentence must not push the label off the row, so the

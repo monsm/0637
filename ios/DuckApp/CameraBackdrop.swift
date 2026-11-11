@@ -28,6 +28,10 @@ final class CameraFeed: NSObject, ObservableObject {
     /// image the user saw behind the duck.
     private let photoOutput = AVCapturePhotoOutput()
     private var photoCompletion: ((UIImage?) -> Void)?
+    /// The pending capture's timeout. A capture interrupted before any photo
+    /// is processed reaches no delegate callback at all, so this releases
+    /// the completion instead of leaving the shutter dead.
+    private var photoWatchdog: DispatchWorkItem?
 
     override init() {
         super.init()
@@ -71,6 +75,10 @@ final class CameraFeed: NSObject, ObservableObject {
     }
 
     private func activate() {
+        // Arriving here means permission is granted, so a denial from an
+        // earlier attempt is stale — clearing it lets the sheet follow when
+        // the user re-enables the camera in Settings without a relaunch.
+        denied = false
         queue.async { [weak self] in
             guard let self else { return }
             if !self.configured {
@@ -162,6 +170,16 @@ final class CameraFeed: NSObject, ObservableObject {
                 connection.videoRotationAngle = angle
             }
             self.photoCompletion = completion
+            // An interruption (an incoming call, the camera taken by another
+            // app) can reach neither photo callback, so ten seconds without
+            // one releases the completion as a failure.
+            self.photoWatchdog?.cancel()
+            let watchdog = DispatchWorkItem { [weak self] in
+                guard let self, let pending = self.consumePhotoCompletion() else { return }
+                DispatchQueue.main.async { pending(nil) }
+            }
+            self.photoWatchdog = watchdog
+            self.queue.asyncAfter(deadline: .now() + 10, execute: watchdog)
             let settings = AVCapturePhotoSettings()
             self.photoOutput.capturePhoto(with: settings, delegate: self)
         }
@@ -209,12 +227,34 @@ extension CameraFeed: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
-        let completion = photoCompletion
-        photoCompletion = nil
+        let completion = consumePhotoCompletion()
         let image = error == nil
             ? photo.fileDataRepresentation().flatMap(UIImage.init(data:))
             : nil
         DispatchQueue.main.async { completion?(image) }
+    }
+
+    /// The terminal callback for a capture that fails before any photo is
+    /// processed — an interruption, the camera taken by another app. Without
+    /// it a failed capture leaves `photoCompletion` set and every later
+    /// shutter press is ignored.
+    func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishCaptureFor photoSettings: AVCapturePhotoSettings,
+        error: Error?
+    ) {
+        let completion = consumePhotoCompletion()
+        DispatchQueue.main.async { completion?(nil) }
+    }
+
+    /// Take the pending completion exactly once and disarm the watchdog.
+    /// Nil when no capture is pending.
+    private func consumePhotoCompletion() -> ((UIImage?) -> Void)? {
+        let completion = photoCompletion
+        photoCompletion = nil
+        photoWatchdog?.cancel()
+        photoWatchdog = nil
+        return completion
     }
 }
 

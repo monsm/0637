@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -43,6 +44,7 @@ fun DanceSheet(
     studio: DanceStudio,
     onSkill: (String) -> Unit,
     onSound: (String) -> Unit,
+    onFeed: () -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -77,6 +79,7 @@ fun DanceSheet(
             when (step.kind) {
                 "skill" -> onSkill(step.value)
                 "sound" -> onSound(step.value)
+                "feed" -> onFeed()
             }
             delay(800)
         }
@@ -87,6 +90,7 @@ fun DanceSheet(
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(
             Modifier
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

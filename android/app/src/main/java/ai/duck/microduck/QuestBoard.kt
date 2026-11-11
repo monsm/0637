@@ -22,6 +22,9 @@ data class QuestBoardUi(
 
 private const val QUEST_PREFS = "duck_quests_v1"
 
+/** The day the core last accepted, so the daily POST fires once per day. */
+@Volatile private var lastPostedDay: String? = null
+
 private fun parseQuests(text: String, chinese: Boolean): QuestBoardUi? = try {
     val board = JSONObject(text)
     val array = board.optJSONArray("quests") ?: org.json.JSONArray()
@@ -55,6 +58,12 @@ fun fetchQuests(): QuestBoardUi? = try {
 /** The phone's calendar day, which the core must know before it can pick goals. */
 fun postQuestDay(context: Context) {
     val day = LocalDate.now().toString()
+    // One post per day: the saver loop calls this every few seconds, and a
+    // replayed POST would reset the core's board mid-day. The claim is set
+    // before the thread starts so concurrent callers cannot double-fire; a
+    // failed post clears it so a later call can retry.
+    if (day == lastPostedDay) return
+    lastPostedDay = day
     val saved = context.getSharedPreferences(QUEST_PREFS, Context.MODE_PRIVATE)
         .getString("board", null)
     val body = JSONObject()
@@ -62,8 +71,11 @@ fun postQuestDay(context: Context) {
         .put("board", if (saved != null) JSONObject(saved) else JSONObject())
     Thread {
         try {
-            postJson("/quests/day", body.toString())
+            if (!postJson("/quests/day", body.toString())) {
+                lastPostedDay = null
+            }
         } catch (_: Throwable) {
+            lastPostedDay = null
         }
     }.start()
 }

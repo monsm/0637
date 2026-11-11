@@ -21,6 +21,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
@@ -432,22 +433,91 @@ impl IntentQueue {
 }
 
 /// Start the server on `0.0.0.0:port`.
-pub fn start(port: u16, queue: Arc<IntentQueue>) -> std::io::Result<()> {
+pub fn start(port: u16, queue: Arc<IntentQueue>) -> std::io::Result<IntentServer> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
-    start_listener(listener, queue);
-    Ok(())
+    Ok(start_listener(listener, queue))
 }
 
+/// A running intent server. Dropping it (or calling `stop`) ends the accept
+/// loop and closes the port, so a freed core cannot leave :8765 bound to a
+/// queue nobody drains any more.
+pub struct IntentServer {
+    shutdown: Arc<AtomicBool>,
+}
+
+impl IntentServer {
+    pub fn stop(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+        // The accept loop notices within one poll interval; joining here
+        // would only stall the caller, and the thread ends on its own.
+    }
+}
+
+impl Drop for IntentServer {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+const ACCEPT_POLL_MS: u64 = 20;
+
 /// Start the server on an already-bound listener (port 0 in tests).
-pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) {
-    std::thread::spawn(move || {
-        for stream in listener.incoming().flatten() {
-            let queue = queue.clone();
-            std::thread::spawn(move || {
-                let _ = handle(stream, queue);
-            });
-        }
-    });
+///
+/// The API is on the LAN with no login, so the server itself must survive
+/// abuse: concurrent handlers are capped (extra connections get 503), a
+/// refused thread only drops that connection, and an accept error sleeps
+/// rather than hot-spinning. Nothing here may unwind and kill the listener.
+pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) -> IntentServer {
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let flag = shutdown.clone();
+    // Non-blocking accept so the loop can watch the shutdown flag: the port
+    // is closed the moment the flag is set and the loop falls through.
+    listener.set_nonblocking(true).ok();
+    let thread = std::thread::Builder::new()
+        .name("duck-intent".to_owned())
+        .spawn(move || {
+            const MAX_CONNECTIONS: usize = 16;
+            let live = Arc::new(AtomicUsize::new(0));
+            loop {
+                if flag.load(Ordering::SeqCst) {
+                    break;
+                }
+                let mut stream = match listener.accept() {
+                    Ok((stream, _)) => stream,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(ACCEPT_POLL_MS));
+                        continue;
+                    }
+                    Err(_) => {
+                        // FD pressure and friends: back off instead of
+                        // spinning on an error the next poll repeats.
+                        std::thread::sleep(Duration::from_millis(10));
+                        continue;
+                    }
+                };
+                if live.load(Ordering::SeqCst) >= MAX_CONNECTIONS {
+                    let _ = respond(&mut stream, 503, "Service Unavailable", "{}");
+                    continue;
+                }
+                let live = live.clone();
+                let queue = queue.clone();
+                // A refused thread drops only this connection, never the
+                // listener: Builder::spawn returns Err instead of panicking.
+                let _ = std::thread::Builder::new()
+                    .name("duck-intent-conn".to_owned())
+                    .spawn(move || {
+                        live.fetch_add(1, Ordering::SeqCst);
+                        let _ = handle(stream, queue);
+                        live.fetch_sub(1, Ordering::SeqCst);
+                    });
+            }
+            // Dropping the listener closes the socket.
+        });
+    // If even the accept thread cannot start, the API is absent but the duck
+    // still runs — the same deal as a taken LAN port. The handle still stops
+    // cleanly; the flag is simply never read.
+    drop(thread);
+    IntentServer { shutdown }
 }
 
 fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()> {
@@ -829,7 +899,8 @@ mod tests {
         queue.set_skills(vec!["roulade".to_owned()]);
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let port = listener.local_addr().expect("addr").port();
-        start_listener(listener, queue.clone());
+        // Keep the handle: dropping it stops the server.
+        let _server = start_listener(listener, queue.clone());
 
         let response = request(port, "POST", "/twist", r#"{"vx":0.4,"vy":0.0,"wz":0.2}"#);
         assert!(response.starts_with("HTTP/1.1 200"), "{response}");
@@ -853,7 +924,7 @@ mod tests {
         let queue = Arc::new(IntentQueue::new());
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let port = listener.local_addr().expect("addr").port();
-        start_listener(listener, queue);
+        let _server = start_listener(listener, queue);
         let response = request(port, "GET", "/nope", "");
         assert!(response.starts_with("HTTP/1.1 404"), "{response}");
     }
@@ -866,7 +937,7 @@ mod tests {
         let queue = Arc::new(IntentQueue::new());
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let port = listener.local_addr().expect("addr").port();
-        start_listener(listener, queue.clone());
+        let _server = start_listener(listener, queue.clone());
 
         // The duck's side of the conversation: take the request, answer it.
         let worker = {

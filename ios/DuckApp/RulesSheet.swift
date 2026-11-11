@@ -129,15 +129,19 @@ struct RulesSheet: View {
                     if !chainDraft.isEmpty {
                         HStack(spacing: 6) {
                             ForEach(Array(chainDraft.enumerated()), id: \.offset) { index, step in
-                                Text(label(for: step.1, kind: step.0))
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .padding(.horizontal, 10)
-                                    .frame(minHeight: 36)
-                                    .background(Color.white.opacity(0.10), in: Capsule())
-                                    .onTapGesture {
-                                        chainDraft.remove(at: index)
-                                    }
-                                    .accessibilityIdentifier("rule-chain-\(index)")
+                                Button {
+                                    chainDraft.remove(at: index)
+                                } label: {
+                                    Text(label(for: step.1, kind: step.0))
+                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                        .padding(.horizontal, 10)
+                                        .frame(minHeight: 48)
+                                        .background(Color.white.opacity(0.10), in: Capsule())
+                                        .contentShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint(Copy.deleteRule)
+                                .accessibilityIdentifier("rule-chain-\(index)")
                             }
                             Spacer()
                         }

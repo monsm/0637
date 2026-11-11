@@ -76,7 +76,22 @@ class MainActivity : ComponentActivity() {
                     coreProvider = { core },
                     onCoreCreated = { created ->
                         core = created
-                        created.startIntentServer(8765)
+                        // A recreate races the previous core's accept loop
+                        // exiting, so the port can still be closing when the
+                        // new core binds. Retry on a worker thread instead of
+                        // blocking composition; after 40 tries it logs and
+                        // gives up rather than throwing.
+                        Thread {
+                            for (attempt in 0 until 40) {
+                                if (created.startIntentServer(8765) == 0) return@Thread
+                                try {
+                                    Thread.sleep(50)
+                                } catch (_: InterruptedException) {
+                                    return@Thread
+                                }
+                            }
+                            android.util.Log.w("duck", "intent server did not bind 8765 after 40 attempts")
+                        }.start()
                         loop = DuckLoop(created, input).also { it.start() }
                         // The duck's own voice: the core decides when it
                         // quacks, this owns the speaker.
@@ -98,6 +113,10 @@ class MainActivity : ComponentActivity() {
                                     saveCompanionNow(activity)
                                     val boardState = fetchRawState()
                                     if (boardState != null) saveQuestBoard(activity, boardState)
+                                    // A midnight rollover reaches the core
+                                    // within one save period; same-day calls
+                                    // are skipped inside postQuestDay.
+                                    postQuestDay(activity)
                                     try {
                                         Thread.sleep(3_000)
                                     } catch (_: InterruptedException) {
@@ -312,32 +331,26 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
     var saved by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
     var kept by remember { mutableStateOf(false) }
-    // One honest line from the deltas the duck actually logged.
-    val events = remember { fetchLifeEvents() }
-    val metres = remember {
-        try {
-            val connection = java.net.URL("http://127.0.0.1:8765/state")
-                .openConnection() as java.net.HttpURLConnection
-            connection.connectTimeout = 1500
-            connection.readTimeout = 1500
-            val text = connection.inputStream.bufferedReader().use { it.readText() }
-            connection.disconnect()
-            Regex(""""metres"\s*:\s*([0-9.]+)""").find(text)
-                ?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
-        } catch (_: Exception) {
-            0.0
+    // One honest line from the deltas the duck actually logged. The fetches
+    // run on IO: a composition-time HttpURLConnection throws
+    // NetworkOnMainThreadException, and the catch would swallow it into the
+    // quiet line every single time.
+    var events by remember { mutableStateOf(emptyList<String>()) }
+    var metres by remember { mutableStateOf(0.0) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            events = fetchLifeEvents()
+            metres = fetchLifeRecord()?.metres ?: 0.0
         }
     }
-    val caption = remember {
-        postcardCaption(
-            rituals = events.count { it == "idle_ritual" },
-            falls = events.count { it.startsWith("fall") },
-            feeds = events.count { it == "feed" },
-            pets = events.count { it == "pet" },
-            moods = events.count { it.startsWith("emotion:") },
-            metres = metres,
-        )
-    }
+    val caption = postcardCaption(
+        rituals = events.count { it == "idle_ritual" },
+        falls = events.count { it.startsWith("fall") },
+        feeds = events.count { it == "feed" },
+        pets = events.count { it == "pet" },
+        moods = events.count { it.startsWith("emotion:") },
+        metres = metres,
+    )
     Dialog(onDismissRequest = onClose) {
         Column(
             Modifier
