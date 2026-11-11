@@ -275,6 +275,33 @@ ground pick、站立网络关闭），需要 manifest 级的模式切换，不�
 
 ---
 
+## 四之八、鸭子的灵魂（2026-11-11 第五批：产品级）
+
+用户反馈「数字版鸭子傻傻的不动，没有物理版的灵魂」。物理版的灵魂在上游仓库里就有：`robotd/idle_head.rs` 的自主张望和 13 个官方情绪（关键帧 + 官方 wav），一直没接。这批全部接入并加产品层：
+
+| 能力 | 内容 | 验证 |
+|---|---|---|
+| 13 官方情绪 | `emotions/*.json` 关键帧（颈/头/身体/喙/技能）+ 官方 wav，逐帧插值，checkpoint 可存取 | smoke: `curious` 播放、时钟推进、声音入队 |
+| 自主张望 | 上游 `idle_head.rs` verbatim 编入（补 IdleState snapshot），无人操纵时接管头部 | smoke: takeover>0.8 |
+| 空闲仪式 | 闲置 30 s（`/config` 可调）自动演一个官方情绪，让鸭子「活着」 | smoke: 9 s 内 emotions 计数增长 |
+| 一次一声音 | 上游 sound.rs 规则：新声音清空队列（官方行为） | 单测 |
+| wheee 欢呼 | 上游三段式 start/loop/end 流式渲染，长按 quack 触发 | smoke + 单测 |
+| 中文语音 | 19 个中/英动词词表（坐下/翻滚/开心/你好…）→ 技能/叫声 | smoke: 4 断言 |
+| 凝视 IK | kinematics crate HeadFk：POST /look 把目标点解算成头关节 | smoke: yaw 符号 |
+| 终身记录 | vetbook：上电/行走/被拿/摔倒/技能/情绪/米数 + 事件流，POST /life 恢复 | smoke: 往返 |
+| 抚摸 | POST /pet：计数 + coo + 150 tick 活泼加成 | smoke |
+| 惊吓 | 麦克风 rms>0.35 上升沿 → 官方 alarm（外部事件，不进 61 维观测） | smoke |
+| 喂食 | POST /feed：官方 ground_pick 啄地 + yes 声 + fed 计数（数字专属仪式） | smoke + MCP |
+| 脸 | 5 格电量计 + 4 状态灯 + 手电筒（7 色），/state.leds | smoke: 手电筒 |
+| 技能环 | 13 情绪全部进 `/skills`，可触发 | smoke |
+| 你不在时 | app 后台期间的事件 diff，回前台一行摘要（两端） | 代码审 |
+| 倾斜凝视 | iOS 菜单开关：手机姿态=头（>4° 才生效，不抢 idle） | 代码审 |
+| 性能表 | /state.performance{fps,ticks/s}，两端 UI 秒级刷新 | smoke: 35+ ticks |
+
+UI 同批重做（小屏批判）：顶栏 6 chip → ⋯菜单；触摸目标全 48pt；sheet 分组折叠（图鉴/此刻/更多）；图鉴行「x/13 moods · y tricks」；Android sheet 可滚动；App 图标（鸭子剪影）；首次引导提示；麦克风权限两端真实接入。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
