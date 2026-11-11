@@ -558,13 +558,21 @@ PY
   [ -n "$coords" ] || return 1
   adb shell input tap $coords > /dev/null 2>&1
 }
-tap_text "Director" || tap_text "取景" || { echo "::error::no Director switch in the shell"; exit 1; }
+tap_text "Director" || tap_text "取景" || {
+  echo "::error::no Director switch in the shell"
+  grep -o 'text="[^"]*"' ui.xml 2>/dev/null | sort -u | head -60 || true
+  exit 1
+}
 SHUTTER_OK=0
 for _ in $(seq 1 10); do
-  if tap_text "Take photo" || tap_text "拍照"; then SHUTTER_OK=1; break; fi
+  if tap_text "Photo" || tap_text "拍照" || tap_text "Take photo"; then SHUTTER_OK=1; break; fi
   sleep 1
 done
-[ "$SHUTTER_OK" = "1" ] || { echo "::error::no shutter in Director"; exit 1; }
+[ "$SHUTTER_OK" = "1" ] || {
+  echo "::error::no shutter in Director"
+  grep -o 'text="[^"]*"' ui.xml 2>/dev/null | sort -u | head -60 || true
+  exit 1
+}
 PHOTO_OK=0
 for _ in $(seq 1 30); do
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
@@ -587,6 +595,11 @@ PY
   fi
   sleep 1
 done
-[ "$PHOTO_OK" = "1" ] || { echo "::error::the Director photo never reached its preview"; exit 1; }
+[ "$PHOTO_OK" = "1" ] || {
+  echo "::error::the Director photo never reached its preview"
+  grep -o 'text="[^"]*"' ui.xml 2>/dev/null | sort -u | head -80 || true
+  adb logcat -d | grep -E "duck-camera|AndroidRuntime|photo" | tail -30 || true
+  exit 1
+}
 echo "Director photo reached the preview with Save and Share"
 echo "smoke test passed"

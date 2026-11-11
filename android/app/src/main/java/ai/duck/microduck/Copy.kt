@@ -129,6 +129,7 @@ val quack get() = pick("Quack", "叫一声")
     // The Director photo.
     val photoTitle get() = pick("Your duck, in your room", "你的鸭子，在你房间")
     val photoTake get() = pick("Take photo", "拍照")
+    val photoShort get() = pick("Photo", "拍照")
     val savePhoto get() = pick("Save", "保存")
     val saved get() = pick("Saved", "已保存")
     val saveFailed get() = pick("No photo access", "无相册权限")

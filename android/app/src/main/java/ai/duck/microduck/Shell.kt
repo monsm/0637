@@ -584,7 +584,7 @@ fun Shell(
                     .padding(top = 56.dp, end = 16.dp),
             ) {
                 RoundChip(
-                    Copy.photoTake,
+                    Copy.photoShort,
                     size = 64.dp,
                     selected = true,
                     selectedColor = Color.White.copy(alpha = 0.28f),
