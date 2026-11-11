@@ -43,6 +43,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -310,6 +311,33 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
     val context = LocalContext.current
     var saved by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
+    var kept by remember { mutableStateOf(false) }
+    // One honest line from the deltas the duck actually logged.
+    val events = remember { fetchLifeEvents() }
+    val metres = remember {
+        try {
+            val connection = java.net.URL("http://127.0.0.1:8765/state")
+                .openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 1500
+            connection.readTimeout = 1500
+            val text = connection.inputStream.bufferedReader().use { it.readText() }
+            connection.disconnect()
+            Regex(""""metres"\s*:\s*([0-9.]+)""").find(text)
+                ?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+        } catch (_: Exception) {
+            0.0
+        }
+    }
+    val caption = remember {
+        postcardCaption(
+            rituals = events.count { it == "idle_ritual" },
+            falls = events.count { it.startsWith("fall") },
+            feeds = events.count { it == "feed" },
+            pets = events.count { it == "pet" },
+            moods = events.count { it.startsWith("emotion:") },
+            metres = metres,
+        )
+    }
     Dialog(onDismissRequest = onClose) {
         Column(
             Modifier
@@ -333,6 +361,14 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
                     .testTag("photo-preview"),
                 contentScale = ContentScale.Fit,
             )
+            Text(
+                caption,
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = 12.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("postcard-caption"),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = {
@@ -346,6 +382,43 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
                 ) {
                     Text(
                         if (saved) Copy.saved else if (saveFailed) Copy.saveFailed else Copy.savePhoto,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                    )
+                }
+                Button(
+                    onClick = {
+                        // Keep to the local shelf: PNG in files/postcards plus
+                        // the caption, shareable from the sheet later.
+                        val dir = PostcardShelf.dir(context)
+                        val name = "card-${System.currentTimeMillis()}.png"
+                        val ok = try {
+                            File(dir, name).outputStream().use {
+                                photo.compress(Bitmap.CompressFormat.PNG, 100, it)
+                            }
+                            true
+                        } catch (_: Throwable) {
+                            false
+                        }
+                        if (ok) {
+                            PostcardShelf.save(
+                                context,
+                                Postcard(
+                                    file = name,
+                                    caption = caption,
+                                    day = java.time.LocalDate.now().toString(),
+                                ),
+                            )
+                        }
+                        kept = ok
+                    },
+                    enabled = !kept,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("photo-keep"),
+                ) {
+                    Text(
+                        if (kept) Copy.postcardSaved else Copy.postcardKeep,
                         fontSize = 13.sp,
                         maxLines = 1,
                     )
