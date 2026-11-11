@@ -570,6 +570,10 @@ echo "--- ground pick ---"
 api POST /ground_pick '{}' > /dev/null
 SEEN=$(poll_state label ground_pick 40 0.2)
 [ "$SEEN" = "ground_pick" ]; check $? "ground pick runs" "label=$SEEN"
+# The peck is the loop's verb, not a scripted skill: the book has to see it
+# through the controller's own state, not the skill slot.
+PECKS=$(api GET /life | python3 -c "import json,sys; print(json.load(sys.stdin).get('ground_picks',0))" 2>/dev/null || echo 0)
+[ "$PECKS" -ge 1 ]; check $? "the book counts the peck" "ground_picks=$PECKS"
 
 # ---------------------------------------------------------------- head/body
 echo "--- head and body control ---"
