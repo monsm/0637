@@ -3,8 +3,21 @@ import SwiftUI
 /// The choreography strip: big tiles, one Record and one Play button. A child
 /// authors by doing, not by editing JSON.
 struct DanceSheet: View {
+    private struct QuickStep {
+        let kind: String
+        let value: String
+    }
+    private let quickSteps = [
+        QuickStep(kind: "skill", value: "roulade"),
+        QuickStep(kind: "skill", value: "kick_left"),
+        QuickStep(kind: "skill", value: "laugh"),
+        QuickStep(kind: "skill", value: "yes"),
+        QuickStep(kind: "sound", value: "chirp"),
+    ]
     @ObservedObject var studio: DanceStudio
     let execute: (DanceStep) -> Void
+    /// Record and perform a quick action without closing the sheet.
+    let tryStep: (String, String) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -66,6 +79,29 @@ struct DanceSheet: View {
                 }
             }
             .frame(maxHeight: 230)
+
+            Text(Copy.danceTry)
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(quickSteps.indices, id: \.self) { index in
+                        let step = quickSteps[index]
+                        Button {
+                            tryStep(step.kind, step.value)
+                        } label: {
+                            Text(step.kind == "sound" ? Copy.danceStepSound : SkillLabel.of(step.value))
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 40)
+                                .background(Color.white.opacity(0.10), in: Capsule())
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("dance-try-\(step.value)")
+                    }
+                }
+            }
 
             HStack(spacing: 10) {
                 Button {

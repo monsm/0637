@@ -9,6 +9,9 @@ struct RulesSheet: View {
     @State private var trigger = "clap"
     @State private var action = "skill"
     @State private var value = "roulade"
+    /// Ordered follow-ups staged before Add. Empty means a classic one-action
+    /// rule; up to four keep the program comprehensible.
+    @State private var chainDraft: [(String, String)] = []
 
     private let triggers = ["clap", "whistle", "pet"]
     private let kinds = ["skill", "emotion", "sound"]
@@ -105,10 +108,51 @@ struct RulesSheet: View {
                         .padding(.vertical, 2)
                     }
 
+                    // Chain: stage follow-up blocks in order. A child can
+                    // build "clap -> roll -> laugh -> chirp" without typing.
+                    HStack(spacing: 8) {
+                        Text(Copy.ruleChain)
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            guard chainDraft.count < 4 else { return }
+                            chainDraft.append((action, value))
+                        } label: {
+                            Label(Copy.ruleChainAdd, systemImage: "plus")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(chainDraft.count >= 4)
+                        .accessibilityIdentifier("rule-chain-add")
+                    }
+                    if !chainDraft.isEmpty {
+                        HStack(spacing: 6) {
+                            ForEach(Array(chainDraft.enumerated()), id: \.offset) { index, step in
+                                Text(label(for: step.1, kind: step.0))
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                    .padding(.horizontal, 10)
+                                    .frame(minHeight: 36)
+                                    .background(Color.white.opacity(0.10), in: Capsule())
+                                    .onTapGesture {
+                                        chainDraft.remove(at: index)
+                                    }
+                                    .accessibilityIdentifier("rule-chain-\(index)")
+                            }
+                            Spacer()
+                        }
+                    }
+
                     Button {
                         var next = controller.rules
-                        next.append(.init(trigger: trigger, action: action, value: value))
+                        next.append(.init(
+                            trigger: trigger,
+                            action: action,
+                            value: value,
+                            then: chainDraft.map { DuckController.DuckRuleStep(action: $0.0, value: $0.1) }
+                        ))
                         controller.saveRules(next)
+                        chainDraft = []
                     } label: {
                         Label(Copy.addRule, systemImage: "plus.circle.fill")
                             .font(.system(size: 14, weight: .semibold, design: .rounded))

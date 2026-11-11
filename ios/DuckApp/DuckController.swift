@@ -34,6 +34,39 @@ final class DuckController: ObservableObject {
         var trigger: String
         var action: String
         var value: String
+        /// Optional ordered follow-ups: a chain, for a longer little program.
+        var then: [DuckRuleStep] = []
+
+        enum CodingKeys: String, CodingKey { case trigger, action, value, then }
+
+        init(
+            trigger: String,
+            action: String,
+            value: String,
+            then: [DuckRuleStep] = []
+        ) {
+            self.trigger = trigger
+            self.action = action
+            self.value = value
+            self.then = then
+        }
+
+        // Programs saved before chains existed have no `then` key; they must
+        // still load rather than being dropped as corrupt.
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            trigger = try container.decode(String.self, forKey: .trigger)
+            action = try container.decode(String.self, forKey: .action)
+            value = try container.decode(String.self, forKey: .value)
+            then = try container.decodeIfPresent(
+                [DuckRuleStep].self,
+                forKey: .then
+            ) ?? []
+        }
+    }
+    struct DuckRuleStep: Codable, Equatable {
+        var action: String
+        var value: String
     }
     @Published var rules: [DuckRule] = []
     /// Today's three small goals. The core measures them from its own vet
@@ -1042,7 +1075,13 @@ final class DuckController: ObservableObject {
                   let action = item["action"] as? String,
                   let value = item["value"] as? String
             else { return nil }
-            return DuckRule(trigger: trigger, action: action, value: value)
+            let then = (item["then"] as? [[String: Any]] ?? []).compactMap { step -> DuckRuleStep? in
+                guard let action = step["action"] as? String,
+                      let value = step["value"] as? String
+                else { return nil }
+                return DuckRuleStep(action: action, value: value)
+            }
+            return DuckRule(trigger: trigger, action: action, value: value, then: then)
         }
     }
 
@@ -1050,8 +1089,18 @@ final class DuckController: ObservableObject {
     /// invalid block comes back refused rather than run.
     func saveRules(_ next: [DuckRule]) {
         rules = next
-        let payload = ["rules": next.map {
-            ["trigger": $0.trigger, "action": $0.action, "value": $0.value]
+        let payload = ["rules": next.map { rule -> [String: Any] in
+            var item: [String: Any] = [
+                "trigger": rule.trigger,
+                "action": rule.action,
+                "value": rule.value,
+            ]
+            if !rule.then.isEmpty {
+                item["then"] = rule.then.map {
+                    ["action": $0.action, "value": $0.value]
+                }
+            }
+            return item
         }]
         if let body = try? JSONSerialization.data(withJSONObject: payload) {
             post("/rules", body)

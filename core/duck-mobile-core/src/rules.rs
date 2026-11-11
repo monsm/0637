@@ -22,9 +22,22 @@ pub const ACTIONS: [&str; 3] = ["skill", "emotion", "sound"];
 pub struct Rule {
     /// "clap", "whistle" or "pet".
     pub trigger: String,
-    /// "skill", "emotion" or "sound".
+    /// "skill", "emotion" or "sound". The first action; kept for older
+    /// saved programs that only know the one-action shape.
     pub action: String,
     /// The skill/emotion/sound name, e.g. "roulade".
+    pub value: String,
+    /// Optional ordered follow-up actions. A program that has a `then` list
+    /// runs `action/value` first, then each entry in order. Absent means the
+    /// old one-action rule.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub then: Vec<Action>,
+}
+
+/// One block after the first: same action/value pair as a classic rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Action {
+    pub action: String,
     pub value: String,
 }
 
@@ -79,10 +92,42 @@ impl Rules {
             if name.trim().is_empty() {
                 return Err(format!("rule {index}: empty value"));
             }
+            let mut then = Vec::new();
+            if let Some(list) = item.get("then") {
+                let list = list
+                    .as_array()
+                    .ok_or_else(|| format!("rule {index}: then must be a list"))?;
+                if list.len() > 4 {
+                    return Err(format!("rule {index}: at most 4 follow-up actions"));
+                }
+                for (at, step) in list.iter().enumerate() {
+                    let step_action = step
+                        .get("action")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| format!("rule {index}.{at}: missing action"))?;
+                    if !ACTIONS.contains(&step_action) {
+                        return Err(format!(
+                            "rule {index}.{at}: no such action: {step_action}"
+                        ));
+                    }
+                    let step_value = step
+                        .get("value")
+                        .and_then(Value::as_str)
+                        .ok_or_else(|| format!("rule {index}.{at}: missing value"))?;
+                    if step_value.trim().is_empty() {
+                        return Err(format!("rule {index}.{at}: empty value"));
+                    }
+                    then.push(Action {
+                        action: step_action.to_owned(),
+                        value: step_value.to_owned(),
+                    });
+                }
+            }
             rules.push(Rule {
                 trigger: trigger.to_owned(),
                 action: action.to_owned(),
                 value: name.to_owned(),
+                then,
             });
         }
         self.rules = rules;
@@ -132,5 +177,33 @@ mod tests {
             }))
             .unwrap_err();
         assert!(error.contains("no such trigger"));
+    }
+
+    #[test]
+    fn a_rule_can_carry_a_short_ordered_chain() {
+        let mut rules = Rules::default();
+        rules
+            .set(&serde_json::json!({
+                "rules": [{
+                    "trigger": "clap",
+                    "action": "skill",
+                    "value": "roulade",
+                    "then": [
+                        { "action": "emotion", "value": "laugh" },
+                        { "action": "sound", "value": "chirp" }
+                    ]
+                }]
+            }))
+            .unwrap();
+        let rule = &rules.rules[0];
+        assert_eq!(rule.then.len(), 2);
+        assert_eq!(rule.then[1].value, "chirp");
+        // The old single-action payload still loads.
+        rules
+            .set(&serde_json::json!({
+                "rules": [{ "trigger": "pet", "action": "sound", "value": "coo" }]
+            }))
+            .unwrap();
+        assert!(rules.rules[0].then.is_empty());
     }
 }

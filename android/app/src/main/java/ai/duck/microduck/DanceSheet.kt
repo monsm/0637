@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -57,8 +59,9 @@ fun DanceSheet(
     }
 
     LaunchedEffect(Unit) {
+        // Keep the sheet's record/playback labels in sync with the studio.
         while (true) {
-            activeStep = studio.activeStep
+            activeStep = if (studio.playing) activeStep else studio.activeStep
             playing = studio.playing
             delay(120)
         }
@@ -78,6 +81,7 @@ fun DanceSheet(
             delay(800)
         }
         studio.finished()
+        activeStep = -1
     }
 
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
@@ -154,6 +158,26 @@ fun DanceSheet(
                     }
                 }
             }
+            Text(
+                Copy.danceTry,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 10.sp,
+            )
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                listOf("roulade", "kick_left", "laugh", "yes").forEach { name ->
+                    ButtonChip(skillLabel(name), "dance-try-$name") {
+                        onSkill(name)
+                        refresh()
+                    }
+                }
+                ButtonChip(Copy.danceStepSound, "dance-try-chirp") {
+                    onSound("chirp")
+                    refresh()
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ButtonChip(
                     if (recording) Copy.danceStopRecord else Copy.danceRecord,
@@ -161,8 +185,7 @@ fun DanceSheet(
                 ) {
                     studio.toggleRecording()
                     refresh()
-                }
-                ButtonChip(
+                }                ButtonChip(
                     if (playing) Copy.danceStop else Copy.dancePlay,
                     "dance-play",
                 ) {

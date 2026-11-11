@@ -1087,9 +1087,39 @@ private fun RulesSheet(onClose: () -> Unit) {
                     ) { value = option }
                 }
             }
+            var chain by remember { mutableStateOf(emptyList<RuleStep>()) }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    Copy.ruleChain,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                )
+                Spacer(Modifier.weight(1f))
+                ButtonChip(Copy.ruleChainAdd, "rule-chain-add") {
+                    if (chain.size < 4) chain = chain + RuleStep(action, value)
+                }
+            }
+            if (chain.isNotEmpty()) {
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    chain.forEachIndexed { index, step ->
+                        RuleChip(
+                            if (step.action == "sound") step.value else skillLabel(step.value),
+                            "rule-chain-$index",
+                            false,
+                        ) { chain = chain.filterIndexed { at, _ -> at != index } }
+                    }
+                }
+            }
             ButtonChip(Copy.addRule, "rule-add") {
-                val next = rules + RuleUi(trigger, action, value)
+                val next = rules + RuleUi(trigger, action, value, chain)
                 rules = next
+                chain = emptyList()
                 saveRules(context, next)
             }
         }
@@ -1384,7 +1414,7 @@ private fun ThumbDeck(
 
 /** A 48 dp close target shared by the ring and the instrument sheet. */
 @Composable
-private fun CloseChip(tag: String, onClose: () -> Unit, size: Dp = 48.dp) {
+internal fun CloseChip(tag: String, onClose: () -> Unit, size: Dp = 48.dp) {
     Box(
         Modifier
             .size(size.coerceAtLeast(48.dp))
@@ -2356,7 +2386,7 @@ private fun InstrumentSheet(
 }
 
 @Composable
-private fun ButtonChip(
+internal fun ButtonChip(
     label: String,
     testTag: String? = null,
     onClick: () -> Unit,

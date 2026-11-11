@@ -213,6 +213,7 @@ enum Copy {
     static var dancePlay: String { pick("Play", "播放") }
     static var danceStop: String { pick("Stop", "停止") }
     static var danceSaved: String { pick("Saved on this phone", "已存在这台手机") }
+    static var danceTry: String { pick("Try these while recording:", "录制时点这些：") }
     static var danceStepPet: String { pick("Pet", "摸摸") }
     static var danceStepSound: String { pick("Quack", "叫一声") }
     // Morning postcard.
@@ -259,6 +260,8 @@ enum Copy {
     static var ruleWhen: String { pick("When", "当") }
     static var ruleThen: String { pick("then", "就") }
     static var addRule: String { pick("Add", "添加") }
+    static var ruleChain: String { pick("then also", "然后再") }
+    static var ruleChainAdd: String { pick("Add step", "加一步") }
     static var deleteRule: String { pick("Delete", "删除") }
     static var rulesEmpty: String {
         pick("No rules yet. Build one: when I clap, roll over.",

@@ -32,7 +32,14 @@ private const val COMPANION_KEY = "duck_companion_v1"
 private const val RULES_KEY = "duck_rules_v1"
 
 /** One block: when `trigger`, do `action`=`value`. */
-data class RuleUi(val trigger: String, val action: String, val value: String)
+data class RuleUi(
+    val trigger: String,
+    val action: String,
+    val value: String,
+    val then: List<RuleStep> = emptyList(),
+)
+
+data class RuleStep(val action: String, val value: String)
 
 /** The program the core is running, read from GET /rules. */
 fun fetchRules(): List<RuleUi>? = try {
@@ -40,10 +47,15 @@ fun fetchRules(): List<RuleUi>? = try {
     val array = summary.optJSONArray("rules") ?: return emptyList()
     (0 until array.length()).mapNotNull { index ->
         val item = array.optJSONObject(index) ?: return@mapNotNull null
+        val chain = item.optJSONArray("then")
         RuleUi(
             trigger = item.optString("trigger", ""),
             action = item.optString("action", ""),
             value = item.optString("value", ""),
+            then = if (chain == null) emptyList() else (0 until chain.length()).mapNotNull { at ->
+                val step = chain.optJSONObject(at) ?: return@mapNotNull null
+                RuleStep(step.optString("action", ""), step.optString("value", ""))
+            },
         )
     }
 } catch (_: Throwable) {
@@ -54,12 +66,18 @@ fun fetchRules(): List<RuleUi>? = try {
 fun saveRules(context: Context, rules: List<RuleUi>) {
     val array = org.json.JSONArray()
     rules.forEach { rule ->
-        array.put(
-            JSONObject()
-                .put("trigger", rule.trigger)
-                .put("action", rule.action)
-                .put("value", rule.value)
-        )
+        val item = JSONObject()
+            .put("trigger", rule.trigger)
+            .put("action", rule.action)
+            .put("value", rule.value)
+        if (rule.then.isNotEmpty()) {
+            val chain = org.json.JSONArray()
+            rule.then.forEach { step ->
+                chain.put(JSONObject().put("action", step.action).put("value", step.value))
+            }
+            item.put("then", chain)
+        }
+        array.put(item)
     }
     val payload = JSONObject().put("rules", array).toString()
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

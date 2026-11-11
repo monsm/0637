@@ -1194,51 +1194,65 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
         let mut executed = false;
         for rule in &rules {
-            let ok = match rule.action.as_str() {
-                "skill" => match rule.value.as_str() {
-                    // The loop owns sit/stand and ground-pick; send them to
-                    // their idempotent entries instead of the skill table.
-                    "sit" => {
-                        if self.is_sitting() {
-                            true
-                        } else {
-                            self.sit_toggle().is_ok()
-                        }
-                    }
-                    "stand" => {
-                        if self.is_sitting() {
-                            self.sit_toggle().is_ok()
-                        } else {
-                            true
-                        }
-                    }
-                    "ground_pick" => self.start_ground_pick().is_ok(),
-                    _ => self.trigger_skill(&rule.value).is_ok(),
-                },
-                "emotion" => self.trigger_emotion(&rule.value).is_ok(),
-                "sound" => {
-                    if crate::voice::TAGS.contains(&rule.value.as_str()) {
-                        self.queue_sound(&rule.value);
-                        true
-                    } else {
-                        false
-                    }
+            let mut steps = Vec::with_capacity(rule.then.len() + 1);
+            steps.push(crate::rules::Action {
+                action: rule.action.clone(),
+                value: rule.value.clone(),
+            });
+            steps.extend(rule.then.iter().cloned());
+            for step in &steps {
+                let ok = self.run_rule_action(&step.action, &step.value);
+                if ok {
+                    executed = true;
+                    self.rules.last = Some(crate::rules::Fired {
+                        trigger: trigger.to_owned(),
+                        action: step.action.clone(),
+                        value: step.value.clone(),
+                        tick: self.clock.tick,
+                    });
                 }
-                _ => false,
-            };
-            if ok {
-                executed = true;
-                self.rules.last = Some(crate::rules::Fired {
-                    trigger: trigger.to_owned(),
-                    action: rule.action.clone(),
-                    value: rule.value.clone(),
-                    tick: self.clock.tick,
-                });
             }
         }
         // If nothing could run (busy, unknown value), let the duck's default
         // reaction have the moment rather than suppressing it silently.
         executed
+    }
+
+    /// One block, through the loop's own idempotent entries where it owns the
+    /// verb. A refused step returns false; a chain keeps going.
+    fn run_rule_action(&mut self, action: &str, value: &str) -> bool {
+        match action {
+            "skill" => match value {
+                // The loop owns sit/stand and ground-pick; send them to
+                // their idempotent entries instead of the skill table.
+                "sit" => {
+                    if self.is_sitting() {
+                        true
+                    } else {
+                        self.sit_toggle().is_ok()
+                    }
+                }
+                "stand" => {
+                    if self.is_sitting() {
+                        self.sit_toggle().is_ok()
+                    } else {
+                        true
+                    }
+                }
+                "ground_pick" => self.start_ground_pick().is_ok(),
+                _ => self.trigger_skill(value).is_ok(),
+            },
+            "emotion" => self.trigger_emotion(value).is_ok(),
+            "sound" => {
+                if crate::voice::TAGS.contains(&value) {
+                    self.queue_sound(value);
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 
     pub fn last_peer_event(&self) -> Option<&serde_json::Value> {

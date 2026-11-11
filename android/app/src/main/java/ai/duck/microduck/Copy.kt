@@ -135,6 +135,8 @@ val quack get() = pick("Quack", "叫一声")
     val danceStopRecord get() = pick("Stop recording", "停止录制")
     val dancePlay get() = pick("Play", "播放")
     val danceStop get() = pick("Stop", "停止")
+    val danceTry get() = pick("Try these while recording:", "录制时点这些：")
+    val danceStepSound get() = pick("Quack", "叫一声")
     // Morning postcard.
     val postcard get() = pick("Morning postcard", "早安明信片")
     val postcardKeep get() = pick("Keep", "收藏")
@@ -170,6 +172,8 @@ val quack get() = pick("Quack", "叫一声")
     val ruleWhen get() = pick("When", "当")
     val ruleThen get() = pick("then", "就")
     val addRule get() = pick("Add", "添加")
+    val ruleChain get() = pick("then also", "然后再")
+    val ruleChainAdd get() = pick("Add step", "加一步")
     val deleteRule get() = pick("Delete", "删除")
     val rulesEmpty get() = pick(
         "No rules yet. Build one: when I clap, roll over.",

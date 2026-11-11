@@ -186,9 +186,27 @@ struct ContentView: View {
                         .presentationDetents(portrait ? [.medium, .large] : [.large])
                         .presentationDragIndicator(.visible)
                 case .dance:
-                    DanceSheet(studio: controller.dance, execute: playDanceStep)
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.visible)
+                    DanceSheet(
+                        studio: controller.dance,
+                        execute: playDanceStep,
+                        tryStep: { kind, value in
+                            let label = kind == "sound"
+                                ? Copy.danceStepSound
+                                : SkillLabel.of(value)
+                            controller.dance.record(
+                                kind,
+                                value: value,
+                                label: label
+                            )
+                            playDanceStep(DanceStep(
+                                kind: kind,
+                                value: value,
+                                label: label
+                            ))
+                        }
+                    )
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
                 }
             }
             .onChange(of: showInstrument) { _, show in

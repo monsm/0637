@@ -428,6 +428,38 @@ e=json.load(sys.stdin).get('rule_event') or {}
 print(e.get('trigger',''), e.get('value',''))
 " 2>/dev/null || echo " ")
 [ "$FIRED" = "clap roulade" ]; check $? "state publishes the block that fired" "event=$FIRED"
+# A chain: one clap -> chirp, THEN laugh. The published event is the last
+# step that really ran, and the emotion count proves the second step ran.
+wait_idle 80 > /dev/null
+LAUGHS_BEFORE=$(api GET /life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('emotions',{}).get('laugh',0))
+" 2>/dev/null || echo 0)
+api POST /rules '{"rules":[{"trigger":"clap","action":"sound","value":"chirp","then":[{"action":"emotion","value":"laugh"}]}]}' > /dev/null || true
+CHAIN_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$CHAIN_TICK}" > /dev/null || true
+sleep 0.15
+api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((CHAIN_TICK + 60))}" > /dev/null || true
+CHAIN_FIRED=""
+for _ in $(seq 1 30); do
+  CHAIN_FIRED=$(api GET /state | python3 -c "
+import json,sys
+e=json.load(sys.stdin).get('rule_event') or {}
+print(e.get('value',''))
+" 2>/dev/null || true)
+  [ "$CHAIN_FIRED" = "laugh" ] && break
+  sleep 0.25
+done
+[ "$CHAIN_FIRED" = "laugh" ]; check $? "a chain runs its steps in order" "last=$CHAIN_FIRED"
+LAUGHS_AFTER=$(api GET /life | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('emotions',{}).get('laugh',0))
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if int('${LAUGHS_AFTER:-0}') > int('${LAUGHS_BEFORE:-0}') else 1)
+" 2>/dev/null
+check $? "the chain's second step really ran" "laughs $LAUGHS_BEFORE -> $LAUGHS_AFTER"
 api POST /rules '{"rules":[]}' > /dev/null || true
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
 
