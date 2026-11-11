@@ -766,6 +766,11 @@ check $? "English speech maps to the same table" "$(printf '%s' "$HEARD2" | head
 HEARD_GET=$(api GET /heard || true)
 printf '%s' "$HEARD_GET" | grep -q '"excited"'
 check $? "the heard words are published for an outside model" "$(printf '%s' "$HEARD_GET" | head -c 120)"
+# Standing up is its own idempotent verb: on a standing duck it must do
+# nothing rather than seat it (the old toggle made 站起来 sit the duck down).
+STAND_UP=$(api POST /heard '{"text":"站起来"}' || true)
+printf '%s' "$STAND_UP" | grep -q '"did":false'
+check $? "站起来 on a standing duck is a no-op" "$(printf '%s' "$STAND_UP" | head -c 140)"
 wait_idle 100 > /dev/null
 GREET=$(api POST /heard '{"text":"你好"}' || true)
 printf '%s' "$GREET" | grep -q '"sound":"greet"'
@@ -1007,12 +1012,32 @@ for name in roulade kick_left sit; do
   state_has "$ROLLER_SKILLS" "\"$name\""
   check $? "roller keeps the skill: $name" ""
 done
+# The companion follows the animal, not the body: hunger, the vet book and
+# the child's rules must survive a whole-bundle switch.
+BOND_WALK=$(api GET /care | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('care',{}).get('bond',0))
+" 2>/dev/null || echo 0)
+api POST /rules '{"rules":[{"trigger":"clap","action":"sound","value":"chirp"}]}' > /dev/null || true
 BACK=$(api POST /mode '{"mode":"walk"}' || true)
 printf '%s' "$BACK" | grep -q '"ok":true'
 check $? "the duck can switch back to walk" "$(printf '%s' "$BACK" | head -c 120)"
 sleep 3
 MODE_BACK=$(api GET /state | field mode)
 [ "$MODE_BACK" = "walk" ]; check $? "the state reports walk again" "mode=$MODE_BACK"
+BOND_WALK_BACK=$(api GET /care | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('care',{}).get('bond',0))
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if abs(float('${BOND_WALK_BACK:-0}') - float('${BOND_WALK:-0}')) < 0.05 else 1)
+" 2>/dev/null
+check $? "a mode switch keeps the companion" "bond $BOND_WALK -> $BOND_WALK_BACK"
+RULES_BACK=$(api GET /rules || true)
+printf '%s' "$RULES_BACK" | grep -q '"value":"chirp"'
+check $? "a mode switch keeps the child's rules" ""
+api POST /rules '{"rules":[]}' > /dev/null || true
 BAD=$(api POST /mode '{"mode":"hover"}' || true)
 printf '%s' "$BAD" | grep -q '"ok":false'
 check $? "an unknown mode is refused" "$(printf '%s' "$BAD" | head -c 120)"

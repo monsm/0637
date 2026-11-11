@@ -617,7 +617,7 @@ fun Shell(
                 skills = skills,
                 bottomAnchored = portrait,
                 onPick = { name ->
-                    dance.record("skill", name, Copy.skillLabel(name))
+                    dance.record("skill", name, skillLabel(name))
                     when (name) {
                         "sit" -> core.sit()
                         "ground_pick" -> core.groundPick()

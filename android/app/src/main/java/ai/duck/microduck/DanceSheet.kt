@@ -185,7 +185,8 @@ fun DanceSheet(
                 ) {
                     studio.toggleRecording()
                     refresh()
-                }                ButtonChip(
+                }
+                ButtonChip(
                     if (playing) Copy.danceStop else Copy.dancePlay,
                     "dance-play",
                 ) {

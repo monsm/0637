@@ -138,6 +138,12 @@ if ! curl -sf --max-time 5 http://127.0.0.1:8765/heard | grep -q '翻滚'; then
   echo "::error::GET /heard does not publish the last words"
   exit 1
 fi
+# 站起来 on a standing duck must be a no-op, not a toggle into the seat.
+if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"text":"站起来"}' http://127.0.0.1:8765/heard | grep -q '"did":false'; then
+  echo "::error::站起来 seated a standing duck"
+  exit 1
+fi
 # The gaze solver: aiming right must yaw the head right.
 LOOK=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"x":1.0,"y":-0.5,"z":0.15}' http://127.0.0.1:8765/look || true)
 if ! echo "$LOOK" | grep -q '"ok":true'; then

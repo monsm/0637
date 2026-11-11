@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 /// The postcard shelf: a Director frame plus one honest line about what the
 /// duck actually did. Local only; Share hands the PNG to the system sheet.
