@@ -80,12 +80,24 @@ class MainActivity : ComponentActivity() {
                         // The duck's own voice: the core decides when it
                         // quacks, this owns the speaker.
                         voice = Voice(created).also { it.start() }
-                        // Restore does not depend on the shell composable
-                        // being on screen; the app owns this hand-back.
+                        // Restore and the periodic save belong to the app,
+                        // not to a composable: the shell can be recomposed or
+                        // stopped, and losing this thread is how the duck
+                        // woke up as a stranger. The saver runs only after a
+                        // restore (or on a first launch with nothing saved),
+                        // so it can never overwrite the file with defaults.
                         val activity = this@MainActivity
                         Thread {
                             if (restoreCompanion(activity)) {
                                 companionReady = true
+                                while (companionReady) {
+                                    saveCompanionNow(activity)
+                                    try {
+                                        Thread.sleep(3_000)
+                                    } catch (_: InterruptedException) {
+                                        break
+                                    }
+                                }
                             }
                         }.start()
                     },

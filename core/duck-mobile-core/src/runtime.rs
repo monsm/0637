@@ -473,6 +473,9 @@ pub struct DuckRuntime<T: RobotIo> {
     /// Last time the duck showed sadness, so a low mood is one scene a
     /// minute rather than a loop.
     last_sad: Option<u64>,
+    /// A short break after waking: being petted awake must produce a coo,
+    /// not immediately the sad timeline because the mood is still low.
+    sad_grace_until: Option<u64>,
     /// The last room sound the duck answered: ("clap"/"whistle", tick).
     last_sound_event: Option<(String, u64)>,
     /// The child's block program. Configuration, not simulation state: a
@@ -607,6 +610,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             care: crate::care::Care::default(),
             care_scale: 1.0,
             last_sad: None,
+            sad_grace_until: None,
             last_sound_event: None,
             rules: crate::rules::Rules::default(),
             last_peer_event: None,
@@ -1731,6 +1735,12 @@ impl<T: RobotIo> DuckRuntime<T> {
         let was_asleep = self.care.asleep;
         self.care
             .tick(self.clock.tick, self.dt.as_secs_f64(), self.care_scale);
+        if self.care.woke {
+            self.care.woke = false;
+            // Five simulated seconds: enough for the coo (or the hand's
+            // skill) to own the moment, not enough to hide a sad duck.
+            self.sad_grace_until = Some(self.clock.tick.saturating_add(250));
+        }
         let now = TickTime::of(&self.clock);
         let sensors: Sensors = self.safety.read()?;
         // One fused sample per tick, exactly as `Imu::decode` counts them.
@@ -2282,6 +2292,9 @@ impl<T: RobotIo> DuckRuntime<T> {
         // timeline, at most once a minute, and never while it is dozing.
         if self.care.sad()
             && !self.care.asleep
+            && self
+                .sad_grace_until
+                .is_none_or(|until| self.clock.tick >= until)
             && emotion_frame.is_none()
             && self.emotion_playing.is_none()
             && !self.controller.busy()

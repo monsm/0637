@@ -35,6 +35,10 @@ pub struct Care {
     pub asleep: bool,
     /// Simulated tick of the last interaction (pet, feed, carry, drive).
     pub last_touch: u64,
+    /// An interaction just woke the duck; the loop reads this once to give it
+    /// a short break before a low mood can play the sad timeline.
+    #[serde(default)]
+    pub woke: bool,
 }
 
 impl Default for Care {
@@ -45,6 +49,7 @@ impl Default for Care {
             bond: 0.1,
             asleep: false,
             last_touch: 0,
+            woke: false,
         }
     }
 }
@@ -75,6 +80,7 @@ impl Care {
 
     /// A hand: pets are the strongest bond signal.
     pub fn pet(&mut self, now: u64) {
+        self.woke = self.woke || self.asleep;
         self.last_touch = now;
         self.asleep = false;
         self.bond = (self.bond + BOND_PER_PET).min(1.0);
@@ -83,6 +89,7 @@ impl Care {
 
     /// A treat: the only thing that lowers hunger.
     pub fn feed(&mut self, now: u64) {
+        self.woke = self.woke || self.asleep;
         self.last_touch = now;
         self.asleep = false;
         self.hunger = (self.hunger - 0.45).max(0.0);
@@ -92,6 +99,7 @@ impl Care {
 
     /// Driving, carrying, a skill: attention, but weaker than a pet.
     pub fn touch(&mut self, now: u64) {
+        self.woke = self.woke || self.asleep;
         self.last_touch = now;
         self.asleep = false;
     }

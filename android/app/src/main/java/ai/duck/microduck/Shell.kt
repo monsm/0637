@@ -200,23 +200,9 @@ fun Shell(
     var careLine by remember { mutableStateOf("") }
     LaunchedEffect(core) {
         val duck = core ?: return@LaunchedEffect
-        // The Activity owns the restore worker (onCoreCreated); wait for its
-        // verdict rather than firing a second restore from the composition,
-        // which can be stopped mid-flight when the screen is not composed.
-        var restored = MainActivity.companionReady
-        var attempts = 0
-        while (!restored && attempts < 60) {
-            delay(250)
-            restored = MainActivity.companionReady
-            attempts += 1
-        }
-        val companionsRestored = restored
         var lastSoundTick = -1
         var lastRuleTick = -1
         var lastPeerTick = -1
-        var lastCompanionSave = 0L
-        // The restore above already waited for the core to acknowledge; no
-        // fixed sleep, and no save before it succeeded.
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.
@@ -241,14 +227,6 @@ fun Shell(
                 soundLine = peerEvent.text
             }
             val now = System.currentTimeMillis()
-            // Save every 3 s, and only after the restore had a chance to
-            // land. A kill without a lifecycle callback keeps the duck.
-            if (companionsRestored && stateText != null &&
-                now - lastCompanionSave >= 3_000
-            ) {
-                lastCompanionSave = now
-                withContext(Dispatchers.IO) { saveCompanionFromState(context, stateText) }
-            }
             if (aiConfig.enabled && !aiThinking &&
                 now - lastAIThink >= maxOf(10, aiConfig.interval) * 1000L
             ) {
