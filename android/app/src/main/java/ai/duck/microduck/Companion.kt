@@ -316,7 +316,11 @@ fun restoreCompanion(context: Context): Boolean {
     // The intent server starts with the core and may not accept connections
     // yet. Retry until it acknowledges, and keep the save gate closed until
     // then: a fresh duck must not overwrite the saved one.
-    val saved = if (raw != null) JSONObject(raw) else null
+    val saved = try {
+        if (raw != null) JSONObject(raw) else null
+    } catch (_: Throwable) {
+        null
+    }
     val care = saved?.optJSONObject("care")
     val life = saved?.optJSONObject("life")
     val wantedBond = care?.optDouble("bond", -1.0) ?: -1.0
@@ -325,7 +329,7 @@ fun restoreCompanion(context: Context): Boolean {
     // HTTP server saw it, not that the tick dequeued it.
     for (attempt in 0 until 40) {
         try {
-            val stateText = fetchRawState() ?: throw IllegalStateException("state not ready")
+            if (fetchRawState() == null) throw IllegalStateException("state not ready")
             if (care != null && !postJsonOk("/care", care.toString())) {
                 throw IllegalStateException("care not accepted")
             }
@@ -348,7 +352,6 @@ fun restoreCompanion(context: Context): Boolean {
                 }
                 if (!seen) throw IllegalStateException("care restore not published")
             }
-            _ = stateText
             return true
         } catch (_: Throwable) {
             try {
