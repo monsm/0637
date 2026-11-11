@@ -13,6 +13,8 @@ final class DuckController: ObservableObject {
     /// Dance Studio is owned by the controller, so every action button can
     /// record what it just did without a second path through the core.
     let dance = DanceStudio()
+    /// The morning postcard shelf.
+    let postcards = PostcardShelf()
     /// The live renderer, for the Director shutter's frame read-back. Weak:
     /// the view owns the renderer, not the controller.
     weak var renderer: Renderer?

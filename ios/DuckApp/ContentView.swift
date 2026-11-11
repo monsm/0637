@@ -169,7 +169,10 @@ struct ContentView: View {
                         .presentationDetents(portrait ? [.medium, .large] : [.large])
                         .presentationDragIndicator(.visible)
                 case .photo(let photo):
-                    PhotoPreviewSheet(photo: photo)
+                    PhotoPreviewSheet(
+                        photo: photo,
+                        shelf: controller.postcards
+                    )
                 case .rules:
                     RulesSheet(controller: controller)
                         .presentationDetents([.large])

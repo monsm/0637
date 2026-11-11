@@ -215,6 +215,16 @@ enum Copy {
     static var danceSaved: String { pick("Saved on this phone", "已存在这台手机") }
     static var danceStepPet: String { pick("Pet", "摸摸") }
     static var danceStepSound: String { pick("Quack", "叫一声") }
+    // Morning postcard.
+    static var postcard: String { pick("Morning postcard", "早安明信片") }
+    static var postcardKeep: String { pick("Keep", "收藏") }
+    static var postcardQuiet: String { pick("A quiet night.", "安静的一夜。") }
+    static var postcardShelf: String { pick("Postcards", "明信片") }
+    static var postcardSaved: String { pick("Kept to the shelf", "已收藏") }
+    static var postcardNone: String { pick("No postcards yet", "还没有明信片") }
+    static func postcardMetres(_ m: Double) -> String {
+        pick(String(format: "walked %.1f m", m), String(format: "走了 %.1f 米", m))
+    }
     // Daily quests.
     static var quests: String { pick("Today's quests", "今日小挑战") }
     static var questDone: String { pick("Done", "完成") }
