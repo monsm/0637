@@ -426,6 +426,82 @@ print(e.get('trigger',''), e.get('value',''))
 api POST /rules '{"rules":[]}' > /dev/null || true
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
 
+# Another duck on the LAN, played by this host over UDP. The app must
+# discover it, answer its greet with a hello, and mark it as answered when
+# we say hi back. This is the same protocol two phones use.
+echo "--- neighbours ---"
+LAN=$(api POST /peers/start '{"name":"CI Duck"}' || true)
+printf '%s' "$LAN" | grep -q '"ok":true'
+check $? "the duck opens its LAN socket" "$(printf '%s' "$LAN" | head -c 140)"
+PEER_REPLY=$(python3 - <<'PY'
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8799))
+sock.settimeout(3.0)
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+greet = {"v": 1, "type": "greet", "from": "peerci01", "name": "Sunny", "to": "all"}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.15)
+sock.sendto(json.dumps(greet).encode(), ("127.0.0.1", 8766))
+try:
+    data, _ = sock.recvfrom(2048)
+    message = json.loads(data)
+    print(message.get("type", ""), message.get("to", ""))
+except Exception:
+    print("timeout", "")
+PY
+)
+[ "${PEER_REPLY%% *}" = "hello" ]; check $? "the duck answers another duck's greet" "reply=$PEER_REPLY"
+sleep 0.5
+NEIGHBOURS=$(api GET /state | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+peers=(d.get('peers') or {}).get('peers') or []
+e=d.get('peer_event') or {}
+print(len(peers), peers[0].get('name','') if peers else '', e.get('kind',''), e.get('name',''))
+" 2>/dev/null || echo "0   ")
+[ "$NEIGHBOURS" = "1 Sunny greeted Sunny" ]
+check $? "the neighbour is discovered and the greeting is published" "$NEIGHBOURS"
+
+# A listener first, then ask the app to greet it: the app's greet arrives on
+# our socket and we answer hello, which the app must report as replied.
+python3 - <<'PY' > /tmp/duck-peer-ack.txt &
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8799))
+sock.settimeout(6.0)
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.2)
+try:
+    data, addr = sock.recvfrom(2048)
+    message = json.loads(data)
+    if message.get("type") == "greet":
+        hello = {"v": 1, "type": "hello", "from": "peerci01", "name": "Sunny", "to": "all"}
+        sock.sendto(json.dumps(hello).encode(), addr)
+        print("greet")
+    else:
+        print(message.get("type", ""))
+except Exception:
+    print("timeout")
+PY
+PEER_PID=$!
+sleep 0.5
+api POST /peers/greet '{"id":"peerci01"}' > /dev/null || true
+wait "$PEER_PID" 2>/dev/null || true
+PEER_ACK=$(cat /tmp/duck-peer-ack.txt 2>/dev/null || echo "")
+[ "$PEER_ACK" = "greet" ]; check $? "our greet reaches the other duck" "ack=$PEER_ACK"
+sleep 0.5
+FIRED=$(api GET /state | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+peers=(d.get('peers') or {}).get('peers') or []
+e=d.get('peer_event') or {}
+print(peers[0].get('replied') if peers else '', e.get('kind',''))
+" 2>/dev/null || echo " ")
+[ "$FIRED" = "True replied" ]; check $? "the other duck's answer is recorded" "state=$FIRED"
+rm -f /tmp/duck-peer-ack.txt
+
 # A treat on the floor: the official ground-pick peck, counted in the
 # life record. Nothing about food exists on the robot; the ritual is
 # digital-only and made of official moves.

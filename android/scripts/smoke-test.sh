@@ -325,6 +325,23 @@ fi
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"rules":[]}' \
   http://127.0.0.1:8765/rules > /dev/null || true
 echo "block rules: clap -> roulade ok ($ROLLS_BEFORE -> $ROLLS_AFTER)"
+
+# The LAN social layer starts on demand and publishes its own identity and
+# an (empty in CI) peer list. Two emulators are not available here, so the
+# protocol itself is exercised by the iOS host-peer test and the unit tests.
+echo "--- neighbours ---"
+if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"name":"CI Android"}' http://127.0.0.1:8765/peers/start | grep -q '"ok":true'; then
+  echo "::error::the duck could not open its LAN peer socket"
+  exit 1
+fi
+PEERS=$(curl -sf --max-time 5 http://127.0.0.1:8765/peers || true)
+echo "$PEERS" | grep -q '"name":"CI Android"'
+if ! echo "$PEERS" | grep -q '"peers"'; then
+  echo "::error::/peers does not publish the peer list"
+  exit 1
+fi
+echo "neighbours: LAN socket and peer list ok"
 # Leave a calm, awake duck for the walk and screenshots.
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"hunger":0.15,"mood":0.35,"bond":0.2,"asleep":false}' \

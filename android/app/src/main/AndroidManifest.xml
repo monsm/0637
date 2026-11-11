@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The LAN peer socket receives broadcasts on some Wi-Fi stacks only
+         while this lock is held; it is acquired when Neighbours starts. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Director mode composites the duck over the rear camera. Not required:
          an emulator or a device without one keeps the studio view. -->
     <uses-permission android:name="android.permission.CAMERA" />

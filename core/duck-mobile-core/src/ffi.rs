@@ -71,6 +71,8 @@ pub struct DuckCore {
     /// that changes with each new reading so one post is heard once.
     sound_watch: crate::sensors::SoundWatch,
     sound_sequence: u64,
+    /// The LAN social layer: other ducks, announces and greetings.
+    lan: Option<crate::lan::Lan>,
     /// A refusal the client should see for longer than the tick that made it:
     /// (tick, message). Published on `/state` until it goes stale.
     notice: Option<(u64, String)>,
@@ -269,6 +271,11 @@ pub unsafe extern "C" fn duck_core_new(
             sensors: crate::sensors::Sensors::default(),
             sound_watch: crate::sensors::SoundWatch::default(),
             sound_sequence: 0,
+            // Discovery starts on demand (POST /peers/start): iOS asks for
+            // local-network permission the first time an app sends on the
+            // LAN, and that question belongs to the moment the user opens
+            // Neighbours, not to every launch.
+            lan: None,
             notice: None,
             rendered_sound: None,
             sound_tag: None,
@@ -833,11 +840,38 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             Err(reason) => refuse(core, format!("rules refused: {reason}")),
         },
         Intent::GetRules => json!({ "ok": true, "rules": core.runtime.rules_summary() }),
+        Intent::GreetPeer(target) => match &core.lan {
+            Some(lan) => {
+                lan.greet(target.as_deref());
+                json!({ "ok": true, "greeted": target })
+            }
+            None => refuse(core, "the LAN peer port is not available".to_owned()),
+        },
+        Intent::PeerName(name) => match &core.lan {
+            Some(lan) => {
+                lan.set_name(&name);
+                json!({ "ok": true, "peers": lan.snapshot() })
+            }
+            None => refuse(core, "the LAN peer port is not available".to_owned()),
+        },
+        Intent::StartLan(name) => {
+            if core.lan.is_none() {
+                core.lan = crate::lan::Lan::start(&name);
+            }
+            match &core.lan {
+                Some(lan) => {
+                    lan.set_name(&name);
+                    json!({ "ok": true, "peers": lan.snapshot() })
+                }
+                None => refuse(core, "the LAN peer port is not available".to_owned()),
+            }
+        }
         Intent::Look { target, neck_pitch } => {
             let gaze = core.runtime.look_at(target, neck_pitch);
             json!({ "ok": true, "head": gaze.joints, "clamped": gaze.clamped })
         }
         Intent::Heard(text) => {
+            core.runtime.heard(&text);
             let Some((phrase, heard)) = crate::speech::interpret(&text) else {
                 // Silence is not an error the client should have to parse:
                 // say what was heard and that nothing matched.
@@ -1157,6 +1191,14 @@ fn publish_state(core: &DuckCore) {
         // The last programmed block that fired, so the child can see their
         // rule run even when the action's own label is gone.
         "rule_event": active.last_rule(),
+        // Other ducks on the LAN, and the last greeting or reply.
+        "peers": core.intents.peers_value(),
+        "peer_event": active.last_peer_event(),
+        // The last words a person said, for a user-supplied model. The audio
+        // itself never leaves the phone; only these words are published.
+        "last_heard": active.last_heard().map(|(text, tick)| {
+            json!({ "text": text, "tick": tick })
+        }),
         "life": active.book().summary(),
         // Hunger, mood and bond: the companion layer's three numbers, plus
         // whether the duck has dozed off. `asleep` is a pose overlay, not a
@@ -1223,6 +1265,14 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         return -1;
     }
     let core = &mut *core;
+    // Other ducks on the LAN: greetings are social events, and the peer list
+    // is published with the rest of the state.
+    if let Some(lan) = &core.lan {
+        for event in lan.take_events() {
+            core.runtime.peer_event(&event);
+        }
+        core.intents.set_peers(lan.snapshot());
+    }
     for queued in core.intents.drain() {
         let result = apply_intent(core, queued.intent);
         // The client that sent a one-shot is waiting on this; a stream may not

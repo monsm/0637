@@ -100,6 +100,24 @@ final class DuckController: ObservableObject {
     /// The last programmed block that fired, as "clap → roulade".
     @Published var ruleNotice: String?
     private var lastRuleTick = -1
+    /// Other ducks on this Wi-Fi, and the last hello exchanged.
+    struct PeerInfo: Identifiable {
+        let id: String
+        let name: String
+        let replied: Bool
+    }
+    @Published var peers: [PeerInfo] = []
+    @Published var peerName = ""
+    @Published var peerNotice: String?
+    private var lastPeerTick = -1
+    /// The user's own model. The shell makes the call; the core never talks
+    /// to the internet. Config lives in UserDefaults beside the language.
+    @Published var aiConfig = AIConfig.load()
+    @Published var aiStatus = ""
+    @Published var aiDecision = ""
+    @Published var aiError: String?
+    private let aiBrain = AIBrain()
+    private var lastAIThink = Date.distantPast
     private var eventsAtBackground: [String] = []
     private var lastEvents: [String] = []
     /// The companion layer, from /state.care: hunger (0 fed .. 1 starving),
@@ -678,6 +696,147 @@ final class DuckController: ObservableObject {
         }
     }
 
+    /// Open the LAN socket and announce this phone. Called when the user
+    /// opens Neighbours — the first local-network use is the moment iOS asks
+    /// for permission, not every launch.
+    func startPeers() {
+        let payload = ["name": UIDevice.current.name]
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        post("/peers/start", body)
+    }
+
+    // MARK: - The user's own model
+
+    func saveAIConfig(_ config: AIConfig) {
+        aiConfig = config
+        config.save()
+        lastAIThink = .distantPast
+        aiStatus = config.enabled ? Copy.aiOn : Copy.aiOff
+        aiError = nil
+    }
+
+    /// Runs from the 1 Hz sensor poll; never more often than the configured
+    /// interval, and never twice at once (AIBrain refuses while busy).
+    private func maybeThinkAI() {
+        guard aiConfig.enabled, ready,
+              !aiConfig.endpoint.trimmingCharacters(in: .whitespaces).isEmpty,
+              Date().timeIntervalSince(lastAIThink) >= max(10, aiConfig.interval)
+        else { return }
+        lastAIThink = Date()
+        aiThinkNow()
+    }
+
+    /// One decision now, whether or not the loop is on.
+    func aiThinkNow() {
+        guard !aiConfig.endpoint.trimmingCharacters(in: .whitespaces).isEmpty else {
+            aiError = Copy.aiNeedEndpoint
+            return
+        }
+        aiStatus = Copy.aiThinking
+        aiError = nil
+        let group = DispatchGroup()
+        var state: [String: Any]?
+        var skills: [String] = []
+        group.enter()
+        URLSession.shared.dataTask(
+            with: URL(string: "http://127.0.0.1:8765/state")!
+        ) { data, _, _ in
+            if let data {
+                state = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            }
+            group.leave()
+        }.resume()
+        group.enter()
+        URLSession.shared.dataTask(
+            with: URL(string: "http://127.0.0.1:8765/skills")!
+        ) { data, _, _ in
+            if let data,
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let list = json["skills"] as? [String] {
+                skills = list
+            }
+            group.leave()
+        }.resume()
+        group.notify(queue: .main) { [weak self] in
+            guard let self else { return }
+            guard let state else {
+                self.aiError = "the duck did not answer /state"
+                self.aiStatus = Copy.aiOffline
+                return
+            }
+            let heard = (state["last_heard"] as? [String: Any])?["text"] as? String
+                ?? self.heardText
+            self.aiBrain.think(
+                config: self.aiConfig,
+                state: state,
+                skills: skills,
+                heard: heard
+            ) { [weak self] decision, error in
+                guard let self else { return }
+                if let error {
+                    self.aiError = error
+                    self.aiStatus = Copy.aiOffline
+                    return
+                }
+                guard let decision else { return }
+                self.aiStatus = Copy.aiOn
+                self.executeAI(decision)
+            }
+        }
+    }
+
+    private func executeAI(_ decision: AIDecision) {
+        let shown = decision.value.isEmpty
+            ? decision.action
+            : "\(decision.action) · \(decision.value)"
+        aiDecision = decision.why.isEmpty ? "AI · \(shown)" : "AI · \(shown) — \(decision.why)"
+        switch decision.action {
+        case "skill":
+            postJSON("/skill", ["name": decision.value])
+        case "sound":
+            postJSON("/sound", ["tag": decision.value])
+        case "sit", "stand":
+            postJSON("/sit", [:])
+        case "stop":
+            postJSON("/twist", ["vx": 0.0, "vy": 0.0, "wz": 0.0])
+        case "look":
+            postJSON("/look", ["x": decision.x, "y": decision.y, "z": decision.z])
+        case "move":
+            moveAI(vx: decision.vx, vz: decision.vz, seconds: decision.seconds)
+        default:
+            break
+        }
+    }
+
+    /// A bounded walk: the model may ask for at most two seconds, and the
+    /// loop stops it even if the app forgets. The deadman would too.
+    private func moveAI(vx: Double, vz: Double, seconds: Double) {
+        let frames = max(1, Int(seconds * 10))
+        func step(_ remaining: Int) {
+            guard remaining > 0 else {
+                postJSON("/twist", ["vx": 0.0, "vy": 0.0, "wz": 0.0])
+                return
+            }
+            postJSON("/twist", ["vx": vx, "vy": 0.0, "wz": vz])
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                step(remaining - 1)
+            }
+        }
+        step(frames)
+    }
+
+    private func postJSON(_ path: String, _ object: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: object) else { return }
+        post(path, data)
+    }
+
+    /// Say hello to one duck, or to every duck on the Wi-Fi.
+    func greetPeer(_ id: String?) {
+        let payload: [String: Any] = id.map { ["id": $0] } ?? [:]
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        post("/peers/greet", body)
+    }
+
     /// The block program the core is running. A GET, because the core is the
     /// authority; the local copy is only the editor's working set.
     func loadRules() {
@@ -872,8 +1031,9 @@ final class DuckController: ObservableObject {
         URLSession.shared.dataTask(with: request).resume()
     }
 
-    private func pollSensors() {
+    func pollSensors() {
         reportPerformance()
+        maybeThinkAI()
         guard let url = URL(string: "http://127.0.0.1:8765/sensors") else { return }
         var request = URLRequest(url: url)
         request.timeoutInterval = 1.5
@@ -922,6 +1082,31 @@ final class DuckController: ObservableObject {
                             self.lastRuleTick = tick
                             let shown = action == "sound" ? value : SkillLabel.of(value)
                             self.ruleNotice = "\(Copy.ruleTrigger(trigger)) → \(shown)"
+                        }
+                    }
+                    if let peers = json["peers"] as? [String: Any] {
+                        self.peerName = peers["name"] as? String ?? self.peerName
+                        let list = peers["peers"] as? [[String: Any]] ?? []
+                        self.peers = list.compactMap { item in
+                            guard let id = item["id"] as? String,
+                                  let name = item["name"] as? String
+                            else { return nil }
+                            return PeerInfo(
+                                id: id,
+                                name: name,
+                                replied: item["replied"] as? Bool ?? false
+                            )
+                        }
+                    }
+                    if let event = json["peer_event"] as? [String: Any],
+                       let kind = event["kind"] as? String,
+                       let name = event["name"] as? String,
+                       let tick = event["tick"] as? Int {
+                        if tick != self.lastPeerTick {
+                            self.lastPeerTick = tick
+                            self.peerNotice = kind == "greeted"
+                                ? Copy.peerGreeted(name)
+                                : Copy.peerReplied(name)
                         }
                     }
                     if let care = json["care"] as? [String: Any] {

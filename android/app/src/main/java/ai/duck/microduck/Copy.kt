@@ -161,6 +161,38 @@ val quack get() = pick("Quack", "叫一声")
         "sound" -> pick("sound", "声音")
         else -> action
     }
+    // Other ducks on the same Wi-Fi.
+    val peers get() = pick("Neighbours", "邻居")
+    val peerSayHi get() = pick("Say hi", "打招呼")
+    val peerSayAll get() = pick("Say hi to everyone", "向大家问好")
+    val peerFind get() = pick("Find ducks on this Wi-Fi", "在 Wi-Fi 里找鸭子")
+    val peersEmpty get() = pick("Looking for ducks on this Wi-Fi…", "正在同一 Wi-Fi 里找鸭子…")
+    val peerRepliedLabel get() = pick("answered", "已回应")
+    val peerNew get() = pick("new", "新朋友")
+    fun peerGreeted(name: String) = pick("$name says hi!", "$name 向你问好！")
+    fun peerReplied(name: String) = pick("$name answered!", "$name 回应了！")
+    // Bring your own model.
+    val ai get() = pick("AI companion", "AI 伙伴")
+    val aiOn get() = pick("watching", "观察中")
+    val aiOff get() = pick("off", "未开启")
+    val aiThinking get() = pick("thinking…", "思考中…")
+    val aiOffline get() = pick("no answer", "没有回应")
+    val aiNeedEndpoint get() = pick("Set an endpoint first", "请先填写接口地址")
+    val aiEndpoint get() = pick("Endpoint", "接口地址")
+    val aiModel get() = pick("Model", "模型")
+    val aiKey get() = pick("API key", "密钥")
+    val aiInterval get() = pick("Every (seconds)", "每隔（秒）")
+    val aiPersona get() = pick("Persona", "性格")
+    val aiThinkNow get() = pick("Think now", "现在想")
+    val aiSave get() = pick("Save", "保存")
+    val aiHint get() = pick(
+        "Any OpenAI-compatible endpoint, including a local Ollama or LM Studio server.",
+        "任何兼容 OpenAI 的接口，包括本机的 Ollama 或 LM Studio。",
+    )
+    val aiNote get() = pick(
+        "The duck's state and the last words it heard go to the endpoint you choose. Your key stays on this phone.",
+        "鸭子的状态和它最后听到的话会发给你填写的接口。密钥只保存在这台手机上。",
+    )
     val showMore get() = pick("More", "更多")
     val showLess get() = pick("Less", "收起")
 

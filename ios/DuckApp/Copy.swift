@@ -246,6 +246,48 @@ enum Copy {
         default: return action
         }
     }
+    // Other ducks on the same Wi-Fi.
+    static var peers: String { pick("Neighbours", "邻居") }
+    static var peerSayHi: String { pick("Say hi", "打招呼") }
+    static var peerSayAll: String { pick("Say hi to everyone", "向大家问好") }
+    static var peersEmpty: String {
+        pick("Looking for ducks on this Wi-Fi…", "正在同一 Wi-Fi 里找鸭子…")
+    }
+    static var peerFind: String { pick("Find ducks on this Wi-Fi", "在 Wi-Fi 里找鸭子") }
+    static var peerNew: String { pick("new", "新朋友") }
+    static var peerRepliedLabel: String { pick("answered", "已回应") }
+    static func peerGreeted(_ name: String) -> String {
+        pick("\(name) says hi!", "\(name) 向你问好！")
+    }
+    static func peerReplied(_ name: String) -> String {
+        pick("\(name) answered!", "\(name) 回应了！")
+    }
+    // Bring your own model.
+    static var ai: String { pick("AI companion", "AI 伙伴") }
+    static var aiOn: String { pick("watching", "观察中") }
+    static var aiOff: String { pick("off", "未开启") }
+    static var aiThinking: String { pick("thinking…", "思考中…") }
+    static var aiOffline: String { pick("no answer", "没有回应") }
+    static var aiNeedEndpoint: String { pick("Set an endpoint first", "请先填写接口地址") }
+    static var aiEndpoint: String { pick("Endpoint", "接口地址") }
+    static var aiModel: String { pick("Model", "模型") }
+    static var aiKey: String { pick("API key", "密钥") }
+    static var aiInterval: String { pick("Every (seconds)", "每隔（秒）") }
+    static var aiPersona: String { pick("Persona", "性格") }
+    static var aiThinkNow: String { pick("Think now", "现在想") }
+    static var aiSave: String { pick("Save", "保存") }
+    static var aiNote: String {
+        pick(
+            "The duck's state and the last words it heard go to the endpoint you choose. Your key stays on this phone and is never sent anywhere else.",
+            "鸭子的状态和它最后听到的话会发给你填写的接口。密钥只保存在这台手机上，不会发往别处。"
+        )
+    }
+    static var aiHint: String {
+        pick(
+            "Any OpenAI-compatible endpoint, including a local Ollama or LM Studio server.",
+            "任何兼容 OpenAI 的接口，包括本机的 Ollama 或 LM Studio。"
+        )
+    }
     static var showMore: String { pick("More", "更多") }
     static var showLess: String { pick("Less", "收起") }
     static var depth: String { pick("depth", "深度") }

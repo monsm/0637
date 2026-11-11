@@ -19,6 +19,7 @@ pub mod control;
 pub mod emotion;
 pub mod export;
 pub mod intent;
+pub mod lan;
 pub mod leds;
 
 pub mod io;

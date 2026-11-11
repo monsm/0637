@@ -48,25 +48,27 @@ fun photoFile(context: Context, bitmap: Bitmap): File {
  * and MediaStore owns the file; a failure returns false rather than claiming
  * a save that did not happen.
  */
-fun savePhoto(context: Context, bitmap: Bitmap): Boolean = try {
-    val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "MicroDuck-${System.currentTimeMillis()}.png")
-        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MicroDuck")
-        put(MediaStore.Images.Media.IS_PENDING, 1)
+fun savePhoto(context: Context, bitmap: Bitmap): Boolean {
+    return try {
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "MicroDuck-${System.currentTimeMillis()}.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/MicroDuck")
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return false
+        resolver.openOutputStream(uri)?.use { stream ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        } ?: return false
+        values.clear()
+        values.put(MediaStore.Images.Media.IS_PENDING, 0)
+        resolver.update(uri, values, null, null)
+        true
+    } catch (_: Throwable) {
+        false
     }
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-        ?: return false
-    resolver.openOutputStream(uri)?.use { stream ->
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
-    } ?: return false
-    values.clear()
-    values.put(MediaStore.Images.Media.IS_PENDING, 0)
-    resolver.update(uri, values, null, null)
-    true
-} catch (_: Throwable) {
-    false
 }
 
 /** Hand the PNG to whatever app the user picks. */

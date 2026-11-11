@@ -132,6 +132,86 @@ fun fetchCare(): CareUi? = try {
     null
 }
 
+/** One other duck on the LAN. */
+data class PeerUi(
+    val id: String,
+    val name: String,
+    val replied: Boolean,
+)
+
+data class PeersUi(
+    val name: String = "",
+    val peers: List<PeerUi> = emptyList(),
+)
+
+fun fetchPeers(): PeersUi? = try {
+    val peers = JSONObject(getJson("/state")).optJSONObject("peers") ?: return null
+    val array = peers.optJSONArray("peers") ?: org.json.JSONArray()
+    PeersUi(
+        name = peers.optString("name", ""),
+        peers = (0 until array.length()).mapNotNull { index ->
+            val item = array.optJSONObject(index) ?: return@mapNotNull null
+            PeerUi(
+                id = item.optString("id", ""),
+                name = item.optString("name", ""),
+                replied = item.optBoolean("replied", false),
+            )
+        },
+    )
+} catch (_: Throwable) {
+    null
+}
+
+private var multicastLock: android.net.wifi.WifiManager.MulticastLock? = null
+
+/**
+ * Open the core's LAN socket and announce this phone. Also takes Android's
+ * multicast lock, without which many Wi-Fi stacks drop the peer broadcasts.
+ * Called when the user opens Neighbours, never at launch.
+ */
+fun startPeers(context: Context, name: String) {
+    try {
+        if (multicastLock == null) {
+            val wifi = context.applicationContext
+                .getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            multicastLock = wifi?.createMulticastLock("duck-peers")?.apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    } catch (_: Throwable) {
+    }
+    Thread {
+        try {
+            postJson("/peers/start", JSONObject().put("name", name).toString())
+        } catch (_: Throwable) {
+        }
+    }.start()
+}
+
+fun greetPeer(context: Context, id: String?) {
+    val payload = if (id == null) JSONObject() else JSONObject().put("id", id)
+    Thread {
+        try {
+            postJson("/peers/greet", payload.toString())
+        } catch (_: Throwable) {
+        }
+    }.start()
+}
+
+/** The last hello exchanged, formatted for the pill. */
+data class PeerEventUi(val tick: Int, val text: String)
+
+fun fetchPeerEvent(): PeerEventUi? = try {
+    val event = JSONObject(getJson("/state")).optJSONObject("peer_event") ?: return null
+    val kind = event.optString("kind", "")
+    val name = event.optString("name", "Duck")
+    val text = if (kind == "greeted") Copy.peerGreeted(name) else Copy.peerReplied(name)
+    PeerEventUi(event.optInt("tick", -1), text)
+} catch (_: Throwable) {
+    null
+}
+
 /** The last room sound the duck answered: kind and the tick it happened. */
 data class SoundEvent(val kind: String, val tick: Int)
 
@@ -150,11 +230,32 @@ fun fetchRuleEvent(): RuleEvent? = try {
     val trigger = event.optString("trigger", "")
     val action = event.optString("action", "")
     val rawValue = event.optString("value", "")
-    val shown = if (action == "sound") rawValue else Copy.skillLabel(rawValue)
+    val shown = if (action == "sound") rawValue else skillLabel(rawValue)
     RuleEvent(
         event.optInt("tick", -1),
         "${Copy.ruleTrigger(trigger)} → $shown",
     )
+} catch (_: Throwable) {
+    null
+}
+
+/** The whole /state document, for the user's model. */
+fun fetchRawState(): String? = try {
+    getJson("/state")
+} catch (_: Throwable) {
+    null
+}
+
+fun fetchSkillNames(): List<String> = try {
+    val array = JSONObject(getJson("/skills")).optJSONArray("skills")
+        ?: return emptyList()
+    (0 until array.length()).mapNotNull { array.optString(it, "").ifEmpty { null } }
+} catch (_: Throwable) {
+    emptyList()
+}
+
+fun fetchLastHeard(): String? = try {
+    JSONObject(getJson("/state")).optJSONObject("last_heard")?.optString("text", "")
 } catch (_: Throwable) {
     null
 }

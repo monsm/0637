@@ -45,6 +45,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -53,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,6 +110,52 @@ fun Shell(
     var showRing by remember { mutableStateOf(false) }
     var showSheet by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
+    var showPeers by remember { mutableStateOf(false) }
+    var peers by remember { mutableStateOf(PeersUi()) }
+    // The user's own model: config, last answer and the loop's guard.
+    var showAI by remember { mutableStateOf(false) }
+    var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
+    var aiStatus by remember { mutableStateOf("") }
+    var aiDecision by remember { mutableStateOf("") }
+    var aiError by remember { mutableStateOf<String?>(null) }
+    var aiThinking by remember { mutableStateOf(false) }
+    var lastAIThink by remember { mutableStateOf(0L) }
+    val aiScope = rememberCoroutineScope()
+    // The one-line pill above the rail: care by default, a room sound, a
+    // block or the model's decision for a moment.
+    var soundLine by remember { mutableStateOf<String?>(null) }
+
+    // One decision: fetch what the duck sees, ask the endpoint, execute the
+    // validated answer. The core never talks to the network.
+    val thinkAI: () -> Unit = {
+        if (!aiThinking) {
+            val config = aiConfig
+            aiThinking = true
+            aiError = null
+            aiStatus = Copy.aiThinking
+            aiScope.launch {
+                val state = withContext(Dispatchers.IO) { fetchRawState() }
+                val skills = withContext(Dispatchers.IO) { fetchSkillNames() }
+                val heard = withContext(Dispatchers.IO) { fetchLastHeard() } ?: ""
+                val result: Pair<AIDecision?, String?> = withContext(Dispatchers.IO) {
+                    if (state == null) null to "the duck did not answer /state"
+                    else AIBrain.think(config, state, skills, heard)
+                }
+                val decision = result.first
+                val error = result.second
+                if (decision != null) {
+                    aiDecision = executeAIDecision(decision)
+                    soundLine = aiDecision
+                    aiStatus = if (config.enabled) Copy.aiOn else Copy.aiOff
+                }
+                if (error != null) {
+                    aiError = error
+                    aiStatus = Copy.aiOffline
+                }
+                aiThinking = false
+            }
+        }
+    }
     var carrying by remember { mutableStateOf(false) }
     // The pad's D-pad modes, reduced to what a phone can do: drive, look,
     // and crouch/lean the standing body.
@@ -149,12 +198,12 @@ fun Shell(
     // second, and the prefs save is handed back on the first frame the core
     // is alive. Both are cheap; neither touches the tick thread.
     var careLine by remember { mutableStateOf("") }
-    var soundLine by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(core) {
         val duck = core ?: return@LaunchedEffect
         withContext(Dispatchers.IO) { restoreCompanion(context) }
         var lastSoundTick = -1
         var lastRuleTick = -1
+        var lastPeerTick = -1
         while (true) {
             val line = withContext(Dispatchers.IO) { fetchCare()?.line() }
             if (line != null) careLine = line
@@ -167,6 +216,20 @@ fun Shell(
             if (rule != null && rule.tick != lastRuleTick) {
                 lastRuleTick = rule.tick
                 soundLine = rule.text
+            }
+            val peersNow = withContext(Dispatchers.IO) { fetchPeers() }
+            if (peersNow != null) peers = peersNow
+            val peerEvent = withContext(Dispatchers.IO) { fetchPeerEvent() }
+            if (peerEvent != null && peerEvent.tick != lastPeerTick) {
+                lastPeerTick = peerEvent.tick
+                soundLine = peerEvent.text
+            }
+            val now = System.currentTimeMillis()
+            if (aiConfig.enabled && !aiThinking &&
+                now - lastAIThink >= maxOf(10, aiConfig.interval) * 1000L
+            ) {
+                lastAIThink = now
+                thinkAI()
             }
             delay(1500)
         }
@@ -265,6 +328,8 @@ fun Shell(
                         onSurface = onSurface,
                         onFlashlight = toggleFlashlight,
                         onRules = { showRules = true },
+                        onPeers = { showPeers = true },
+                        onAI = { showAI = true },
                         onLanguage = {
                             Copy.language = if (Copy.language == Copy.Language.English) {
                                 Copy.Language.Chinese
@@ -427,6 +492,8 @@ fun Shell(
                 onSurface = onSurface,
                 onFlashlight = toggleFlashlight,
                 onRules = { showRules = true },
+                onPeers = { showPeers = true },
+                onAI = { showAI = true },
                 onLanguage = {
                     Copy.language = if (Copy.language == Copy.Language.English) {
                         Copy.Language.Chinese
@@ -599,6 +666,264 @@ fun Shell(
     if (showRules && core != null) {
         RulesSheet(onClose = { showRules = false })
     }
+
+    if (showPeers) {
+        PeersSheet(
+            peers = peers,
+            onStart = { startPeers(context, android.os.Build.MODEL) },
+            onGreet = { id -> greetPeer(context, id) },
+            onClose = { showPeers = false },
+        )
+    }
+
+    if (showAI) {
+        AISheet(
+            config = aiConfig,
+            status = aiStatus,
+            decision = aiDecision,
+            error = aiError,
+            onSave = { config ->
+                aiConfig = config
+                AIStore.save(context, config)
+                aiStatus = if (config.enabled) Copy.aiOn else Copy.aiOff
+                aiError = null
+            },
+            onThink = { config ->
+                aiConfig = config
+                AIStore.save(context, config)
+                lastAIThink = System.currentTimeMillis()
+                thinkAI()
+            },
+            onClose = { showAI = false },
+        )
+    }
+}
+
+/** The user's own model: endpoint, key and how often it may decide. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AISheet(
+    config: AIConfig,
+    status: String,
+    decision: String,
+    error: String?,
+    onSave: (AIConfig) -> Unit,
+    onThink: (AIConfig) -> Unit,
+    onClose: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var enabled by remember { mutableStateOf(config.enabled) }
+    var endpoint by remember { mutableStateOf(config.endpoint) }
+    var model by remember { mutableStateOf(config.model) }
+    var key by remember { mutableStateOf(config.key) }
+    var interval by remember { mutableStateOf(config.interval.toString()) }
+    var persona by remember { mutableStateOf(config.persona) }
+    val current: () -> AIConfig = {
+        AIConfig(
+            enabled = enabled,
+            endpoint = endpoint,
+            model = model,
+            key = key,
+            interval = interval.toIntOrNull()?.coerceIn(10, 300) ?: 30,
+            persona = persona,
+        )
+    }
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+        Column(
+            Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    Copy.ai,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("ai-title"),
+                )
+                CloseChip("ai-close", onClose)
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.ai, color = Color.White, fontSize = 13.sp)
+                Spacer(Modifier.weight(1f))
+                Switch(checked = enabled, onCheckedChange = { enabled = it })
+            }
+            OutlinedTextField(
+                value = endpoint,
+                onValueChange = { endpoint = it },
+                label = { Text(Copy.aiEndpoint) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ai-endpoint"),
+            )
+            OutlinedTextField(
+                value = model,
+                onValueChange = { model = it },
+                label = { Text(Copy.aiModel) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ai-model"),
+            )
+            OutlinedTextField(
+                value = key,
+                onValueChange = { key = it },
+                label = { Text(Copy.aiKey) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ai-key"),
+            )
+            OutlinedTextField(
+                value = persona,
+                onValueChange = { persona = it },
+                label = { Text(Copy.aiPersona) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ai-persona"),
+            )
+            OutlinedTextField(
+                value = interval,
+                onValueChange = { interval = it },
+                label = { Text(Copy.aiInterval) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("ai-interval"),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ButtonChip(Copy.aiSave, "ai-save") { onSave(current()) }
+                ButtonChip(Copy.aiThinkNow, "ai-think") { onThink(current()) }
+            }
+            if (status.isNotEmpty()) {
+                Text(
+                    status,
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.testTag("ai-status"),
+                )
+            }
+            if (error != null) {
+                Text(error, color = Color(0xFFFFB74D), fontSize = 11.sp)
+            }
+            if (decision.isNotEmpty()) {
+                Text(
+                    decision,
+                    color = Color(0xFF80DEEA),
+                    fontSize = 12.sp,
+                    modifier = Modifier.testTag("ai-decision"),
+                )
+            }
+            Text(Copy.aiHint, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+            Text(Copy.aiNote, color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+        }
+    }
+}
+
+/**
+ * Other ducks on this Wi-Fi. Discovery is the core's UDP announce; the list
+ * updates from /state while this sheet is open. A greeting is one of the
+ * duck's social reactions, and the answer comes back as "X answered!".
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PeersSheet(
+    peers: PeersUi,
+    onStart: () -> Unit,
+    onGreet: (String?) -> Unit,
+    onClose: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+        Column(
+            Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        Copy.peers,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp,
+                        modifier = Modifier.testTag("peers-title"),
+                    )
+                    if (peers.name.isNotEmpty()) {
+                        Text(
+                            "${Copy.name} · ${peers.name}",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+                CloseChip("peers-close", onClose)
+            }
+            if (peers.peers.isEmpty()) {
+                Text(
+                    Copy.peersEmpty,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.testTag("peers-empty"),
+                )
+            } else {
+                peers.peers.forEachIndexed { index, peer ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Box(
+                            Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (peer.replied) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
+                                    CircleShape,
+                                ),
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                peer.name,
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.testTag("peer-row-$index"),
+                            )
+                            Text(
+                                if (peer.replied) Copy.peerRepliedLabel else Copy.peerNew,
+                                color = Color.White.copy(alpha = 0.6f),
+                                fontSize = 10.sp,
+                            )
+                        }
+                        ButtonChip(Copy.peerSayHi, "peer-greet-$index") { onGreet(peer.id) }
+                    }
+                }
+                ButtonChip(Copy.peerSayAll, "peer-greet-all") { onGreet(null) }
+            }
+            if (peers.name.isEmpty()) {
+                ButtonChip(Copy.peerFind, "peers-start") { onStart() }
+            }
+        }
+    }
 }
 
 /**
@@ -673,7 +998,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                 ) {
                     Text(
                         "${Copy.ruleWhen} ${Copy.ruleTrigger(rule.trigger)} → " +
-                            if (rule.action == "sound") rule.value else Copy.skillLabel(rule.value),
+                            if (rule.action == "sound") rule.value else skillLabel(rule.value),
                         color = Color.White,
                         fontSize = 13.sp,
                         modifier = Modifier
@@ -720,7 +1045,7 @@ private fun RulesSheet(onClose: () -> Unit) {
             ) {
                 values.forEach { option ->
                     RuleChip(
-                        if (action == "sound") option else Copy.skillLabel(option),
+                        if (action == "sound") option else skillLabel(option),
                         "rule-value-$option",
                         value == option,
                     ) { value = option }
@@ -783,6 +1108,8 @@ private fun TopBar(
     onSurface: (Surface) -> Unit,
     onFlashlight: () -> Unit,
     onRules: () -> Unit,
+    onPeers: () -> Unit,
+    onAI: () -> Unit,
     onLanguage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -853,6 +1180,14 @@ private fun TopBar(
                 DropdownMenuItem(
                     text = { Text(Copy.blocks, color = Color.White) },
                     onClick = { onRules(); onMenuOpen(false) },
+                )
+                DropdownMenuItem(
+                    text = { Text(Copy.peers, color = Color.White) },
+                    onClick = { onPeers(); onMenuOpen(false) },
+                )
+                DropdownMenuItem(
+                    text = { Text(Copy.ai, color = Color.White) },
+                    onClick = { onAI(); onMenuOpen(false) },
                 )
                 DropdownMenuItem(
                     text = { Text(Copy.language.label, color = Color.White) },
@@ -1187,7 +1522,7 @@ private fun Modifier.sceneLongPress(
  * block the frame. Both /pet and /feed answer with a refusal when the duck is
  * busy; that refusal has nothing to show on screen.
  */
-internal fun postDuckCommand(path: String) {
+internal fun postDuckCommand(path: String, body: String = "{}") {
     Thread {
         try {
             val connection = java.net.URL("http://127.0.0.1:8765$path")
@@ -1196,7 +1531,8 @@ internal fun postDuckCommand(path: String) {
             connection.connectTimeout = 2000
             connection.readTimeout = 5000
             connection.doOutput = true
-            connection.outputStream.use { it.write("{}".toByteArray()) }
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.outputStream.use { it.write(body.toByteArray()) }
             connection.inputStream.readBytes()
             connection.disconnect()
         } catch (_: Exception) {

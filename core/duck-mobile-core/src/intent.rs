@@ -98,6 +98,13 @@ pub enum Intent {
     /// A child's block program: triggers and actions in the duck's own verbs.
     SetRules(serde_json::Value),
     GetRules,
+    /// Say hello to another duck on the LAN (None = every duck).
+    GreetPeer(Option<String>),
+    /// The name this duck announces.
+    PeerName(String),
+    /// Open the LAN socket and announce as `name`. On-demand because iOS
+    /// asks for local-network permission the first time one is opened.
+    StartLan(String),
     /// How long the duck waits before doing something by itself, in seconds.
     IdleRitual(f64),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
@@ -133,6 +140,8 @@ pub struct IntentQueue {
     state: Mutex<Value>,
     skills: Mutex<Vec<String>>,
     fingerprint: Mutex<String>,
+    /// The LAN peers as the loop last published them.
+    peers: Mutex<Value>,
     /// The time machine's answers, filled by the core on the next tick.
     time: Mutex<Value>,
     /// The forks: one entry per branch, filled by the core.
@@ -169,6 +178,7 @@ impl IntentQueue {
             })),
             skills: Mutex::new(Vec::new()),
             fingerprint: Mutex::new("{}".to_owned()),
+            peers: Mutex::new(json!({ "peers": [] })),
             branches: Mutex::new(json!({ "branches": [], "selected": "" })),
             sensors: Mutex::new(json!({ "mode": "twin" })),
             life: Mutex::new(crate::vetbook::Book::default()),
@@ -331,6 +341,18 @@ impl IntentQueue {
         self.sensors.lock().expect("intent sensors").to_string()
     }
 
+    pub fn set_peers(&self, value: Value) {
+        *self.peers.lock().expect("intent peers") = value;
+    }
+
+    pub fn peers_json(&self) -> String {
+        self.peers.lock().expect("intent peers").to_string()
+    }
+
+    pub fn peers_value(&self) -> Value {
+        self.peers.lock().expect("intent peers").clone()
+    }
+
     /// The care slice of the published state: one GET for a shell that wants
     /// to save the duck's tummy and mood without parsing the whole snapshot.
     pub fn care_json(&self) -> String {
@@ -338,6 +360,15 @@ impl IntentQueue {
         json!({
             "care": state.get("care").cloned().unwrap_or(Value::Null),
             "care_time_scale": state.get("care_time_scale").cloned().unwrap_or(json!(1.0)),
+        })
+        .to_string()
+    }
+
+    /// What the duck's ear last heard, for GET /heard.
+    pub fn heard_json(&self) -> String {
+        let state = self.state.lock().expect("intent state");
+        json!({
+            "last_heard": state.get("last_heard").cloned().unwrap_or(Value::Null),
         })
         .to_string()
     }
@@ -592,10 +623,28 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         // The companion state is public read / restore-only write: a client
         // can hand back what it saved, but cannot claim the duck loves it.
         ("GET", "/care") => Ok(queue.care_json()),
+        ("GET", "/heard") => Ok(queue.heard_json()),
         ("GET", "/rules") => Ok(queue.request(Intent::GetRules).to_string()),
         ("POST", "/rules") => Ok(queue
             .request(Intent::SetRules(value.clone()))
-            .to_string()),        ("POST", "/care") => {
+            .to_string()),
+        ("GET", "/peers") => Ok(queue.peers_json()),
+        ("POST", "/peers/start") => Ok(queue
+            .request(Intent::StartLan(
+                value["name"].as_str().unwrap_or("MicroDuck").to_owned(),
+            ))
+            .to_string()),
+        ("POST", "/peers/greet") => Ok(queue
+            .request(Intent::GreetPeer(
+                value["id"].as_str().filter(|id| !id.is_empty()).map(str::to_owned),
+            ))
+            .to_string()),
+        ("POST", "/peers/name") => match value["name"].as_str() {
+            Some(name) => Ok(queue
+                .request(Intent::PeerName(name.to_owned()))
+                .to_string()),
+            None => Err("missing name"),
+        },        ("POST", "/care") => {
             let saved = value.get("care").cloned().unwrap_or(value);
             Ok(queue.request(Intent::RestoreCare(saved)).to_string())
         }

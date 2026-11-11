@@ -33,6 +33,10 @@ struct ContentView: View {
     @State private var showInstrument = false
     /// The child's block program, edited over the live duck.
     @State private var showRules = false
+    /// Other ducks on the Wi-Fi.
+    @State private var showPeers = false
+    /// The user's own model.
+    @State private var showAI = false
     @State private var tapTarget: CGPoint?
     @State private var lastTap = Date.distantPast
     /// Flipping this re-renders every `Copy` string.
@@ -149,6 +153,16 @@ struct ContentView: View {
                     .presentationDetents(portrait ? [.large] : [.large])
                     .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $showPeers) {
+                PeersSheet(controller: controller)
+                    .presentationDetents(portrait ? [.medium, .large] : [.large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showAI) {
+                AISheet(controller: controller)
+                    .presentationDetents(portrait ? [.medium, .large] : [.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .preferredColorScheme(.dark)
         // The hint teaches gestures, so it must wait until gestures work:
@@ -185,6 +199,24 @@ struct ContentView: View {
             withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard moodText == notice else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
+        // A greeting from the room next door, or the answer to ours.
+        .onChange(of: controller.peerNotice) { _, notice in
+            guard let notice, !notice.isEmpty else { return }
+            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                guard moodText == notice else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
+        // The model's own line, when it decides something.
+        .onChange(of: controller.aiDecision) { _, decision in
+            guard let decision, !decision.isEmpty else { return }
+            withAnimation(.easeIn(duration: 0.2)) { moodText = decision }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                guard moodText == decision else { return }
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
@@ -438,6 +470,21 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(controller.paused ? Copy.resume : Copy.freeze)
             .accessibilityIdentifier("rail-pause")
+
+            // Other ducks on this Wi-Fi: discovery is the core's, the list is
+            // one tap from the stage.
+            Button {
+                showPeers = true
+            } label: {
+                Image(systemName: "dot.radiowaves.left.and.right")
+                    .font(.system(size: 16))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.peers)
+            .accessibilityIdentifier("duck-peers")
 
             Button {
                 toggleSurface()
@@ -768,6 +815,18 @@ struct ContentView: View {
                     Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
                 }
                 .accessibilityIdentifier("open-rules")
+                Button {
+                    showPeers = true
+                } label: {
+                    Label(Copy.peers, systemImage: "dot.radiowaves.left.and.right")
+                }
+                .accessibilityIdentifier("open-peers")
+                Button {
+                    showAI = true
+                } label: {
+                    Label(Copy.ai, systemImage: "brain.head.profile")
+                }
+                .accessibilityIdentifier("open-ai")
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .semibold))

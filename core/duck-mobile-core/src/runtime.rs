@@ -478,6 +478,11 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The child's block program. Configuration, not simulation state: a
     /// rewind replays the duck under the same rules it has now.
     rules: crate::rules::Rules,
+    /// The last LAN greeting or reply, for the peers sheet and /state.
+    last_peer_event: Option<serde_json::Value>,
+    /// The last words a person said to the duck, and the tick. A user's own
+    /// model reads this with /state to decide what to do next.
+    last_heard: Option<(String, u64)>,
     /// The virtual face LEDs: status, battery gauge and flashlight. The phone
     /// has no I²C expander, but the verdict and the colours are the duck's.
     face: crate::leds::Face,
@@ -594,6 +599,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_sad: None,
             last_sound_event: None,
             rules: crate::rules::Rules::default(),
+            last_peer_event: None,
+            last_heard: None,
             pet_glow_until: None,
             last_idle_ritual: None,
             idle_ritual_ticks: 1500,
@@ -1172,6 +1179,46 @@ impl<T: RobotIo> DuckRuntime<T> {
             });
         }
         true
+    }
+
+    pub fn last_peer_event(&self) -> Option<&serde_json::Value> {
+        self.last_peer_event.as_ref()
+    }
+
+    /// The words the duck's ear last heard. The words are text, not audio;
+    /// the microphone reading stays the room's, never a sense.
+    pub fn heard(&mut self, text: &str) {
+        self.last_heard = Some((text.chars().take(200).collect(), self.clock.tick));
+        self.care.touch(self.clock.tick);
+    }
+
+    pub fn last_heard(&self) -> Option<(&str, u64)> {
+        self.last_heard
+            .as_ref()
+            .map(|(text, tick)| (text.as_str(), *tick))
+    }
+
+    /// A greeting from another duck arrived, or ours was answered. Both are
+    /// social events on the phone side: the duck answers with its own voice
+    /// and one of its own emotions, never a control input.
+    pub fn peer_event(&mut self, event: &crate::lan::PeerEvent) {
+        let (kind, from, name, sound, emotion) = match event {
+            crate::lan::PeerEvent::Greeted { from, name } => {
+                ("greeted", from, name, "greet", "excited")
+            }
+            crate::lan::PeerEvent::Replied { from, name } => {
+                ("replied", from, name, "yes", "yes")
+            }
+        };
+        self.last_peer_event = Some(serde_json::json!({
+            "kind": kind,
+            "from": from,
+            "name": name,
+            "tick": self.clock.tick,
+        }));
+        if self.trigger_emotion(emotion).is_err() {
+            self.queue_sound(sound);
+        }
     }
 
     /// Replace the child's block program from the wire.

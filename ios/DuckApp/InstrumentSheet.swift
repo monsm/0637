@@ -17,6 +17,8 @@ struct InstrumentSheet: View {
     /// The vet book file the export button produced. Non-nil presents the
     /// system share sheet for exactly that file.
     @State private var shareURL: URL?
+    /// The user's own model.
+    @State private var showAI = false
 
     var body: some View {
         ScrollView {
@@ -30,6 +32,15 @@ struct InstrumentSheet: View {
                 lifeRecord
                 awayRow
                 voiceCommands
+                Button {
+                    showAI = true
+                } label: {
+                    Label(Copy.ai, systemImage: "brain.head.profile")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("ai-open")
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { showDetails.toggle() }
                 } label: {
@@ -61,6 +72,11 @@ struct InstrumentSheet: View {
             if let shareURL {
                 ShareSheet(items: [shareURL])
             }
+        }
+        .sheet(isPresented: $showAI) {
+            AISheet(controller: controller)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 

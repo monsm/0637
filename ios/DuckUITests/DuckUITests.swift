@@ -137,6 +137,24 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(export.waitForExistence(timeout: 5), "the vet book export is missing")
         XCTAssertTrue(export.isHittable, "the vet book export is not tappable")
 
+        // The user's own model: the editor is reachable and its controls exist.
+        let aiOpen = app.buttons["ai-open"]
+        XCTAssertTrue(aiOpen.waitForExistence(timeout: 5), "no AI companion entry")
+        aiOpen.tap()
+        XCTAssertTrue(
+            app.staticTexts["ai-title"].waitForExistence(timeout: 10),
+            "the AI companion sheet did not open"
+        )
+        XCTAssertTrue(
+            app.textFields["ai-endpoint"].waitForExistence(timeout: 5),
+            "the AI sheet has no endpoint field"
+        )
+        app.buttons["ai-close"].tap()
+        XCTAssertTrue(
+            app.staticTexts["sheet-title"].waitForExistence(timeout: 5),
+            "closing the AI sheet did not return to the instrument"
+        )
+
         // Close the sheet with its own button: in a portrait medium detent a
         // swipe scrolls the sheet's ScrollView instead of dismissing it.
         let sheetClose = app.buttons["sheet-close"]
@@ -179,6 +197,20 @@ final class DuckUITests: XCTestCase {
             .completed,
             "the block editor did not close"
         )
+        // The neighbours sheet: with no second phone in CI it must say so
+        // rather than sit blank, and its close target must work.
+        let peersButton = app.buttons["duck-peers"]
+        XCTAssertTrue(peersButton.waitForExistence(timeout: 5), "the Neighbours button is missing")
+        peersButton.tap()
+        XCTAssertTrue(
+            app.staticTexts["peers-title"].waitForExistence(timeout: 10),
+            "the neighbours sheet did not open"
+        )
+        XCTAssertTrue(
+            app.staticTexts["peers-empty"].waitForExistence(timeout: 5),
+            "an empty LAN has no empty-state line"
+        )
+        app.buttons["peers-close"].tap()
         let after = waitForLabel(["walk", "stand"], timeout: 30)
         XCTAssertTrue(
             ["walk", "stand"].contains(after),
