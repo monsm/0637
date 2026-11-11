@@ -120,6 +120,7 @@ fun Shell(
     var aiError by remember { mutableStateOf<String?>(null) }
     var aiThinking by remember { mutableStateOf(false) }
     var lastAIThink by remember { mutableStateOf(0L) }
+    var companionsRestored by remember { mutableStateOf(false) }
     val aiScope = rememberCoroutineScope()
     // The one-line pill above the rail: care by default, a room sound, a
     // block or the model's decision for a moment.
@@ -205,32 +206,43 @@ fun Shell(
         var lastRuleTick = -1
         var lastPeerTick = -1
         var lastCompanionSave = 0L
+        // Wait for the core's restore intents to be processed on the tick
+        // thread before the first periodic save: a fresh duck must not
+        // overwrite the saved one at the first poll after a relaunch.
+        delay(700)
+        companionsRestored = true
+        MainActivity.companionReady = true
         while (true) {
-            val line = withContext(Dispatchers.IO) { fetchCare()?.line() }
+            // One /state for the whole shell: no extra fetch can race the
+            // snapshot it persists.
+            val stateText = withContext(Dispatchers.IO) { fetchRawState() }
+            val line = stateText?.let(::parseCare)?.line()
             if (line != null) careLine = line
-            val event = withContext(Dispatchers.IO) { fetchSoundEvent() }
+            val event = stateText?.let(::parseSoundEvent)
             if (event != null && event.kind.isNotEmpty() && event.tick != lastSoundTick) {
                 lastSoundTick = event.tick
                 soundLine = Copy.heardSound(event.kind)
             }
-            val rule = withContext(Dispatchers.IO) { fetchRuleEvent() }
+            val rule = stateText?.let(::parseRuleEvent)
             if (rule != null && rule.tick != lastRuleTick) {
                 lastRuleTick = rule.tick
                 soundLine = rule.text
             }
-            val peersNow = withContext(Dispatchers.IO) { fetchPeers() }
+            val peersNow = stateText?.let(::parsePeers)
             if (peersNow != null) peers = peersNow
-            val peerEvent = withContext(Dispatchers.IO) { fetchPeerEvent() }
+            val peerEvent = stateText?.let(::parsePeerEvent)
             if (peerEvent != null && peerEvent.tick != lastPeerTick) {
                 lastPeerTick = peerEvent.tick
                 soundLine = peerEvent.text
             }
             val now = System.currentTimeMillis()
-            // Save on a cadence as well as onPause: a process killed without a
-            // lifecycle callback still leaves the duck's tummy on disk.
-            if (now - lastCompanionSave >= 10_000) {
+            // Save every 3 s, and only after the restore had a chance to
+            // land. A kill without a lifecycle callback keeps the duck.
+            if (companionsRestored && stateText != null &&
+                now - lastCompanionSave >= 3_000
+            ) {
                 lastCompanionSave = now
-                withContext(Dispatchers.IO) { saveCompanionNow(context) }
+                withContext(Dispatchers.IO) { saveCompanionFromState(context, stateText) }
             }
             if (aiConfig.enabled && !aiThinking &&
                 now - lastAIThink >= maxOf(10, aiConfig.interval) * 1000L

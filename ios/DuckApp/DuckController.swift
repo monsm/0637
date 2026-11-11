@@ -130,6 +130,10 @@ final class DuckController: ObservableObject {
     @Published var careAsleep = false
     private var companionRestored = false
     private var lastCompanionSave = Date.distantPast
+    /// The last /state slices the 1 Hz poll read. A synchronous copy at the
+    /// door cannot be killed with the process like an in-flight URLSession.
+    private var latestCare: [String: Any]?
+    private var latestLife: [String: Any]?
 
     /// One line for the Stage Deck's mood pill, built from the core's care
     /// numbers rather than from what the shell imagines.
@@ -628,7 +632,13 @@ final class DuckController: ObservableObject {
         eventsAtBackground = lastEvents
         // Save the companion state at the door as well as on the 15 s cadence:
         // a phone can be killed while suspended, and the duck should wake up
-        // with the tummy it went to sleep with.
+        // with the tummy it went to sleep with. `simctl terminate` sends no
+        // scenePhase change, so the cadence has to be frequent enough too.
+        if let care = latestCare, companionRestored {
+            var payload: [String: Any] = ["care": care]
+            if let life = latestLife { payload["life"] = life }
+            UserDefaults.standard.set(payload, forKey: "duck_companion_v1")
+        }
         saveCompanionNow()
     }
 
@@ -648,11 +658,15 @@ final class DuckController: ObservableObject {
     /// numbers back to the core on the next launch; the core is the authority
     /// and clamps whatever it is given.
     private func saveCompanionState(care: [String: Any], life: [String: Any]?) {
+        // Keep the most recent read even before the restore lands; the
+        // background path needs a copy that no network request can outlive.
+        latestCare = care
+        latestLife = life
         // Until the saved payload has been handed back, a poll's default care
         // must not overwrite it: the first launch's 1 Hz save could otherwise
         // race the restore and persist a fresh duck over the real one.
         guard companionRestored else { return }
-        guard Date().timeIntervalSince(lastCompanionSave) >= 15 else { return }
+        guard Date().timeIntervalSince(lastCompanionSave) >= 4 else { return }
         var payload: [String: Any] = ["care": care]
         if let life { payload["life"] = life }
         UserDefaults.standard.set(payload, forKey: "duck_companion_v1")

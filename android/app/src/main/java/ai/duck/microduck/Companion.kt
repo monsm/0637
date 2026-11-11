@@ -119,8 +119,9 @@ fun shareVetbook(context: Context) {
     }.start()
 }
 
-fun fetchCare(): CareUi? = try {
-    val text = getJson("/state")
+fun fetchCare(): CareUi? = fetchRawState()?.let(::parseCare)
+
+fun parseCare(text: String): CareUi? = try {
     val care = JSONObject(text).optJSONObject("care") ?: return null
     CareUi(
         hunger = care.optDouble("hunger", 0.15),
@@ -144,8 +145,10 @@ data class PeersUi(
     val peers: List<PeerUi> = emptyList(),
 )
 
-fun fetchPeers(): PeersUi? = try {
-    val peers = JSONObject(getJson("/state")).optJSONObject("peers") ?: return null
+fun fetchPeers(): PeersUi? = fetchRawState()?.let(::parsePeers)
+
+fun parsePeers(text: String): PeersUi? = try {
+    val peers = JSONObject(text).optJSONObject("peers") ?: return null
     val array = peers.optJSONArray("peers") ?: org.json.JSONArray()
     PeersUi(
         name = peers.optString("name", ""),
@@ -202,12 +205,14 @@ fun greetPeer(context: Context, id: String?) {
 /** The last hello exchanged, formatted for the pill. */
 data class PeerEventUi(val tick: Int, val text: String)
 
-fun fetchPeerEvent(): PeerEventUi? = try {
-    val event = JSONObject(getJson("/state")).optJSONObject("peer_event") ?: return null
+fun fetchPeerEvent(): PeerEventUi? = fetchRawState()?.let(::parsePeerEvent)
+
+fun parsePeerEvent(text: String): PeerEventUi? = try {
+    val event = JSONObject(text).optJSONObject("peer_event") ?: return null
     val kind = event.optString("kind", "")
     val name = event.optString("name", "Duck")
-    val text = if (kind == "greeted") Copy.peerGreeted(name) else Copy.peerReplied(name)
-    PeerEventUi(event.optInt("tick", -1), text)
+    val text2 = if (kind == "greeted") Copy.peerGreeted(name) else Copy.peerReplied(name)
+    PeerEventUi(event.optInt("tick", -1), text2)
 } catch (_: Throwable) {
     null
 }
@@ -215,8 +220,10 @@ fun fetchPeerEvent(): PeerEventUi? = try {
 /** The last room sound the duck answered: kind and the tick it happened. */
 data class SoundEvent(val kind: String, val tick: Int)
 
-fun fetchSoundEvent(): SoundEvent? = try {
-    val event = JSONObject(getJson("/state")).optJSONObject("sound_event") ?: return null
+fun fetchSoundEvent(): SoundEvent? = fetchRawState()?.let(::parseSoundEvent)
+
+fun parseSoundEvent(text: String): SoundEvent? = try {
+    val event = JSONObject(text).optJSONObject("sound_event") ?: return null
     SoundEvent(event.optString("kind", ""), event.optInt("tick", -1))
 } catch (_: Throwable) {
     null
@@ -225,8 +232,10 @@ fun fetchSoundEvent(): SoundEvent? = try {
 /** The last programmed block that fired, formatted for the pill. */
 data class RuleEvent(val tick: Int, val text: String)
 
-fun fetchRuleEvent(): RuleEvent? = try {
-    val event = JSONObject(getJson("/state")).optJSONObject("rule_event") ?: return null
+fun fetchRuleEvent(): RuleEvent? = fetchRawState()?.let(::parseRuleEvent)
+
+fun parseRuleEvent(text: String): RuleEvent? = try {
+    val event = JSONObject(text).optJSONObject("rule_event") ?: return null
     val trigger = event.optString("trigger", "")
     val action = event.optString("action", "")
     val rawValue = event.optString("value", "")
@@ -274,8 +283,14 @@ fun saveCompanion(context: Context) {
  * lifecycle callback keeps the duck's tummy.
  */
 fun saveCompanionNow(context: Context) {
+    val state = fetchRawState() ?: return
+    saveCompanionFromState(context, state)
+}
+
+/** Persist the exact /state snapshot the care loop just read. */
+fun saveCompanionFromState(context: Context, stateText: String) {
     try {
-        val state = JSONObject(getJson("/state"))
+        val state = JSONObject(stateText)
         val saved = JSONObject()
         state.optJSONObject("care")?.let { saved.put("care", it) }
         state.optJSONObject("life")?.let { saved.put("life", it) }
@@ -284,7 +299,7 @@ fun saveCompanionNow(context: Context) {
                 .edit().putString(COMPANION_KEY, saved.toString()).commit()
         }
     } catch (_: Throwable) {
-        // The server may not be up yet; the next save tries again.
+        // A malformed snapshot is skipped; the next tick tries again.
     }
 }
 
@@ -297,6 +312,13 @@ fun restoreCompanion(context: Context) {
     val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .getString(COMPANION_KEY, null)
     Thread {
+        // Let the core's launched-effect restore take the queue first: a
+        // restore posted in the same tick would be overwritten by the fresh
+        // default care this function is about to persist.
+        try {
+            Thread.sleep(700)
+        } catch (_: InterruptedException) {
+        }
         if (raw != null) {
             try {
                 val saved = JSONObject(raw)

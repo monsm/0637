@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var input: DuckInput
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        companionReady = false
         // Edge-to-edge: the GL scene runs under the bars, the chrome insets
         // itself (safeDrawing in portrait, systemBarsPadding in landscape).
         enableEdgeToEdge()
@@ -89,6 +90,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    companion object {
+        /** The shell sets this while its restore has had time to land. */
+        @Volatile @JvmStatic var companionReady = false
+    }
+
     override fun onPause() {
         super.onPause()
         // Remember what the duck had done by now; onResume's sheet reads the
@@ -101,7 +107,7 @@ class MainActivity : ComponentActivity() {
         // and the bond must survive the process being killed at any moment.
         // Wait for the write: force-stop can follow this callback immediately,
         // and a fire-and-forget thread would die with the process.
-        if (core != null) {
+        if (core != null && MainActivity.companionReady) {
             val save = Thread { saveCompanionNow(this) }
             save.start()
             try {
@@ -112,6 +118,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        companionReady = false
         voice?.stop()
         voice = null
         loop?.stop()
