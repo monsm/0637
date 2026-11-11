@@ -385,7 +385,11 @@ printf '%s' "$LIFE" | python3 -c "
 import json,sys
 b=json.load(sys.stdin)
 any_emotion = sum(b.get('emotions',{}).values())
-sys.exit(0 if b.get('skills',{}).get('roulade',0) >= 1 and b.get('fed',0) >= 1 and any_emotion >= 1 else 1)
+# At this point the duck has been fed and has played ritual emotions;
+# no ring skill has run yet (roulade comes with the speech section), so
+# this asserts exactly what has happened. The skills tally is checked
+# after the ring section.
+sys.exit(0 if b.get('fed',0) >= 1 and any_emotion >= 1 else 1)
 " 2>/dev/null
 check $? "life counts the skills and emotions the duck ran" ""
 printf '%s' "$LIFE" | python3 -c "
@@ -535,6 +539,14 @@ for name in roulade kick_left kick_right; do
   # Let the one-shot finish before the next one.
   wait_idle 100 > /dev/null
 done
+# The book counted every one of them: a skill records itself when the
+# scheduler actually starts it, not when the client asks.
+RAN=$(api GET /life | python3 -c "
+import json,sys
+s=json.load(sys.stdin).get('skills',{})
+print(sum(1 for k in ('roulade','kick_left','kick_right') if s.get(k,0) >= 1))
+" 2>/dev/null || echo 0)
+[ "$RAN" -ge 3 ]; check $? "life counts the skills that ran" "counted=$RAN/3"
 
 # An emotion is a scripted timeline, not a policy: its head/beak pose is
 # applied by the 50 Hz loop, and `/state.emotion` is the honest evidence that
