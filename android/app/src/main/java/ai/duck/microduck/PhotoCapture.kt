@@ -85,6 +85,24 @@ fun savePhoto(context: Context, bitmap: Bitmap): Boolean {
     }
 }
 
+/** Hand an already-kept postcard file to the chooser. */
+fun sharePostcard(context: Context, file: File) {
+    val uri: Uri = FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file,
+    )
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(
+        Intent.createChooser(send, Copy.share)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    )
+}
+
 /** Hand the PNG to whatever app the user picks. */
 fun sharePhoto(context: Context, bitmap: Bitmap) {
     val file = photoFile(context, bitmap)

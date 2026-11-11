@@ -117,6 +117,7 @@ fun Shell(
     // The user's own model: config, last answer and the loop's guard.
     var showAI by remember { mutableStateOf(false) }
     var showDance by remember { mutableStateOf(false) }
+    var showPostcards by remember { mutableStateOf(false) }
     val dance = remember(context) { DanceStudio(context) }
     var danceShow by remember { mutableStateOf(0) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
@@ -677,7 +678,12 @@ fun Shell(
                 }
             },
             quests = quests,
+            onPostcards = { showPostcards = true },
         ) { showSheet = false }
+    }
+
+    if (showPostcards) {
+        PostcardsSheet(onClose = { showPostcards = false })
     }
 
     if (showDance && core != null) {
@@ -2063,6 +2069,7 @@ private fun InstrumentSheet(
     onToggleSpeech: () -> Unit,
     onToggleMic: () -> Unit,
     quests: QuestBoardUi,
+    onPostcards: () -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -2286,6 +2293,7 @@ private fun InstrumentSheet(
                 )
             }
             LifeCard(lifeRecord) { shareVetbook(context) }
+            ButtonChip(Copy.postcardShelf, "postcards-open", onPostcards)
             awaySummary?.let { summary ->
                 Row(
                     Modifier.fillMaxWidth(),

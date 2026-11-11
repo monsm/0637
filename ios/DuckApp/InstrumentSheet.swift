@@ -19,6 +19,8 @@ struct InstrumentSheet: View {
     @State private var shareURL: URL?
     /// The user's own model.
     @State private var showAI = false
+    /// The kept postcards.
+    @State private var showPostcards = false
 
     var body: some View {
         ScrollView {
@@ -31,6 +33,23 @@ struct InstrumentSheet: View {
                 behaviorRow
                 trickRow
                 lifeRecord
+                Button {
+                    showPostcards = true
+                } label: {
+                    Label(
+                        "\(Copy.postcardShelf) · \(controller.postcards.cards.count)",
+                        systemImage: "photo.on.rectangle.angled"
+                    )
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("postcards-open")
+                .sheet(isPresented: $showPostcards) {
+                    PostcardShelfView(shelf: controller.postcards)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
                 awayRow
                 voiceCommands
                 Button {

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The only thing shared out of the app: the vet book export in cache. -->
+<!-- The only things shared out of the app: exports and kept postcards. -->
 <paths>
     <cache-path name="exports" path="exports/" />
     <cache-path name="photos" path="photos/" />
+    <files-path name="postcards" path="postcards/" />
 </paths>
