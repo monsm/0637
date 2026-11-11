@@ -21,6 +21,8 @@ struct InstrumentSheet: View {
     @State private var showAI = false
     /// The kept postcards.
     @State private var showPostcards = false
+    /// The collection page.
+    @State private var showDex = false
 
     var body: some View {
         ScrollView {
@@ -33,6 +35,20 @@ struct InstrumentSheet: View {
                 behaviorRow
                 trickRow
                 lifeRecord
+                Button {
+                    showDex = true
+                } label: {
+                    Label(Copy.dex, systemImage: "square.grid.3x3.fill")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("dex-open")
+                .sheet(isPresented: $showDex) {
+                    DexSheet(controller: controller)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
                 Button {
                     showPostcards = true
                 } label: {

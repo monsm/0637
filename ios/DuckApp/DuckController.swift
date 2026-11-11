@@ -80,6 +80,16 @@ final class DuckController: ObservableObject {
     @Published var quests: [QuestCard] = []
     @Published var questStreak = 0
     @Published var questDay = ""
+    /// The collection page: every official move and emotion with its real
+    /// lifetime count, and the first day this phone saw the duck do it.
+    struct DexEntry: Identifiable {
+        let id: String
+        let count: Int
+        let firstSeen: String?
+        let isEmotion: Bool
+    }
+    @Published var dex: [DexEntry] = []
+    private static let dexKey = "duck_dex_first_v1"
     private static let rulesKey = "duck_rules_v1"
     private static let questKey = "duck_quests_v1"
 
@@ -837,6 +847,42 @@ final class DuckController: ObservableObject {
         }
     }
 
+    /// Every official verb with its real count. `firstSeen` is stamped the
+    /// first time this phone sees a nonzero count; it is a local keepsake,
+    /// not a second source of truth.
+    private func updateDex(skills: [String: Any], emotions: [String: Any]) {
+        let names = skillNames()
+        guard !names.isEmpty else { return }
+        var first = UserDefaults.standard.dictionary(forKey: Self.dexKey) as? [String: String] ?? [:]
+        var entries: [DexEntry] = []
+        for name in names {
+            let skill = skills[name] as? Int ?? 0
+            let emotion = emotions[name] as? Int ?? 0
+            let count = max(skill, emotion)
+            if count > 0 && first[name] == nil {
+                first[name] = Self.isoDay()
+            }
+            entries.append(DexEntry(
+                id: name,
+                count: count,
+                firstSeen: first[name],
+                isEmotion: Self.emotionNames.contains(name)
+            ))
+        }
+        UserDefaults.standard.set(first, forKey: Self.dexKey)
+        dex = entries.sorted { a, b in
+            if a.isEmotion != b.isEmotion { return !a.isEmotion }
+            if a.count != b.count { return a.count > b.count }
+            return a.id < b.id
+        }
+    }
+
+    /// robotd's thirteen official emotions.
+    private static let emotionNames: Set<String> = [
+        "angry", "curious", "defiant", "devastated", "excited", "impatient",
+        "laugh", "mmh", "mock", "no", "sad", "yes", "yes_fast",
+    ]
+
     /// The phone's calendar day in ISO form. The core measures quests; the
     /// shell owns what "today" means.
     private static func isoDay() -> String {
@@ -1095,6 +1141,7 @@ final class DuckController: ObservableObject {
     /// Replace the set in the core and on disk. The core validates; an
     /// invalid block comes back refused rather than run.
     func saveRules(_ next: [DuckRule]) {
+        guard next.count <= 8 else { return }
         rules = next
         let payload = ["rules": next.map { rule -> [String: Any] in
             var item: [String: Any] = [
@@ -1405,6 +1452,7 @@ final class DuckController: ObservableObject {
                         let emotions = life["emotions"] as? [String: Any] ?? [:]
                         let skills = life["skills"] as? [String: Any] ?? [:]
                         self.lastEvents = life["events"] as? [String] ?? self.lastEvents
+                        self.updateDex(skills: skills, emotions: emotions)
                         self.vetbookMetres = life["metres"] as? Double ?? 0
                         self.vetbookRolls = skills["roulade"] as? Int ?? 0
                         self.vetbookPickups = life["pickups"] as? Int ?? 0

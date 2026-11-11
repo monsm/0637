@@ -147,6 +147,12 @@ val quack get() = pick("Quack", "叫一声")
     val postcardSaved get() = pick("Kept to the shelf", "已收藏")
     val postcardNone get() = pick("No postcards yet", "还没有明信片")
     fun postcardMetres(m: Double) = pick("walked ${"%.1f".format(m)} m", "走了 ${"%.1f".format(m)} 米")
+    // Mood dex.
+    val dex get() = pick("Mood dex", "情绪图鉴")
+    val dexMoves get() = pick("Moves", "动作")
+    val dexMoods get() = pick("Moods", "情绪")
+    val dexNever get() = pick("not yet", "还没见过")
+    val dexFirst get() = pick("first", "初次")
     // The vet book, and the file it exports.
     val lifeRecord get() = pick("Life record", "终身记录")
     val walked get() = pick("walked", "走过")

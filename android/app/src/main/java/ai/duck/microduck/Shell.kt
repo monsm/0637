@@ -118,6 +118,8 @@ fun Shell(
     var showAI by remember { mutableStateOf(false) }
     var showDance by remember { mutableStateOf(false) }
     var showPostcards by remember { mutableStateOf(false) }
+    var showDex by remember { mutableStateOf(false) }
+    var dex by remember { mutableStateOf(emptyList<DexEntryUi>()) }
     val dance = remember(context) { DanceStudio(context) }
     var danceShow by remember { mutableStateOf(0) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
@@ -229,6 +231,10 @@ fun Shell(
             if (peersNow != null) peers = peersNow
             val questsNow = stateText?.let(::parseQuestsFromState)
             if (questsNow != null && questsNow.quests.isNotEmpty()) quests = questsNow
+            val dexNow = stateText?.let {
+                DexStore.build(context, it, skills, Copy.language == Copy.Language.Chinese)
+            }
+            if (dexNow != null && dexNow.isNotEmpty()) dex = dexNow
             val peerEvent = stateText?.let(::parsePeerEvent)
             if (peerEvent != null && peerEvent.tick != lastPeerTick) {
                 lastPeerTick = peerEvent.tick
@@ -679,7 +685,12 @@ fun Shell(
             },
             quests = quests,
             onPostcards = { showPostcards = true },
+            onDex = { showDex = true },
         ) { showSheet = false }
+    }
+
+    if (showDex) {
+        DexSheet(dex, onClose = { showDex = false })
     }
 
     if (showPostcards) {
@@ -2087,6 +2098,7 @@ private fun InstrumentSheet(
     onToggleMic: () -> Unit,
     quests: QuestBoardUi,
     onPostcards: () -> Unit,
+    onDex: () -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -2311,6 +2323,7 @@ private fun InstrumentSheet(
             }
             LifeCard(lifeRecord) { shareVetbook(context) }
             ButtonChip(Copy.postcardShelf, "postcards-open", onPostcards)
+            ButtonChip(Copy.dex, "dex-open", onDex)
             awaySummary?.let { summary ->
                 Row(
                     Modifier.fillMaxWidth(),

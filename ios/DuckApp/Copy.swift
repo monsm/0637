@@ -226,6 +226,12 @@ enum Copy {
     static func postcardMetres(_ m: Double) -> String {
         pick(String(format: "walked %.1f m", m), String(format: "走了 %.1f 米", m))
     }
+    // Mood dex.
+    static var dex: String { pick("Mood dex", "情绪图鉴") }
+    static var dexMoves: String { pick("Moves", "动作") }
+    static var dexMoods: String { pick("Moods", "情绪") }
+    static var dexNever: String { pick("not yet", "还没见过") }
+    static var dexFirst: String { pick("first", "初次") }
     // Daily quests.
     static var quests: String { pick("Today's quests", "今日小挑战") }
     static var questDone: String { pick("Done", "完成") }
