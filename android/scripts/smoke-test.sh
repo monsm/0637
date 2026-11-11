@@ -485,6 +485,12 @@ curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
 # The shell saves every three seconds; let a full cadence (plus its state
 # fetch) see the new numbers before the process is killed.
 sleep 8
+CARE_NOW=$(curl -sf --max-time 5 http://127.0.0.1:8765/care | python3 -c "
+import json,sys
+c=json.load(sys.stdin).get('care') or {}
+print(c.get('hunger'), c.get('bond'), c.get('asleep'))
+" 2>/dev/null || echo "?")
+echo "care before restart: $CARE_NOW"
 adb shell input keyevent KEYCODE_HOME > /dev/null 2>&1 || true
 sleep 3
 adb shell am force-stop ai.duck.microduck > /dev/null 2>&1 || true
@@ -511,7 +517,7 @@ python3 -c "
 import sys
 h,b=map(float,'${RESTORED_CARE:-0 0}'.split())
 sys.exit(0 if 0.38 <= h <= 0.50 and b >= 0.28 else 1)
-" || { echo "::error::the companion state did not survive a restart: $RESTORED_CARE"; exit 1; }
+" || { echo "::error::the companion state did not survive a restart: $RESTORED_CARE"; adb logcat -d | grep -E "duck-care" | tail -40; exit 1; }
 echo "care survived restart: hunger/bond=$RESTORED_CARE"
 
 # Director's shutter, end to end: enter Director, tap the shutter, and the

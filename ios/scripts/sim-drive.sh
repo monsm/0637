@@ -793,10 +793,14 @@ POSTURE_STILL=$(api GET /state | field label)
 [ "$POSTURE_STILL" = "sit" ]; check $? "asking to sit twice does not stand it up" "label=$POSTURE_STILL"
 api POST /posture '{"sit":false}' > /dev/null || true
 POSTURE_UP=""
-for _ in $(seq 1 30); do
+for _ in $(seq 1 12); do
   POSTURE_UP=$(api GET /state | field label)
   case "$POSTURE_UP" in rise|walk|stand) break ;; esac
-  sleep 0.3
+  # The seat ramp refuses a stand for its first two seconds, exactly like the
+  # /sit button; keep asking the way a person would.
+  api POST /posture '{"sit":false}' > /dev/null || true
+  sleep 0.6
+  POSTURE_UP=$(api GET /state | field label)
 done
 case "$POSTURE_UP" in
   rise|walk|stand) check 0 "posture stands the duck" "label=$POSTURE_UP" ;;

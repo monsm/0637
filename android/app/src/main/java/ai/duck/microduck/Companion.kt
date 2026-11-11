@@ -297,6 +297,10 @@ fun saveCompanionFromState(context: Context, stateText: String) {
         if (saved.length() > 0) {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit().putString(COMPANION_KEY, saved.toString()).commit()
+            android.util.Log.i(
+                "duck-care",
+                "saved care=" + (saved.optJSONObject("care")?.toString() ?: "—"),
+            )
         }
     } catch (_: Throwable) {
         // A malformed snapshot is skipped; the next tick tries again.
@@ -312,6 +316,10 @@ fun restoreCompanion(context: Context): Boolean {
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     val raw = prefs.getString(COMPANION_KEY, null)
     val rules = prefs.getString(RULES_KEY, null)
+    android.util.Log.i(
+        "duck-care",
+        "restore start key=${if (raw != null) "present" else "absent"} rules=${rules != null}",
+    )
     if (raw == null && rules == null) return true
     // The intent server starts with the core and may not accept connections
     // yet. Retry until it acknowledges, and keep the save gate closed until
@@ -352,6 +360,12 @@ fun restoreCompanion(context: Context): Boolean {
                 }
                 if (!seen) throw IllegalStateException("care restore not published")
             }
+            android.util.Log.i(
+                "duck-care",
+                "restore ok after attempt $attempt bond=${fetchRawState()?.let { s ->
+                    try { JSONObject(s).optJSONObject("care")?.optDouble("bond", -1.0) } catch (_: Throwable) { -1.0 }
+                }}",
+            )
             return true
         } catch (_: Throwable) {
             try {
@@ -360,6 +374,7 @@ fun restoreCompanion(context: Context): Boolean {
             }
         }
     }
+    android.util.Log.w("duck-care", "restore FAILED after retries, wanted bond=$wantedBond")
     return false
 }
 

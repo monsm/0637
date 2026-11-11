@@ -80,6 +80,14 @@ class MainActivity : ComponentActivity() {
                         // The duck's own voice: the core decides when it
                         // quacks, this owns the speaker.
                         voice = Voice(created).also { it.start() }
+                        // Restore does not depend on the shell composable
+                        // being on screen; the app owns this hand-back.
+                        val activity = this@MainActivity
+                        Thread {
+                            if (restoreCompanion(activity)) {
+                                companionReady = true
+                            }
+                        }.start()
                     },
                     input = input,
                     onQuack = { voice?.play("chirp") },

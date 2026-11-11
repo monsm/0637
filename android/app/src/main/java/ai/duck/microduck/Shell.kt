@@ -200,12 +200,17 @@ fun Shell(
     var careLine by remember { mutableStateOf("") }
     LaunchedEffect(core) {
         val duck = core ?: return@LaunchedEffect
-        var companionsRestored = false
-        withContext(Dispatchers.IO) {
-            companionsRestored = restoreCompanion(context)
+        // The Activity owns the restore worker (onCoreCreated); wait for its
+        // verdict rather than firing a second restore from the composition,
+        // which can be stopped mid-flight when the screen is not composed.
+        var restored = MainActivity.companionReady
+        var attempts = 0
+        while (!restored && attempts < 60) {
+            delay(250)
+            restored = MainActivity.companionReady
+            attempts += 1
         }
-        if (!companionsRestored) return@LaunchedEffect
-        MainActivity.companionReady = true
+        val companionsRestored = restored
         var lastSoundTick = -1
         var lastRuleTick = -1
         var lastPeerTick = -1
