@@ -133,7 +133,7 @@ impl Lan {
                     "name": peer.name,
                     "addr": peer.addr.to_string(),
                     "replied": peer.replied,
-                    "last_seen_ms": peer.last_seen_ms,
+                    "last_seen_ms": peer.last_seen_ms as u64,
                 })
             })
             .collect();

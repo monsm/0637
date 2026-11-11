@@ -164,6 +164,16 @@ mod tests {
     }
 
     #[test]
+    fn a_fast_care_clock_brings_the_doze_sooner() {
+        let mut care = Care::default();
+        care.last_touch = 0;
+        // 200 ticks = 4 simulated seconds; at 200x that is 800 care-seconds,
+        // past the twelve-minute doze threshold, without waiting.
+        care.tick(200, 0.02, 200.0);
+        assert!(care.asleep, "a sped-up care clock must age the idle spell too");
+    }
+
+    #[test]
     fn a_saved_state_restores() {
         let mut care = Care::default();
         care.feed(12);

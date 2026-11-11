@@ -133,6 +133,11 @@ if ! echo "$HEARD" | grep -q '"skill":"roulade"'; then
   echo "::error::Chinese speech did not map to roulade: $HEARD"
   exit 1
 fi
+# The words are published for a user-supplied model, not only acted on.
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/heard | grep -q '翻滚'; then
+  echo "::error::GET /heard does not publish the last words"
+  exit 1
+fi
 # The gaze solver: aiming right must yaw the head right.
 LOOK=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"x":1.0,"y":-0.5,"z":0.15}' http://127.0.0.1:8765/look || true)
 if ! echo "$LOOK" | grep -q '"ok":true'; then
@@ -300,19 +305,23 @@ print(json.load(sys.stdin).get('skills',{}).get('roulade',0))
 " 2>/dev/null || echo 0
 }
 ROLLS_BEFORE=$(rolls_of)
-RT=$(sound_tick)
-curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$RT}" \
-  http://127.0.0.1:8765/sensor > /dev/null || true
-sleep 0.15
-curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((RT + 60))}" \
-  http://127.0.0.1:8765/sensor > /dev/null || true
 ROLLS_AFTER=$ROLLS_BEFORE
-for _ in $(seq 1 40); do
-  ROLLS_AFTER=$(rolls_of)
+for attempt in 1 2 3 4; do
+  RT=$(sound_tick)
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$RT}" \
+    http://127.0.0.1:8765/sensor > /dev/null || true
+  sleep 0.15
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((RT + 60))}" \
+    http://127.0.0.1:8765/sensor > /dev/null || true
+  for _ in $(seq 1 20); do
+    ROLLS_AFTER=$(rolls_of)
+    [ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ] && break
+    sleep 0.25
+  done
   [ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ] && break
-  sleep 0.25
+  sleep 1.5
 done
 if [ "$ROLLS_AFTER" -le "$ROLLS_BEFORE" ]; then
   echo "::error::a clap did not run the programmed roulade: $ROLLS_BEFORE -> $ROLLS_AFTER"
@@ -410,6 +419,9 @@ if [ "$MODE" != '"mode":"walk"' ]; then
   echo "::error::the duck did not start in walk mode: $MODE"
   exit 1
 fi
+# A block rule may have just run a real skill; a mode switch requires the
+# duck to be standing still, so let the scheduled move finish first.
+sleep 3
 ROLLER=$(curl -sf --max-time 20 -X POST -H 'Content-Type: application/json'   -d '{"mode":"roller"}' http://127.0.0.1:8765/mode || true)
 echo "$ROLLER" | tee intent-mode-roller.json > /dev/null
 if ! echo "$ROLLER" | grep -q '"ok":true'; then

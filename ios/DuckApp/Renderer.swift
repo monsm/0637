@@ -422,7 +422,10 @@ final class Renderer: NSObject, MTKViewDelegate {
         blit.endEncoding()
         buffer.commit()
         buffer.waitUntilCompleted()
-        let data = Data(bytes: readback.contents(), count: bytesPerRow * height)
+        let data = Data(
+            bytes: UnsafeRawPointer(readback.contents()),
+            count: bytesPerRow * height
+        )
         guard let provider = CGDataProvider(data: data as CFData),
               let image = CGImage(
                 width: width,

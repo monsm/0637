@@ -648,6 +648,10 @@ final class DuckController: ObservableObject {
     /// numbers back to the core on the next launch; the core is the authority
     /// and clamps whatever it is given.
     private func saveCompanionState(care: [String: Any], life: [String: Any]?) {
+        // Until the saved payload has been handed back, a poll's default care
+        // must not overwrite it: the first launch's 1 Hz save could otherwise
+        // race the restore and persist a fresh duck over the real one.
+        guard companionRestored else { return }
         guard Date().timeIntervalSince(lastCompanionSave) >= 15 else { return }
         var payload: [String: Any] = ["care": care]
         if let life { payload["life"] = life }
@@ -674,15 +678,15 @@ final class DuckController: ObservableObject {
     /// fresh install has nothing; the duck starts at its defaults.
     func restoreCompanionState() {
         guard !companionRestored else { return }
-        companionRestored = true
-        guard let saved = UserDefaults.standard.dictionary(forKey: "duck_companion_v1") else { return }
-        if let care = saved["care"] as? [String: Any],
-           let data = try? JSONSerialization.data(withJSONObject: care) {
-            post("/care", data)
-        }
-        if let life = saved["life"] as? [String: Any],
-           let data = try? JSONSerialization.data(withJSONObject: life) {
-            post("/life", data)
+        if let saved = UserDefaults.standard.dictionary(forKey: "duck_companion_v1") {
+            if let care = saved["care"] as? [String: Any],
+               let data = try? JSONSerialization.data(withJSONObject: care) {
+                post("/care", data)
+            }
+            if let life = saved["life"] as? [String: Any],
+               let data = try? JSONSerialization.data(withJSONObject: life) {
+                post("/life", data)
+            }
         }
         if let data = UserDefaults.standard.data(forKey: Self.rulesKey),
            let saved = try? JSONDecoder().decode([DuckRule].self, from: data) {
@@ -694,6 +698,7 @@ final class DuckController: ObservableObject {
                 post("/rules", body)
             }
         }
+        companionRestored = true
     }
 
     /// Open the LAN socket and announce this phone. Called when the user

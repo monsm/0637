@@ -2136,6 +2136,13 @@ impl<T: RobotIo> DuckRuntime<T> {
         // back after a long stillness; a two-second cooldown keeps a bouncing
         // classifier from turning one pickup into a chorus.
         let loud = self.room_loud;
+        // A clap or whistle was already classified this tick. The generic
+        // startle alarm would double-answer it; let the specific reaction
+        // (or the child's rule) own the moment.
+        let just_heard = self
+            .last_sound_event
+            .as_ref()
+            .is_some_and(|(_, tick)| *tick == self.clock.tick);
         let moving = command.twist.iter().any(|value| value.abs() > 1e-3);
         let cooldown = self
             .last_reaction
@@ -2144,7 +2151,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         // A sudden bang in the room startles it: the official alarm chirp
         // and an impatient emotion, on the rising edge with a cooldown so
         // one clap is one reaction.
-        if loud && !self.last_loud && cooldown && emotion_frame.is_none() {
+        if loud && !self.last_loud && cooldown && emotion_frame.is_none() && !just_heard {
             reaction = Some("alarm");
             // A bang wakes a dozing duck. The alarm is the reaction; the
             // touch is what keeps it from falling straight back asleep.

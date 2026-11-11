@@ -28,6 +28,10 @@ final class CameraFeed: NSObject, ObservableObject {
     private let photoOutput = AVCapturePhotoOutput()
     private var photoCompletion: ((UIImage?) -> Void)?
 
+    override init() {
+        super.init()
+    }
+
     func start() {
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {

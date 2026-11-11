@@ -403,17 +403,22 @@ import json,sys
 print(json.load(sys.stdin).get('skills',{}).get('roulade',0))
 " 2>/dev/null || echo 0)
 RULE_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
-api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$RULE_TICK}" > /dev/null || true
-sleep 0.15
-api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((RULE_TICK + 60))}" > /dev/null || true
 ROLLS_AFTER=$ROLLS_BEFORE
-for _ in $(seq 1 40); do
-  ROLLS_AFTER=$(api GET /life | python3 -c "
+for attempt in 1 2 3 4; do
+  RULE_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
+  api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$RULE_TICK}" > /dev/null || true
+  sleep 0.15
+  api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((RULE_TICK + 60))}" > /dev/null || true
+  for _ in $(seq 1 20); do
+    ROLLS_AFTER=$(api GET /life | python3 -c "
 import json,sys
 print(json.load(sys.stdin).get('skills',{}).get('roulade',0))
 " 2>/dev/null || echo "$ROLLS_BEFORE")
+    [ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ] && break
+    sleep 0.25
+  done
   [ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ] && break
-  sleep 0.25
+  sleep 1.5
 done
 [ "$ROLLS_AFTER" -gt "$ROLLS_BEFORE" ]
 check $? "a clap runs the programmed roulade" "rolls $ROLLS_BEFORE -> $ROLLS_AFTER"
@@ -698,6 +703,11 @@ wait_idle 100 > /dev/null
 HEARD2=$(api POST /heard '{"text":"excited"}' || true)
 printf '%s' "$HEARD2" | grep -q '"skill":"excited"'
 check $? "English speech maps to the same table" "$(printf '%s' "$HEARD2" | head -c 140)"
+# The words are published for the user's own model: GET /heard and
+# /state.last_heard read the same record the duck just acted on.
+HEARD_GET=$(api GET /heard || true)
+printf '%s' "$HEARD_GET" | grep -q '"excited"'
+check $? "the heard words are published for an outside model" "$(printf '%s' "$HEARD_GET" | head -c 120)"
 wait_idle 100 > /dev/null
 GREET=$(api POST /heard '{"text":"你好"}' || true)
 printf '%s' "$GREET" | grep -q '"sound":"greet"'

@@ -69,6 +69,23 @@ final class DuckUITests: XCTestCase {
         option.tap()
     }
 
+    /// Scroll a sheet until a control is actually tappable. The instrument
+    /// sheet opens at its medium detent, where the lower cards live below the
+    /// fold; XCUITest's existence check alone would pass on an unreachable
+    /// element and the tap would fail.
+    private func bringIntoView(
+        _ element: XCUIElement,
+        scroll: XCUIElement,
+        maxSwipes: Int = 5
+    ) {
+        var swipes = 0
+        while !(element.exists && element.isHittable) && swipes < maxSwipes {
+            guard scroll.exists else { break }
+            scroll.swipeUp()
+            swipes += 1
+        }
+    }
+
     /// A menu item, found wherever SwiftUI put it. The popup's container
     /// element type varies by iOS version, so this searches every button
     /// descendant by identifier and falls back to the visible label.
@@ -133,12 +150,15 @@ final class DuckUITests: XCTestCase {
             app.progressIndicators["care-hunger"].waitForExistence(timeout: 5),
             "the companion card has no hunger bar"
         )
+        let sheetScroll = app.scrollViews.firstMatch
         let export = app.buttons["export-vetbook"]
+        bringIntoView(export, scroll: sheetScroll)
         XCTAssertTrue(export.waitForExistence(timeout: 5), "the vet book export is missing")
         XCTAssertTrue(export.isHittable, "the vet book export is not tappable")
 
         // The user's own model: the editor is reachable and its controls exist.
         let aiOpen = app.buttons["ai-open"]
+        bringIntoView(aiOpen, scroll: sheetScroll)
         XCTAssertTrue(aiOpen.waitForExistence(timeout: 5), "no AI companion entry")
         aiOpen.tap()
         XCTAssertTrue(
@@ -154,10 +174,17 @@ final class DuckUITests: XCTestCase {
             app.staticTexts["sheet-title"].waitForExistence(timeout: 5),
             "closing the AI sheet did not return to the instrument"
         )
+        // The header scrolled away with the rest of the sheet content; bring
+        // its close target back before using it.
+        let sheetClose = app.buttons["sheet-close"]
+        var scrollBack = 0
+        while !sheetClose.isHittable && scrollBack < 5 {
+            sheetScroll.swipeDown()
+            scrollBack += 1
+        }
 
         // Close the sheet with its own button: in a portrait medium detent a
         // swipe scrolls the sheet's ScrollView instead of dismissing it.
-        let sheetClose = app.buttons["sheet-close"]
         XCTAssertTrue(sheetClose.waitForExistence(timeout: 5), "the sheet has no close button")
         sheetClose.tap()
         let gone = XCTNSPredicateExpectation(

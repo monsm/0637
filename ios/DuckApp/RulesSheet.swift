@@ -87,11 +87,11 @@ struct RulesSheet: View {
 
                     Text(Copy.ruleWhen)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    chipRow(triggers, selected: trigger, prefix: "rule-trigger") { trigger = $0 }
+                    chipRow(triggers, selected: trigger, kind: "trigger") { trigger = $0 }
 
                     Text(Copy.ruleThen)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    chipRow(kinds, selected: action, prefix: "rule-kind") { action = $0 }
+                    chipRow(kinds, selected: action, kind: "action") { action = $0 }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(valueOptions, id: \.self) { option in
@@ -128,17 +128,15 @@ struct RulesSheet: View {
     private func chipRow(
         _ options: [String],
         selected: String,
-        prefix: String,
+        kind: String,
         onPick: @escaping (String) -> Void
     ) -> some View {
         HStack(spacing: 8) {
             ForEach(options, id: \.self) { option in
                 chip(
-                    option == trigger && prefix == "rule-trigger"
-                        ? Copy.ruleTrigger(option)
-                        : (prefix == "rule-kind" ? Copy.ruleKind(option) : option),
+                    kind == "trigger" ? Copy.ruleTrigger(option) : Copy.ruleKind(option),
                     selected: selected == option,
-                    id: "\(prefix)-\(option)"
+                    id: "rule-\(kind == "trigger" ? "trigger" : "kind")-\(option)"
                 ) { onPick(option) }
             }
         }

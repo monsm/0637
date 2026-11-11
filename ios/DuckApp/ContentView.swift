@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import SwiftUI
 import UIKit
 
@@ -37,6 +38,26 @@ struct ContentView: View {
     @State private var showPeers = false
     /// The user's own model.
     @State private var showAI = false
+    /// One sheet at a time. SwiftUI's multiple `.sheet` modifiers on one view
+    /// are not reliable; a single item sheet cannot disagree with itself.
+    enum Modal: Identifiable {
+        case instrument
+        case photo(DuckController.CapturedPhoto)
+        case rules
+        case peers
+        case ai
+
+        var id: String {
+            switch self {
+            case .instrument: return "instrument"
+            case .photo(let photo): return "photo-\(photo.id)"
+            case .rules: return "rules"
+            case .peers: return "peers"
+            case .ai: return "ai"
+            }
+        }
+    }
+    @State private var modal: Modal?
     @State private var tapTarget: CGPoint?
     @State private var lastTap = Date.distantPast
     /// Flipping this re-renders every `Copy` string.
@@ -135,33 +156,47 @@ struct ContentView: View {
             // The 3D scene fills the screen (it owns its own ignoresSafeArea),
             // but the chrome stays inside the safe area: on a notched phone
             // the old full-screen ignore put the buttons under the home bar.
-            .sheet(isPresented: $showInstrument) {
-                InstrumentSheet(controller: controller)
-                    // A medium sheet on a landscape phone is about 196 pt:
-                    // too short for the time machine. Portrait has the room.
-                    .presentationDetents(portrait ? [.medium, .large] : [.large])
-                    .presentationDragIndicator(.visible)
+            // One modal sheet for every surface: instrument, Director photo,
+            // blocks, neighbours and the user's model.
+            .sheet(item: $modal) { sheet in
+                switch sheet {
+                case .instrument:
+                    InstrumentSheet(controller: controller)
+                        .presentationDetents(portrait ? [.medium, .large] : [.large])
+                        .presentationDragIndicator(.visible)
+                case .photo(let photo):
+                    PhotoPreviewSheet(photo: photo)
+                case .rules:
+                    RulesSheet(controller: controller)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                case .peers:
+                    PeersSheet(controller: controller)
+                        .presentationDetents(portrait ? [.medium, .large] : [.large])
+                        .presentationDragIndicator(.visible)
+                case .ai:
+                    AISheet(controller: controller)
+                        .presentationDetents(portrait ? [.medium, .large] : [.large])
+                        .presentationDragIndicator(.visible)
+                }
             }
-            // The Director photo, once the shutter has captured it. Its own
-            // sheet so it can sit over the live view without closing the
-            // instrument.
-            .sheet(item: $controller.capturedPhoto) { photo in
-                PhotoPreviewSheet(photo: photo)
+            .onChange(of: showInstrument) { _, show in
+                if show { showInstrument = false; modal = .instrument }
             }
-            .sheet(isPresented: $showRules) {
-                RulesSheet(controller: controller)
-                    .presentationDetents(portrait ? [.large] : [.large])
-                    .presentationDragIndicator(.visible)
+            .onReceive(controller.$capturedPhoto) { photo in
+                if let photo {
+                    controller.capturedPhoto = nil
+                    modal = .photo(photo)
+                }
             }
-            .sheet(isPresented: $showPeers) {
-                PeersSheet(controller: controller)
-                    .presentationDetents(portrait ? [.medium, .large] : [.large])
-                    .presentationDragIndicator(.visible)
+            .onChange(of: showRules) { _, show in
+                if show { showRules = false; modal = .rules }
             }
-            .sheet(isPresented: $showAI) {
-                AISheet(controller: controller)
-                    .presentationDetents(portrait ? [.medium, .large] : [.large])
-                    .presentationDragIndicator(.visible)
+            .onChange(of: showPeers) { _, show in
+                if show { showPeers = false; modal = .peers }
+            }
+            .onChange(of: showAI) { _, show in
+                if show { showAI = false; modal = .ai }
             }
         }
         .preferredColorScheme(.dark)
@@ -515,7 +550,7 @@ struct ContentView: View {
     }
 
     private var thumbDeck: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Spacer(minLength: 0)
             deckButton("duck-feed", Copy.feed, "fork.knife") { controller.feed() }
             deckButton("duck-skills", Copy.skills, "sparkles") { showRing = true }
@@ -524,7 +559,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: "waveform")
                     .font(.system(size: 19))
-                    .frame(width: 52, height: 52)
+                    .frame(width: 50, height: 50)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
             }
@@ -542,7 +577,7 @@ struct ContentView: View {
             } label: {
                 Image(systemName: controller.carrying ? "hand.raised.fill" : "hand.point.up.left.fill")
                     .font(.system(size: 20))
-                    .frame(width: 60, height: 60)
+                    .frame(width: 56, height: 56)
                     .background(
                         controller.carrying
                             ? AnyShapeStyle(Color.cyan.opacity(0.35))
@@ -589,7 +624,7 @@ struct ContentView: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .frame(width: 48, height: 48)
+                .frame(width: 46, height: 46)
                 .background(.ultraThinMaterial, in: Circle())
                 .contentShape(Circle())
         }
