@@ -361,12 +361,17 @@ echo "--- feed ---"
 # Wait for it to finish, then retry the treat a few times if it still
 # refuses (a ritual can start again between the check and the post).
 FED=""
-for _ in $(seq 1 30); do
-  wait_idle 40 > /dev/null
+for _ in $(seq 1 20); do
   FED=$(api POST /feed '{}' || true)
   case "$FED" in *'"ok":true'*) break ;; esac
-  sleep 0.5
+  # Only "already pecking" is worth retrying: the previous peck is still
+  # running. Any other refusal is a state the script must not paper over.
+  case "$FED" in *"already pecking"*) sleep 0.8 ;; *) break ;; esac
 done
+if ! printf '%s' "$FED" | grep -q '"ok":true'; then
+  echo "feed refused: $FED"
+  echo "state at refusal: $(api GET /state | head -c 700)"
+fi
 printf '%s' "$FED" | grep -q '"ok":true'
 check $? "a treat starts the peck" "$(printf '%s' "$FED" | head -c 120)"
 

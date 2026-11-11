@@ -801,7 +801,8 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                 core.intents.set_life(core.runtime.book());
                 json!({ "ok": true, "fed": core.runtime.book().life.fed })
             }
-            _ => refuse(core, "busy".to_owned()),
+            Ok(false) => refuse(core, "the duck is already pecking".to_owned()),
+            Err(reason) => refuse(core, reason.to_owned()),
         },
         Intent::Look { target, neck_pitch } => {
             let gaze = core.runtime.look_at(target, neck_pitch);
