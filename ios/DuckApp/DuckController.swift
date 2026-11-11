@@ -67,6 +67,13 @@ final class DuckController: ObservableObject {
     @Published var faceGauge = "Unknown"
     @Published var faceBattery = "—"
     @Published var faceBars = 0
+    /// While-you-were-away: the events the duck logged since the app last
+    /// went to the background, summed up in one line when it comes back.
+    /// A duck that played by itself while nobody watched should say so.
+    @Published var awaySummary: String?
+    private var eventsAtBackground: [String] = []
+    private var lastEvents: [String] = []
+
     /// Tilt-to-look: the phone *is* the head. Off by default; the menu asks
     /// for it. While on and nobody is steering, the phone's attitude becomes
     /// the head command, the way the physical pad's IMU steers the real duck.
@@ -527,6 +534,56 @@ final class DuckController: ObservableObject {
         sensorTimer = timer
     }
 
+    /// The app goes to the background: remember what the duck had done by
+    /// then, so the return can say what happened since.
+    func appWentBackground() {
+        eventsAtBackground = lastEvents
+    }
+
+    /// The app comes back: whatever the duck logged on its own - rituals,
+    /// falls, feeds - becomes one line on the sheet. The 1 Hz poll is
+    /// suspended in the background, so fetch the current events first;
+    /// otherwise the diff would always be empty.
+    func appBecameActive() {
+        guard let url = URL(string: "http://127.0.0.1:8765/state") else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2.0
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let self,
+                  let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let life = json["life"] as? [String: Any],
+                  let events = life["events"] as? [String]
+            else { return }
+            DispatchQueue.main.async {
+                self.lastEvents = events
+                self.summarizeAway()
+            }
+        }.resume()
+    }
+
+    private func summarizeAway() {
+        let known = Set(eventsAtBackground)
+        let fresh = lastEvents.filter { !known.contains($0) }
+        guard !fresh.isEmpty else { return }
+        var parts: [String] = []
+        let rituals = fresh.filter { $0 == "idle_ritual" }.count
+        let falls = fresh.filter { $0.hasPrefix("fall") }.count
+        let feeds = fresh.filter { $0 == "feed" }.count
+        let pets = fresh.filter { $0 == "pet" }.count
+        if rituals > 0 { parts.append(Copy.awayRituals(rituals)) }
+        if falls > 0 { parts.append(Copy.awayFalls(falls)) }
+        if feeds > 0 { parts.append(Copy.awayFeeds(feeds)) }
+        if pets > 0 { parts.append(Copy.awayPets(pets)) }
+        let moods = fresh.filter { $0.hasPrefix("emotion:") }
+        if !moods.isEmpty {
+            let names = Set(moods.map { String($0.dropFirst("emotion:".count)) })
+            parts.append(Copy.awayMoods(names.count))
+        }
+        guard !parts.isEmpty else { return }
+        awaySummary = parts.joined(separator: " · ")
+    }
+
     /// A treat on the floor: POST /feed, the core runs the official
     /// ground-pick peck and counts it in the life record. Fire-and-forget;
     /// the sheet shows the skill when it starts.
@@ -575,6 +632,7 @@ final class DuckController: ObservableObject {
                     if let life = json["life"] as? [String: Any] {
                         let emotions = life["emotions"] as? [String: Any] ?? [:]
                         let skills = life["skills"] as? [String: Any] ?? [:]
+                        self.lastEvents = life["events"] as? [String] ?? self.lastEvents
                         self.trickBook = String(
                             format: "%d/13 moods · %d tricks",
                             emotions.count,

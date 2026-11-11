@@ -22,6 +22,7 @@ struct InstrumentSheet: View {
                 face
                 behaviorRow
                 trickRow
+                awayRow
                 voiceCommands
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { showDetails.toggle() }
@@ -55,6 +56,14 @@ struct InstrumentSheet: View {
 
     private var trickRow: some View {
         row(Copy.trickBook, controller.trickBook)
+    }
+
+    /// What the duck got up to while the app was away: rituals it played,
+    /// falls it took. One line, only when there is something to say.
+    @ViewBuilder private var awayRow: some View {
+        if let summary = controller.awaySummary {
+            row(Copy.awayTitle, summary)
+        }
     }
 
     private var header: some View {

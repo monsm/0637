@@ -58,6 +58,11 @@ object Copy {
     val putDown get() = pick("Drop", "放下")
     val held get() = pick("in a hand · drag to carry", "在手里 · 拖动搬运")
     val feed get() = pick("Feed", "喂食")
+val awayTitle get() = pick("While you were away", "你不在时")
+fun awayRituals(n: Int) = pick("played by itself ×$n", "自己演了 $n 出")
+fun awayFalls(n: Int) = pick("fell ×$n", "摔了 $n 次")
+fun awayFeeds(n: Int) = pick("ate ×$n", "吃了 $n 次")
+fun awayMoods(n: Int) = pick("$n moods", "$n 种心情")
 val quack get() = pick("Quack", "叫一声")
     val drive get() = pick("drive", "驱动")
     fun stick(mode: String): String = when (mode) {

@@ -118,6 +118,12 @@ struct ContentView: View {
         // notification pull or leaving the app would otherwise leave the
         // joystick where the finger was and the duck walking by itself.
         .onChange(of: scenePhase) { _, phase in
+            if phase == .background {
+                controller.appWentBackground()
+            }
+            if phase == .active {
+                controller.appBecameActive()
+            }
             if phase != .active {
                 controller.joystick = .zero
                 controller.setHead(yaw: 0, pitch: 0)

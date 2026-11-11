@@ -91,6 +91,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Remember what the duck had done by now; onResume's sheet reads the
+        // diff as "while you were away".
+        Thread {
+            val events = fetchLifeEvents()
+            if (events.isNotEmpty()) AwayStore.atBackground = events.toSet()
+        }.start()
+    }
+
     override fun onDestroy() {
         voice?.stop()
         voice = null

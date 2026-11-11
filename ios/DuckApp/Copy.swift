@@ -160,6 +160,22 @@ enum Copy {
     static var behavior: String { pick("behaviour", "此刻") }
     static var menu: String { pick("Menu", "菜单") }
     static var feed: String { pick("Feed", "喂食") }
+    static var awayTitle: String { pick("While you were away", "你不在时") }
+    static func awayRituals(_ n: Int) -> String {
+        String(format: pick("played by itself ×%d", "自己演了 %d 出"), n)
+    }
+    static func awayFalls(_ n: Int) -> String {
+        String(format: pick("fell ×%d", "摔了 %d 次"), n)
+    }
+    static func awayFeeds(_ n: Int) -> String {
+        String(format: pick("ate ×%d", "吃了 %d 次"), n)
+    }
+    static func awayPets(_ n: Int) -> String {
+        String(format: pick("petted ×%d", "被摸 %d 次"), n)
+    }
+    static func awayMoods(_ n: Int) -> String {
+        String(format: pick("%d moods", "%d 种心情"), n)
+    }
     static var tiltLook: String { pick("Tilt to look", "倾斜看") }
     static var tiltLookOn: String { pick("Tilt to look: on", "倾斜看：开") }
     static var trickBook: String { pick("Trick book", "技巧图鉴") }

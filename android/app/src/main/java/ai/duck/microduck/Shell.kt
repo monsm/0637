@@ -51,6 +51,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The fused shell, the same shape as the iOS one: a live duck first, an
@@ -655,6 +657,33 @@ private fun InstrumentSheet(
     var face by remember { mutableStateOf(FaceUi()) }
     // The trick book: how many of its own moods and moves the duck has run.
     var trickBook by remember { mutableStateOf("—") }
+    // What the duck logged while the app was away; remembered across closes
+    // by hoisting it to the activity's state via a remembered ref.
+    var awaySummary by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val current = fetchLifeEvents()
+            val known = AwayStore.atBackground
+            if (known != null) {
+                val fresh = current.filter { it !in known }
+                if (fresh.isNotEmpty()) {
+                    val parts = mutableListOf<String>()
+                    val rituals = fresh.count { it == "idle_ritual" }
+                    val falls = fresh.count { it.startsWith("fall") }
+                    val feeds = fresh.count { it == "feed" }
+                    val moods = fresh.count { it.startsWith("emotion:") }
+                    if (rituals > 0) parts.add(Copy.awayRituals(rituals))
+                    if (falls > 0) parts.add(Copy.awayFalls(falls))
+                    if (feeds > 0) parts.add(Copy.awayFeeds(feeds))
+                    if (moods > 0) parts.add(Copy.awayMoods(moods))
+                    if (parts.isNotEmpty()) withContext(Dispatchers.Main) {
+                        awaySummary = parts.joinToString(" · ")
+                    }
+                }
+            }
+        }
+    }
     LaunchedEffect(core) {
         while (true) {
             micSummary = fetchMicSummary()
@@ -774,6 +803,16 @@ private fun InstrumentSheet(
                 Text(Copy.trickBook, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
                 Text(trickBook, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
             }
+            awaySummary?.let { summary ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(Copy.awayTitle, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                    Text(summary, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                }
+            }
             // The face: the status LED's verdict, the four-light battery gauge
             // and the pack percentage, all read back from /state.leds.
             Row(
@@ -878,6 +917,35 @@ private data class FaceUi(
     val percent: String = "—",
     val color: String? = null,
 )
+
+/// The events the duck had logged when the app last went to the background.
+/// Process-level: the activity's onPause writes it, the sheet's first
+/// composition after onResume reads it.
+object AwayStore {
+    @Volatile var atBackground: Set<String>? = null
+}
+
+/// The duck's event log, from GET /state -> life.events. Null when the
+/// server is not up.
+internal fun fetchLifeEvents(): List<String> {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/state")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 1500
+        connection.readTimeout = 1500
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        Regex(""""events"\s*:\s*\[(.*?)]""", RegexOption.DOT_MATCHES_ALL)
+            .find(text)?.groupValues?.get(1)
+            ?.split(",")
+            ?.mapNotNull { entry ->
+                Regex(""""([^"]+)"""").find(entry)?.groupValues?.get(1)
+            } ?: emptyList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
 
 /**
  * The face's own numbers, from GET /state: the `leds` object the core
