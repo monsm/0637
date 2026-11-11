@@ -465,6 +465,10 @@ pub struct DuckRuntime<T: RobotIo> {
     /// Rising edges for the duck's own voice: robotd coos when a hand picks
     /// it up, alarms when it falls, and inquires when motion resumes after a
     /// long stillness. Three of the six synthesized tags were dead code.
+    /// The phone heard a sudden loud sound this tick (set by the FFI from
+    /// the sensor registry, which lives on DuckCore, not the runtime).
+    room_loud: bool,
+    last_loud: bool,
     last_pickup_paused: bool,
     last_fallen: bool,
     /// Consecutive ticks the fall predictor has said "down". A one-tick tip
@@ -563,6 +567,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_sound: None,
             last_ride_segment: None,
             last_emotion_sound: None,
+            room_loud: false,
+            last_loud: false,
             last_pickup_paused: false,
             last_fallen: false,
             fallen_ticks: 0,
@@ -989,6 +995,11 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// A stroke of the hand: the duck counts it, coos, and stays lively a
     /// little longer than usual. `pet_detect` does the same for the physical
     /// robot's shell.
+    /// The sensor bridge's verdict for this tick.
+    pub fn set_room_loud(&mut self, loud: bool) {
+        self.room_loud = loud;
+    }
+
     pub fn pet(&mut self) {
         self.book.life.pets += 1;
         self.book.note("pet".to_owned());
@@ -1858,11 +1869,18 @@ impl<T: RobotIo> DuckRuntime<T> {
         // coos in a hand, alarms on a fall, and inquires when the pad comes
         // back after a long stillness; a two-second cooldown keeps a bouncing
         // classifier from turning one pickup into a chorus.
+        let loud = self.room_loud;
         let moving = command.twist.iter().any(|value| value.abs() > 1e-3);
         let cooldown = self
             .last_reaction
             .is_none_or(|tick| self.clock.tick.saturating_sub(tick) >= 100);
         let mut reaction = None;
+        // A sudden bang in the room startles it: the official alarm chirp
+        // and an impatient emotion, on the rising edge with a cooldown so
+        // one clap is one reaction.
+        if loud && !self.last_loud && cooldown && emotion_frame.is_none() {
+            reaction = Some("alarm");
+        }
         if pickup_paused && !self.last_pickup_paused {
             reaction = Some("coo");
         } else if self.safety.fallen() {
@@ -1911,6 +1929,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             self.queue_sound(tag);
             self.last_reaction = Some(self.clock.tick);
         }
+        self.room_loud = false;
+        self.last_loud = loud;
         self.last_pickup_paused = pickup_paused;
         self.last_fallen = self.safety.fallen();
         self.last_moving = moving;

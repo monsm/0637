@@ -1175,6 +1175,9 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         // be waiting at all, and the queue keeps the answer bounded.
         core.intents.answer(queued.id, result);
     }
+    // A sudden loud sound in the room is an external event, never a sense.
+    // The sensor registry is on DuckCore; hand its verdict to the loop.
+    core.runtime.set_room_loud(core.sensors.loud());
     // The phone's IMU is an external disturbance, not a sense: a shake is a
     // shove, exactly as a hand on the real duck would be. It is one impulse —
     // the reading is consumed here, or a single shake would shove the duck

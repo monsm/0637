@@ -105,6 +105,15 @@ impl Sensors {
         Some(push)
     }
 
+    /// A sudden loud sound in the room, as an external event. The duck's own
+    /// 61-D observation never sees the microphone; this is the sanctioned
+    /// boundary (FIDELITY §4): a startle, not a sense.
+    pub fn loud(&self) -> bool {
+        let Some(reading) = &self.microphone else { return false };
+        let rms = reading.value.get("rms").and_then(Value::as_f64).unwrap_or(0.0);
+        rms > 0.35
+    }
+
     pub fn to_json(&self) -> Value {
         json!({
             "mode": self.mode.unwrap_or(Mode::Twin).as_str(),

@@ -339,6 +339,15 @@ PET=$(api POST /pet '{}' || true)
 printf '%s' "$PET" | grep -q '"ok":true'
 check $? "the duck accepts a stroke" "$(printf '%s' "$PET" | head -c 120)"
 
+# A sudden bang in the room is an external event: the duck startles with
+# the official alarm voice. Nothing about it enters the 61-D observation.
+echo "--- startle ---"
+api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.9,"peak_hz":440},"tick_ms":0}' > /dev/null || true
+sleep 0.4
+STARTLED=$(api GET /state | field last_sound)
+[ "$STARTLED" = "alarm" ]; check $? "a loud room startles the duck" "last_sound=$STARTLED"
+api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
+
 # The lifetime record: the same facts robotd's vet book keeps, countable on
 # a phone. A duck that has run a skill must say so.
 echo "--- life ---"
