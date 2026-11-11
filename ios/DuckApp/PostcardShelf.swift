@@ -34,7 +34,7 @@ final class PostcardShelf: ObservableObject {
         else { return [] }
         return cards.filter { card in
             FileManager.default.fileExists(
-                at: directory.appendingPathComponent(card.file)
+                atPath: directory.appendingPathComponent(card.file).path
             )
         }
     }

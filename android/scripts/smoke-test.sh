@@ -242,7 +242,9 @@ curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 400))}" \
   http://127.0.0.1:8765/care > /dev/null || true
 sleep 0.5
-if ! curl -sf --max-time 5 http://127.0.0.1:8765/care | grep -q '"asleep":true'; then
+CARE_DOZE_DEBUG=$(curl -sf --max-time 5 http://127.0.0.1:8765/care || true)
+echo "care doze state: $CARE_DOZE_DEBUG"
+if ! echo "$CARE_DOZE_DEBUG" | grep -q '"asleep":true'; then
   echo "::error::a long neglect did not put the duck to sleep"
   exit 1
 fi
