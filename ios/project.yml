@@ -48,7 +48,11 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # Portrait is the product; landscape stays as the two-hand instrument
+        # and demo layout. Upside-down is omitted on iPhone, as Apple expects.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # iPhone first. iPad gets its own adaptive pass before it is claimed.
+        TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_CFBundleDisplayName: MicroDuck
         # One single-size 1024 app icon (Xcode 14+): no hand-maintained
         # size grid, the catalog ships just the 1024 PNG.

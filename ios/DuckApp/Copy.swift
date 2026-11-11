@@ -32,14 +32,17 @@ enum Copy {
     static var fell: String { pick("it fell", "摔倒了") }
     static var waking: String { pick("waking up…", "正在唤醒…") }
     static var tapHint: String {
-        pick("tap ahead to walk · long-press the duck", "点前方走路 · 长按鸭子")
+        // The gesture is a drag from wherever the thumb lands; "tap ahead"
+        // described a walk-to-point the app never had.
+        pick("drag to walk · long-press for skills · tap the duck to pet",
+             "拖动走路 · 长按出技能 · 点鸭子摸摸")
     }
     /// Shown once, above the bottom bar, then never again. Distinct from the
     /// persistent `tapHint`: this one teaches the two gestures on first launch.
     static var firstLaunchHint: String {
         pick(
-            "Tap ahead to walk · long-press the duck for skills",
-            "点前方走路 · 长按鸭子出技能"
+            "Drag to walk · long-press for skills · tap the duck to pet",
+            "拖动走路 · 长按出技能 · 点鸭子摸摸"
         )
     }
     static var live: String { pick("Live", "实时") }
@@ -159,6 +162,7 @@ enum Copy {
     }
     static var behavior: String { pick("behaviour", "此刻") }
     static var menu: String { pick("Menu", "菜单") }
+    static var cameraUnavailable: String { pick("NO CAMERA", "无相机") }
     static var feed: String { pick("Feed", "喂食") }
     static var awayTitle: String { pick("While you were away", "你不在时") }
     static func awayRituals(_ n: Int) -> String {

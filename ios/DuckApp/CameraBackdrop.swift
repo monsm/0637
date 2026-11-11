@@ -154,6 +154,29 @@ final class CameraPreviewView: UIView {
         // `layerClass` guarantees the type.
         layer as! AVCaptureVideoPreviewLayer
     }
+
+    /// The room must stay upright in both orientations. `layoutSubviews`
+    /// runs on every bounds/rotation change, which is exactly when the
+    /// interface orientation (and therefore the needed angle) moves.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateRotation()
+    }
+
+    func updateRotation() {
+        guard let connection = previewLayer.connection else { return }
+        let angle: CGFloat
+        switch window?.windowScene?.interfaceOrientation {
+        case .portrait: angle = 90
+        case .portraitUpsideDown: angle = 270
+        case .landscapeLeft: angle = 0
+        case .landscapeRight: angle = 180
+        default: angle = 90
+        }
+        if connection.isVideoRotationAngleSupported(angle) {
+            connection.videoRotationAngle = angle
+        }
+    }
 }
 
 /// The SwiftUI wrapper. It takes no touches: the duck's gestures are above it.
@@ -166,11 +189,9 @@ struct CameraBackdrop: UIViewRepresentable {
         view.backgroundColor = .black
         view.previewLayer.session = session
         view.previewLayer.videoGravity = .resizeAspectFill
-        // The app is landscape-only; rotate the image to match.
-        if let connection = view.previewLayer.connection,
-           connection.isVideoRotationAngleSupported(90) {
-            connection.videoRotationAngle = 90
-        }
+        // The angle itself depends on the interface orientation and is set in
+        // `layoutSubviews`, which runs as soon as the view has a window.
+        view.updateRotation()
         return view
     }
 

@@ -100,6 +100,11 @@ class DuckCore(
         if (handle != 0L) nativeTickIndex(handle) else 0L
     }
 
+    /** The oldest checkpoint the core still retains, for the rail's span. */
+    fun oldestTick(): Long = synchronized(lock) {
+        if (handle != 0L) nativeOldestTick(handle) else 0L
+    }
+
     /** The platform's own measurements, once a second: fps and ticks/s. */
     fun setPerformance(fps: Double, tps: Double) = synchronized(lock) {
         if (handle != 0L) nativeSetPerformance(handle, fps, tps)
@@ -237,6 +242,7 @@ class DuckCore(
         @JvmStatic private external fun nativeFree(handle: Long)
         @JvmStatic private external fun nativeTick(handle: Long): Int
         @JvmStatic private external fun nativeTickIndex(handle: Long): Long
+        @JvmStatic private external fun nativeOldestTick(handle: Long): Long
         @JvmStatic private external fun nativePaused(handle: Long): Boolean
         @JvmStatic private external fun nativeSpeed(handle: Long): Double
         @JvmStatic private external fun nativeSetPaused(handle: Long, paused: Boolean)

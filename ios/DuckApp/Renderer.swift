@@ -320,10 +320,14 @@ final class Renderer: NSObject, MTKViewDelegate {
         let alpha = controller.interpolationAlpha()
         let trunkPose = controller.interpolatedPose(body: 1, alpha: alpha)
         let focus = trunkPose?.position ?? controller.trunk
+        // Portrait narrows the horizontal field to a third of landscape's.
+        // Backing off slightly keeps a side-stepping or carried duck in
+        // frame without shrinking it vertically (fovY is unchanged).
+        let eyeDistance = aspect < 1 ? distance * 1.15 : distance
         let eye = focus + SIMD3<Float>(
-            distance * cos(pitch) * sin(yaw),
-            distance * cos(pitch) * cos(yaw),
-            distance * sin(pitch)
+            eyeDistance * cos(pitch) * sin(yaw),
+            eyeDistance * cos(pitch) * cos(yaw),
+            eyeDistance * sin(pitch)
         )
         let viewMatrix = lookAt(eye: eye, center: focus, up: SIMD3<Float>(0, 0, 1))
         let projection = perspective(

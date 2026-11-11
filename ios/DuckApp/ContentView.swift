@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 /// The fused shell: a live duck first, an instrument underneath, a viewfinder
 /// when you want one.
@@ -43,6 +44,9 @@ struct ContentView: View {
     /// tell that release apart from a fresh tap. The window matters only for
     /// a lift outside the button, where the action never runs.
     @State private var wheeeEndedAt = Date.distantPast
+    /// One transient line above the time rail: what happened while the app
+    /// was away. It hides itself and takes no space when empty.
+    @State private var moodText: String?
 
     enum Surface: String, CaseIterable {
         case live = "Live"
@@ -52,6 +56,12 @@ struct ContentView: View {
     var body: some View {
         let _ = languageTick
         GeometryReader { geometry in
+            // Portrait is the product; landscape is the two-hand instrument
+            // and demo layout. A width under 600 keeps phones (and a narrow
+            // split view) in the one-thumb shell; wider surfaces keep the
+            // already-tested landscape chrome.
+            let portrait = geometry.size.height > geometry.size.width
+                && geometry.size.width < 600
             ZStack {
                 // The drive gesture lives ON the scene rather than on a
                 // full-screen clear layer: a separate hit-testing layer above
@@ -59,60 +69,86 @@ struct ContentView: View {
                 // presses on a device.
                 scene
                     .contentShape(Rectangle())
-                    .gesture(driveGesture(in: geometry.size))
+                    .gesture(
+                        portrait
+                            ? AnyGesture(portraitDriveGesture(in: geometry.size))
+                            : AnyGesture(driveGesture(in: geometry.size))
+                    )
                     .onLongPressGesture(minimumDuration: 0.35) {
                         if controller.ready && controller.renderError == nil {
                             showRing = true
                         }
                     }
-                chrome(in: geometry.size)
-                    .zIndex(2)
+                if portrait {
+                    portraitChrome(in: geometry.size)
+                        .zIndex(2)
+                } else {
+                    chrome(in: geometry.size)
+                        .zIndex(2)
+                }
                 if showRing {
-                    SkillRing(names: controller.skillNames()) { name in
+                    SkillRing(
+                        names: controller.skillNames(),
+                        bottomAnchored: portrait
+                    ) { name in
                         controller.trigger(name)
                         showRing = false
                     } onClose: {
                         showRing = false
                     }
                 }
-                // One small caption, above the bottom bar, in the same capsule
-                // language as the rest of the chrome. It takes no touches so
-                // it cannot swallow the first walk tap.
-                if showHint {
-                    Text(Copy.firstLaunchHint)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .allowsHitTesting(false)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .padding(.bottom, 74)
-                        .transition(.opacity)
-                        .zIndex(1)
-                        .accessibilityIdentifier("first-launch-hint")
+                // The core takes seconds to load; until it is ready the
+                // controls look alive but every call would be a no-op. Say so.
+                if !controller.ready && controller.renderError == nil {
+                    VStack(spacing: 10) {
+                        ProgressView()
+                            .tint(.white)
+                        Text(Copy.waking)
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.75))
+                    }
+                    .allowsHitTesting(false)
+                    .zIndex(3)
                 }
+            }
+            // Halfway through a rotation the thumb's old translation means
+            // something else; hand the duck back neutral, once.
+            .onChange(of: portrait) { _, _ in
+                controller.joystick = .zero
+                controller.setHead(yaw: 0, pitch: 0)
+                controller.releaseBody()
+                wheeeHolding = false
+                controller.setWheee(false)
             }
             // The 3D scene fills the screen (it owns its own ignoresSafeArea),
             // but the chrome stays inside the safe area: on a notched phone
             // the old full-screen ignore put the buttons under the home bar.
             .sheet(isPresented: $showInstrument) {
                 InstrumentSheet(controller: controller)
-                    .presentationDetents([.medium, .large])
+                    // A medium sheet on a landscape phone is about 196 pt:
+                    // too short for the time machine. Portrait has the room.
+                    .presentationDetents(portrait ? [.medium, .large] : [.large])
                     .presentationDragIndicator(.visible)
             }
         }
         .preferredColorScheme(.dark)
-        // A Task sleeps without blocking the 50 Hz main run loop. Cancellation
-        // keeps the persisted flag set, which is the one-time promise.
+        // The hint teaches gestures, so it must wait until gestures work:
+        // the core takes seconds to load, and a hint spent over a dead screen
+        // is spent forever. It is shown once the duck is ready, on both
+        // orientations, and its flag is only written when it is really shown.
+        .onChange(of: controller.ready) { _, ready in
+            if ready { presentHint() }
+        }
+        .onChange(of: controller.awaySummary) { _, summary in
+            guard let summary, !summary.isEmpty else { return }
+            withAnimation(.easeIn(duration: 0.2)) { moodText = summary }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+                guard moodText == summary else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
         .task {
-            guard !hintShown else { return }
-            hintShown = true
-            withAnimation(.easeIn(duration: 0.25)) { showHint = true }
-            // `try?` so a cancelled sleep (view torn down, app backgrounded)
-            // cannot throw out of a SwiftUI modifier.
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
-            withAnimation(.easeOut(duration: 0.6)) { showHint = false }
+            if controller.ready { presentHint() }
         }
         // SwiftUI does not report a cancelled drag. A phone call, a
         // notification pull or leaving the app would otherwise leave the
@@ -230,10 +266,315 @@ struct ContentView: View {
 
     // MARK: - Chrome
 
+    /// The one-time gesture hint. It lives in the chrome column, not as an
+    /// overlay with a magic bottom offset: any change in bar height or safe
+    /// area would otherwise move it onto a button.
+    private var hintCapsule: some View {
+        Text(Copy.firstLaunchHint)
+            .font(.system(size: 11, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.85))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial, in: Capsule())
+            .allowsHitTesting(false)
+            .padding(.bottom, 6)
+            .transition(.opacity)
+            .accessibilityIdentifier("first-launch-hint")
+    }
+
+    private func presentHint() {
+        guard !hintShown else { return }
+        hintShown = true
+        withAnimation(.easeIn(duration: 0.25)) { showHint = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+            withAnimation(.easeOut(duration: 0.6)) { showHint = false }
+        }
+    }
+
+    // MARK: - Portrait shell (Stage Deck)
+
+    /// The one-thumb composition: status on top, the duck's stage in the
+    /// middle, and a 48 pt time rail plus a 76 pt deck under the thumb. The
+    /// landscape chrome is untouched and still used whenever the window is
+    /// wider than it is tall.
+    private func portraitChrome(in size: CGSize) -> some View {
+        VStack(spacing: 0) {
+            topBar(showSurface: false)
+            Spacer(minLength: 0)
+                // The stage keeps the drive gesture; the chrome above it must
+                // not swallow it.
+                .allowsHitTesting(false)
+            if showHint {
+                hintCapsule
+            } else if let mood = moodText {
+                moodPill(mood)
+            }
+            timeRail
+                .disabled(!controller.ready)
+                .opacity(controller.ready ? 1 : 0.4)
+            thumbDeck
+                .disabled(!controller.ready)
+                .opacity(controller.ready ? 1 : 0.4)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
+    }
+
+    /// The whole story layer from the companion direction, reduced to one
+    /// line: what happened while you were away, or what the duck feels now.
+    private func moodPill(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium, design: .rounded))
+            .foregroundStyle(.white.opacity(0.85))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+            .allowsHitTesting(false)
+            .padding(.bottom, 6)
+            .transition(.opacity)
+            .accessibilityIdentifier("mood-pill")
+    }
+
+    private var timeRail: some View {
+        HStack(spacing: 8) {
+            Button {
+                showInstrument = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 15))
+                    Text("t \(controller.simTick)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 3)
+                            Capsule()
+                                .fill(Color.accentColor.opacity(0.6))
+                                .frame(width: railProgress(width: proxy.size.width), height: 3)
+                        }
+                        .frame(maxHeight: .infinity, alignment: .center)
+                    }
+                    .frame(height: 18)
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.timeMachine)
+            .accessibilityIdentifier("duck-time")
+
+            Button {
+                controller.setPaused(!controller.paused)
+            } label: {
+                Image(systemName: controller.paused ? "play.fill" : "pause.fill")
+                    .font(.system(size: 16))
+                    .frame(width: 48, height: 48)
+                    .background(
+                        controller.paused
+                            ? AnyShapeStyle(Color.orange.opacity(0.28))
+                            : AnyShapeStyle(.ultraThinMaterial),
+                        in: Circle()
+                    )
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(controller.paused ? Copy.resume : Copy.freeze)
+            .accessibilityIdentifier("rail-pause")
+
+            Button {
+                toggleSurface()
+            } label: {
+                Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(surface == .live ? Copy.director : Copy.live)
+            .accessibilityIdentifier("surface-toggle")
+        }
+        .frame(height: 48)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+    }
+
+    /// The share of retained history, not of the whole run: the bar fills as
+    /// checkpoints age out of the ring buffer.
+    private func railProgress(width: CGFloat) -> CGFloat {
+        let newest = Double(controller.simTick)
+        guard newest > 0 else { return 0 }
+        let oldest = Double(min(controller.oldestTick, controller.simTick))
+        let fraction = max(0, min(1, (newest - oldest) / newest))
+        return width * CGFloat(fraction)
+    }
+
+    private var thumbDeck: some View {
+        HStack(spacing: 8) {
+            Spacer(minLength: 0)
+            deckButton("duck-feed", Copy.feed, "fork.knife") { controller.feed() }
+            deckButton("duck-skills", Copy.skills, "sparkles") { showRing = true }
+            Button {
+                quackTapped()
+            } label: {
+                Image(systemName: "waveform")
+                    .font(.system(size: 19))
+                    .frame(width: 56, height: 56)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(wheeeGesture)
+            .accessibilityLabel(Copy.quack)
+            .accessibilityIdentifier("duck-quack")
+
+            Button {
+                if controller.carrying {
+                    controller.release()
+                } else {
+                    controller.grab()
+                }
+            } label: {
+                Image(systemName: controller.carrying ? "hand.raised.fill" : "hand.point.up.left.fill")
+                    .font(.system(size: 20))
+                    .frame(width: 64, height: 64)
+                    .background(
+                        controller.carrying
+                            ? AnyShapeStyle(Color.cyan.opacity(0.35))
+                            : AnyShapeStyle(.ultraThinMaterial),
+                        in: Circle()
+                    )
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(controller.carrying ? Copy.putDown : Copy.grab)
+            .accessibilityIdentifier("duck-grab")
+        }
+        .frame(height: 76)
+        .padding(.horizontal, 10)
+        .background(
+            Color(red: 0.078, green: 0.102, blue: 0.133).opacity(0.94),
+            in: RoundedRectangle(cornerRadius: 28)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 28)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func deckButton(
+        _ id: String,
+        _ label: String,
+        _ icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 19))
+                .frame(width: 52, height: 52)
+                .background(.ultraThinMaterial, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
+    }
+
+    private func toggleSurface() {
+        withAnimation(.snappy(duration: 0.2)) {
+            surface = surface == .live ? .director : .live
+        }
+    }
+
+    /// Tap = chirp, hold 0.3 s = the official wheee ride. Shared by the
+    /// landscape bar and the portrait deck so the two cannot drift.
+    private func quackTapped() {
+        if wheeeHolding || Date().timeIntervalSince(wheeeEndedAt) < 0.5 {
+            wheeeHolding = false
+            wheeeEndedAt = .distantPast
+        } else if let core = controller.core {
+            controller.voice.play(core: core, tag: "chirp")
+        }
+    }
+
+    /// Portrait steering is translation-based from wherever the thumb lands:
+    /// a hidden centre-origin joystick made a resting thumb command reverse,
+    /// and a quick tap only stepped for as long as the finger was down.
+    private func portraitDriveGesture(in size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { gesture in
+                guard controller.ready, !showRing else { return }
+                if controller.carrying {
+                    let dx = gesture.translation.width / (size.width * 0.5)
+                    let dy = gesture.translation.height / (size.height * 0.5)
+                    controller.carry(dx: Double(dx) * 0.35, dy: 0, dz: Double(-dy) * 0.30)
+                    return
+                }
+                let distance = hypot(gesture.translation.width, gesture.translation.height)
+                guard distance >= 8 else { return }
+                let scale = min(distance / 90, 1)
+                let nx = gesture.translation.width / distance * scale
+                let ny = gesture.translation.height / distance * scale
+                switch stickMode {
+                case .drive:
+                    // Up (negative height) is forward; the controller turns
+                    // joystick.y into vx and joystick.x into -wz.
+                    controller.joystick = CGPoint(x: nx, y: -ny)
+                case .head:
+                    controller.setHead(yaw: Double(nx) * 1.2, pitch: Double(-ny) * 0.6)
+                case .body:
+                    controller.setBody(z: Double(-ny) * 0.05, roll: Double(nx) * 0.12)
+                }
+            }
+            .onEnded { gesture in
+                guard controller.ready else { return }
+                if controller.carrying { return }
+                let distance = hypot(gesture.translation.width, gesture.translation.height)
+                let wasTap = distance < 8
+                if wasTap && !showRing {
+                    // A touch on the duck strokes it; a touch on the floor
+                    // ahead sends a short step or turn, not a dead no-op.
+                    let insideDuck = gesture.location.x > size.width * 0.25
+                        && gesture.location.x < size.width * 0.75
+                        && gesture.location.y > size.height * 0.33
+                        && gesture.location.y < size.height * 0.68
+                    if insideDuck {
+                        controller.pet()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } else if stickMode == .drive {
+                        let dx = gesture.location.x - size.width * 0.5
+                        let dy = gesture.location.y - size.height * 0.5
+                        let norm = max(hypot(dx, dy), 1)
+                        controller.joystick = CGPoint(
+                            x: dx / norm * 0.6,
+                            y: -dy / norm * 0.6
+                        )
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            controller.joystick = .zero
+                        }
+                    }
+                } else {
+                    controller.joystick = .zero
+                    controller.setHead(yaw: 0, pitch: 0)
+                    controller.releaseBody()
+                }
+            }
+    }
+
     @ViewBuilder
     private func chrome(in size: CGSize) -> some View {
         VStack(spacing: 0) {
-            topBar
+            topBar()
             Spacer()
             if let failure = failureMessage {
                 failureCard(failure)
@@ -241,7 +582,12 @@ struct ContentView: View {
                 // No card: the space between the bars stays transparent to taps.
                 Color.clear.frame(height: 0)
             }
+            if showHint { hintCapsule }
             bottomBar
+                // Until the core is ready every control is a no-op; dim and
+                // disable them rather than letting them look alive.
+                .disabled(!controller.ready)
+                .opacity(controller.ready ? 1 : 0.4)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -255,7 +601,7 @@ struct ContentView: View {
         return nil
     }
 
-    private var topBar: some View {
+    private func topBar(showSurface: Bool = true) -> some View {
         HStack(alignment: .top) {
             // The duck's name and what it is doing, in words rather than numbers.
             VStack(alignment: .leading, spacing: 2) {
@@ -287,20 +633,23 @@ struct ContentView: View {
             Spacer()
             // The camera is one tap, not one menu deep: framing the duck with
             // the phone is the whole point of Director, and it was the one
-            // chip worth keeping on the bar.
-            Button {
-                withAnimation(.snappy(duration: 0.2)) {
-                    surface = surface == .live ? .director : .live
+            // chip worth keeping on the bar. In portrait it moves down to the
+            // time rail, inside the thumb's arc.
+            if showSurface {
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) {
+                        surface = surface == .live ? .director : .live
+                    }
+                } label: {
+                    Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 48, height: 48)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .contentShape(Circle())
                 }
-            } label: {
-                Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
-                    .font(.system(size: 17, weight: .semibold))
-                    .frame(width: 48, height: 48)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .contentShape(Circle())
+                .accessibilityLabel(surface == .live ? Copy.director : Copy.live)
+                .accessibilityIdentifier("surface-toggle")
             }
-            .accessibilityLabel(surface == .live ? Copy.director : Copy.live)
-            .accessibilityIdentifier("surface-toggle")
             // One menu, not six chips. On a landscape phone the chips ran off
             // the edge and nothing was legible; the stick modes, the surface,
             // the language and the flashlight now live behind one button a
@@ -399,15 +748,10 @@ struct ContentView: View {
 
             // The duck's own voice: `robotctl quack` is a chirp.
             Button {
-                // Held for 0.3 s it is the joy-ride instead: `wheeeGesture`
-                // starts it and ends it on the lift, and the gesture's end
-                // runs before this action, so this sees the marker it left.
-                if wheeeHolding || Date().timeIntervalSince(wheeeEndedAt) < 0.5 {
-                    wheeeHolding = false
-                    wheeeEndedAt = .distantPast
-                } else if let core = controller.core {
-                    controller.voice.play(core: core, tag: "chirp")
-                }
+                // Held for 0.3 s it is the joy-ride instead; `quackTapped`
+                // keeps the tap and the ride from drifting apart between
+                // the two compositions.
+                quackTapped()
             } label: {
                 Label(Copy.quack, systemImage: "waveform")
                     .labelStyle(.iconOnly)
@@ -554,6 +898,9 @@ struct ContentView: View {
 /// capsules, same tap-outside-to-close overlay.
 struct SkillRing: View {
     let names: [String]
+    /// Portrait presents the picker as a bottom deck so the duck above it
+    /// stays visible; landscape keeps the centred card.
+    var bottomAnchored = false
     let onPick: (String) -> Void
     let onClose: () -> Void
 
@@ -573,12 +920,17 @@ struct SkillRing: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: bottomAnchored ? .bottom : .center) {
             Color.black.opacity(0.45)
                 .ignoresSafeArea()
                 .onTapGesture(perform: onClose)
             picker
-                .transition(.scale.combined(with: .opacity))
+                .padding(.bottom, bottomAnchored ? 12 : 0)
+                .transition(
+                    bottomAnchored
+                        ? .move(edge: .bottom).combined(with: .opacity)
+                        : .scale.combined(with: .opacity)
+                )
         }
     }
 
@@ -593,9 +945,12 @@ struct SkillRing: View {
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 28, height: 28)
+                        // 48 pt, the same floor as every other control; the
+                        // 28 pt icon-only target was the smallest thing in
+                        // the app.
+                        .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
                         .contentShape(Circle())
                 }
@@ -614,7 +969,10 @@ struct SkillRing: View {
                 }
                 .padding(.bottom, 4)
             }
-            .frame(maxHeight: 360)
+            // Landscape's safe height is about 372 pt; the old fixed 360 pt
+            // scroll plus header and padding clipped both ends. Portrait has
+            // room for the whole palette.
+            .frame(maxHeight: bottomAnchored ? 430 : 240)
         }
         .padding(16)
         .frame(maxWidth: 360)
@@ -645,7 +1003,7 @@ struct SkillRing: View {
                             .minimumScaleFactor(0.8)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 9)
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, minHeight: 48)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
                     .buttonStyle(.plain)
@@ -679,9 +1037,12 @@ struct DirectorOverlay: View {
             .overlay(alignment: .topLeading) {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(Color.red)
+                        .fill(controller.cameraActive ? Color.red : Color.orange)
                         .frame(width: 7, height: 7)
-                    Text(Copy.viewfinder)
+                    // With no camera (simulator, denied permission, a device
+                    // without one) Director is a dark studio, not a room.
+                    // Say that instead of drawing a viewfinder over it.
+                    Text(controller.cameraActive ? Copy.viewfinder : Copy.cameraUnavailable)
                         .font(.system(size: 9, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.85))
                 }

@@ -113,10 +113,14 @@ class DuckRenderer(
         val view = FloatArray(16)
         val viewProjection = FloatArray(16)
         val cosPitch = cos(pitch.toDouble()).toFloat()
+        // A portrait window is narrower than it is tall; pull the eye back a
+        // little so the duck does not fill the frame edge to edge. The same
+        // 0.85 base distance, scaled the way the iOS renderer does.
+        val cameraDistance = if (aspect < 1f) distance * 1.15f else distance
         val eye = floatArrayOf(
-            trunk[0] + distance * cosPitch * sin(yaw.toDouble()).toFloat(),
-            trunk[1] + distance * cosPitch * cos(yaw.toDouble()).toFloat(),
-            trunk[2] + distance * sin(pitch.toDouble()).toFloat(),
+            trunk[0] + cameraDistance * cosPitch * sin(yaw.toDouble()).toFloat(),
+            trunk[1] + cameraDistance * cosPitch * cos(yaw.toDouble()).toFloat(),
+            trunk[2] + cameraDistance * sin(pitch.toDouble()).toFloat(),
         )
         Matrix.perspectiveM(projection, 0, 45f, aspect, 0.01f, 100f)
         Matrix.setLookAtM(

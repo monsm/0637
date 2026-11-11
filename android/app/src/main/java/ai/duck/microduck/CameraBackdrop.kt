@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
@@ -45,6 +46,17 @@ fun CameraBackdrop(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    // The activity handles configChanges, so turning the phone does not
+    // recreate the window. CameraX still has to be told which way up the
+    // display is: reading LocalConfiguration recomposes this branch on a
+    // turn, and the preview below is rebound with the new target rotation so
+    // the image (and the duck composited over it) stays upright.
+    val configuration = LocalConfiguration.current
+    val rotation = displayRotation(context)
+    var previewUseCase by remember { mutableStateOf<Preview?>(null) }
+    LaunchedEffect(configuration, rotation) {
+        previewUseCase?.targetRotation = rotation
+    }
     var granted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
@@ -72,7 +84,7 @@ fun CameraBackdrop(
         }
     }
 
-    DisposableEffect(active, granted) {
+    DisposableEffect(active, granted, rotation) {
         var provider: ProcessCameraProvider? = null
         var metadata: java.util.concurrent.ScheduledExecutorService? = null
         var disposed = false
@@ -88,9 +100,13 @@ fun CameraBackdrop(
                 try {
                     val cameraProvider = future.get()
                     provider = cameraProvider
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
+                    val preview = Preview.Builder()
+                        .setTargetRotation(rotation)
+                        .build()
+                        .also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                            previewUseCase = it
+                        }
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,
@@ -112,6 +128,7 @@ fun CameraBackdrop(
         }
         onDispose {
             disposed = true
+            previewUseCase = null
             metadata?.shutdownNow()
             provider?.unbindAll()
             onAvailability(false)
@@ -124,6 +141,18 @@ fun CameraBackdrop(
             modifier = modifier,
         )
     }
+}
+
+/**
+ * The display's rotation, the value CameraX's targetRotation expects. The
+ * Activity owns an unspecified-orientation window that handles its own
+ * configChanges, so the display is the truth, not the activity's requested
+ * orientation.
+ */
+@Suppress("DEPRECATION")
+private fun displayRotation(context: Context): Int {
+    val activity = context as? android.app.Activity ?: return android.view.Surface.ROTATION_0
+    return activity.windowManager.defaultDisplay.rotation
 }
 
 /** One metadata post per second, on its own thread: not the control loop. */

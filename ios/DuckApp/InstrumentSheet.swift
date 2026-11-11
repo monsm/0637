@@ -6,6 +6,7 @@ struct InstrumentSheet: View {
     @ObservedObject var controller: DuckController
     /// Flipping the language re-renders the sheet's computed strings.
     @State private var languageTick = 0
+    @Environment(\.dismiss) private var dismiss
 
     /// The sheet's first screen is the time machine and the living duck:
     /// what it is doing, its face, its history. The dense telemetry, the
@@ -82,6 +83,21 @@ struct InstrumentSheet: View {
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("sheet-label")
+            // A deterministic dismissal: the UI test used to swipe the sheet
+            // down, which in a portrait medium detent scrolls instead.
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 48, height: 48)
+                    .background(Color.white.opacity(0.10), in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.close)
+            .accessibilityIdentifier("sheet-close")
         }
     }
 
@@ -95,18 +111,20 @@ struct InstrumentSheet: View {
             VStack(spacing: 6) {
                 GeometryReader { geometry in
                     let width = geometry.size.width
-                    let span = max(controller.oldestTick, 1)
+                    // The share of history still retained, matching the
+                    // portrait rail. Dividing by oldestTick mislabelled the
+                    // bar once ticks 0 aged out.
+                    let newest = max(CGFloat(controller.simTick), 1)
+                    let fraction = max(0, min(1,
+                        (newest - CGFloat(controller.oldestTick)) / newest
+                    ))
                     ZStack(alignment: .leading) {
                         Capsule()
                             .fill(Color.white.opacity(0.08))
                             .frame(height: 6)
                         Capsule()
                             .fill(Color.accentColor.opacity(0.6))
-                            .frame(
-                                width: width * CGFloat(controller.simTick - controller.oldestTick)
-                                    / CGFloat(max(span, 1)),
-                                height: 6
-                            )
+                            .frame(width: width * fraction, height: 6)
                     }
                 }
                 .frame(height: 10)
@@ -160,7 +178,7 @@ struct InstrumentSheet: View {
                 Text(title)
                     .font(.system(size: 9, design: .rounded))
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 48)
             .padding(.vertical, 9)
             .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
         }
@@ -273,8 +291,8 @@ struct InstrumentSheet: View {
                 controller.toggleFlashlight()
             } label: {
                 Image(systemName: "flashlight.on.fill")
-                    .font(.system(size: 13))
-                    .frame(width: 28, height: 28)
+                    .font(.system(size: 14))
+                    .frame(width: 48, height: 48)
                     .background(Color.white.opacity(0.10), in: Circle())
                     .contentShape(Circle())
             }

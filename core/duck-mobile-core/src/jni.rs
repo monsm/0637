@@ -21,7 +21,8 @@ use crate::ffi::{
     duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_flashlight,
     duck_core_load_emotions, duck_core_load_pickup,
     duck_core_mesh_name, duck_core_mesh_soup,
-    duck_core_fork, duck_core_new, duck_core_paused, duck_core_seek, duck_core_set_paused,
+    duck_core_fork, duck_core_new, duck_core_oldest_tick, duck_core_paused, duck_core_seek,
+    duck_core_set_paused,
     duck_core_set_speed, duck_core_speed, duck_core_step,
     duck_core_push, duck_core_reload_policies, duck_core_render_qpos, duck_core_set_body,
     duck_core_set_head, duck_core_set_twist, duck_core_sit_toggle, duck_core_skill_count,
@@ -258,6 +259,19 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeTickIndex(
         return 0;
     }
     unsafe { duck_core_tick_index(handle as *mut DuckCore) as jlong }
+}
+
+/// The oldest checkpoint the core still retains, for the rail's progress.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeOldestTick(
+    _env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jlong {
+    if handle == 0 {
+        return 0;
+    }
+    unsafe { duck_core_oldest_tick(handle as *mut DuckCore) as jlong }
 }
 
 #[unsafe(no_mangle)]

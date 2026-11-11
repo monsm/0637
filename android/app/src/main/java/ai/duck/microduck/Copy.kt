@@ -44,7 +44,10 @@ object Copy {
     val name get() = "MicroDuck"
     val fell get() = pick("it fell", "摔倒了")
     val waking get() = pick("waking up…", "正在唤醒…")
-    val tapHint get() = pick("tap ahead to walk · long-press the duck", "点前方走路 · 长按鸭子")
+    val tapHint get() = pick(
+        "drag to walk · long-press for skills · tap the duck to pet",
+        "拖动走路 · 长按出技能 · 点鸭子摸摸",
+    )
     val live get() = pick("Live", "实时")
     val director get() = pick("Director", "取景")
     val time get() = pick("Time", "时间")
@@ -75,10 +78,14 @@ val quack get() = pick("Quack", "叫一声")
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
     // First-launch hint: shown once above the bottom bar, then never again.
-    val dragHint get() = pick("Drag to drive · long-press the duck for skills", "拖动开车 · 长按鸭子出技能")
+    val dragHint get() = pick(
+        "Drag to walk · long-press for skills · tap the duck to pet",
+        "拖动走路 · 长按出技能 · 点鸭子摸摸",
+    )
 
     // Instrument sheet
     val thisDuck get() = pick("This duck", "这只鸭子")
+    val close get() = pick("Close", "关闭")
     val timeMachine get() = pick("Time machine", "时间机器")
     val freeze get() = pick("Freeze", "冻结")
     val resume get() = pick("Resume", "继续")

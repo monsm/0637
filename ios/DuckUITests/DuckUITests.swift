@@ -12,8 +12,23 @@ final class DuckUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        // Portrait is the product; a simulator that was last used in
+        // landscape would otherwise validate the wrong shell.
+        XCUIDevice.shared.orientation = .portrait
         app = XCUIApplication()
         app.launch()
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline && app.frame.height <= app.frame.width {
+            usleep(100_000)
+        }
+        XCTAssertTrue(
+            app.frame.height > app.frame.width,
+            "the app did not launch in portrait (\(app.frame))"
+        )
+    }
+
+    override func tearDownWithError() throws {
+        XCUIDevice.shared.orientation = .portrait
     }
 
     private func labelElement() -> XCUIElement {
@@ -112,8 +127,20 @@ final class DuckUITests: XCTestCase {
         )
         app.buttons["time-play.fill"].tap()
 
-        // Close the sheet and keep driving.
-        app.swipeDown()
+        // Close the sheet with its own button: in a portrait medium detent a
+        // swipe scrolls the sheet's ScrollView instead of dismissing it.
+        let sheetClose = app.buttons["sheet-close"]
+        XCTAssertTrue(sheetClose.waitForExistence(timeout: 5), "the sheet has no close button")
+        sheetClose.tap()
+        let gone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: app.staticTexts["sheet-title"]
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [gone], timeout: 5),
+            .completed,
+            "the sheet did not close"
+        )
         let after = waitForLabel(["walk", "stand"], timeout: 30)
         XCTAssertTrue(
             ["walk", "stand"].contains(after),
@@ -141,5 +168,41 @@ final class DuckUITests: XCTestCase {
             ["walk", "stand"].contains(backLive),
             "the duck stopped after leaving Director: label=\(backLive)"
         )
+    }
+
+    /// The same duck, the wide composition: rotation must swap shells without
+    /// losing the core, the controls or the skill path.
+    func testLandscapeRoundTrip() throws {
+        XCTAssertTrue(labelElement().waitForExistence(timeout: 120), "the status panel never appeared")
+        let ready = waitForLabel(["walk", "stand"], timeout: 180)
+        XCTAssertTrue(["walk", "stand"].contains(ready), "the loop never drove: label=\(ready)")
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline && app.frame.width <= app.frame.height {
+            usleep(100_000)
+        }
+        XCTAssertTrue(
+            app.frame.width > app.frame.height,
+            "rotation to landscape did not happen (\(app.frame))"
+        )
+        // Every load-bearing control exists in the wide shell too.
+        for id in ["duck-label", "duck-menu", "surface-toggle", "duck-time", "duck-skills", "duck-quack", "duck-grab"] {
+            let element = app.buttons[id].exists ? app.buttons[id] : app.staticTexts[id]
+            XCTAssertTrue(element.waitForExistence(timeout: 5), "\(id) missing in landscape")
+        }
+        try pickSkill("roulade")
+        let verdict = app.staticTexts["duck-last-skill"]
+        XCTAssertTrue(verdict.waitForExistence(timeout: 20), "the ring did not reach the core in landscape")
+        XCTAssertEqual(verdict.label, "roulade")
+
+        XCUIDevice.shared.orientation = .portrait
+        let back = Date().addingTimeInterval(10)
+        while Date() < back && app.frame.height <= app.frame.width {
+            usleep(100_000)
+        }
+        let after = waitForLabel(["walk", "stand"], timeout: 30)
+        XCTAssertTrue(["walk", "stand"].contains(after), "the duck stopped after rotating back: label=\(after)")
+        XCTAssertTrue(app.buttons["duck-quack"].exists, "the portrait deck is missing after rotating back")
     }
 }

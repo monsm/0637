@@ -474,6 +474,18 @@ final class DuckController: ObservableObject {
         }
     }
 
+    /// Whether the window is taller than it is wide, read from the active
+    /// scene rather than UIScreen (which is deprecated and wrong in split
+    /// view). Falls back to the first connected scene.
+    private static var interfaceIsPortrait: Bool {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+            ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        guard let orientation = scene?.interfaceOrientation else { return true }
+        return orientation == .portrait || orientation == .portraitUpsideDown
+    }
+
     /// The duck is in Twin mode: the phone's IMU does not replace its
     /// proprioception, it applies external disturbances (a shake is a shove).
     private func startMotion() {
@@ -491,11 +503,13 @@ final class DuckController: ObservableObject {
                !self.carrying,
                self.ready {
                 let gravity = motion.gravity
-                // Landscape: the phone's z axis points out of the screen and
-                // x runs along the long edge, so rolling it pans the gaze and
-                // tipping it forward/back tilts the head.
-                let yaw = -gravity.z * 0.9
-                let pitch = gravity.x * 0.45
+                // The device axes swap with the interface orientation, so the
+                // mapping does too: in portrait the short edge is x (roll =
+                // pan) and the long edge is y (tip = pitch); in landscape it
+                // is the other way round.
+                let portrait = Self.interfaceIsPortrait
+                let yaw = portrait ? gravity.x * 0.9 : -gravity.z * 0.9
+                let pitch = portrait ? -gravity.y * 0.45 : gravity.x * 0.45
                 // A phone lying flat on a table is the neutral pose: below a
                 // few degrees of tilt, say nothing, so the duck's own
                 // look-around is not silenced by a resting phone.
@@ -582,6 +596,17 @@ final class DuckController: ObservableObject {
         }
         guard !parts.isEmpty else { return }
         awaySummary = parts.joined(separator: " · ")
+    }
+
+    /// A stroke of the hand: POST /pet. The core counts it, coos and stays
+    /// lively a little longer; `/state` and the away recap read it back.
+    func pet() {
+        guard let url = URL(string: "http://127.0.0.1:8765/pet") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 2.0
+        request.httpBody = Data("{}".utf8)
+        URLSession.shared.dataTask(with: request).resume()
     }
 
     /// A treat on the floor: POST /feed, the core runs the official

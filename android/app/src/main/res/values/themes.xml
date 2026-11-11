@@ -2,6 +2,9 @@
 <resources>
     <style name="Theme.Duck" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:windowFullscreen">true</item>
+        <!-- Portrait-first: let the stage draw under the cutout and keep the
+             chrome out of it with WindowInsets.safeDrawing. -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <item name="android:colorAccent">#FFD166</item>
     </style>
 </resources>

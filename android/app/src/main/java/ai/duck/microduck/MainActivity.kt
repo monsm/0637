@@ -4,6 +4,7 @@ import android.opengl.GLSurfaceView
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -51,6 +52,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var input: DuckInput
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Edge-to-edge: the GL scene runs under the bars, the chrome insets
+        // itself (safeDrawing in portrait, systemBarsPadding in landscape).
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         Copy.load(this)
         input = DuckInput()
@@ -69,23 +73,7 @@ class MainActivity : ComponentActivity() {
                     input = input,
                     onQuack = { voice?.play("chirp") },
                     onWheee = { held -> core?.wheee(held) },
-                    onFeed = {
-                        Thread {
-                            try {
-                                val connection = java.net.URL("http://127.0.0.1:8765/feed")
-                                    .openConnection() as java.net.HttpURLConnection
-                                connection.requestMethod = "POST"
-                                connection.connectTimeout = 2000
-                                connection.readTimeout = 5000
-                                connection.doOutput = true
-                                connection.outputStream.use { it.write("{}".toByteArray()) }
-                                connection.inputStream.readBytes()
-                                connection.disconnect()
-                            } catch (_: Exception) {
-                                // The loop refuses when busy; nothing to show.
-                            }
-                        }.start()
-                    },
+                    onFeed = { postDuckCommand("/feed") },
                 )
             }
         }
