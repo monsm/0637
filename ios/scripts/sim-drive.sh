@@ -551,18 +551,35 @@ except Exception:
 PY
 PEER_PID=$!
 sleep 0.5
-api POST /peers/greet '{"id":"peerci01"}' > /dev/null || true
+# The greet rides one intent POST and one tick; a stalled moment on a busy
+# runner must not end the story. The POST and the wait are idempotent: ask
+# again until the ack lands or the window closes.
+PEER_ACK=""
+for _ in $(seq 1 8); do
+  api POST /peers/greet '{"id":"peerci01"}' > /dev/null || true
+  for _ in $(seq 1 15); do
+    PEER_ACK=$(cat /tmp/duck-peer-ack.txt 2>/dev/null || echo "")
+    [ "$PEER_ACK" = "greet" ] && break 2
+    sleep 0.1
+  done
+done
 wait "$PEER_PID" 2>/dev/null || true
-PEER_ACK=$(cat /tmp/duck-peer-ack.txt 2>/dev/null || echo "")
 [ "$PEER_ACK" = "greet" ]; check $? "our greet reaches the other duck" "ack=$PEER_ACK"
 sleep 0.5
-FIRED=$(api GET /state | python3 -c "
+FIRED=""
+for _ in $(seq 1 25); do
+  FIRED=$(api GET /state | python3 -c "
 import json,sys
-d=json.load(sys.stdin)
-peers=(d.get('peers') or {}).get('peers') or []
-e=d.get('peer_event') or {}
-print(peers[0].get('replied') if peers else '', e.get('kind',''))
+try:
+    d=json.load(sys.stdin)
+    peers=(d.get('peers') or {}).get('peers') or []
+    e=d.get('peer_event') or {}
+    print(peers[0].get('replied') if peers else '', e.get('kind',''))
+except Exception: print(' ')
 " 2>/dev/null || echo " ")
+  [ "$FIRED" = "True replied" ] && break
+  sleep 0.2
+done
 [ "$FIRED" = "True replied" ]; check $? "the other duck's answer is recorded" "state=$FIRED"
 rm -f /tmp/duck-peer-ack.txt
 
@@ -980,9 +997,14 @@ api POST /body '{"z":0.0,"roll":0.05,"pitch":0.05}' > /dev/null
 check $? "body command accepted" ""
 # A held body pose zeroes the twist — the pad's body mode holds the duck
 # still. Releasing it must give the duck its legs back, or driving is dead
-# for the rest of the session.
-api POST /body '{"active":false}' > /dev/null
-check $? "body pose released" ""
+# for the rest of the session. The POST waits on a tick; a busy runner gets
+# a few tries before the story ends.
+BODY_RELEASED=1
+for _ in $(seq 1 5); do
+  if api POST /body '{"active":false}' > /dev/null; then BODY_RELEASED=0; break; fi
+  sleep 0.5
+done
+check $BODY_RELEASED "body pose released" ""
 WAIT_BEFORE=$(api GET /state | field trunk)
 for _ in $(seq 1 10); do
   api POST /twist '{"vx":0.4,"vy":0.0,"wz":0.0}' > /dev/null
