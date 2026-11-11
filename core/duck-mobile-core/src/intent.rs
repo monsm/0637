@@ -484,7 +484,13 @@ pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) -> IntentS
     let thread = std::thread::Builder::new()
         .name("duck-intent".to_owned())
         .spawn(move || {
-            const MAX_CONNECTIONS: usize = 16;
+            // A cap on concurrent handlers bounds the thread count under a
+            // flood. It must sit well above the shells' own appetite: every
+            // idle pooled connection (URLSession keeps several per session)
+            // holds a handler for up to the read timeout before the client
+            // speaks, and a busy CI simulator was observed outgrowing a
+            // smaller cap — the 503s came back as empty reads.
+            const MAX_CONNECTIONS: usize = 64;
             let live = Arc::new(AtomicUsize::new(0));
             loop {
                 if flag.load(Ordering::SeqCst) {
