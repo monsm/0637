@@ -18,19 +18,33 @@ import java.io.File
  * system chooser. No frame here enters the duck's senses.
  */
 fun compositePhoto(room: Bitmap?, duck: Bitmap): Bitmap {
-    if (room == null) return duck
     val width = duck.width
     val height = duck.height
     if (width <= 0 || height <= 0) return duck
     val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(out)
-    // Aspect-fill the room into the frame the user saw, then the duck at the
-    // same framing. The viewfinder is a screen-space composite; so is this.
-    val scale = maxOf(width.toFloat() / room.width, height.toFloat() / room.height)
-    val dw = room.width * scale
-    val dh = room.height * scale
-    val dst = RectF((width - dw) / 2f, (height - dh) / 2f, (width + dw) / 2f, (height + dh) / 2f)
-    canvas.drawBitmap(room, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+    if (room != null) {
+        // Aspect-fill the room into the frame the user saw, then the duck at
+        // the same framing. The viewfinder is a screen-space composite; so is
+        // this.
+        val scale = maxOf(width.toFloat() / room.width, height.toFloat() / room.height)
+        val dw = room.width * scale
+        val dh = room.height * scale
+        val dst = RectF((width - dw) / 2f, (height - dh) / 2f, (width + dw) / 2f, (height + dh) / 2f)
+        canvas.drawBitmap(room, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+    } else {
+        // In Director the GL frame is transparent when no camera image came
+        // back. Paint the studio behind it instead of saving an empty PNG.
+        canvas.drawColor(android.graphics.Color.rgb(14, 19, 26))
+        val paint = Paint()
+        paint.shader = android.graphics.LinearGradient(
+            0f, 0f, 0f, height.toFloat(),
+            android.graphics.Color.rgb(14, 19, 26),
+            android.graphics.Color.rgb(23, 28, 36),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+    }
     canvas.drawBitmap(duck, 0f, 0f, null)
     return out
 }

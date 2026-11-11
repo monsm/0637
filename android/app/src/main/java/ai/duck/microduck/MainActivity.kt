@@ -152,6 +152,7 @@ private fun DuckScreen(
     var renderer by remember { mutableStateOf<DuckRenderer?>(null) }
     val cameraCapture = remember { CameraCapture() }
     var photo by remember { mutableStateOf<Bitmap?>(null) }
+    var photoInFlight by remember { mutableStateOf(false) }
     var cameraAvailable by remember { mutableStateOf(false) }
     val cameraActive = surface == Surface.Director && cameraAvailable
     LaunchedEffect(cameraActive) { input.cameraActive = cameraActive }
@@ -241,17 +242,23 @@ private fun DuckScreen(
                 onFeed = onFeed,
                 onPhoto = {
                     val duckRenderer = renderer
-                    if (duckRenderer != null) {
+                    if (duckRenderer != null && !photoInFlight) {
+                        photoInFlight = true
                         val main = Handler(Looper.getMainLooper())
                         duckRenderer.captureFrame { duck ->
                             main.post {
-                                if (duck == null) return@post
+                                if (duck == null) {
+                                    photoInFlight = false
+                                    return@post
+                                }
                                 if (cameraActive) {
                                     cameraCapture.take(context) { room ->
                                         photo = compositePhoto(room, duck)
+                                        photoInFlight = false
                                     }
                                 } else {
                                     photo = duck
+                                    photoInFlight = false
                                 }
                             }
                         }

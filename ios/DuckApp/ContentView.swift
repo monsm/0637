@@ -1233,8 +1233,11 @@ struct DirectorOverlay: View {
                     .padding(.bottom, bar / 2 - 5)
                     .padding(.trailing, 14)
             }
-            .overlay(alignment: .topTrailing) {
+            .overlay(alignment: .trailing) {
                 // The one shutter: the frame already on the screen is the photo.
+                // Vertically centred, not top-trailing: in landscape the top
+                // bar's menu sits exactly where a top-trailing shutter would
+                // be, and the menu would eat the tap.
                 Button {
                     controller.captureDirectorPhoto()
                 } label: {
@@ -1255,7 +1258,6 @@ struct DirectorOverlay: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Copy.photoTake)
                 .accessibilityIdentifier("duck-photo")
-                .padding(.top, bar + 10)
                 .padding(.trailing, 16)
             }
         }

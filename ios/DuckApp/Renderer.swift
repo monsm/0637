@@ -380,14 +380,44 @@ final class Renderer: NSObject, MTKViewDelegate {
         // a second rendering that could disagree with it.
         if let completion = captureCompletion {
             captureCompletion = nil
-            // Present and read the same finished drawable. The command buffer
-            // must be committed before waiting; the drawable stays valid until
-            // the next frame.
-            buffer.present(drawable)
-            buffer.commit()
-            buffer.waitUntilCompleted()
-            let image = readTexture(drawable.texture)
-            completion(image)
+            // Encode the copy into the same command buffer, before the
+            // present: a drawable may be recycled as soon as it is shown.
+            let texture = drawable.texture
+            let width = texture.width
+            let height = texture.height
+            let bytesPerRow = ((width * 4 + 255) / 256) * 256
+            if let readback = device.makeBuffer(
+                length: bytesPerRow * height,
+                options: .storageModeShared
+            ),
+                let blit = buffer.makeBlitCommandEncoder()
+            {
+                blit.copy(
+                    from: texture,
+                    sourceSlice: 0,
+                    sourceLevel: 0,
+                    sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+                    sourceSize: MTLSize(width: width, height: height, depth: 1),
+                    to: readback,
+                    destinationOffset: 0,
+                    destinationBytesPerRow: bytesPerRow,
+                    destinationBytesPerImage: bytesPerRow * height
+                )
+                blit.endEncoding()
+                buffer.present(drawable)
+                buffer.commit()
+                buffer.waitUntilCompleted()
+                completion(image(
+                    from: readback,
+                    width: width,
+                    height: height,
+                    bytesPerRow: bytesPerRow
+                ))
+            } else {
+                buffer.present(drawable)
+                buffer.commit()
+                completion(nil)
+            }
         } else {
             buffer.present(drawable)
             buffer.commit()
@@ -400,34 +430,13 @@ final class Renderer: NSObject, MTKViewDelegate {
         captureCompletion = completion
     }
 
-    /// The frame in the drawable, as an image. A blit to a shared buffer is
-    /// the portable read-back: drawable textures are private on iOS.
-    private func readTexture(_ texture: MTLTexture) -> UIImage? {
-        let width = texture.width
-        let height = texture.height
+    private func image(
+        from readback: MTLBuffer,
+        width: Int,
+        height: Int,
+        bytesPerRow: Int
+    ) -> UIImage? {
         guard width > 0, height > 0 else { return nil }
-        let bytesPerRow = ((width * 4 + 255) / 256) * 256
-        guard let readback = device.makeBuffer(
-            length: bytesPerRow * height,
-            options: .storageModeShared
-        ),
-            let buffer = queue.makeCommandBuffer(),
-            let blit = buffer.makeBlitCommandEncoder()
-        else { return nil }
-        blit.copy(
-            from: texture,
-            sourceSlice: 0,
-            sourceLevel: 0,
-            sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
-            sourceSize: MTLSize(width: width, height: height, depth: 1),
-            to: readback,
-            destinationOffset: 0,
-            destinationBytesPerRow: bytesPerRow,
-            destinationBytesPerImage: bytesPerRow * height
-        )
-        blit.endEncoding()
-        buffer.commit()
-        buffer.waitUntilCompleted()
         let data = Data(
             bytes: UnsafeRawPointer(readback.contents()),
             count: bytesPerRow * height

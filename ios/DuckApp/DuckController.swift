@@ -122,6 +122,9 @@ final class DuckController: ObservableObject {
     /// Bumped by every decision so an old move chain cannot keep steering
     /// after a stop, a look or a newer move.
     private var moveGeneration = 0
+    /// One shutter press, one still: a second tap while the camera is still
+    /// exposing is ignored rather than overwriting the pending completion.
+    private var photoInFlight = false
     private var eventsAtBackground: [String] = []
     private var lastEvents: [String] = []
     /// The companion layer, from /state.care: hunger (0 fed .. 1 starving),
@@ -1084,22 +1087,24 @@ final class DuckController: ObservableObject {
     /// frame already has the studio behind it and that is the photo. The
     /// result is written to Documents/Photos before the preview appears.
     func captureDirectorPhoto() {
-        guard let renderer else { return }
+        guard !photoInFlight, let renderer else { return }
+        photoInFlight = true
         renderer.snapshot { [weak self] duck in
-            guard let self, let duck else { return }
+            guard let self else { return }
+            guard let duck else {
+                self.photoInFlight = false
+                return
+            }
             let finish: (UIImage) -> Void = { [weak self] image in
                 guard let self else { return }
+                self.photoInFlight = false
                 let url = self.writePhoto(image)
                 self.capturedPhoto = Self.CapturedPhoto(image: image, url: url)
             }
             if self.cameraActive {
                 self.camera.capture { [weak self] room in
                     guard let self else { return }
-                    if let room {
-                        finish(Self.composite(room: room, duck: duck))
-                    } else {
-                        finish(duck)
-                    }
+                    finish(Self.composite(room: room, duck: duck))
                 }
             } else {
                 finish(duck)
@@ -1109,24 +1114,45 @@ final class DuckController: ObservableObject {
 
     /// The camera photo behind, the duck frame over it. Both fill the screen
     /// the user saw, so the composite matches the viewfinder (screen-space,
-    /// not a tracked AR projection — this duck has no camera pose).
-    private static func composite(room: UIImage, duck: UIImage) -> UIImage {
+    /// not a tracked AR projection — this duck has no camera pose). With no
+    /// room (the still failed) the duck frame is transparent in Director, so
+    /// paint the studio behind it rather than saving an empty alpha PNG.
+    private static func composite(room: UIImage?, duck: UIImage) -> UIImage {
         let size = duck.size
         guard size.width > 0, size.height > 0 else { return duck }
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
-        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            let target = size.width / size.height
-            let source = room.size.width / max(room.size.height, 1)
-            var rect = CGRect(origin: .zero, size: size)
-            if source > target {
-                let width = size.height * source
-                rect = CGRect(x: (size.width - width) / 2, y: 0, width: width, height: size.height)
-            } else if source < target {
-                let height = size.width / source
-                rect = CGRect(x: 0, y: (size.height - height) / 2, width: size.width, height: height)
+        return UIGraphicsImageRenderer(size: size, format: format).image { context in
+            if let room {
+                let target = size.width / size.height
+                let source = room.size.width / max(room.size.height, 1)
+                var rect = CGRect(origin: .zero, size: size)
+                if source > target {
+                    let width = size.height * source
+                    rect = CGRect(x: (size.width - width) / 2, y: 0, width: width, height: size.height)
+                } else if source < target {
+                    let height = size.width / source
+                    rect = CGRect(x: 0, y: (size.height - height) / 2, width: size.width, height: height)
+                }
+                room.draw(in: rect)
+            } else {
+                let colors = [
+                    UIColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1).cgColor,
+                    UIColor(red: 0.09, green: 0.11, blue: 0.14, alpha: 1).cgColor,
+                ] as CFArray
+                if let gradient = CGGradient(
+                    colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                    colors: colors,
+                    locations: [0, 1]
+                ) {
+                    context.cgContext.drawLinearGradient(
+                        gradient,
+                        start: CGPoint(x: 0, y: 0),
+                        end: CGPoint(x: 0, y: size.height),
+                        options: []
+                    )
+                }
             }
-            room.draw(in: rect)
             duck.draw(in: CGRect(origin: .zero, size: size))
         }
     }

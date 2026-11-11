@@ -131,13 +131,27 @@ final class CameraFeed: NSObject, ObservableObject {
     /// Ask the camera for one still. Completion always runs on the main
     /// thread; nil means no camera, not yet running, or the capture failed.
     func capture(completion: @escaping (UIImage?) -> Void) {
-        let angle: CGFloat
-        switch UIDevice.current.orientation {
-        case .landscapeLeft: angle = 0
-        case .landscapeRight: angle = 180
-        case .portraitUpsideDown: angle = 270
-        default: angle = 90
+        // The preview rotates by the *interface* orientation; UIDevice's
+        // landscape names are the opposite of the interface's (and read
+        // unknown when the phone lies flat). Using the device orientation
+        // here made every landscape still 180 degrees off. Read the same
+        // window scene the preview uses.
+        let readAngle = {
+            let scenes = UIApplication.shared.connectedScenes.compactMap {
+                $0 as? UIWindowScene
+            }
+            let scene = scenes.first { $0.activationState == .foregroundActive }
+                ?? scenes.first
+            switch scene?.interfaceOrientation {
+            case .landscapeLeft: return CGFloat(0)
+            case .landscapeRight: return CGFloat(180)
+            case .portraitUpsideDown: return CGFloat(270)
+            default: return CGFloat(90)
+            }
         }
+        let angle: CGFloat = Thread.isMainThread
+            ? readAngle()
+            : DispatchQueue.main.sync(execute: readAngle)
         queue.async { [weak self] in
             guard let self, self.configured, self.session.isRunning else {
                 DispatchQueue.main.async { completion(nil) }
