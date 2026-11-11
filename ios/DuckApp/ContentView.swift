@@ -305,11 +305,13 @@ struct ContentView: View {
                 } label: {
                     Label(Copy.live, systemImage: "circle.dashed")
                 }
+                .accessibilityIdentifier("surface-live")
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { surface = .director }
                 } label: {
                     Label(Copy.director, systemImage: "viewfinder")
                 }
+                .accessibilityIdentifier("surface-director")
                 Divider()
                 Button {
                     controller.toggleFlashlight()
