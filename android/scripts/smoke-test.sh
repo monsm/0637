@@ -472,9 +472,9 @@ echo "--- companion survives a restart ---"
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"hunger":0.42,"mood":0.6,"bond":0.33,"asleep":false}' \
   http://127.0.0.1:8765/care > /dev/null || true
-# The shell saves every three seconds; let one cadence see the new numbers
-# before the process is killed.
-sleep 5
+# The shell saves every three seconds; let a full cadence (plus its state
+# fetch) see the new numbers before the process is killed.
+sleep 8
 adb shell input keyevent KEYCODE_HOME > /dev/null 2>&1 || true
 sleep 3
 adb shell am force-stop ai.duck.microduck > /dev/null 2>&1 || true

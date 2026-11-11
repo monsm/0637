@@ -129,6 +129,7 @@ final class DuckController: ObservableObject {
     @Published var careBond: Double = 0
     @Published var careAsleep = false
     private var companionRestored = false
+    private var companionRestoreStarted = false
     private var lastCompanionSave = Date.distantPast
     /// The last /state slices the 1 Hz poll read. A synchronous copy at the
     /// door cannot be killed with the process like an in-flight URLSession.
@@ -691,28 +692,86 @@ final class DuckController: ObservableObject {
     /// Called once the core is up: give back what the last session saved. A
     /// fresh install has nothing; the duck starts at its defaults.
     func restoreCompanionState() {
-        guard !companionRestored else { return }
-        if let saved = UserDefaults.standard.dictionary(forKey: "duck_companion_v1") {
-            if let care = saved["care"] as? [String: Any],
-               let data = try? JSONSerialization.data(withJSONObject: care) {
-                post("/care", data)
-            }
-            if let life = saved["life"] as? [String: Any],
-               let data = try? JSONSerialization.data(withJSONObject: life) {
-                post("/life", data)
-            }
-        }
-        if let data = UserDefaults.standard.data(forKey: Self.rulesKey),
-           let saved = try? JSONDecoder().decode([DuckRule].self, from: data) {
-            rules = saved
-            let payload = ["rules": saved.map {
+        guard !companionRestoreStarted else { return }
+        companionRestoreStarted = true
+        let defaults = UserDefaults.standard
+        let saved = defaults.dictionary(forKey: "duck_companion_v1")
+        var rulesPayload: Data?
+        var savedRules: [DuckRule] = []
+        if let data = defaults.data(forKey: Self.rulesKey),
+           let decoded = try? JSONDecoder().decode([DuckRule].self, from: data) {
+            savedRules = decoded
+            let payload = ["rules": decoded.map {
                 ["trigger": $0.trigger, "action": $0.action, "value": $0.value]
             }]
-            if let body = try? JSONSerialization.data(withJSONObject: payload) {
-                post("/rules", body)
+            rulesPayload = try? JSONSerialization.data(withJSONObject: payload)
+        }
+        guard saved != nil || rulesPayload != nil else {
+            companionRestored = true
+            return
+        }
+        // The intent server comes up with the core; a launch can beat it.
+        // Retry on a worker until the core acknowledges, and keep the save
+        // gate closed until then so a fresh duck cannot overwrite the file.
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            var delivered = true
+            if let saved {
+                let care = saved["care"] as? [String: Any]
+                let life = saved["life"] as? [String: Any]
+                var attempts = 0
+                var ok = false
+                while attempts < 40 && !ok {
+                    attempts += 1
+                    let careOK = care.map { Self.postSync("/care", $0) } ?? true
+                    let lifeOK = life.map { Self.postSync("/life", $0) } ?? true
+                    ok = careOK && lifeOK
+                    if !ok { Thread.sleep(forTimeInterval: 0.25) }
+                }
+                delivered = delivered && ok
+            }
+            if let rulesPayload {
+                var attempts = 0
+                var ok = false
+                while attempts < 40 && !ok {
+                    attempts += 1
+                    ok = Self.postSyncData("/rules", rulesPayload)
+                    if !ok { Thread.sleep(forTimeInterval: 0.25) }
+                }
+                delivered = delivered && ok
+            }
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if !savedRules.isEmpty { self.rules = savedRules }
+                self.companionRestored = delivered
             }
         }
-        companionRestored = true
+    }
+
+    /// A blocking POST for the restore path only: it must know whether the
+    /// core really took the state, which the fire-and-forget helpers cannot
+    /// tell it. Called on a utility queue.
+    private static func postSync(_ path: String, _ object: [String: Any]) -> Bool {
+        guard let data = try? JSONSerialization.data(withJSONObject: object) else { return false }
+        return postSyncData(path, data)
+    }
+
+    private static func postSyncData(_ path: String, _ body: Data) -> Bool {
+        guard let url = URL(string: "http://127.0.0.1:8765\(path)") else { return false }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 2
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let semaphore = DispatchSemaphore(value: 0)
+        var ok = false
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            if let http = response as? HTTPURLResponse {
+                ok = (200..<300).contains(http.statusCode)
+            }
+            semaphore.signal()
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 3)
+        return ok
     }
 
     /// Open the LAN socket and announce this phone. Called when the user

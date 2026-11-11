@@ -120,7 +120,6 @@ fun Shell(
     var aiError by remember { mutableStateOf<String?>(null) }
     var aiThinking by remember { mutableStateOf(false) }
     var lastAIThink by remember { mutableStateOf(0L) }
-    var companionsRestored by remember { mutableStateOf(false) }
     val aiScope = rememberCoroutineScope()
     // The one-line pill above the rail: care by default, a room sound, a
     // block or the model's decision for a moment.
@@ -201,17 +200,18 @@ fun Shell(
     var careLine by remember { mutableStateOf("") }
     LaunchedEffect(core) {
         val duck = core ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) { restoreCompanion(context) }
+        var companionsRestored = false
+        withContext(Dispatchers.IO) {
+            companionsRestored = restoreCompanion(context)
+        }
+        if (!companionsRestored) return@LaunchedEffect
+        MainActivity.companionReady = true
         var lastSoundTick = -1
         var lastRuleTick = -1
         var lastPeerTick = -1
         var lastCompanionSave = 0L
-        // Wait for the core's restore intents to be processed on the tick
-        // thread before the first periodic save: a fresh duck must not
-        // overwrite the saved one at the first poll after a relaunch.
-        delay(700)
-        companionsRestored = true
-        MainActivity.companionReady = true
+        // The restore above already waited for the core to acknowledge; no
+        // fixed sleep, and no save before it succeeded.
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.

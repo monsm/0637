@@ -1187,7 +1187,7 @@ echo "--- companion survives a restart ---"
 # distinctive value here (the long session has aged it), wait for one cadence,
 # then kill the process the way iOS can.
 api POST /care '{"hunger":0.42,"mood":0.6,"bond":0.33,"asleep":false}' > /dev/null || true
-sleep 6
+sleep 8
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" > /dev/null 2>&1 || true
 sleep 2
 xcrun simctl launch "$UDID" "$BUNDLE_ID" > /dev/null 2>&1 || true

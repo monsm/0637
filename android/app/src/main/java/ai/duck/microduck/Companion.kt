@@ -308,34 +308,39 @@ fun saveCompanionFromState(context: Context, stateText: String) {
  * restore-only: the core clamps them, and the next /state poll shows what the
  * duck actually accepted.
  */
-fun restoreCompanion(context: Context) {
-    val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        .getString(COMPANION_KEY, null)
-    Thread {
-        // Let the core's launched-effect restore take the queue first: a
-        // restore posted in the same tick would be overwritten by the fresh
-        // default care this function is about to persist.
+fun restoreCompanion(context: Context): Boolean {
+    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val raw = prefs.getString(COMPANION_KEY, null)
+    val rules = prefs.getString(RULES_KEY, null)
+    if (raw == null && rules == null) return true
+    // The intent server starts with the core and may not accept connections
+    // yet. Retry until it acknowledges, and keep the save gate closed until
+    // then: a fresh duck must not overwrite the saved one.
+    for (attempt in 0 until 40) {
         try {
-            Thread.sleep(700)
-        } catch (_: InterruptedException) {
-        }
-        if (raw != null) {
-            try {
+            if (raw != null) {
                 val saved = JSONObject(raw)
-                saved.optJSONObject("care")?.let { postJson("/care", it.toString()) }
-                saved.optJSONObject("life")?.let { postJson("/life", it.toString()) }
-            } catch (_: Throwable) {
-                // A corrupt payload is dropped rather than crashing the launch.
+                val care = saved.optJSONObject("care")
+                if (care != null && !postJsonOk("/care", care.toString())) {
+                    throw IllegalStateException("care not accepted")
+                }
+                val life = saved.optJSONObject("life")
+                if (life != null && !postJsonOk("/life", life.toString())) {
+                    throw IllegalStateException("life not accepted")
+                }
+            }
+            if (rules != null && !postJsonOk("/rules", rules)) {
+                throw IllegalStateException("rules not accepted")
+            }
+            return true
+        } catch (_: Throwable) {
+            try {
+                Thread.sleep(250)
+            } catch (_: InterruptedException) {
             }
         }
-        // The child's block program is configuration, saved separately.
-        try {
-            val rules = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString(RULES_KEY, null)
-            if (rules != null) postJson("/rules", rules)
-        } catch (_: Throwable) {
-        }
-    }.start()
+    }
+    return false
 }
 
 private fun getJson(path: String): String {
@@ -351,15 +356,19 @@ private fun getJson(path: String): String {
 }
 
 private fun postJson(path: String, body: String) {
+    postJsonOk(path, body)
+}
+
+private fun postJsonOk(path: String, body: String): Boolean {
     val connection = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
     connection.requestMethod = "POST"
     connection.doOutput = true
     connection.setRequestProperty("Content-Type", "application/json")
     connection.connectTimeout = 2000
     connection.readTimeout = 2000
-    try {
+    return try {
         connection.outputStream.use { it.write(body.toByteArray()) }
-        connection.responseCode
+        connection.responseCode in 200..299
     } finally {
         connection.disconnect()
     }
