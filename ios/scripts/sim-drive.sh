@@ -329,7 +329,12 @@ b=json.load(sys.stdin); b['pets']=7; print(json.dumps(b))
 RESTORED=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   --data-binary @/tmp/duck-life.json http://127.0.0.1:8765/life || true)
 printf '%s' "$RESTORED" | grep -q '"ok":true'
 check $? "the shell can restore the duck's record" "$(printf '%s' "$RESTORED" | head -c 120)"
-LIFE_BACK=$(api GET /life || true)
+LIFE_BACK=""
+for _ in $(seq 1 30); do
+  LIFE_BACK=$(api GET /life || true)
+  printf '%s' "$LIFE_BACK" | grep -q '"pets":7' && break
+  sleep 0.1
+done
 printf '%s' "$LIFE_BACK" | grep -q '"pets":7'
 check $? "the restored record is the one served" ""
 rm -f /tmp/duck-life.json

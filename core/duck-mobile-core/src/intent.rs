@@ -517,9 +517,13 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         // share sheet wants. No new counting path: both call vetbook/export.
         ("GET", "/export/vetbook.md") => Ok(queue.vetbook_markdown()),
         ("GET", "/export/vetbook.json") => Ok(queue.vetbook_json()),
-        ("POST", "/life") => Ok(queue
-            .request(Intent::RestoreLife(value.clone()))
-            .to_string()),
+        // The lifetime record a shell saved across launches. A restore is
+        // fire-and-forget: a launch can beat the first tick, and a loaded
+        // phone must not turn a hand-back into a 300 ms timeout.
+        ("POST", "/life") => {
+            queue.push(Intent::RestoreLife(value.clone()));
+            Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
         ("POST", "/mcp") => Ok(crate::mcp::handle(&body, &queue)),
         ("GET", "/mcp") => Ok(crate::mcp::handle(
             r#"{"jsonrpc":"2.0","id":0,"method":"tools/list"}"#,
