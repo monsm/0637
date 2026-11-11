@@ -161,6 +161,21 @@ enum Copy {
         )
     }
     static var behavior: String { pick("behaviour", "此刻") }
+    // The companion layer: three numbers and a nap. "Fullness" is shown
+    // because a full bar should mean "fed", not "starving".
+    static var care: String { pick("Companion", "陪伴") }
+    static var fullness: String { pick("fullness", "饱腹") }
+    static var mood: String { pick("mood", "心情") }
+    static var bond: String { pick("bond", "亲密") }
+    static var dozing: String { pick("dozing", "打盹中") }
+    static func careLine(hunger: Double, mood: Double, bond: Double, asleep: Bool) -> String {
+        let full = Int(((1.0 - hunger) * 100).rounded())
+        let moodPercent = Int((((mood + 1) / 2) * 100).rounded())
+        if asleep { return "\(dozing) · \(fullness) \(full)%" }
+        if hunger > 0.65 { return pick("hungry · fullness \(full)%", "饿了 · 饱腹 \(full)%") }
+        if mood < -0.2 { return pick("a little sad · bond \(Int(bond * 100))%", "有点难过 · 亲密 \(Int(bond * 100))%") }
+        return pick("content · mood \(moodPercent)%", "心情不错 · 心情 \(moodPercent)%")
+    }
     static var menu: String { pick("Menu", "菜单") }
     static var cameraUnavailable: String { pick("NO CAMERA", "无相机") }
     static var feed: String { pick("Feed", "喂食") }

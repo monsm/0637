@@ -73,6 +73,28 @@ final class DuckController: ObservableObject {
     @Published var awaySummary: String?
     private var eventsAtBackground: [String] = []
     private var lastEvents: [String] = []
+    /// The companion layer, from /state.care: hunger (0 fed .. 1 starving),
+    /// mood (-1 sad .. 1 happy), bond (0..1) and whether it has dozed off.
+    /// These are the duck's, not the phone's; the shell only shows them and
+    /// hands them back across launches.
+    @Published var careHunger: Double = 0
+    @Published var careMood: Double = 0
+    @Published var careBond: Double = 0
+    @Published var careAsleep = false
+    private var companionRestored = false
+    private var lastCompanionSave = Date.distantPast
+
+    /// One line for the Stage Deck's mood pill, built from the core's care
+    /// numbers rather than from what the shell imagines.
+    var careLine: String? {
+        guard ready else { return nil }
+        return Copy.careLine(
+            hunger: careHunger,
+            mood: careMood,
+            bond: careBond,
+            asleep: careAsleep
+        )
+    }
 
     /// Tilt-to-look: the phone *is* the head. Off by default; the menu asks
     /// for it. While on and nobody is steering, the phone's attitude becomes
@@ -552,6 +574,64 @@ final class DuckController: ObservableObject {
     /// then, so the return can say what happened since.
     func appWentBackground() {
         eventsAtBackground = lastEvents
+        // Save the companion state at the door as well as on the 15 s cadence:
+        // a phone can be killed while suspended, and the duck should wake up
+        // with the tummy it went to sleep with.
+        saveCompanionNow()
+    }
+
+    /// One JSON body to one of the core's POST routes. Fire-and-forget: the
+    /// next /state poll shows the effect.
+    private func post(_ path: String, _ body: Data) {
+        guard let url = URL(string: "http://127.0.0.1:8765\(path)") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 2.0
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        URLSession.shared.dataTask(with: request).resume()
+    }
+
+    /// The shell's only persistent copy of the duck's inner life. It hands the
+    /// numbers back to the core on the next launch; the core is the authority
+    /// and clamps whatever it is given.
+    private func saveCompanionState(care: [String: Any], life: [String: Any]?) {
+        guard Date().timeIntervalSince(lastCompanionSave) >= 15 else { return }
+        var payload: [String: Any] = ["care": care]
+        if let life { payload["life"] = life }
+        UserDefaults.standard.set(payload, forKey: "duck_companion_v1")
+        lastCompanionSave = Date()
+    }
+
+    private func saveCompanionNow() {
+        guard let url = URL(string: "http://127.0.0.1:8765/state") else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 1.5
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            guard let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let care = json["care"] as? [String: Any]
+            else { return }
+            var payload: [String: Any] = ["care": care]
+            if let life = json["life"] as? [String: Any] { payload["life"] = life }
+            UserDefaults.standard.set(payload, forKey: "duck_companion_v1")
+        }.resume()
+    }
+
+    /// Called once the core is up: give back what the last session saved. A
+    /// fresh install has nothing; the duck starts at its defaults.
+    func restoreCompanionState() {
+        guard !companionRestored else { return }
+        companionRestored = true
+        guard let saved = UserDefaults.standard.dictionary(forKey: "duck_companion_v1") else { return }
+        if let care = saved["care"] as? [String: Any],
+           let data = try? JSONSerialization.data(withJSONObject: care) {
+            post("/care", data)
+        }
+        if let life = saved["life"] as? [String: Any],
+           let data = try? JSONSerialization.data(withJSONObject: life) {
+            post("/life", data)
+        }
     }
 
     /// The app comes back: whatever the duck logged on its own - rituals,
@@ -654,6 +734,13 @@ final class DuckController: ObservableObject {
                         self.behaviorSummary = "—"
                     }
                     self.parseLeds(json["leds"])
+                    if let care = json["care"] as? [String: Any] {
+                        self.careHunger = care["hunger"] as? Double ?? 0
+                        self.careMood = care["mood"] as? Double ?? 0
+                        self.careBond = care["bond"] as? Double ?? 0
+                        self.careAsleep = care["asleep"] as? Bool ?? false
+                        self.saveCompanionState(care: care, life: json["life"] as? [String: Any])
+                    }
                     if let life = json["life"] as? [String: Any] {
                         let emotions = life["emotions"] as? [String: Any] ?? [:]
                         let skills = life["skills"] as? [String: Any] ?? [:]

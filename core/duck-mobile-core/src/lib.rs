@@ -14,6 +14,7 @@ pub use duck_control;
 /// copying it) is what keeps the skill priority, timings and low-pass behaviour
 /// identical to the robot.
 pub mod bam;
+pub mod care;
 pub mod control;
 pub mod emotion;
 pub mod intent;

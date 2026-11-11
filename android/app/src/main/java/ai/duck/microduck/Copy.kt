@@ -100,6 +100,24 @@ val quack get() = pick("Quack", "叫一声")
     val listening get() = pick("listening…", "聆听中…")
     val unavailable get() = pick("unavailable", "不可用")
     val behavior get() = pick("behaviour", "此刻")
+    // The companion layer: three numbers and a nap. "Fullness" is shown so a
+    // full bar means fed, not starving.
+    val care get() = pick("Companion", "陪伴")
+    val fullness get() = pick("fullness", "饱腹")
+    val mood get() = pick("mood", "心情")
+    val bond get() = pick("bond", "亲密")
+    val dozing get() = pick("dozing", "打盹中")
+    fun careLine(hunger: Double, mood: Double, bond: Double, asleep: Boolean): String {
+        val full = ((1.0 - hunger) * 100).toInt()
+        val moodPercent = (((mood + 1) / 2) * 100).toInt()
+        if (asleep) return "$dozing · $fullness $full%"
+        if (hunger > 0.65) return pick("hungry · fullness $full%", "饿了 · 饱腹 $full%")
+        if (mood < -0.2) return pick(
+            "a little sad · bond ${(bond * 100).toInt()}%",
+            "有点难过 · 亲密 ${(bond * 100).toInt()}%",
+        )
+        return pick("content · mood $moodPercent%", "心情不错 · 心情 $moodPercent%")
+    }
     val trickBook get() = pick("Trick book", "技巧图鉴")
     val showMore get() = pick("More", "更多")
     val showLess get() = pick("Less", "收起")

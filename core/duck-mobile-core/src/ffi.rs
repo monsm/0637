@@ -794,16 +794,32 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
         }
         Intent::Pet => {
             core.runtime.pet();
-            json!({ "ok": true, "pets": core.runtime.book().life.pets })
+            json!({
+                "ok": true,
+                "pets": core.runtime.book().life.pets,
+                "care": core.runtime.care().summary(),
+            })
         }
         Intent::Feed => match core.runtime.feed() {
             Ok(true) => {
                 core.intents.set_life(core.runtime.book());
-                json!({ "ok": true, "fed": core.runtime.book().life.fed })
+                json!({
+                    "ok": true,
+                    "fed": core.runtime.book().life.fed,
+                    "care": core.runtime.care().summary(),
+                })
             }
             Ok(false) => refuse(core, "the duck is already pecking".to_owned()),
             Err(reason) => refuse(core, reason.to_owned()),
         },
+        Intent::RestoreCare(saved) => {
+            core.runtime.restore_care(&saved);
+            json!({ "ok": true, "care": core.runtime.care().summary() })
+        }
+        Intent::CareScale(scale) => {
+            core.runtime.set_care_scale(scale);
+            json!({ "ok": true, "care_time_scale": core.runtime.care_scale() })
+        }
         Intent::Look { target, neck_pitch } => {
             let gaze = core.runtime.look_at(target, neck_pitch);
             json!({ "ok": true, "head": gaze.joints, "clamped": gaze.clamped })
@@ -1118,6 +1134,11 @@ fn publish_state(core: &DuckCore) {
         "last_emotion_sound": active.last_emotion_sound(),
         "last_ride_segment": active.last_ride_segment(),
         "life": active.book().summary(),
+        // Hunger, mood and bond: the companion layer's three numbers, plus
+        // whether the duck has dozed off. `asleep` is a pose overlay, not a
+        // power state — the control loop is running either way.
+        "care": active.care().summary(),
+        "care_time_scale": active.care_scale(),
         "leds": {
             "status": active.face().status,
             "gauge": active.face().gauge,

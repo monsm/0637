@@ -42,6 +42,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -70,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import kotlin.math.hypot
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -137,6 +139,20 @@ fun Shell(
             hintPrefs.edit().putBoolean("hintShown", true).apply()
             delay(4000)
             hintDismiss = false
+        }
+    }
+
+    // The companion layer: the pill reads the core's own numbers once a
+    // second, and the prefs save is handed back on the first frame the core
+    // is alive. Both are cheap; neither touches the tick thread.
+    var careLine by remember { mutableStateOf("") }
+    LaunchedEffect(core) {
+        val duck = core ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) { restoreCompanion(context) }
+        while (true) {
+            val line = withContext(Dispatchers.IO) { fetchCare()?.line() }
+            if (line != null) careLine = line
+            delay(1500)
         }
     }
 
@@ -258,6 +274,18 @@ fun Shell(
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 6.dp),
+                        )
+                    }
+                    // Once the hint is gone, the same slot answers "how is it
+                    // doing": fullness, mood and a nap, from /state.care.
+                    if (!hintDismiss && careLine.isNotEmpty()) {
+                        Text(
+                            careLine,
+                            color = Color.White.copy(alpha = 0.72f),
+                            fontSize = 11.sp,
+                            modifier = Modifier
+                                .padding(bottom = 6.dp)
+                                .testTag("care-pill"),
                         )
                     }
                     PortraitTimeRail(
@@ -1197,6 +1225,70 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
 }
 
 /** The instrument sheet: time machine, numbers, sensors, fingerprint. */
+/**
+ * Hunger, mood and bond, drawn from the core's own numbers. Fullness fills the
+ * first bar: a full bar means a fed duck. The nap is a state, not a number.
+ */
+@Composable
+private fun CareCard(care: CareUi) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                Copy.care,
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (care.asleep) {
+                Text(
+                    Copy.dozing,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 11.sp,
+                    modifier = Modifier.testTag("care-sleep"),
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            CareBar(Copy.fullness, care.fullness, Color(0xFFFFB74D), "care-hunger", Modifier.weight(1f))
+            CareBar(Copy.mood, care.moodFraction, Color(0xFFF48FB1), "care-mood", Modifier.weight(1f))
+            CareBar(Copy.bond, care.bondFraction, Color(0xFF80DEEA), "care-bond", Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun CareBar(
+    label: String,
+    value: Float,
+    tint: Color,
+    tag: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp)
+        LinearProgressIndicator(
+            progress = { value },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .testTag(tag),
+            color = tint,
+            trackColor = Color.White.copy(alpha = 0.10f),
+        )
+        Text(
+            "${(value * 100).roundToInt()}%",
+            color = Color.White.copy(alpha = 0.6f),
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun InstrumentSheet(
@@ -1238,6 +1330,8 @@ private fun InstrumentSheet(
     var face by remember { mutableStateOf(FaceUi()) }
     // The trick book: how many of its own moods and moves the duck has run.
     var trickBook by remember { mutableStateOf("—") }
+    // The companion layer, read from /state.care on the same 1 Hz loop.
+    var care by remember { mutableStateOf(CareUi()) }
     // What the duck logged while the app was away; remembered across closes
     // by hoisting it to the activity's state via a remembered ref.
     var awaySummary by remember { mutableStateOf<String?>(null) }
@@ -1271,6 +1365,7 @@ private fun InstrumentSheet(
             behaviorSummary = fetchBehaviorSummary()
             face = fetchFace()
             trickBook = fetchTrickBook()
+            fetchCare()?.let { care = it }
             delay(1000)
         }
     }
@@ -1301,6 +1396,7 @@ private fun InstrumentSheet(
                 CloseChip("sheet-close", onClose)
             }
             ButtonChip(if (showDetails) Copy.showLess else Copy.showMore) { showDetails = !showDetails }
+            CareCard(care)
             if (showDetails && status.size >= 14) {
                 Text(
                     buildString {

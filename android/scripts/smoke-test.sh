@@ -187,6 +187,64 @@ if ! echo "$REFUSED" | grep -q '"ok":false'; then
   exit 1
 fi
 
+# The companion layer: hunger, mood and bond live in the core, age on its
+# simulated clock, and are shown by both shells. A treat fills the tummy, a
+# stroke warms the bond, neglect puts it to sleep, and a hand wakes it.
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/care | grep -q '"hunger"'; then
+  echo "::error::/care does not publish the companion state"
+  exit 1
+fi
+CARE_HUNGER_BEFORE=$(curl -sf --max-time 5 http://127.0.0.1:8765/care | python3 -c "
+import json,sys
+print((json.load(sys.stdin).get('care') or {}).get('hunger',1))
+" 2>/dev/null || echo 1)
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8765/feed > /dev/null || true
+sleep 1
+CARE_HUNGER_AFTER=$(curl -sf --max-time 5 http://127.0.0.1:8765/care | python3 -c "
+import json,sys
+print((json.load(sys.stdin).get('care') or {}).get('hunger',1))
+" 2>/dev/null || echo 1)
+python3 -c "
+import sys
+sys.exit(0 if float('${CARE_HUNGER_BEFORE}') > float('${CARE_HUNGER_AFTER}') else 1)
+" || { echo "::error::a treat did not lower hunger: $CARE_HUNGER_BEFORE -> $CARE_HUNGER_AFTER"; exit 1; }
+CARE_BOND_BEFORE=$(curl -sf --max-time 5 http://127.0.0.1:8765/care | python3 -c "
+import json,sys
+print((json.load(sys.stdin).get('care') or {}).get('bond',0))
+" 2>/dev/null || echo 0)
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8765/pet > /dev/null || true
+sleep 0.4
+CARE_BOND_AFTER=$(curl -sf --max-time 5 http://127.0.0.1:8765/care | python3 -c "
+import json,sys
+print((json.load(sys.stdin).get('care') or {}).get('bond',0))
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if float('${CARE_BOND_AFTER}') > float('${CARE_BOND_BEFORE}') else 1)
+" || { echo "::error::a stroke did not warm the bond: $CARE_BOND_BEFORE -> $CARE_BOND_AFTER"; exit 1; }
+# Twelve minutes of neglect, expressed on the simulated clock: the last
+# touch was 800 s ago. A doze, then a hand wakes it.
+CARE_TICK=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -oE '"tick":[0-9]+' | head -1 | cut -d: -f2)
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 40000))}" \
+  http://127.0.0.1:8765/care > /dev/null || true
+sleep 0.5
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/care | grep -q '"asleep":true'; then
+  echo "::error::a long neglect did not put the duck to sleep"
+  exit 1
+fi
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8765/pet > /dev/null || true
+sleep 0.4
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/care | grep -q '"asleep":false'; then
+  echo "::error::a stroke did not wake the duck"
+  exit 1
+fi
+echo "care: hunger $CARE_HUNGER_BEFORE -> $CARE_HUNGER_AFTER, bond $CARE_BOND_BEFORE -> $CARE_BOND_AFTER, doze and wake ok"
+# Leave a calm, awake duck for the walk and screenshots.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"hunger":0.15,"mood":0.35,"bond":0.2,"asleep":false}' \
+  http://127.0.0.1:8765/care > /dev/null || true
+
 # The build proves which scene, meshes and policies it is running.
 FINGERPRINT=$(curl -sf --max-time 5 http://127.0.0.1:8765/fingerprint || true)
 echo "$FINGERPRINT" | tee intent-fingerprint.json > /dev/null
@@ -279,4 +337,42 @@ if [ -s android-screen.png ] && [ -s android-screen-2.png ]; then
   python3 scripts/check-frame.py android-screen.png android-screen-2.png \
     --min-diff 0.0002 || exit 1
 fi
+
+# The companion state must survive the process being killed by Android. Set
+# a distinctive value, background the app so onPause writes the prefs, kill
+# it, relaunch, and read back what the core accepted. A default-valued duck
+# (hunger 0.15, bond 0.1) means the hand-back never ran.
+echo "--- companion survives a restart ---"
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"hunger":0.42,"mood":0.6,"bond":0.33,"asleep":false}' \
+  http://127.0.0.1:8765/care > /dev/null || true
+sleep 1
+adb shell input keyevent KEYCODE_HOME > /dev/null 2>&1 || true
+sleep 3
+adb shell am force-stop ai.duck.microduck > /dev/null 2>&1 || true
+sleep 1
+adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
+RESTORED_CARE=""
+for _ in $(seq 1 180); do
+  RESTORED_CARE=$(curl -sf --max-time 5 http://127.0.0.1:8765/care 2>/dev/null | python3 -c "
+import json,sys
+c=json.load(sys.stdin).get('care') or {}
+h=c.get('hunger'); b=c.get('bond')
+print(f'{h:.3f} {b:.3f}' if h is not None and b is not None else '')
+" 2>/dev/null || true)
+  if [ -n "$RESTORED_CARE" ]; then
+    python3 -c "
+import sys
+h,b=map(float,'$RESTORED_CARE'.split())
+sys.exit(0 if 0.38 <= h <= 0.50 and b >= 0.28 else 1)
+" 2>/dev/null && break
+  fi
+  sleep 1
+done
+python3 -c "
+import sys
+h,b=map(float,'${RESTORED_CARE:-0 0}'.split())
+sys.exit(0 if 0.38 <= h <= 0.50 and b >= 0.28 else 1)
+" || { echo "::error::the companion state did not survive a restart: $RESTORED_CARE"; exit 1; }
+echo "care survived restart: hunger/bond=$RESTORED_CARE"
 echo "smoke test passed"

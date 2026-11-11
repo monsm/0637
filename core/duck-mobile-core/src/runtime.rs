@@ -398,6 +398,13 @@ pub struct Checkpoint {
     pub idle_state: crate::control::IdleState,
     #[serde(default)]
     pub last_idle: IdleSnapshot,
+    /// The companion state at this tick. A rewind must bring the tummy, the
+    /// mood and the doze back with the body: otherwise a forked duck inherits
+    /// a future — or a past — that belongs to another branch.
+    #[serde(default)]
+    pub care: Option<crate::care::Care>,
+    #[serde(default)]
+    pub last_sad: Option<u64>,
 }
 
 /// The last idle offset, as plain numbers: `IdleOffset` is upstream's type
@@ -452,6 +459,16 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The duck's lifetime record: seconds powered and walking, falls, picks
     /// up, skills by name. It is what makes this the same animal tomorrow.
     book: crate::vetbook::Book,
+    /// The companion layer: hunger, mood and bond. It only decides when the
+    /// duck shows one of its own emotions (sad after neglect, a doze when
+    /// left alone); it never filters the policies or the safety layer.
+    care: crate::care::Care,
+    /// How fast the care clock runs against the simulated clock. 1.0 is real
+    /// time; CI runs it faster to reach a doze without waiting twelve minutes.
+    care_scale: f64,
+    /// Last time the duck showed sadness, so a low mood is one scene a
+    /// minute rather than a loop.
+    last_sad: Option<u64>,
     /// The virtual face LEDs: status, battery gauge and flashlight. The phone
     /// has no I²C expander, but the verdict and the colours are the duck's.
     face: crate::leds::Face,
@@ -563,6 +580,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             idle_params: robotd_params::IdleParams::default(),
             last_idle: crate::control::IdleOffset::default(),
             book: crate::vetbook::Book::default(),
+            care: crate::care::Care::default(),
+            care_scale: 1.0,
+            last_sad: None,
             pet_glow_until: None,
             last_idle_ritual: None,
             idle_ritual_ticks: 1500,
@@ -658,6 +678,12 @@ impl<T: RobotIo> DuckRuntime<T> {
             None => {
                 let anchor = self.safety.io().trunk_position().unwrap_or([0.0; 3]);
                 self.carry = Some((anchor, offset));
+                // A hand picking it up is attention, and the duck answers a
+                // hand with its coo. The pickup classifier coos too when it
+                // confirms the lift; a second coo replaces the first, so the
+                // moment never turns into a chorus.
+                self.care.touch(self.clock.tick);
+                self.queue_sound("coo");
             }
         }
     }
@@ -1009,6 +1035,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.book.note("pet".to_owned());
         self.queue_sound("coo");
         self.pet_glow_until = Some(self.clock.tick + 150);
+        self.care.pet(self.clock.tick);
     }
 
     /// A treat on the floor: the official ground-pick peck serves as the
@@ -1024,7 +1051,29 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.book.life.fed += 1;
         self.book.note("feed".to_owned());
         self.queue_sound("yes");
+        self.care.feed(self.clock.tick);
         Ok(true)
+    }
+
+    /// The companion state, for `/state.care` and the shells' status pill.
+    pub fn care(&self) -> crate::care::Care {
+        self.care
+    }
+
+    /// How fast care ages. 1.0 is real time; a client may speed it up for a
+    /// demo or a test, exactly as `idle_ritual_s` shortens the duck's
+    /// self-entertainment clock.
+    pub fn set_care_scale(&mut self, scale: f64) {
+        self.care_scale = scale.clamp(0.0, 10_000.0);
+    }
+
+    pub fn care_scale(&self) -> f64 {
+        self.care_scale
+    }
+
+    /// Hand back the care numbers a shell saved across launches.
+    pub fn restore_care(&mut self, saved: &serde_json::Value) {
+        self.care.restore(saved);
     }
 
     /// The lifetime record, for `/state.life` and the shell's own storage.
@@ -1296,6 +1345,8 @@ impl<T: RobotIo> DuckRuntime<T> {
                 mouth: self.last_idle.mouth,
                 takeover: self.last_idle.takeover,
             },
+            care: Some(self.care),
+            last_sad: self.last_sad,
         })
     }
 
@@ -1396,6 +1447,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             mouth: checkpoint.last_idle.mouth,
             takeover: checkpoint.last_idle.takeover,
         };
+        if let Some(care) = checkpoint.care {
+            self.care = care;
+        }
+        self.last_sad = checkpoint.last_sad;
         self.shutdown = match checkpoint.shutdown.as_str() {
             "sitting" => Shutdown::Sitting {
                 since: TickTime(checkpoint.shutdown_since),
@@ -1440,6 +1495,12 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     fn tick_inner(&mut self) -> Result<TickReport, RuntimeError> {
         self.clock.advance(1);
+        // Care ages on the simulated clock: a rewind restores the tummy and
+        // the mood that went with that tick, and a paused duck does not get
+        // hungrier while the world is frozen.
+        let was_asleep = self.care.asleep;
+        self.care
+            .tick(self.clock.tick, self.dt.as_secs_f64(), self.care_scale);
         let now = TickTime::of(&self.clock);
         let sensors: Sensors = self.safety.read()?;
         // One fused sample per tick, exactly as `Imu::decode` counts them.
@@ -1811,6 +1872,16 @@ impl<T: RobotIo> DuckRuntime<T> {
         command.body.roll = self.body_ema[1];
         command.body.pitch = self.body_ema[2];
 
+        // Whoever is steering the head, the body or the stick is paying the
+        // duck attention. It keeps a hand on the duck from counting as
+        // neglect, and it wakes a dozing one.
+        let attended = self.twist_ema.iter().any(|value| value.abs() > 1e-3)
+            || self.head_ema.iter().any(|value| value.abs() > 1e-3)
+            || self.body_active;
+        if attended {
+            self.care.touch(self.clock.tick);
+        }
+
         // An emotion is a scripted move, not a policy: for its own ticks it
         // replaces the client's head/body/mouth command, exactly as
         // `emotion.rs::Frame::apply` replaces the Snapshot. A pad still
@@ -1884,6 +1955,14 @@ impl<T: RobotIo> DuckRuntime<T> {
         {
             command.body.z += idle.body_z;
         }
+        // A dozing duck tucks its neck and shuts its beak. This is a pose
+        // overlay on top of the same idle behaviour, not a policy switch: the
+        // safety layer still sees every joint, and any touch removes it on
+        // the next tick.
+        if self.care.asleep {
+            command.head[0] -= 0.12;
+            command.head[1] -= 0.30;
+        }
 
         // The duck's voice reacts to the world, on rising edges only. robotd
         // coos in a hand, alarms on a fall, and inquires when the pad comes
@@ -1900,6 +1979,9 @@ impl<T: RobotIo> DuckRuntime<T> {
         // one clap is one reaction.
         if loud && !self.last_loud && cooldown && emotion_frame.is_none() {
             reaction = Some("alarm");
+            // A bang wakes a dozing duck. The alarm is the reaction; the
+            // touch is what keeps it from falling straight back asleep.
+            self.care.touch(self.clock.tick);
         }
         if pickup_paused && !self.last_pickup_paused {
             reaction = Some("coo");
@@ -1926,6 +2008,10 @@ impl<T: RobotIo> DuckRuntime<T> {
                 reaction = Some("inquire");
             }
         }
+        // Waking up is its own little moment: a coo, once, not every tick.
+        if reaction.is_none() && was_asleep && !self.care.asleep {
+            reaction = Some("coo");
+        }
         // The idle ritual: after a long stillness (and never during a skill,
         // a shutdown, a hold or an emotion) the duck plays one of its own
         // official timelines. Deterministic on the simulated clock, so a
@@ -1942,6 +2028,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             && !pickup_paused
             && !self.shutting_down()
             && !self.powered_off
+            && !self.care.asleep
             && !self.emotions.is_empty()
         {
             // Only the emotions that carry no skill: an unprompted sit would
@@ -1953,6 +2040,25 @@ impl<T: RobotIo> DuckRuntime<T> {
                 self.last_idle_ritual = Some(self.clock.tick);
                 self.book.note("idle_ritual".to_owned());
             }
+        }
+        // Neglect shows. A low mood is not a number in a menu: after a few
+        // minutes without attention the duck plays its own official sad
+        // timeline, at most once a minute, and never while it is dozing.
+        if self.care.sad()
+            && !self.care.asleep
+            && emotion_frame.is_none()
+            && self.emotion_playing.is_none()
+            && !self.controller.busy()
+            && !pickup_paused
+            && !self.shutting_down()
+            && self
+                .last_sad
+                .is_none_or(|tick| self.clock.tick.saturating_sub(tick) >= 3000)
+            && self.emotions.get("sad").is_some()
+        {
+            let _ = self.trigger_emotion("sad");
+            self.last_sad = Some(self.clock.tick);
+            self.book.note("sad".to_owned());
         }
         if let Some(tag) = reaction {
             self.queue_sound(tag);
@@ -2001,6 +2107,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             // it is on the robot. Only while driving: a held or homing duck
             // keeps the mouth its hold pose gave it.
             let mouth = emotion_frame.map_or(self.mouth.max(idle.mouth), |frame| frame.mouth);
+            // A sleeping duck's beak is shut, even if the idle yawn was due.
+            let mouth = if self.care.asleep { 0.0 } else { mouth };
             targets[duck_control::model::MOUTH_INDEX] =
                 duck_control::model::mouth_target(mouth);
         }
@@ -2010,6 +2118,8 @@ impl<T: RobotIo> DuckRuntime<T> {
         report.targets = targets;
         report.gain = gain;
         report.mouth = if pickup_paused {
+            0.0
+        } else if self.care.asleep {
             0.0
         } else {
             emotion_frame.map_or(self.mouth.max(idle.mouth), |frame| frame.mouth)

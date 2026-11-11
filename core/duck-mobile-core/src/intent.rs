@@ -91,6 +91,10 @@ pub enum Intent {
     /// The lifetime record a shell saved across launches, handed back so the
     /// duck's history survives an app restart.
     RestoreLife(serde_json::Value),
+    /// The care state a shell saved across launches (hunger, mood, bond).
+    RestoreCare(serde_json::Value),
+    /// How fast care ages against real time; 1.0 is normal.
+    CareScale(f64),
     /// How long the duck waits before doing something by itself, in seconds.
     IdleRitual(f64),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
@@ -323,6 +327,17 @@ impl IntentQueue {
     pub fn sensors_json(&self) -> String {
         self.sensors.lock().expect("intent sensors").to_string()
     }
+
+    /// The care slice of the published state: one GET for a shell that wants
+    /// to save the duck's tummy and mood without parsing the whole snapshot.
+    pub fn care_json(&self) -> String {
+        let state = self.state.lock().expect("intent state");
+        json!({
+            "care": state.get("care").cloned().unwrap_or(Value::Null),
+            "care_time_scale": state.get("care_time_scale").cloned().unwrap_or(json!(1.0)),
+        })
+        .to_string()
+    }
 }
 
 /// Start the server on `0.0.0.0:port`.
@@ -538,11 +553,26 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         },
         ("POST", "/pet") => Ok(queue.request(Intent::Pet).to_string()),
         ("POST", "/feed") => Ok(queue.request(Intent::Feed).to_string()),
-        ("POST", "/config") => Ok(queue
-            .request(Intent::IdleRitual(
-                value["idle_ritual_s"].as_f64().unwrap_or(30.0),
-            ))
-            .to_string()),
+        // The companion state is public read / restore-only write: a client
+        // can hand back what it saved, but cannot claim the duck loves it.
+        ("GET", "/care") => Ok(queue.care_json()),
+        ("POST", "/care") => {
+            let saved = value.get("care").cloned().unwrap_or(value);
+            Ok(queue.request(Intent::RestoreCare(saved)).to_string())
+        }
+        ("POST", "/config") => {
+            let idle = value.get("idle_ritual_s").and_then(Value::as_f64);
+            let care = value.get("care_time_scale").and_then(Value::as_f64);
+            // Keep the old shape working: /config with only idle_ritual_s.
+            // A care scale travels as its own fire-and-forget intent so one
+            // response still means "the configuration was taken".
+            if let Some(scale) = care {
+                queue.push(Intent::CareScale(scale));
+            }
+            Ok(queue
+                .request(Intent::IdleRitual(idle.unwrap_or(30.0)))
+                .to_string())
+        }
         ("POST", "/wheee") => Ok(queue
             .request(Intent::Wheee(value["hold"].as_bool().unwrap_or(false)))
             .to_string()),

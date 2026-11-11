@@ -87,6 +87,9 @@ class MainActivity : ComponentActivity() {
             val events = fetchLifeEvents()
             if (events.isNotEmpty()) AwayStore.atBackground = events.toSet()
         }.start()
+        // The companion state is the duck's, not the activity's: hunger, mood
+        // and the bond must survive the process being killed at any moment.
+        if (core != null) saveCompanion(this)
     }
 
     override fun onDestroy() {

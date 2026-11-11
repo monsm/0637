@@ -143,7 +143,10 @@ struct ContentView: View {
         // is spent forever. It is shown once the duck is ready, on both
         // orientations, and its flag is only written when it is really shown.
         .onChange(of: controller.ready) { _, ready in
-            if ready { presentHint() }
+            if ready {
+                presentHint()
+                controller.restoreCompanionState()
+            }
         }
         .onChange(of: controller.awaySummary) { _, summary in
             guard let summary, !summary.isEmpty else { return }
@@ -154,7 +157,10 @@ struct ContentView: View {
             }
         }
         .task {
-            if controller.ready { presentHint() }
+            if controller.ready {
+                presentHint()
+                controller.restoreCompanionState()
+            }
         }
         // SwiftUI does not report a cancelled drag. A phone call, a
         // notification pull or leaving the app would otherwise leave the
@@ -314,6 +320,8 @@ struct ContentView: View {
                 hintCapsule
             } else if let mood = moodText {
                 moodPill(mood)
+            } else if let care = controller.careLine {
+                moodPill(care)
             }
             timeRail
                 .disabled(!controller.ready)

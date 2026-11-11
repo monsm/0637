@@ -21,6 +21,7 @@ struct InstrumentSheet: View {
                 header
                 timeMachine
                 face
+                careCard
                 behaviorRow
                 trickRow
                 awayRow
@@ -47,6 +48,60 @@ struct InstrumentSheet: View {
         .background(Color(red: 0.055, green: 0.075, blue: 0.10))
         .id(languageTick)
         .preferredColorScheme(.dark)
+    }
+
+    /// The companion's three numbers. Fullness, not hunger, fills the bar:
+    /// a full bar must mean a fed duck. The pin is the core's published value;
+    /// nothing here is computed by the shell except the percentage.
+    private var careCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle(Copy.care, detail: controller.careAsleep ? Copy.dozing : nil)
+            HStack(alignment: .top, spacing: 14) {
+                careBar(
+                    Copy.fullness,
+                    value: 1 - controller.careHunger,
+                    tint: .orange,
+                    id: "care-hunger"
+                )
+                careBar(
+                    Copy.mood,
+                    value: (controller.careMood + 1) / 2,
+                    tint: .pink,
+                    id: "care-mood"
+                )
+                careBar(
+                    Copy.bond,
+                    value: controller.careBond,
+                    tint: .cyan,
+                    id: "care-bond"
+                )
+            }
+            if controller.careAsleep {
+                Text(Copy.careLine(
+                    hunger: controller.careHunger,
+                    mood: controller.careMood,
+                    bond: controller.careBond,
+                    asleep: true
+                ))
+                .font(.system(size: 11, design: .rounded))
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func careBar(_ label: String, value: Double, tint: Color, id: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+            ProgressView(value: min(max(value, 0), 1))
+                .tint(tint)
+                .accessibilityIdentifier(id)
+            Text("\(Int((min(max(value, 0), 1) * 100).rounded()))%")
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// The behaviour row already lived in telemetry; up here it is one of the

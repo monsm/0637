@@ -68,6 +68,11 @@ pub fn tools() -> Value {
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
         },
         {
+            "name": "duck_care",
+            "description": "The duck's companion state: hunger (0 fed .. 1 starving), mood (-1 sad .. 1 happy), bond (0..1), and whether it has dozed off. Pet or feed it to move these; they age on the duck's own clock.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        },
+        {
             "name": "duck_wheee",
             "description": "The duck's joy-ride: hold=true starts the official wheee (start segment + repeating loops), hold=false ends it. This is the held sound the physical duck's trigger makes.",
             "inputSchema": {
@@ -306,6 +311,9 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             "life": serde_json::from_str::<serde_json::Value>(&queue.life_json())
                 .unwrap_or(serde_json::json!({})),
         })),
+        "duck_care" => Ok(serde_json::from_str::<serde_json::Value>(&queue.care_json())
+            .map(|care| serde_json::json!({ "ok": true, "care": care["care"].clone() }))
+            .unwrap_or_else(|_| serde_json::json!({ "ok": false, "error": "care unavailable" }))),
         "duck_wheee" => Ok(queue.request(crate::intent::Intent::Wheee(
             arguments.get("hold").and_then(Value::as_bool).unwrap_or(false),
         ))),

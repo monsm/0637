@@ -409,6 +409,68 @@ sys.exit(0 if float('${LIFE_STATE:--1}') >= 0 else 1)
 " 2>/dev/null
 check $? "state carries the same record" "walking_s=$LIFE_STATE"
 
+# The companion layer: hunger, mood and bond are the duck's own numbers,
+# aged on its simulated clock. A treat must fill the tummy and a stroke must
+# warm the bond; neglect must put it to sleep; a hand must wake it; a low
+# mood must actually reach the official sad timeline.
+echo "--- care ---"
+CARE=$(api GET /care || true)
+printf '%s' "$CARE" | grep -q '"hunger"'
+check $? "care publishes hunger, mood and bond" "$(printf '%s' "$CARE" | head -c 140)"
+printf '%s' "$CARE" | python3 -c "
+import json,sys
+c=json.load(sys.stdin).get('care') or {}
+# The feed above ran, and so did a pet: the numbers must have moved.
+sys.exit(0 if c.get('hunger',1) < 0.15 and c.get('bond',0) > 0.1 and 'mood' in c else 1)
+" 2>/dev/null
+check $? "a treat fills the tummy and a stroke warms the bond" ""
+
+CARE_TICK=$(api GET /state | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('tick',0))
+" 2>/dev/null || echo 0)
+# Twelve minutes of neglect, expressed honestly: the last touch was 800 s
+# ago on the simulated clock. The duck must doze without anyone waiting 12
+# real minutes.
+api POST /care "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 40000))}" > /dev/null || true
+sleep 0.4
+DOZING=$(api GET /care | python3 -c "
+import json,sys
+print('yes' if (json.load(sys.stdin).get('care') or {}).get('asleep') else 'no')
+" 2>/dev/null || echo "no")
+[ "$DOZING" = "yes" ]; check $? "a long neglect puts the duck to sleep" "asleep=$DOZING"
+
+api POST /pet '{}' > /dev/null || true
+sleep 0.4
+WOKEN=$(api GET /care | python3 -c "
+import json,sys
+print('awake' if not (json.load(sys.stdin).get('care') or {}).get('asleep') else 'asleep')
+" 2>/dev/null || echo "asleep")
+[ "$WOKEN" = "awake" ]; check $? "a stroke wakes it" "$WOKEN"
+WOKE_SOUND=$(api GET /state | field last_sound)
+[ "$WOKE_SOUND" = "coo" ]; check $? "the duck coos when a hand wakes it" "last_sound=$WOKE_SOUND"
+
+# A foul mood is not a number in a menu: the official sad timeline plays.
+CARE_TICK=$(api GET /state | python3 -c "
+import json,sys
+print(json.load(sys.stdin).get('tick',0))
+" 2>/dev/null || echo 0)
+api POST /care "{\"hunger\":0.2,\"mood\":-0.9,\"bond\":0.4,\"asleep\":false,\"last_touch\":$CARE_TICK}" > /dev/null || true
+SAD_NAME=""
+for _ in $(seq 1 30); do
+  SAD_NAME=$(api GET /state | python3 -c "
+import json,sys
+e=json.load(sys.stdin).get('emotion') or {}
+print(e.get('name',''))
+" 2>/dev/null || true)
+  [ "$SAD_NAME" = "sad" ] && break
+  sleep 0.3
+done
+[ "$SAD_NAME" = "sad" ]; check $? "a low mood plays the official sad timeline" "emotion=$SAD_NAME"
+
+# Leave a distinctive state for the restart check at the end of the run.
+api POST /care '{"hunger":0.42,"mood":0.6,"bond":0.33,"asleep":false}' > /dev/null || true
+
 # Gaze: the gaze solver runs on the training MJCF's own kinematics, so
 # aiming right of the trunk must produce a positive head_yaw and the answer
 # must stay within the servo travel the MJCF declares.
@@ -930,6 +992,39 @@ check $? "frames 1-2 differ (scene is live)" ""
 python3 "$ROOT/scripts/check-frame.py" "$OUT/frame-2.png" "$OUT/frame-3.png" \
   --min-diff 0.0002 >> "$OUT/frame-check.log" 2>&1
 check $? "frames 2-3 differ (scene is live)" ""
+
+# ---------------------------------------------------------------- restart
+# The shell owns the only durable copy: it saves /state.care and /state.life
+# on a 15 s cadence and on background, then hands them back once the core is
+# up. Kill the process the way iOS can and prove the duck wakes up itself.
+echo "--- companion survives a restart ---"
+sleep 16
+xcrun simctl terminate "$UDID" "$BUNDLE_ID" > /dev/null 2>&1 || true
+sleep 2
+xcrun simctl launch "$UDID" "$BUNDLE_ID" > /dev/null 2>&1 || true
+RESTORED_CARE=""
+for _ in $(seq 1 180); do
+  RESTORED_CARE=$(api GET /care 2>/dev/null | python3 -c "
+import json,sys
+c=json.load(sys.stdin).get('care') or {}
+h=c.get('hunger'); b=c.get('bond')
+print(f'{h:.3f} {b:.3f}' if h is not None and b is not None else '')
+" 2>/dev/null || true)
+  if [ -n "$RESTORED_CARE" ]; then
+    python3 -c "
+import sys
+h,b=map(float,'$RESTORED_CARE'.split())
+sys.exit(0 if 0.38 <= h <= 0.50 and b >= 0.28 else 1)
+" 2>/dev/null && break
+  fi
+  sleep 0.5
+done
+python3 -c "
+import sys
+h,b=map(float,'${RESTORED_CARE:-0 0}'.split())
+sys.exit(0 if 0.38 <= h <= 0.50 and b >= 0.28 else 1)
+" 2>/dev/null
+check $? "the duck wakes up with its tummy and bond" "hunger/bond=$RESTORED_CARE"
 
 # ---------------------------------------------------------------- renderer log
 # NSLog is unbuffered and lands in the unified log; Swift's print() to a pipe
