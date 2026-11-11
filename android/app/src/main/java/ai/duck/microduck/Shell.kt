@@ -3,12 +3,15 @@ package ai.duck.microduck
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -776,133 +779,124 @@ private fun Modifier.portraitStageGesture(
 ): Modifier = pointerInput(core, carrying, stick) {
     val deadzone = 8.dp.toPx()
     val fullScale = 90.dp.toPx()
+    val handler = Handler(Looper.getMainLooper())
+    // A new touch invalidates any pending pulse reset, so an old timer cannot
+    // stop the shove a newer gesture just started.
     var pulseToken = 0
-    coroutineScope {
-        // `AwaitPointerEventScope` is not a CoroutineScope: keep the outer
-        // one so the tap pulse can outlive the gesture's own scope.
-        val gestureScope = this
-        awaitEachGesture {
-            val down = awaitFirstDown(requireUnconsumed = false)
-            // A new touch invalidates any pending pulse's reset and stops the
-            // old shove immediately: the duck must not keep walking under the
-            // new gesture's deadzone.
-            pulseToken += 1
-            input.vx = 0.0
-            input.wz = 0.0
-            var dragged = false
-            var longPressed = false
-            var last = down
-            var finished = false
-            try {
-                coroutineScope {
-                    val hold = launch {
-                        delay(350)
-                        if (!dragged) {
-                            longPressed = true
-                            onLongPress()
-                        }
-                    }
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        last = change
-                        val dx = change.position.x - down.position.x
-                        val dy = change.position.y - down.position.y
-                        val distance = hypot(dx, dy)
-                        if (!dragged && distance >= deadzone) {
-                            dragged = true
-                            hold.cancel()
-                        }
-                        if (dragged && !longPressed) {
-                            change.consume()
-                            if (carrying) {
-                                // The hand moves with the drag; a carry is an
-                                // external force, never a gait command.
-                                val halfWidth = size.width.toFloat().coerceAtLeast(1f) * 0.5f
-                                val halfHeight = size.height.toFloat().coerceAtLeast(1f) * 0.5f
-                                core.carry(
-                                    (dx / halfWidth * 0.35f).toDouble(),
-                                    0.0,
-                                    (-dy / halfHeight * 0.30f).toDouble(),
-                                    true,
-                                )
-                            } else {
-                                val scale = min(distance / fullScale, 1f)
-                                val nx = if (distance > 0f) dx / distance * scale else 0f
-                                val ny = if (distance > 0f) dy / distance * scale else 0f
-                                when (stick) {
-                                    "head" -> core.setHead(
-                                        0.0,
-                                        (ny * 0.6f).toDouble(),
-                                        (nx * 1.2f).toDouble(),
-                                        0.0,
-                                    )
-                                    "body" -> core.setBody(
-                                        (-ny * 0.05f).toDouble(),
-                                        (nx * 0.12f).toDouble(),
-                                        0.0,
-                                    )
-                                    else -> {
-                                        // Up the screen is forward.
-                                        input.vx = (-ny * 0.4f).toDouble()
-                                        input.wz = (-nx * 1.0f).toDouble()
-                                    }
-                                }
-                            }
-                        }
-                        if (!change.pressed) break
-                    }
-                    hold.cancel()
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        pulseToken += 1
+        input.vx = 0.0
+        input.wz = 0.0
+        var dragged = false
+        var longPressed = false
+        var finished = false
+        var last = down
+        // A Handler, not a coroutine: `awaitEachGesture` runs in a restricted
+        // suspension scope and cannot launch on another scope.
+        val hold = Runnable {
+            if (!dragged && !longPressed) {
+                longPressed = true
+                onLongPress()
+            }
+        }
+        handler.postDelayed(hold, 350)
+        try {
+            while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                last = change
+                val dx = change.position.x - down.position.x
+                val dy = change.position.y - down.position.y
+                val distance = hypot(dx, dy)
+                if (!dragged && distance >= deadzone) {
+                    dragged = true
+                    handler.removeCallbacks(hold)
                 }
-                // A held duck stays where the drag left it; the walk command
-                // is what must stop with the finger.
-                if (carrying) return@awaitEachGesture
-                val heldFor = last.uptimeMillis - down.uptimeMillis
-                val wasTap = last.changedToUp() && !dragged && heldFor < 300
-                if (wasTap && !longPressed) {
-                    val width = size.width.toFloat().coerceAtLeast(1f)
-                    val height = size.height.toFloat().coerceAtLeast(1f)
-                    val x = last.position.x
-                    val y = last.position.y
-                    val insideDuck = x > width * 0.25f && x < width * 0.75f &&
-                        y > height * 0.33f && y < height * 0.68f
-                    if (insideDuck) {
-                        // A touch on the duck strokes it.
-                        postDuckCommand("/pet")
-                    } else if (stick == "drive") {
-                        // A short shove toward the point, then stop: a tap is
-                        // a step, not a dead no-op.
-                        val dx = x - width * 0.5f
-                        val dy = y - height * 0.5f
-                        val norm = maxOf(hypot(dx, dy), 1f)
-                        input.vx = (-dy / norm * 0.6f).toDouble()
-                        input.wz = (-dx / norm * 0.6f).toDouble()
-                        val token = pulseToken
-                        gestureScope.launch {
-                            delay(250)
-                            if (pulseToken == token) {
-                                input.vx = 0.0
-                                input.wz = 0.0
+                if (dragged && !longPressed) {
+                    change.consume()
+                    if (carrying) {
+                        val halfWidth = size.width.toFloat().coerceAtLeast(1f) * 0.5f
+                        val halfHeight = size.height.toFloat().coerceAtLeast(1f) * 0.5f
+                        core.carry(
+                            (dx / halfWidth * 0.35f).toDouble(),
+                            0.0,
+                            (-dy / halfHeight * 0.30f).toDouble(),
+                            true,
+                        )
+                    } else {
+                        val scale = min(distance / fullScale, 1f)
+                        val nx = if (distance > 0f) dx / distance * scale else 0f
+                        val ny = if (distance > 0f) dy / distance * scale else 0f
+                        when (stick) {
+                            "head" -> core.setHead(
+                                0.0,
+                                (ny * 0.6f).toDouble(),
+                                (nx * 1.2f).toDouble(),
+                                0.0,
+                            )
+                            "body" -> core.setBody(
+                                (-ny * 0.05f).toDouble(),
+                                (nx * 0.12f).toDouble(),
+                                0.0,
+                            )
+                            else -> {
+                                input.vx = (-ny * 0.4f).toDouble()
+                                input.wz = (-nx * 1.0f).toDouble()
                             }
                         }
                     }
-                } else {
-                    input.vx = 0.0
-                    input.wz = 0.0
-                    core.setHead(0.0, 0.0, 0.0, 0.0)
-                    core.releaseBody()
+                }
+                if (!change.pressed) break
+            }
+            handler.removeCallbacks(hold)
+            if (carrying) {
+                // A held duck stays where the hand left it.
+                finished = true
+                return@awaitEachGesture
+            }
+            val heldFor = last.uptimeMillis - down.uptimeMillis
+            val wasTap = last.changedToUp() && !dragged && heldFor < 300
+            if (wasTap && !longPressed) {
+                val width = size.width.toFloat().coerceAtLeast(1f)
+                val height = size.height.toFloat().coerceAtLeast(1f)
+                val x = last.position.x
+                val y = last.position.y
+                val insideDuck = x > width * 0.25f && x < width * 0.75f &&
+                    y > height * 0.33f && y < height * 0.68f
+                if (insideDuck) {
+                    postDuckCommand("/pet")
+                } else if (stick == "drive") {
+                    val dx = x - width * 0.5f
+                    val dy = y - height * 0.5f
+                    val norm = maxOf(hypot(dx, dy), 1f)
+                    input.vx = (-dy / norm * 0.6f).toDouble()
+                    input.wz = (-dx / norm * 0.6f).toDouble()
+                    val token = pulseToken
+                    handler.postDelayed({
+                        if (pulseToken == token) {
+                            input.vx = 0.0
+                            input.wz = 0.0
+                        }
+                    }, 250)
                 }
                 finished = true
-            } finally {
-                // A gesture cancelled by the system (an edge swipe, a call,
-                // the app going away) never reports its release; hand the
-                // duck back neutral rather than leaving the walk latched.
-                if (!finished && !carrying) {
-                    input.vx = 0.0
-                    input.wz = 0.0
-                    core.setHead(0.0, 0.0, 0.0, 0.0)
-                    core.releaseBody()
-                }
+            } else {
+                input.vx = 0.0
+                input.wz = 0.0
+                core.setHead(0.0, 0.0, 0.0, 0.0)
+                core.releaseBody()
+                finished = true
+            }
+        } finally {
+            handler.removeCallbacks(hold)
+            // A gesture cancelled by the system never reports its release;
+            // hand the duck back neutral rather than leaving a walk latched.
+            if (!finished && !carrying) {
+                input.vx = 0.0
+                input.wz = 0.0
+                core.setHead(0.0, 0.0, 0.0, 0.0)
+                core.releaseBody()
             }
         }
     }
@@ -921,14 +915,11 @@ private fun Modifier.sceneLongPress(
     if (!enabled) return this
     return pointerInput(enabled) {
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false)
-            coroutineScope {
-                val hold = launch {
-                    delay(350)
-                    onLongPress()
-                }
-                waitForUpOrCancellation()
-                hold.cancel()
+            // A foundation helper, not a coroutine: the restricted pointer
+            // scope cannot launch timers on its own.
+            val down = awaitFirstDown(requireUnconsumed = false)
+            if (awaitLongPressOrCancellation(down.id) != null) {
+                onLongPress()
             }
         }
     }
