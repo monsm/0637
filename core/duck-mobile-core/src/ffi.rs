@@ -1385,7 +1385,7 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         let finished = core.quests.update(&quest_day, &values);
         if !finished.is_empty() {
             on_active(core, |runtime| {
-                let _ = runtime.trigger_emotion("excited");
+                let _ = runtime.celebrate_emotion("excited");
             });
         }
         core.intents.set_quests(core.quests.summary(&values));

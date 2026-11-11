@@ -1044,7 +1044,19 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// `robot.do <emotion>` on the real duck: the emotion is a skill, so it
     /// goes through the same `/skills` list and `/skill` verb as a kick.
     pub fn trigger_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        // A person or a rule asking for a mood is attention.
         self.care.touch(self.clock.tick);
+        self.start_emotion(name)
+    }
+
+    /// A celebration the duck performs by itself (a completed quest). It must
+    /// not count as a touch: the pet that completed the goal is the touch,
+    /// and an automatic cheer would otherwise reset a doze or a neglect timer.
+    pub fn celebrate_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        self.start_emotion(name)
+    }
+
+    fn start_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
         if self.controller.busy() || self.controller.is_sitting() {
             return Err("a move is running; the duck must be standing still");
         }

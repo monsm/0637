@@ -181,6 +181,21 @@ mod tests {
     }
 
     #[test]
+    fn a_restored_old_touch_and_a_fast_clock_doze() {
+        let mut care = Care::default();
+        care.restore(&serde_json::json!({
+            "hunger": 0.9,
+            "mood": 0.2,
+            "bond": 0.4,
+            "asleep": false,
+            "last_touch": 300,
+        }));
+        // 400 ticks of neglect at 200x = 1600 care-seconds, past 12 minutes.
+        care.tick(700, 0.02, 200.0);
+        assert!(care.asleep, "restore + scale must doze, got {:?}", care);
+    }
+
+    #[test]
     fn a_saved_state_restores() {
         let mut care = Care::default();
         care.feed(12);
