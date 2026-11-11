@@ -190,6 +190,18 @@ impl Library {
         self.0.keys().cloned().collect()
     }
 
+    /// The emotions the duck may pick for itself when left alone: the ones
+    /// that carry no skill. `devastated` sits the duck down partway through,
+    /// and an unprompted sit has nothing to stand it back up, so the ritual
+    /// must never choose it. A duck left alone stays on its feet.
+    pub fn ritual_names(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter(|(_, emotion)| emotion.sit_due.is_none())
+            .map(|(name, _)| name.clone())
+            .collect()
+    }
+
     pub fn get(&self, name: &str) -> Option<&Emotion> {
         self.0.get(name)
     }
@@ -276,5 +288,15 @@ mod tests {
         assert!(library.get("curious").is_some());
         assert!(library.get("curious").unwrap().duration() > 2.0);
         assert!(!library.get("curious").unwrap().pcm().is_empty());
+    }
+
+    #[test]
+    fn the_ritual_never_chooses_an_emotion_that_sits_the_duck() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../upstream/microduck/robotd/emotions");
+        let library = Library::load(&dir).expect("upstream emotions");
+        let ritual = library.ritual_names();
+        assert!(!ritual.is_empty());
+        assert!(!ritual.contains(&"devastated".to_owned()));
+        assert!(ritual.contains(&"curious".to_owned()));
     }
 }

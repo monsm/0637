@@ -1933,11 +1933,15 @@ impl<T: RobotIo> DuckRuntime<T> {
             && !self.powered_off
             && !self.emotions.is_empty()
         {
-            let names = self.emotions.names();
-            let index = (self.clock.tick / period.max(1)) as usize % names.len();
-            let _ = self.trigger_emotion(&names[index]);
-            self.last_idle_ritual = Some(self.clock.tick);
-            self.book.note("idle_ritual".to_owned());
+            // Only the emotions that carry no skill: an unprompted sit would
+            // leave the duck seated until someone stands it up by hand.
+            let names = self.emotions.ritual_names();
+            if !names.is_empty() {
+                let index = (self.clock.tick / period.max(1)) as usize % names.len();
+                let _ = self.trigger_emotion(&names[index]);
+                self.last_idle_ritual = Some(self.clock.tick);
+                self.book.note("idle_ritual".to_owned());
+            }
         }
         if let Some(tag) = reaction {
             self.queue_sound(tag);
