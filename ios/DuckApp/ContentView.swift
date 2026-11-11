@@ -313,6 +313,15 @@ struct ContentView: View {
                         systemImage: "flashlight.on.fill"
                     )
                 }
+                // Tilt-to-look: the phone is the head, as the pad's IMU is.
+                Button {
+                    controller.tiltLook.toggle()
+                } label: {
+                    Label(
+                        controller.tiltLook ? Copy.tiltLookOn : Copy.tiltLook,
+                        systemImage: controller.tiltLook ? "iphone.and.arrow.left.and.right" : "iphone.gen3"
+                    )
+                }
                 Button {
                     Copy.language = Copy.language == .english ? .chinese : .english
                     languageTick &+= 1

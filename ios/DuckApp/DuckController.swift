@@ -67,6 +67,14 @@ final class DuckController: ObservableObject {
     @Published var faceGauge = "Unknown"
     @Published var faceBattery = "—"
     @Published var faceBars = 0
+    /// Tilt-to-look: the phone *is* the head. Off by default; the menu asks
+    /// for it. While on and nobody is steering, the phone's attitude becomes
+    /// the head command, the way the physical pad's IMU steers the real duck.
+    /// Published rather than @AppStorage so the menu re-renders when it
+    /// flips; the flag itself is persisted beside the language preference.
+    @Published var tiltLook: Bool = UserDefaults.standard.bool(forKey: "tilt_look") {
+        didSet { UserDefaults.standard.set(tiltLook, forKey: "tilt_look") }
+    }
     /// The trick book: how many of the duck's own moves and emotions it has
     /// actually performed, from /state.life. A collection you fill by playing,
     /// not a list of names.
@@ -466,6 +474,28 @@ final class DuckController: ObservableObject {
         motion.deviceMotionUpdateInterval = 0.02
         motion.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let self, let motion else { return }
+            // Tilt-to-look: with the switch on and the joystick idle, the
+            // phone's attitude steers the head, as the real pad's IMU does.
+            // Landscape: rolling the phone pans (yaw), pitching it tilts
+            // (pitch). Clamped to roughly the joystick's own range so a
+            // wrist movement can never fold the neck over.
+            if self.tiltLook,
+               self.joystick == .zero,
+               !self.carrying,
+               self.ready {
+                let gravity = motion.gravity
+                // Landscape: the phone's z axis points out of the screen and
+                // x runs along the long edge, so rolling it pans the gaze and
+                // tipping it forward/back tilts the head.
+                let yaw = -gravity.z * 0.9
+                let pitch = gravity.x * 0.45
+                // A phone lying flat on a table is the neutral pose: below a
+                // few degrees of tilt, say nothing, so the duck's own
+                // look-around is not silenced by a resting phone.
+                if abs(yaw) > 0.07 || abs(pitch) > 0.07 {
+                    self.setHead(yaw: yaw, pitch: pitch)
+                }
+            }
             let acceleration = motion.userAcceleration
             let magnitude = sqrt(
                 acceleration.x * acceleration.x
