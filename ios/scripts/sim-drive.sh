@@ -341,7 +341,12 @@ check $? "the duck accepts a stroke" "$(printf '%s' "$PET" | head -c 120)"
 
 # A sudden bang in the room is an external event: the duck startles with
 # the official alarm voice. Nothing about it enters the 61-D observation.
+# This runs before the pet: a stroke's coo and a bang's alarm share the
+# 100-tick reaction cooldown, and 0.4 s later the alarm is still blocked.
 echo "--- startle ---"
+# The pet's coo and the alarm share the 100-tick reaction cooldown; give
+# it time to lapse before the bang, or the alarm is silently swallowed.
+sleep 2.5
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.9,"peak_hz":440},"tick_ms":0}' > /dev/null || true
 sleep 0.4
 STARTLED=$(api GET /state | field last_sound)
