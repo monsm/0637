@@ -357,8 +357,12 @@ echo "--- startle ---"
 # to 25 Hz, or the alarm is silently swallowed by the cooldown.
 sleep 4
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.9,"peak_hz":440},"tick_ms":0}' > /dev/null || true
-sleep 0.6
-STARTLED=$(api GET /state | field last_sound)
+STARTLED=""
+for _ in $(seq 1 40); do
+  STARTLED=$(api GET /state | field last_sound)
+  [ "$STARTLED" = "alarm" ] && break
+  sleep 0.1
+done
 [ "$STARTLED" = "alarm" ]; check $? "a loud room startles the duck" "last_sound=$STARTLED"
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
 
@@ -504,14 +508,22 @@ except Exception:
 PY
 )
 [ "${PEER_REPLY%% *}" = "hello" ]; check $? "the duck answers another duck's greet" "reply=$PEER_REPLY"
-sleep 0.5
-NEIGHBOURS=$(api GET /state | python3 -c "
+# Discovery and the greeting land on published ticks; poll for the pair
+# rather than racing one publish after a fixed nap.
+NEIGHBOURS=""
+for _ in $(seq 1 30); do
+  NEIGHBOURS=$(api GET /state | python3 -c "
 import json,sys
-d=json.load(sys.stdin)
-peers=(d.get('peers') or {}).get('peers') or []
-e=d.get('peer_event') or {}
-print(len(peers), peers[0].get('name','') if peers else '', e.get('kind',''), e.get('name',''))
-" 2>/dev/null || echo "0   ")
+try:
+    d=json.load(sys.stdin)
+    peers=(d.get('peers') or {}).get('peers') or []
+    e=d.get('peer_event') or {}
+    print(len(peers), peers[0].get('name','') if peers else '', e.get('kind',''), e.get('name',''))
+except Exception: print('')
+" 2>/dev/null || echo "")
+  [ "$NEIGHBOURS" = "1 Sunny greeted Sunny" ] && break
+  sleep 0.2
+done
 [ "$NEIGHBOURS" = "1 Sunny greeted Sunny" ]
 check $? "the neighbour is discovered and the greeting is published" "$NEIGHBOURS"
 
@@ -649,7 +661,15 @@ import json,sys
 print('awake' if not (json.load(sys.stdin).get('care') or {}).get('asleep') else 'asleep')
 " 2>/dev/null || echo "asleep")
 [ "$WOKEN" = "awake" ]; check $? "a stroke wakes it" "$WOKEN"
-WOKE_SOUND=$(api GET /state | field last_sound)
+# The wake coo can be superseded on a later tick by an idle ritual's own
+# event, so poll for the coo the instant it publishes instead of reading
+# the latest sound after a fixed nap.
+WOKE_SOUND=""
+for _ in $(seq 1 20); do
+  WOKE_SOUND=$(api GET /state | field last_sound)
+  [ "$WOKE_SOUND" = "coo" ] && break
+  sleep 0.05
+done
 [ "$WOKE_SOUND" = "coo" ]; check $? "the duck coos when a hand wakes it" "last_sound=$WOKE_SOUND"
 # Back to real time for the rest of the session.
 api POST /config '{"care_time_scale":1}' > /dev/null || true
