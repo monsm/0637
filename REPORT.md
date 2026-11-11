@@ -326,7 +326,7 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 |---|---|---|---|---|---|
 | 1 | 养成 | `care.rs`：饥饿/心情/亲密、久忽略变 sad、12 分钟打盹、摸/喂/开机唤醒、`idle_s` 而非绝对 tick 的持久化 | 陪伴卡三格 + 状态胶囊；4 s 存档 + 退出同步；恢复重试并核对发布值 | 同左；Activity 线程负责恢复 + 3 s 存档，`usesCleartextTraffic` 后本机 HTTP 才真正可用 | iOS 168/168（`06ddea8`）；Android `0.424/0.330` 跨进程恢复 |
 | 2 | 记忆 | `/export/vetbook.{json,md}`；`Life` 增加 claps/whistles；米数/启动/关机计数真正增长 | 终身记录三数 + 文件分享（临时目录） | 三数 + FileProvider/ACTION_SEND | 两端导出断言；走米数与关机计数断言 |
-| 3 | 拍照 | 无核心改动（画面读取由平台完成） | Metal drawable 同命令缓冲 blit 回读；`framebufferOnly=false`；相机静帧按 interface orientation 旋转；无相机/失败时合成棚拍背景；单飞快门 | `glReadPixels` 回读 + CameraX ImageProxy 旋转；MediaStore 保存 + FileProvider 分享；同样单飞与棚拍回退 | iOS UI 测试（快门→预览）+ smoke；Android 走查中 |
+| 3 | 拍照 | 无核心改动（画面读取由平台完成） | Metal drawable 同命令缓冲 blit 回读；`framebufferOnly=false`；相机静帧按 interface orientation 旋转；无相机/失败时合成棚拍背景；单飞快门 | `glReadPixels` 回读 + CameraX ImageProxy 旋转；MediaStore 保存 + FileProvider 分享；同样单飞与棚拍回退 | iOS UI 测试（快门→预览）+ smoke；Android `f210dee` smoke：`Director photo reached the preview with Save and Share` |
 | 4 | 声音 | RMS+过零主频分类拍手/口哨；每 tick 只响一次；`/state.sound_event` 与 life 计数 | 麦克风 10 Hz（真实时间戳） | 256 ms 窗口 + 真实时间戳 | 两端拍手/口哨断言；规则接管时不再被 alarm 覆盖 |
 | 5 | 积木规则 | `/rules` GET/POST，8 条上限；触发 clap/whistle/pet；动作 skill/emotion/sound；sit/stand 幂等、ground_pick 走环内置动词；失败不压制默认反应 | 大 chip 编辑器 + 最近触发胶囊 | 同左 + 菜单入口 | 两端「拍手→真 roulade」断言；`/state.rule_event` |
 | 6 | 多机 | UDP 8766 announce/greet/hello；按需启动；peer TTL 8 s；`/state.peers`、`peer_event`；greet 不再误标 replied | 邻居页、单发/群发问候、找回按钮 | 邻居页 + multicast lock + 机型名 | iOS 宿主机模拟第二只鸭子：发现、hello 应答、replied；Android socket/peer 列表 |
@@ -341,6 +341,8 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 - AI 的 sit/stand 同走 `/sit` toggle；Think now 会重复请求；移动链不可取消；iOS 不检查 HTTP 状态；
 - 拍照：iOS 设备朝向与界面朝向在横屏相反、Metal 在 present 后回读 drawable、横屏快门被顶栏菜单盖住、相机失败保存透明 PNG、连拍覆盖 completion；Android 同样是透明回退；
 - Android 存档线程从未落盘——根因是 Android 默认禁止明文 HTTP，应用自身的 `127.0.0.1:8765` 全部被静默拒绝（外部 adb 检查因此从未暴露它）。`usesCleartextTraffic` 同时允许本机 Ollama/LM Studio。
+
+**最终验证（2026-11-11）**：iOS `06ddea8` **构建 + 模拟器 smoke 168/168 + XCUITest + 设备切片 + 未签名 IPA 全绿**；Android `f210dee` **APK 构建 + 16 KB 对齐 + 模拟器 smoke 全绿**（含进程重启养成恢复、拍手/口哨、积木→真 roulade、UDP 邻居、vetbook 导出、Director 快门→预览）。两端共享的 core 自 `06ddea8` 后未再改动（`6a102fa`/`e568c30`/`f210dee` 只动 Android 清单/UI 与报告），因此 iOS 的绿灯覆盖当前 core。
 
 **仍受限**：iOS 真机 IPA 需要仓库 secrets；Android arm64 真机未跑；真实双手机、真实相机与真实模型需要用户在自己的设备/端点上验证。玩法说明见 [COMPANION.md](COMPANION.md)。
 
@@ -381,7 +383,7 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 | iOS 真机 IPA | 流水线就绪，等签名凭据 |
 | 相机 / LiDAR / AR 模式 | ✅ 系统相机预览层作背景（Director 模式）；LiDAR 深度读数与 8×8 ToF 降采样在 `/sensors`；未做 ARKit/ARCore 跟踪与平面锚定 |
 | 扬声器 | ✅ 官方声码合成器编译进核心，两端已接扬声器 |
-| 麦克风 | ✅ 两端真实拾音（RMS + 主频，1 Hz 进 `/sensor`），用时才申请权限，拒绝显示「未授权」；常开监听按设计不做 |
+| 麦克风 | ✅ 两端真实拾音（RMS + 过零主频；iOS 10 Hz、Android 256 ms 窗，带真实时间戳进 `/sensor`），用时才申请权限，拒绝显示「未授权」；常开监听按设计不做 |
 | roller 模式 | ✅ 整套 bundle + roller 场景切换；`/mode`、MCP `duck_mode`、两端界面切换 |
 | 电池关机 | ✅ 坐下→憩姿→断力矩；空电量（EMA ≤ 6.6 V）自动触发，`/power` 重新上电 |
 | 里程计 `/pose` | ✅ 官方接触式里程计编进核心，随 checkpoint 倒带 |
@@ -390,7 +392,7 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 | Android 真机实测 | CI 仅覆盖模拟器（API 30 x86_64）；arm64 真机未跑 |
 | 性能指标（fps / 控制 Hz） | ✅ 两端实测并发布在 `/state.performance`，仪表表显示；CI 两端断言 `ticks_per_second > 0`，绿跑实测 iOS 55.2 fps / 50.0 Hz、Android 模拟器 14.8 fps / 50.5 Hz。功耗未采集（需真机电量计） |
 | 物理版情绪 / 人格 | ✅ 官方 `robotd/emotions/` 13 个关键帧时间线 + 48 kHz 声音原样接入，`/skills`、`/skill`、MCP、技能环可发现；50 Hz 循环按 `Frame::apply` 语义驱动头/身体/喙，声音走现有扬声器通道，checkpoint 可恢复播放。IdleHead 张望/呼吸/瞌睡随 checkpoint 精确重放 |
-| 声音反应 | ✅ 7 个官方合成音全部可用；被抱起 `coo`、持续摔倒 `alarm`、久静后重新驱动 `inquire`（上升沿 + 冷却）；情绪音为官方 wav |
+| 声音反应 | ✅ 7 个官方合成音全部可用；被抱起 `coo`、持续摔倒 `alarm`、久静后重新驱动 `inquire`（上升沿 + 冷却）；拍手/口哨分类为官方 `laugh`/`curious` 并发布事件；情绪音为官方 wav |
 | 虚拟脸灯 | ✅ `robotd/src/leds.rs` 的纯语义（状态 4 档、电量表 5 档 + 3% 滞回、7 色手电筒）发布在 `/state.leds`，`/flashlight` 与 MCP `duck_flashlight` 可控制；无 I²C 硬件，故为状态等价 |
 | 中文语音 | ✅ 系统级离线识别（iOS `SFSpeechRecognizer` zh-CN / Android `SpeechRecognizer` zh-CN），用时才申请权限；文字走 `POST /heard` 映射到技能/情绪/问候，CI 直接测文字链路（模拟器无麦克风，识别本身须真机验证） |
 | 凝视野 IK | ✅ `POST /look` + MCP `duck_look`：`HeadFk::look_at` 基于训练 MJCF 的正运动学求解，受舵机行程限制；`/state.pose` 供客户端换算躯干坐标 |
