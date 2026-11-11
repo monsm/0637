@@ -318,6 +318,34 @@ UI 同批重做（小屏批判）：顶栏 6 chip → ⋯菜单；触摸目标�
 
 ---
 
+## 四之九、七个陪伴功能（2026-11-11 第六批）
+
+Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后，按用户给定顺序完成七项「core + iOS + Android 端到端」功能。所有状态都走同一约束：手机是外设，鸭子 61 维观测/策略/安全层不变。
+
+| # | 功能 | 核心 | iOS | Android | CI 证据 |
+|---|---|---|---|---|---|
+| 1 | 养成 | `care.rs`：饥饿/心情/亲密、久忽略变 sad、12 分钟打盹、摸/喂/开机唤醒、`idle_s` 而非绝对 tick 的持久化 | 陪伴卡三格 + 状态胶囊；4 s 存档 + 退出同步；恢复重试并核对发布值 | 同左；Activity 线程负责恢复 + 3 s 存档，`usesCleartextTraffic` 后本机 HTTP 才真正可用 | iOS 168/168（`06ddea8`）；Android `0.424/0.330` 跨进程恢复 |
+| 2 | 记忆 | `/export/vetbook.{json,md}`；`Life` 增加 claps/whistles；米数/启动/关机计数真正增长 | 终身记录三数 + 文件分享（临时目录） | 三数 + FileProvider/ACTION_SEND | 两端导出断言；走米数与关机计数断言 |
+| 3 | 拍照 | 无核心改动（画面读取由平台完成） | Metal drawable 同命令缓冲 blit 回读；`framebufferOnly=false`；相机静帧按 interface orientation 旋转；无相机/失败时合成棚拍背景；单飞快门 | `glReadPixels` 回读 + CameraX ImageProxy 旋转；MediaStore 保存 + FileProvider 分享；同样单飞与棚拍回退 | iOS UI 测试（快门→预览）+ smoke；Android 走查中 |
+| 4 | 声音 | RMS+过零主频分类拍手/口哨；每 tick 只响一次；`/state.sound_event` 与 life 计数 | 麦克风 10 Hz（真实时间戳） | 256 ms 窗口 + 真实时间戳 | 两端拍手/口哨断言；规则接管时不再被 alarm 覆盖 |
+| 5 | 积木规则 | `/rules` GET/POST，8 条上限；触发 clap/whistle/pet；动作 skill/emotion/sound；sit/stand 幂等、ground_pick 走环内置动词；失败不压制默认反应 | 大 chip 编辑器 + 最近触发胶囊 | 同左 + 菜单入口 | 两端「拍手→真 roulade」断言；`/state.rule_event` |
+| 6 | 多机 | UDP 8766 announce/greet/hello；按需启动；peer TTL 8 s；`/state.peers`、`peer_event`；greet 不再误标 replied | 邻居页、单发/群发问候、找回按钮 | 邻居页 + multicast lock + 机型名 | iOS 宿主机模拟第二只鸭子：发现、hello 应答、replied；Android socket/peer 列表 |
+| 7 | AI 伙伴 | `/state.last_heard`、`GET /heard`；`/posture` 幂等坐/站 | OpenAI 兼容端点、每 N 秒、Think now、HTTP 状态码、无效回答提示、移动可取消 | 同左；配置本地存储 | 两端编译 + UI 控件；真实模型需用户自己的端点 |
+
+**独立对抗审计**（4 个维度 + 对抗复核）确认并修复了 18 个真实缺陷，其中较关键的：
+
+- `sound_event` 的 tick 比 tick_inner 早一帧，拍手/口哨的自身反应会被通用 alarm 顶掉；
+- 旧进程的绝对 `last_touch` 在新进程 tick=0 时被误读成「刚被摸」，打盹/忽略跨重启失真；
+- `/life` 漏掉 claps/whistles，重启即清零；`metres`/`boots`/`power_offs` 从未增长；
+- 规则里的 sit 是 toggle、ground_pick 找不到内置动词，却仍标记为已触发；
+- AI 的 sit/stand 同走 `/sit` toggle；Think now 会重复请求；移动链不可取消；iOS 不检查 HTTP 状态；
+- 拍照：iOS 设备朝向与界面朝向在横屏相反、Metal 在 present 后回读 drawable、横屏快门被顶栏菜单盖住、相机失败保存透明 PNG、连拍覆盖 completion；Android 同样是透明回退；
+- Android 存档线程从未落盘——根因是 Android 默认禁止明文 HTTP，应用自身的 `127.0.0.1:8765` 全部被静默拒绝（外部 adb 检查因此从未暴露它）。`usesCleartextTraffic` 同时允许本机 Ollama/LM Studio。
+
+**仍受限**：iOS 真机 IPA 需要仓库 secrets；Android arm64 真机未跑；真实双手机、真实相机与真实模型需要用户在自己的设备/端点上验证。玩法说明见 [COMPANION.md](COMPANION.md)。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。

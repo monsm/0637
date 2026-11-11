@@ -573,15 +573,18 @@ fun Shell(
             )
         }
 
+        }
+
         // The Director shutter: one tap reads the frame on screen back, puts
         // it over the camera still (or over the studio when there is no
-        // camera) and opens the preview. Top-end so it never covers the duck.
+        // camera) and opens the preview. Outside the portrait/landscape
+        // branches: the camera exists in both.
         if (surface == Surface.Director && core != null && onPhoto != null) {
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
                     .systemBarsPadding()
-                    .padding(top = 56.dp, end = 16.dp),
+                    .padding(top = 72.dp, end = 16.dp),
             ) {
                 RoundChip(
                     Copy.photoShort,
@@ -592,8 +595,6 @@ fun Shell(
                     onClick = onPhoto,
                 )
             }
-        }
-
         }
 
         // The ring is shell-wide: portrait anchors it to the bottom (the duck
