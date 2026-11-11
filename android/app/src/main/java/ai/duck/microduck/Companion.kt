@@ -316,22 +316,39 @@ fun restoreCompanion(context: Context): Boolean {
     // The intent server starts with the core and may not accept connections
     // yet. Retry until it acknowledges, and keep the save gate closed until
     // then: a fresh duck must not overwrite the saved one.
+    val saved = if (raw != null) JSONObject(raw) else null
+    val care = saved?.optJSONObject("care")
+    val life = saved?.optJSONObject("life")
+    val wantedBond = care?.optDouble("bond", -1.0) ?: -1.0
+    // Wait until /state is published (the loop is alive), then post and
+    // verify the bond: /care is fire-and-forget, so a 2xx only means the
+    // HTTP server saw it, not that the tick dequeued it.
     for (attempt in 0 until 40) {
         try {
-            if (raw != null) {
-                val saved = JSONObject(raw)
-                val care = saved.optJSONObject("care")
-                if (care != null && !postJsonOk("/care", care.toString())) {
-                    throw IllegalStateException("care not accepted")
-                }
-                val life = saved.optJSONObject("life")
-                if (life != null && !postJsonOk("/life", life.toString())) {
-                    throw IllegalStateException("life not accepted")
-                }
+            val stateText = fetchRawState() ?: throw IllegalStateException("state not ready")
+            if (care != null && !postJsonOk("/care", care.toString())) {
+                throw IllegalStateException("care not accepted")
+            }
+            if (life != null && !postJsonOk("/life", life.toString())) {
+                throw IllegalStateException("life not accepted")
             }
             if (rules != null && !postJsonOk("/rules", rules)) {
                 throw IllegalStateException("rules not accepted")
             }
+            if (wantedBond >= 0.0) {
+                var seen = false
+                for (check in 0 until 8) {
+                    Thread.sleep(100)
+                    val state = JSONObject(fetchRawState() ?: "{}")
+                    val bond = state.optJSONObject("care")?.optDouble("bond", -1.0) ?: -1.0
+                    if (bond >= 0.0 && kotlin.math.abs(bond - wantedBond) < 0.02) {
+                        seen = true
+                        break
+                    }
+                }
+                if (!seen) throw IllegalStateException("care restore not published")
+            }
+            _ = stateText
             return true
         } catch (_: Throwable) {
             try {

@@ -781,7 +781,28 @@ case "$STAND_LABEL" in
 esac
 wait_idle 80 > /dev/null
 
-# ---------------------------------------------------------------- skills
+# The idempotent posture route the AI uses: asking twice must not toggle the
+# duck back up, unlike the /sit button.
+echo "--- posture ---"
+api POST /posture '{"sit":true}' > /dev/null || true
+POSTURE_SIT=$(poll_state label sit 40 0.2)
+[ "$POSTURE_SIT" = "sit" ]; check $? "posture seats the duck" "label=$POSTURE_SIT"
+api POST /posture '{"sit":true}' > /dev/null || true
+sleep 0.6
+POSTURE_STILL=$(api GET /state | field label)
+[ "$POSTURE_STILL" = "sit" ]; check $? "asking to sit twice does not stand it up" "label=$POSTURE_STILL"
+api POST /posture '{"sit":false}' > /dev/null || true
+POSTURE_UP=""
+for _ in $(seq 1 30); do
+  POSTURE_UP=$(api GET /state | field label)
+  case "$POSTURE_UP" in rise|walk|stand) break ;; esac
+  sleep 0.3
+done
+case "$POSTURE_UP" in
+  rise|walk|stand) check 0 "posture stands the duck" "label=$POSTURE_UP" ;;
+  *)               check 1 "posture stands the duck" "label=$POSTURE_UP" ;;
+esac
+wait_idle 80 > /dev/null
 for name in roulade kick_left kick_right; do
   echo "--- skill $name ---"
   # The kicks last 0.5 s and roulade 1.0 s: sample fast, and retry if the

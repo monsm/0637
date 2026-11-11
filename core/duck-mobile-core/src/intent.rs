@@ -650,9 +650,16 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
                 .request(Intent::PeerName(name.to_owned()))
                 .to_string()),
             None => Err("missing name"),
-        },        ("POST", "/care") => {
-            let saved = value.get("care").cloned().unwrap_or(value);
-            Ok(queue.request(Intent::RestoreCare(saved)).to_string())
+        },
+        // The companion state is public read / restore-only write: a client
+        // can hand back what it saved, but cannot claim the duck loves it.
+        // A restore is fire-and-forget: a launch can beat the first tick and
+        // must not leave a client blocked for 300 ms waiting for an answer.
+        ("POST", "/care") => {
+            queue.push(Intent::RestoreCare(
+                value.get("care").cloned().unwrap_or(value.clone()),
+            ));
+            Ok(json!({ "ok": true, "queued": true }).to_string())
         }
         ("POST", "/config") => {
             let idle = value.get("idle_ritual_s").and_then(Value::as_f64);

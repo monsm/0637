@@ -722,13 +722,34 @@ final class DuckController: ObservableObject {
             if let saved {
                 let care = saved["care"] as? [String: Any]
                 let life = saved["life"] as? [String: Any]
-                var attempts = 0
+                // POST /care is fire-and-forget, so a 2xx only proves the
+                // server received it. Wait for /state to publish the bond
+                // before opening the save gate.
+                let wanted = care?["bond"] as? Double
                 var ok = false
+                var attempts = 0
                 while attempts < 40 && !ok {
                     attempts += 1
+                    guard Self.getStateSync() != nil else {
+                        Thread.sleep(forTimeInterval: 0.25)
+                        continue
+                    }
                     let careOK = care.map { Self.postSync("/care", $0) } ?? true
                     let lifeOK = life.map { Self.postSync("/life", $0) } ?? true
-                    ok = careOK && lifeOK
+                    if careOK && lifeOK && wanted != nil {
+                        for _ in 0..<8 {
+                            Thread.sleep(forTimeInterval: 0.1)
+                            if let now = Self.getStateSync(),
+                               let c = now["care"] as? [String: Any],
+                               let bond = c["bond"] as? Double,
+                               abs(bond - wanted!) < 0.02 {
+                                ok = true
+                                break
+                            }
+                        }
+                    } else {
+                        ok = careOK && lifeOK
+                    }
                     if !ok { Thread.sleep(forTimeInterval: 0.25) }
                 }
                 delivered = delivered && ok
@@ -757,6 +778,24 @@ final class DuckController: ObservableObject {
     private static func postSync(_ path: String, _ object: [String: Any]) -> Bool {
         guard let data = try? JSONSerialization.data(withJSONObject: object) else { return false }
         return postSyncData(path, data)
+    }
+
+    /// One /state on the restore worker. Its presence means the loop is
+    /// publishing; its content is used to verify a restore actually landed.
+    private static func getStateSync() -> [String: Any]? {
+        guard let url = URL(string: "http://127.0.0.1:8765/state") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: [String: Any]?
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            if let data {
+                result = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            }
+            semaphore.signal()
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 3)
+        return result
     }
 
     private static func postSyncData(_ path: String, _ body: Data) -> Bool {
