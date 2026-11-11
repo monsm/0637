@@ -69,10 +69,16 @@ struct ContentView: View {
                 // presses on a device.
                 scene
                     .contentShape(Rectangle())
+                    // Both gestures stay installed; the mask picks the one
+                    // for this composition. A ternary of AnyGesture erased
+                    // two different `some Gesture` types and failed to infer.
                     .gesture(
-                        portrait
-                            ? AnyGesture(portraitDriveGesture(in: geometry.size))
-                            : AnyGesture(driveGesture(in: geometry.size))
+                        driveGesture(in: geometry.size),
+                        including: portrait ? .none : .all
+                    )
+                    .gesture(
+                        portraitDriveGesture(in: geometry.size),
+                        including: portrait ? .all : .none
                     )
                     .onLongPressGesture(minimumDuration: 0.35) {
                         if controller.ready && controller.renderError == nil {
