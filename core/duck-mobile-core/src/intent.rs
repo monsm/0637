@@ -624,7 +624,13 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
             None => Err("missing tag"),
         },
-        ("POST", "/pet") => Ok(queue.request(Intent::Pet).to_string()),
+        // Petting and opening discovery are fire-and-forget: the duck's
+        // answer is its coo and the peer list, which /state publishes. A
+        // loaded phone must not turn a tap into a 300 ms timeout.
+        ("POST", "/pet") => {
+            queue.push(Intent::Pet);
+            Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
         ("POST", "/feed") => Ok(queue.request(Intent::Feed).to_string()),
         // The companion state is public read / restore-only write: a client
         // can hand back what it saved, but cannot claim the duck loves it.
@@ -635,11 +641,12 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             .request(Intent::SetRules(value.clone()))
             .to_string()),
         ("GET", "/peers") => Ok(queue.peers_json()),
-        ("POST", "/peers/start") => Ok(queue
-            .request(Intent::StartLan(
+        ("POST", "/peers/start") => {
+            queue.push(Intent::StartLan(
                 value["name"].as_str().unwrap_or("MicroDuck").to_owned(),
-            ))
-            .to_string()),
+            ));
+            Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
         ("POST", "/peers/greet") => Ok(queue
             .request(Intent::GreetPeer(
                 value["id"].as_str().filter(|id| !id.is_empty()).map(str::to_owned),

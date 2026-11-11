@@ -344,8 +344,15 @@ if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   echo "::error::the duck could not open its LAN peer socket"
   exit 1
 fi
-PEERS=$(curl -sf --max-time 5 http://127.0.0.1:8765/peers || true)
-echo "$PEERS" | grep -q '"name":"CI Android"'
+for _ in $(seq 1 30); do
+  PEERS=$(curl -sf --max-time 5 http://127.0.0.1:8765/peers || true)
+  echo "$PEERS" | grep -q '"name":"CI Android"' && break
+  sleep 0.2
+done
+if ! echo "$PEERS" | grep -q '"name":"CI Android"'; then
+  echo "::error::the LAN socket never announced the duck"
+  exit 1
+fi
 if ! echo "$PEERS" | grep -q '"peers"'; then
   echo "::error::/peers does not publish the peer list"
   exit 1

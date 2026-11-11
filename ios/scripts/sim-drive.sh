@@ -438,6 +438,12 @@ echo "--- neighbours ---"
 LAN=$(api POST /peers/start '{"name":"CI Duck"}' || true)
 printf '%s' "$LAN" | grep -q '"ok":true'
 check $? "the duck opens its LAN socket" "$(printf '%s' "$LAN" | head -c 140)"
+# Starting discovery is queued; wait until /peers publishes our name before
+# the host peer sends anything, or the first packet lands before the socket.
+for _ in $(seq 1 30); do
+  api GET /peers | grep -q '"name":"CI Duck"' && break
+  sleep 0.2
+done
 PEER_REPLY=$(python3 - <<'PY'
 import json, socket, time
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
