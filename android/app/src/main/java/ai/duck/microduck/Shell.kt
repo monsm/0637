@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.horizontalScroll
@@ -112,6 +113,7 @@ fun Shell(
     var showRules by remember { mutableStateOf(false) }
     var showPeers by remember { mutableStateOf(false) }
     var peers by remember { mutableStateOf(PeersUi()) }
+    var quests by remember { mutableStateOf(QuestBoardUi()) }
     // The user's own model: config, last answer and the loop's guard.
     var showAI by remember { mutableStateOf(false) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
@@ -221,6 +223,8 @@ fun Shell(
             }
             val peersNow = stateText?.let(::parsePeers)
             if (peersNow != null) peers = peersNow
+            val questsNow = stateText?.let(::parseQuestsFromState)
+            if (questsNow != null && questsNow.quests.isNotEmpty()) quests = questsNow
             val peerEvent = stateText?.let(::parsePeerEvent)
             if (peerEvent != null && peerEvent.tick != lastPeerTick) {
                 lastPeerTick = peerEvent.tick
@@ -663,6 +667,7 @@ fun Shell(
                     MicState.Denied -> audioLauncher.launch(Manifest.permission.RECORD_AUDIO)
                 }
             },
+            quests = quests,
         ) { showSheet = false }
     }
 
@@ -1798,6 +1803,95 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
  * first bar: a full bar means a fed duck. The nap is a state, not a number.
  */
 @Composable
+/**
+ * Three quests from the core's real counters. One progress meter per row;
+ * text, percent and a checkmark carry the meaning so it never relies on hue.
+ */
+@Composable
+private fun QuestCard(board: QuestBoardUi) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color.White.copy(alpha = 0.05f), RoundedRectangleShape(14.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                Copy.quests,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("quests-title"),
+            )
+            if (board.streak > 0) {
+                Text(
+                    Copy.questStreak(board.streak),
+                    color = Color(0xFFFFB74D),
+                    fontSize = 11.sp,
+                )
+            }
+        }
+        if (board.quests.isEmpty()) {
+            Text("…", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+        } else {
+            board.quests.forEachIndexed { index, quest ->
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (quest.done) "✓" else "${index + 1}",
+                            color = if (quest.done) Color(0xFF66BB6A) else Color.White.copy(alpha = 0.55f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(18.dp),
+                        )
+                        Text(
+                            quest.title,
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            if (quest.done) Copy.questDone else "${(quest.progress * 100).roundToInt()}%",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 10.sp,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { quest.progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(5.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .testTag("quest-progress-$index"),
+                        color = if (quest.done) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
+                        trackColor = Color.White.copy(alpha = 0.10f),
+                    )
+                }
+            }
+            if (board.quests.all { it.done }) {
+                Text(
+                    Copy.questAllDone,
+                    color = Color(0xFF66BB6A),
+                    fontSize = 11.sp,
+                    modifier = Modifier.testTag("quest-all-done"),
+                )
+            }
+        }
+    }
+}
+
 private fun CareCard(care: CareUi) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(
@@ -1904,6 +1998,7 @@ private fun InstrumentSheet(
     speechFeed: SpeechFeed,
     onToggleSpeech: () -> Unit,
     onToggleMic: () -> Unit,
+    quests: QuestBoardUi,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -2005,6 +2100,7 @@ private fun InstrumentSheet(
                 CloseChip("sheet-close", onClose)
             }
             ButtonChip(if (showDetails) Copy.showLess else Copy.showMore) { showDetails = !showDetails }
+            QuestCard(quests)
             CareCard(care)
             if (showDetails && status.size >= 14) {
                 Text(

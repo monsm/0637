@@ -374,6 +374,41 @@ if ! curl -sf --max-time 5 http://127.0.0.1:8765/export/vetbook.json | grep -q '
   exit 1
 fi
 echo "vet book export: markdown and json ok"
+# Daily quests: calendar day in, three measurable goals out.
+echo "--- daily quests ---"
+QUEST_DAY=$(python3 -c 'import datetime; print(datetime.date.today().isoformat())')
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"day\":\"$QUEST_DAY\",\"board\":{}}" http://127.0.0.1:8765/quests/day > /dev/null || true
+QUESTS=$(curl -sf --max-time 5 http://127.0.0.1:8765/quests || true)
+if ! echo "$QUESTS" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+q=d.get('quests',[])
+sys.exit(0 if d.get('day') == '$QUEST_DAY' and len(q)==3 and all('title_en' in x and 'progress' in x for x in q) else 1)
+" 2>/dev/null; then
+  echo "::error::the daily quest board was not created: $QUESTS"
+  exit 1
+fi
+echo "daily quests: 3 goals for $QUEST_DAY"
+# A real pet feeds the board if today's quest measures pets; the generic
+# assertion is that the board stays valid and its progress never goes back
+# while the life counters only grow.
+QUEST_SUM_BEFORE=$(echo "$QUESTS" | python3 -c "
+import json,sys
+print(sum(x.get('progress',0) for x in json.load(sys.stdin).get('quests',[])))
+" 2>/dev/null || echo 0)
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' \
+  http://127.0.0.1:8765/pet > /dev/null || true
+sleep 0.4
+QUEST_SUM_AFTER=$(curl -sf --max-time 5 http://127.0.0.1:8765/quests | python3 -c "
+import json,sys
+print(sum(x.get('progress',0) for x in json.load(sys.stdin).get('quests',[])))
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if float('${QUEST_SUM_AFTER:-0}') >= float('${QUEST_SUM_BEFORE:-0}') else 1)
+" 2>/dev/null || { echo "::error::the quest board went backwards after a pet"; exit 1; }
+echo "daily quests: progress stays honest after an action"
 
 # The build proves which scene, meshes and policies it is running.
 FINGERPRINT=$(curl -sf --max-time 5 http://127.0.0.1:8765/fingerprint || true)

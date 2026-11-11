@@ -31,7 +31,19 @@ final class DuckController: ObservableObject {
         var value: String
     }
     @Published var rules: [DuckRule] = []
+    /// Today's three small goals. The core measures them from its own vet
+    /// book; the shell only shows the board and hands it back across launches.
+    struct QuestCard: Identifiable {
+        let id: String
+        let title: String
+        let progress: Double
+        let done: Bool
+    }
+    @Published var quests: [QuestCard] = []
+    @Published var questStreak = 0
+    @Published var questDay = ""
     private static let rulesKey = "duck_rules_v1"
+    private static let questKey = "duck_quests_v1"
 
     @Published var ready = false
     @Published var errorMessage: String?
@@ -705,6 +717,18 @@ final class DuckController: ObservableObject {
         let saved = defaults.dictionary(forKey: "duck_companion_v1")
         var rulesPayload: Data?
         var savedRules: [DuckRule] = []
+        let questSaved = defaults.dictionary(forKey: Self.questKey) as? [String: Any]
+        let day = Self.isoDay()
+        // Tell the core whose calendar day it is, with the board we saved.
+        // This is independent of care/rules restore: a fresh install still
+        // gets three quests today.
+        let dayPayload: [String: Any] = [
+            "day": day,
+            "board": questSaved ?? [:],
+        ]
+        if let body = try? JSONSerialization.data(withJSONObject: dayPayload) {
+            post("/quests/day", body)
+        }
         if let data = defaults.data(forKey: Self.rulesKey),
            let decoded = try? JSONDecoder().decode([DuckRule].self, from: data) {
             savedRules = decoded
@@ -773,6 +797,17 @@ final class DuckController: ObservableObject {
                 self.companionRestored = delivered
             }
         }
+    }
+
+    /// The phone's calendar day in ISO form. The core measures quests; the
+    /// shell owns what "today" means.
+    private static func isoDay() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
     }
 
     /// A blocking POST for the restore path only: it must know whether the
@@ -1222,8 +1257,7 @@ final class DuckController: ObservableObject {
                 DispatchQueue.main.async {
                     guard let self else { return }
                     if let emotion = json["emotion"] as? [String: Any],
-                       let name = emotion["name"] as? String {
-                        let elapsed = emotion["elapsed_s"] as? Double ?? 0
+                       let name = emotion["name"] as? String {                        let elapsed = emotion["elapsed_s"] as? Double ?? 0
                         let duration = emotion["duration_s"] as? Double ?? 0
                         self.behaviorSummary = String(format: "%@ %.1f/%.1fs", name, elapsed, duration)
                     } else if let idle = json["idle"] as? [String: Any],
@@ -1233,6 +1267,26 @@ final class DuckController: ObservableObject {
                         self.behaviorSummary = "—"
                     }
                     self.parseLeds(json["leds"])
+                    if let board = json["quests"] as? [String: Any] {
+                        let chinese = Copy.language == .chinese
+                        let list = board["quests"] as? [[String: Any]] ?? []
+                        self.quests = list.compactMap { item in
+                            guard let id = item["id"] as? String else { return nil }
+                            let title = (chinese ? item["title_zh"] : item["title_en"]) as? String
+                                ?? item["title_en"] as? String ?? id
+                            return QuestCard(
+                                id: id,
+                                title: title,
+                                progress: min(max(item["progress"] as? Double ?? 0, 0), 1),
+                                done: item["done"] as? Bool ?? false
+                            )
+                        }
+                        self.questStreak = board["streak"] as? Int ?? 0
+                        self.questDay = board["day"] as? String ?? ""
+                        if !list.isEmpty {
+                            UserDefaults.standard.set(board, forKey: Self.questKey)
+                        }
+                    }
                     if let event = json["sound_event"] as? [String: Any],
                        let kind = event["kind"] as? String,
                        let tick = event["tick"] as? Int {

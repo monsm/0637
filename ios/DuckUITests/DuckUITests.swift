@@ -150,6 +150,10 @@ final class DuckUITests: XCTestCase {
             app.progressIndicators["care-hunger"].waitForExistence(timeout: 5),
             "the companion card has no hunger bar"
         )
+        XCTAssertTrue(
+            app.staticTexts["quests-title"].waitForExistence(timeout: 5),
+            "the quests card is missing"
+        )
         let sheetScroll = app.scrollViews.firstMatch
         let export = app.buttons["export-vetbook"]
         bringIntoView(export, scroll: sheetScroll)

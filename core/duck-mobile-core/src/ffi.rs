@@ -73,6 +73,9 @@ pub struct DuckCore {
     sound_sequence: u64,
     /// The LAN social layer: other ducks, announces and greetings.
     lan: Option<crate::lan::Lan>,
+    /// Daily quests. Kept on DuckCore, not the simulated runtime: a rewind
+    /// must not rewind the person's day.
+    quests: crate::quests::QuestBoard,
     /// A refusal the client should see for longer than the tick that made it:
     /// (tick, message). Published on `/state` until it goes stale.
     notice: Option<(u64, String)>,
@@ -276,6 +279,7 @@ pub unsafe extern "C" fn duck_core_new(
             // LAN, and that question belongs to the moment the user opens
             // Neighbours, not to every launch.
             lan: None,
+            quests: crate::quests::QuestBoard::default(),
             notice: None,
             rendered_sound: None,
             sound_tag: None,
@@ -849,6 +853,15 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
                 }
             }
         }
+        Intent::QuestDay(day, board) => {
+            if day.len() == 10 {
+                core.quests.restore(&board);
+                core.intents.set_day(day.clone());
+                json!({ "ok": true, "day": day })
+            } else {
+                refuse(core, "quest day must be yyyy-mm-dd".to_owned())
+            }
+        }
         Intent::GetRules => json!({ "ok": true, "rules": core.runtime.rules_summary() }),
         Intent::GreetPeer(target) => match &core.lan {
             Some(lan) => {
@@ -1209,6 +1222,9 @@ fn publish_state(core: &DuckCore) {
         "last_heard": active.last_heard().map(|(text, tick)| {
             json!({ "text": text, "tick": tick })
         }),
+        // Today's three quests, from the same vet book counters.
+        "quests": serde_json::from_str::<serde_json::Value>(&core.intents.quests_json())
+            .unwrap_or(serde_json::json!({})),
         "life": active.book().summary(),
         // Hunger, mood and bond: the companion layer's three numbers, plus
         // whether the duck has dozed off. `asleep` is a pose overlay, not a
@@ -1275,6 +1291,21 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         return -1;
     }
     let core = &mut *core;
+    // Daily quests: use the shell's calendar day and this tick's real state.
+    // A quest completing is a real event; the duck answers with one of its
+    // own official emotions rather than a fake notification.
+    let quest_day = core.intents.day();
+    if quest_day.len() == 10 {
+        let values = json!({
+            "care": core.runtime.care_summary(),
+            "life": core.runtime.book().summary(),
+        });
+        let finished = core.quests.update(&quest_day, &values);
+        if !finished.is_empty() {
+            let _ = core.runtime.trigger_emotion("excited");
+        }
+        core.intents.set_quests(core.quests.summary(&values));
+    }
     // Other ducks on the LAN: greetings are social events, and the peer list
     // is published with the rest of the state.
     if let Some(lan) = &core.lan {

@@ -200,6 +200,15 @@ enum Copy {
     static var trickBook: String { pick("Trick book", "技巧图鉴") }
     // The vet book, and the file it exports.
     static var lifeRecord: String { pick("Life record", "终身记录") }
+    // Daily quests.
+    static var quests: String { pick("Today's quests", "今日小挑战") }
+    static var questDone: String { pick("Done", "完成") }
+    static func questStreak(_ days: Int) -> String {
+        pick("\(days)-day streak", "连续 \(days) 天")
+    }
+    static var questAllDone: String {
+        pick("All done — the duck is proud of you!", "全部完成，鸭子为你骄傲！")
+    }
     static var walked: String { pick("walked", "走过") }
     static var rolls: String { pick("rolls", "翻滚") }
     static var pickups: String { pick("picked up", "被抱起") }
@@ -282,8 +291,7 @@ enum Copy {
             "鸭子的状态和它最后听到的话会发给你填写的接口。密钥只保存在这台手机上，不会发往别处。"
         )
     }
-    static var aiHint: String {
-        pick(
+    static var aiHint: String {        pick(
             "Any OpenAI-compatible endpoint, including a local Ollama or LM Studio server.",
             "任何兼容 OpenAI 的接口，包括本机的 Ollama 或 LM Studio。"
         )

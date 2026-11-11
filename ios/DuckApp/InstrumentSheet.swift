@@ -26,6 +26,7 @@ struct InstrumentSheet: View {
                 header
                 timeMachine
                 face
+                questCard
                 careCard
                 behaviorRow
                 trickRow
@@ -122,6 +123,61 @@ struct InstrumentSheet: View {
     /// The companion's three numbers. Fullness, not hunger, fills the bar:
     /// a full bar must mean a fed duck. The pin is the core's published value;
     /// nothing here is computed by the shell except the percentage.
+    /// Three quests from the core's real counters. Each row is a single-series
+    /// progress meter: the text and x/y numbers carry the meaning, not colour,
+    /// and completion has a checkmark as well as the word "Done".
+    private var questCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(Copy.quests)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .accessibilityIdentifier("quests-title")
+                Spacer()
+                if controller.questStreak > 0 {
+                    Text(Copy.questStreak(controller.questStreak))
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(.orange)
+                }
+            }
+            if controller.quests.isEmpty {
+                Text("…")
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(controller.quests.enumerated()), id: \.element.id) { index, quest in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(quest.done ? "✓" : "\(index + 1)")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundStyle(quest.done ? .green : .secondary)
+                                .frame(width: 16)
+                            Text(quest.title)
+                                .font(.system(size: 12, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            Spacer()
+                            Text(quest.done ? Copy.questDone : "\(Int(quest.progress * 100))%")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        ProgressView(value: quest.progress)
+                            .tint(quest.done ? .green : .blue)
+                            .accessibilityIdentifier("quest-progress-\(index)")
+                    }
+                }
+                if controller.quests.allSatisfy({ $0.done }) {
+                    Text(Copy.questAllDone)
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(.green)
+                        .accessibilityIdentifier("quest-all-done")
+                }
+            }
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+    }
+
     private var careCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(Copy.care, detail: controller.careAsleep ? Copy.dozing : nil)

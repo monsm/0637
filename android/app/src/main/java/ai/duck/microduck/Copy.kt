@@ -119,6 +119,11 @@ val quack get() = pick("Quack", "叫一声")
         return pick("content · mood $moodPercent%", "心情不错 · 心情 $moodPercent%")
     }
     val trickBook get() = pick("Trick book", "技巧图鉴")
+    // Daily quests.
+    val quests get() = pick("Today's quests", "今日小挑战")
+    val questDone get() = pick("Done", "完成")
+    fun questStreak(days: Int) = pick("$days-day streak", "连续 $days 天")
+    val questAllDone get() = pick("All done — the duck is proud of you!", "全部完成，鸭子为你骄傲！")
     // The vet book, and the file it exports.
     val lifeRecord get() = pick("Life record", "终身记录")
     val walked get() = pick("walked", "走过")

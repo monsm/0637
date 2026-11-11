@@ -338,13 +338,13 @@ fun restoreCompanion(context: Context): Boolean {
     for (attempt in 0 until 40) {
         try {
             if (fetchRawState() == null) throw IllegalStateException("state not ready")
-            if (care != null && !postJsonOk("/care", care.toString())) {
+            if (care != null && !postJson("/care", care.toString())) {
                 throw IllegalStateException("care not accepted")
             }
-            if (life != null && !postJsonOk("/life", life.toString())) {
+            if (life != null && !postJson("/life", life.toString())) {
                 throw IllegalStateException("life not accepted")
             }
-            if (rules != null && !postJsonOk("/rules", rules)) {
+            if (rules != null && !postJson("/rules", rules)) {
                 throw IllegalStateException("rules not accepted")
             }
             if (wantedBond >= 0.0) {
@@ -378,7 +378,7 @@ fun restoreCompanion(context: Context): Boolean {
     return false
 }
 
-private fun getJson(path: String): String {
+internal fun getJson(path: String): String {
     val connection = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
     connection.requestMethod = "GET"
     connection.connectTimeout = 1500
@@ -390,11 +390,7 @@ private fun getJson(path: String): String {
     }
 }
 
-private fun postJson(path: String, body: String) {
-    postJsonOk(path, body)
-}
-
-private fun postJsonOk(path: String, body: String): Boolean {
+internal fun postJson(path: String, body: String): Boolean {
     val connection = URL("http://127.0.0.1:8765$path").openConnection() as HttpURLConnection
     connection.requestMethod = "POST"
     connection.doOutput = true

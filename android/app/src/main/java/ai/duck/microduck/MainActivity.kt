@@ -88,10 +88,15 @@ class MainActivity : ComponentActivity() {
                         // so it can never overwrite the file with defaults.
                         val activity = this@MainActivity
                         Thread {
+                            // The phone's calendar day with the saved quest
+                            // board; this is independent of care restore.
+                            postQuestDay(activity)
                             if (restoreCompanion(activity)) {
                                 companionReady = true
                                 while (companionReady) {
                                     saveCompanionNow(activity)
+                                    val boardState = fetchRawState()
+                                    if (boardState != null) saveQuestBoard(activity, boardState)
                                     try {
                                         Thread.sleep(3_000)
                                     } catch (_: InterruptedException) {

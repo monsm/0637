@@ -108,6 +108,9 @@ pub enum Intent {
     /// Open the LAN socket and announce as `name`. On-demand because iOS
     /// asks for local-network permission the first time one is opened.
     StartLan(String),
+    /// The shell's calendar day, plus the quest board it saved. Quests are
+    /// the person's day, not simulated time; a rewind must not rewrite them.
+    QuestDay(String, serde_json::Value),
     /// How long the duck waits before doing something by itself, in seconds.
     IdleRitual(f64),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
@@ -153,6 +156,9 @@ pub struct IntentQueue {
     sensors: Mutex<Value>,
     /// The duck's lifetime record, shared with the loop that counts it.
     life: Mutex<crate::vetbook::Book>,
+    /// Daily quests: the board the loop publishes and the day the shell owns.
+    quests: Mutex<Value>,
+    day: Mutex<String>,
 }
 
 impl Default for IntentQueue {
@@ -185,6 +191,8 @@ impl IntentQueue {
             branches: Mutex::new(json!({ "branches": [], "selected": "" })),
             sensors: Mutex::new(json!({ "mode": "twin" })),
             life: Mutex::new(crate::vetbook::Book::default()),
+            quests: Mutex::new(json!({ "day": "", "quests": [], "streak": 0 })),
+            day: Mutex::new(String::new()),
             time: Mutex::new(json!({
                 "tick": 0,
                 "paused": false,
@@ -328,6 +336,7 @@ impl IntentQueue {
 
     /// The lifetime record as JSON. The queue owns the book so the shell can
     /// read it without going through the core's FFI.
+    /// The lifetime record, as the core last published it.
     pub fn life_json(&self) -> String {
         self.life.lock().expect("intent life").summary().to_string()
     }
@@ -342,6 +351,22 @@ impl IntentQueue {
 
     pub fn sensors_json(&self) -> String {
         self.sensors.lock().expect("intent sensors").to_string()
+    }
+
+    pub fn quests_json(&self) -> String {
+        self.quests.lock().expect("intent quests").to_string()
+    }
+
+    pub fn set_quests(&self, value: Value) {
+        *self.quests.lock().expect("intent quests") = value;
+    }
+
+    pub fn set_day(&self, value: String) {
+        *self.day.lock().expect("intent day") = value;
+    }
+
+    pub fn day(&self) -> String {
+        self.day.lock().expect("intent day").clone()
     }
 
     pub fn set_peers(&self, value: Value) {
@@ -487,6 +512,7 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         ("GET", "/sensors") => Ok(queue.sensors_json()),
         // The lifetime record, the same counters the shell keeps in storage.
         ("GET", "/life") => Ok(queue.life_json()),
+        ("GET", "/quests") => Ok(queue.quests_json()),
         // The same record as a file a person can share, in the two shapes a
         // share sheet wants. No new counting path: both call vetbook/export.
         ("GET", "/export/vetbook.md") => Ok(queue.vetbook_markdown()),
@@ -667,6 +693,14 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
                 value.get("care").cloned().unwrap_or(value.clone()),
             ));
             Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
+        ("POST", "/quests/day") => {
+            let day = value["day"].as_str().unwrap_or("").chars().take(10).collect::<String>();
+            let board = value.get("board").cloned().unwrap_or(json!({}));
+            queue.set_day(day.clone());
+            Ok(queue
+                .request(Intent::QuestDay(day, board))
+                .to_string())
         }
         ("POST", "/config") => {
             let idle = value.get("idle_ritual_s").and_then(Value::as_f64);

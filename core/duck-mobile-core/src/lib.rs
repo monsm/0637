@@ -28,6 +28,7 @@ pub mod mcp;
 pub mod params;
 pub mod pickup;
 pub mod provenance;
+pub mod quests;
 pub mod rules;
 #[cfg(feature = "mujoco")]
 pub mod ffi;

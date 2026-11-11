@@ -651,6 +651,20 @@ sys.exit(0 if d.get('highlights',{}).get('rolls') is not None and 'care' in d el
 " 2>/dev/null
 check $? "the vet book has a canonical JSON shape" "$(printf '%s' "$VETBOOK_JSON" | head -c 120)"
 
+# Daily quests: the shell posts its calendar day, the core picks three
+# measurable goals from the real vet book, and completing one is visible.
+echo "--- daily quests ---"
+QUEST_DAY=$(python3 -c 'import datetime; print(datetime.date.today().isoformat())')
+api POST /quests/day "{\"day\":\"$QUEST_DAY\",\"board\":{}}" > /dev/null || true
+QUESTS=$(api GET /quests || true)
+printf '%s' "$QUESTS" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)
+q=d.get('quests',[])
+sys.exit(0 if d.get('day') == '$QUEST_DAY' and len(q)==3 and all('title_en' in x and 'progress' in x for x in q) else 1)
+" 2>/dev/null
+check $? "a calendar day creates three real quests" "$(printf '%s' "$QUESTS" | head -c 160)"
+
 # Gaze: the gaze solver runs on the training MJCF's own kinematics, so
 # aiming right of the trunk must produce a positive head_yaw and the answer
 # must stay within the servo travel the MJCF declares.
