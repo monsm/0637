@@ -10,6 +10,9 @@ import simd
 /// The renderer and the core share the main thread, so Metal never reads
 /// MuJoCo state while it is being written.
 final class DuckController: ObservableObject {
+    /// Dance Studio is owned by the controller, so every action button can
+    /// record what it just did without a second path through the core.
+    let dance = DanceStudio()
     /// The live renderer, for the Director shutter's frame read-back. Weak:
     /// the view owns the renderer, not the controller.
     weak var renderer: Renderer?
@@ -1214,6 +1217,7 @@ final class DuckController: ObservableObject {
     /// A stroke of the hand: POST /pet. The core counts it, coos and stays
     /// lively a little longer; `/state` and the away recap read it back.
     func pet() {
+        dance.record("pet", label: Copy.danceStepPet)
         guard let url = URL(string: "http://127.0.0.1:8765/pet") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1226,6 +1230,7 @@ final class DuckController: ObservableObject {
     /// ground-pick peck and counts it in the life record. Fire-and-forget;
     /// the sheet shows the skill when it starts.
     func feed() {
+        dance.record("feed", label: Copy.feed)
         guard let url = URL(string: "http://127.0.0.1:8765/feed") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1701,6 +1706,7 @@ final class DuckController: ObservableObject {
     }
 
     func sit() {
+        dance.record("sit", label: Copy.sit)
         guard let core else { return }
         _ = duck_core_sit_toggle(core)
     }
@@ -1757,6 +1763,7 @@ final class DuckController: ObservableObject {
     /// loop's own; the rest are manifest skills, and the core refuses an
     /// unknown name rather than pretending it started.
     func trigger(_ name: String) {
+        dance.record("skill", value: name, label: SkillLabel.of(name))
         guard let core else { return }
         let started = name.withCString { duck_core_trigger_skill(core, $0) }
         if started != 0 { lastSkill = name }

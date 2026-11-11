@@ -124,6 +124,17 @@ val quack get() = pick("Quack", "叫一声")
     val questDone get() = pick("Done", "完成")
     fun questStreak(days: Int) = pick("$days-day streak", "连续 $days 天")
     val questAllDone get() = pick("All done — the duck is proud of you!", "全部完成，鸭子为你骄傲！")
+    // Dance Studio.
+    val dance get() = pick("Dance Studio", "编舞铺")
+    val danceHint get() = pick(
+        "Press Record, then do anything: a skill, a quack, a treat. Press Play and the duck repeats it.",
+        "按录制，然后做动作：技能、叫声、喂食。按播放，鸭子照着重演。",
+    )
+    val danceEmpty get() = pick("No steps yet", "还没有动作")
+    val danceRecord get() = pick("Record", "录制")
+    val danceStopRecord get() = pick("Stop recording", "停止录制")
+    val dancePlay get() = pick("Play", "播放")
+    val danceStop get() = pick("Stop", "停止")
     // The vet book, and the file it exports.
     val lifeRecord get() = pick("Life record", "终身记录")
     val walked get() = pick("walked", "走过")

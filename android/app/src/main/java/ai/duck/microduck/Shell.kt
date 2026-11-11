@@ -116,6 +116,9 @@ fun Shell(
     var quests by remember { mutableStateOf(QuestBoardUi()) }
     // The user's own model: config, last answer and the loop's guard.
     var showAI by remember { mutableStateOf(false) }
+    var showDance by remember { mutableStateOf(false) }
+    val dance = remember(context) { DanceStudio(context) }
+    var danceShow by remember { mutableStateOf(0) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
     var aiStatus by remember { mutableStateOf("") }
     var aiDecision by remember { mutableStateOf("") }
@@ -334,6 +337,7 @@ fun Shell(
                         onSurface = onSurface,
                         onFlashlight = toggleFlashlight,
                         onRules = { showRules = true },
+                        onDance = { showDance = true },
                         onPeers = { showPeers = true },
                         onAI = { showAI = true },
                         onLanguage = {
@@ -402,7 +406,10 @@ fun Shell(
                         carrying = carrying,
                         onCarrying = { carrying = it },
                         quack = quack,
-                        onFeed = onFeed,
+                        onFeed = {
+                            dance.record("feed", label = Copy.feed)
+                            onFeed?.invoke()
+                        },
                         onWheee = onWheee,
                         onSkills = { showRing = true },
                         modifier = Modifier
@@ -498,6 +505,7 @@ fun Shell(
                 onSurface = onSurface,
                 onFlashlight = toggleFlashlight,
                 onRules = { showRules = true },
+                onDance = { showDance = true },
                 onPeers = { showPeers = true },
                 onAI = { showAI = true },
                 onLanguage = {
@@ -608,6 +616,7 @@ fun Shell(
                 skills = skills,
                 bottomAnchored = portrait,
                 onPick = { name ->
+                    dance.record("skill", name, Copy.skillLabel(name))
                     when (name) {
                         "sit" -> core.sit()
                         "ground_pick" -> core.groundPick()
@@ -669,6 +678,25 @@ fun Shell(
             },
             quests = quests,
         ) { showSheet = false }
+    }
+
+    if (showDance && core != null) {
+        DanceSheet(
+            studio = dance,
+            onSkill = { name ->
+                dance.record("skill", name, skillLabel(name))
+                when (name) {
+                    "sit" -> core.sit()
+                    "ground_pick" -> core.groundPick()
+                    else -> core.skill(name)
+                }
+            },
+            onSound = { tag ->
+                dance.record("sound", tag, tag)
+                quack?.invoke()
+            },
+            onClose = { showDance = false },
+        )
     }
 
     if (showRules && core != null) {
@@ -1116,6 +1144,7 @@ private fun TopBar(
     onSurface: (Surface) -> Unit,
     onFlashlight: () -> Unit,
     onRules: () -> Unit,
+    onDance: () -> Unit,
     onPeers: () -> Unit,
     onAI: () -> Unit,
     onLanguage: () -> Unit,
@@ -1188,6 +1217,10 @@ private fun TopBar(
                 DropdownMenuItem(
                     text = { Text(Copy.blocks, color = Color.White) },
                     onClick = { onRules(); onMenuOpen(false) },
+                )
+                DropdownMenuItem(
+                    text = { Text(Copy.dance, color = Color.White) },
+                    onClick = { onDance(); onMenuOpen(false) },
                 )
                 DropdownMenuItem(
                     text = { Text(Copy.peers, color = Color.White) },

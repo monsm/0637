@@ -200,6 +200,21 @@ enum Copy {
     static var trickBook: String { pick("Trick book", "技巧图鉴") }
     // The vet book, and the file it exports.
     static var lifeRecord: String { pick("Life record", "终身记录") }
+    // Dance Studio: record actions and replay them.
+    static var dance: String { pick("Dance Studio", "编舞铺") }
+    static var danceShort: String { pick("Dance", "编舞") }
+    static var danceHint: String {
+        pick("Press Record, then do anything: a skill, a quack, a treat. Press Play and the duck repeats it.",
+             "按录制，然后做动作：技能、叫声、喂食。按播放，鸭子照着重演。")
+    }
+    static var danceEmpty: String { pick("No steps yet", "还没有动作") }
+    static var danceRecord: String { pick("Record", "录制") }
+    static var danceStopRecord: String { pick("Stop recording", "停止录制") }
+    static var dancePlay: String { pick("Play", "播放") }
+    static var danceStop: String { pick("Stop", "停止") }
+    static var danceSaved: String { pick("Saved on this phone", "已存在这台手机") }
+    static var danceStepPet: String { pick("Pet", "摸摸") }
+    static var danceStepSound: String { pick("Quack", "叫一声") }
     // Daily quests.
     static var quests: String { pick("Today's quests", "今日小挑战") }
     static var questDone: String { pick("Done", "完成") }

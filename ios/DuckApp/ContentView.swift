@@ -38,6 +38,8 @@ struct ContentView: View {
     @State private var showPeers = false
     /// The user's own model.
     @State private var showAI = false
+    /// The child's choreography recorder.
+    @State private var showDance = false
     /// One sheet at a time. SwiftUI's multiple `.sheet` modifiers on one view
     /// are not reliable; a single item sheet cannot disagree with itself.
     enum Modal: Identifiable {
@@ -46,6 +48,7 @@ struct ContentView: View {
         case rules
         case peers
         case ai
+        case dance
 
         var id: String {
             switch self {
@@ -54,6 +57,7 @@ struct ContentView: View {
             case .rules: return "rules"
             case .peers: return "peers"
             case .ai: return "ai"
+            case .dance: return "dance"
             }
         }
     }
@@ -178,6 +182,10 @@ struct ContentView: View {
                     AISheet(controller: controller)
                         .presentationDetents(portrait ? [.medium, .large] : [.large])
                         .presentationDragIndicator(.visible)
+                case .dance:
+                    DanceSheet(studio: controller.dance, execute: playDanceStep)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
                 }
             }
             .onChange(of: showInstrument) { _, show in
@@ -197,6 +205,9 @@ struct ContentView: View {
             }
             .onChange(of: showAI) { _, show in
                 if show { showAI = false; modal = .ai }
+            }
+            .onChange(of: showDance) { _, show in
+                if show { showDance = false; modal = .dance }
             }
         }
         .preferredColorScheme(.dark)
@@ -647,6 +658,22 @@ struct ContentView: View {
             wheeeEndedAt = .distantPast
         } else if let core = controller.core {
             controller.voice.play(core: core, tag: "chirp")
+            controller.dance.record("sound", value: "chirp", label: Copy.danceStepSound)
+        }
+    }
+
+    /// Replay one recorded step through the same button path it was made by.
+    private func playDanceStep(_ step: DanceStep) {
+        switch step.kind {
+        case "skill": controller.trigger(step.value)
+        case "sound":
+            if let core = controller.core {
+                controller.voice.play(core: core, tag: step.value)
+            }
+        case "pet": controller.pet()
+        case "feed": controller.feed()
+        case "sit": controller.sit()
+        default: break
         }
     }
 
@@ -862,6 +889,12 @@ struct ContentView: View {
                     Label(Copy.ai, systemImage: "brain.head.profile")
                 }
                 .accessibilityIdentifier("open-ai")
+                Button {
+                    showDance = true
+                } label: {
+                    Label(Copy.dance, systemImage: "music.note.list")
+                }
+                .accessibilityIdentifier("open-dance")
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 17, weight: .semibold))
