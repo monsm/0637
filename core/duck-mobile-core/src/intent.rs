@@ -87,6 +87,7 @@ pub enum Intent {
     Wheee(bool),
     /// A stroke of the hand on the duck.
     Pet,
+    Feed,
     /// The lifetime record a shell saved across launches, handed back so the
     /// duck's history survives an app restart.
     RestoreLife(serde_json::Value),
@@ -536,6 +537,7 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             None => Err("missing tag"),
         },
         ("POST", "/pet") => Ok(queue.request(Intent::Pet).to_string()),
+        ("POST", "/feed") => Ok(queue.request(Intent::Feed).to_string()),
         ("POST", "/config") => Ok(queue
             .request(Intent::IdleRitual(
                 value["idle_ritual_s"].as_f64().unwrap_or(30.0),

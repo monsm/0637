@@ -353,6 +353,14 @@ STARTLED=$(api GET /state | field last_sound)
 [ "$STARTLED" = "alarm" ]; check $? "a loud room startles the duck" "last_sound=$STARTLED"
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
 
+# A treat on the floor: the official ground-pick peck, counted in the
+# life record. Nothing about food exists on the robot; the ritual is
+# digital-only and made of official moves.
+echo "--- feed ---"
+FED=$(api POST /feed '{}' || true)
+printf '%s' "$FED" | grep -q '"ok":true'
+check $? "a treat starts the peck" "$(printf '%s' "$FED" | head -c 120)"
+
 # The lifetime record: the same facts robotd's vet book keeps, countable on
 # a phone. A duck that has run a skill must say so.
 echo "--- life ---"
@@ -362,7 +370,8 @@ check $? "life publishes the record" "$(printf '%s' "$LIFE" | head -c 120)"
 printf '%s' "$LIFE" | python3 -c "
 import json,sys
 b=json.load(sys.stdin)
-sys.exit(0 if b.get('skills',{}).get('roulade',0) >= 1 and b.get('emotions',{}).get('curious',0) >= 1 else 1)
+any_emotion = sum(b.get('emotions',{}).values())
+sys.exit(0 if b.get('skills',{}).get('roulade',0) >= 1 and b.get('fed',0) >= 1 and any_emotion >= 1 else 1)
 " 2>/dev/null
 check $? "life counts the skills and emotions the duck ran" ""
 printf '%s' "$LIFE" | python3 -c "
@@ -807,7 +816,7 @@ check $? "MCP initialize answers" "$(printf '%s' "$INIT" | head -c 100)"
 
 TOOLS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' http://127.0.0.1:8765/mcp || true)
 echo "$TOOLS" | tee "$OUT/mcp-tools.json" > /dev/null
-for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear duck_look duck_wheee duck_life duck_pet; do
+for tool in duck_state duck_move duck_skill duck_pause duck_fork duck_sensors duck_flashlight duck_hear duck_look duck_wheee duck_life duck_pet duck_feed; do
   printf '%s' "$TOOLS" | grep -q "\"$tool\""
   check $? "MCP tool listed: $tool" ""
 done

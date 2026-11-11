@@ -69,6 +69,23 @@ class MainActivity : ComponentActivity() {
                     input = input,
                     onQuack = { voice?.play("chirp") },
                     onWheee = { held -> core?.wheee(held) },
+                    onFeed = {
+                        Thread {
+                            try {
+                                val connection = java.net.URL("http://127.0.0.1:8765/feed")
+                                    .openConnection() as java.net.HttpURLConnection
+                                connection.requestMethod = "POST"
+                                connection.connectTimeout = 2000
+                                connection.readTimeout = 5000
+                                connection.doOutput = true
+                                connection.outputStream.use { it.write("{}".toByteArray()) }
+                                connection.inputStream.readBytes()
+                                connection.disconnect()
+                            } catch (_: Exception) {
+                                // The loop refuses when busy; nothing to show.
+                            }
+                        }.start()
+                    },
                 )
             }
         }
@@ -95,6 +112,7 @@ private fun DuckScreen(
     input: DuckInput,
     onQuack: () -> Unit,
     onWheee: (Boolean) -> Unit,
+    onFeed: () -> Unit,
 ) {
     val context = LocalContext.current
     var core by remember { mutableStateOf(coreProvider()) }
@@ -185,6 +203,7 @@ private fun DuckScreen(
                 onSurface = { surface = it },
                 quack = onQuack,
                 onWheee = onWheee,
+                onFeed = onFeed,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

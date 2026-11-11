@@ -527,6 +527,18 @@ final class DuckController: ObservableObject {
         sensorTimer = timer
     }
 
+    /// A treat on the floor: POST /feed, the core runs the official
+    /// ground-pick peck and counts it in the life record. Fire-and-forget;
+    /// the sheet shows the skill when it starts.
+    func feed() {
+        guard let url = URL(string: "http://127.0.0.1:8765/feed") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 2.0
+        request.httpBody = Data("{}".utf8)
+        URLSession.shared.dataTask(with: request).resume()
+    }
+
     private func pollSensors() {
         reportPerformance()
         guard let url = URL(string: "http://127.0.0.1:8765/sensors") else { return }

@@ -57,7 +57,8 @@ object Copy {
     val grab get() = pick("Hold", "拎起")
     val putDown get() = pick("Drop", "放下")
     val held get() = pick("in a hand · drag to carry", "在手里 · 拖动搬运")
-    val quack get() = pick("Quack", "叫一声")
+    val feed get() = pick("Feed", "喂食")
+val quack get() = pick("Quack", "叫一声")
     val drive get() = pick("drive", "驱动")
     fun stick(mode: String): String = when (mode) {
         "head" -> pick("look", "看")

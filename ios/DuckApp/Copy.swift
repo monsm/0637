@@ -159,6 +159,7 @@ enum Copy {
     }
     static var behavior: String { pick("behaviour", "此刻") }
     static var menu: String { pick("Menu", "菜单") }
+    static var feed: String { pick("Feed", "喂食") }
     static var tiltLook: String { pick("Tilt to look", "倾斜看") }
     static var tiltLookOn: String { pick("Tilt to look: on", "倾斜看：开") }
     static var trickBook: String { pick("Trick book", "技巧图鉴") }

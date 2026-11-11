@@ -58,6 +58,11 @@ pub fn tools() -> Value {
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
         },
         {
+            "name": "duck_feed",
+            "description": "Drop a treat: the duck does its official ground-pick peck at the floor and a satisfied sound. Digital-only ritual built from official moves; counted in the life record.",
+            "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+        },
+        {
             "name": "duck_life",
             "description": "The duck's lifetime record: seconds powered, walking and held; falls, pickups, sit/stand counts; every skill and emotion it has run, by name; metres walked.",
             "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
@@ -295,6 +300,7 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             Ok(queue.request(crate::intent::Intent::Skill(skill.to_owned())))
         }
         "duck_pet" => Ok(queue.request(crate::intent::Intent::Pet)),
+        "duck_feed" => Ok(queue.request(crate::intent::Intent::Feed)),
         "duck_life" => Ok(serde_json::json!({
             "ok": true,
             "life": serde_json::from_str::<serde_json::Value>(&queue.life_json())

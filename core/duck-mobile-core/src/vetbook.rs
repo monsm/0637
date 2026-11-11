@@ -47,6 +47,8 @@ pub struct Life {
     pub wake_ups: u64,
     /// Times somebody petted it.
     pub pets: u64,
+    /// Breadcrumb rituals: a treat dropped on the floor for the peck.
+    pub fed: u64,
     /// One-shot skills, by name: rolls, kicks, emotions.
     pub skills: BTreeMap<String, u64>,
     /// Emotions played, by name.
@@ -146,6 +148,7 @@ impl Book {
             "stand_ups": self.life.stand_ups,
             "wake_ups": self.life.wake_ups,
             "pets": self.life.pets,
+            "fed": self.life.fed,
             "metres": self.life.metres,
             "power_offs": self.life.power_offs,
             "skills": self.life.skills,

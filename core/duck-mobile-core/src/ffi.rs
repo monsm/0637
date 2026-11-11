@@ -777,6 +777,7 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             if let Some(v) = num("stand_ups") { life.stand_ups = v as u64; }
             if let Some(v) = num("wake_ups") { life.wake_ups = v as u64; }
             if let Some(v) = num("pets") { life.pets = v as u64; }
+            if let Some(v) = num("fed") { life.fed = v as u64; }
             if let Some(v) = num("metres") { life.metres = v; }
             if let Some(v) = num("power_offs") { life.power_offs = v as u64; }
             if let Some(m) = saved.get("skills").and_then(|v| v.as_object()) {
@@ -795,6 +796,13 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             core.runtime.pet();
             json!({ "ok": true, "pets": core.runtime.book().life.pets })
         }
+        Intent::Feed => match core.runtime.feed() {
+            Ok(true) => {
+                core.intents.set_life(core.runtime.book());
+                json!({ "ok": true, "fed": core.runtime.book().life.fed })
+            }
+            _ => refuse(core, "busy".to_owned()),
+        },
         Intent::Look { target, neck_pitch } => {
             let gaze = core.runtime.look_at(target, neck_pitch);
             json!({ "ok": true, "head": gaze.joints, "clamped": gaze.clamped })

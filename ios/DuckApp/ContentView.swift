@@ -397,6 +397,21 @@ struct ContentView: View {
             .accessibilityLabel(Copy.quack)
             .accessibilityIdentifier("duck-quack")
 
+            // A treat on the floor: the official ground-pick peck.
+            Button {
+                controller.feed()
+            } label: {
+                Label(Copy.feed, systemImage: "fork.knife")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 18))
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.feed)
+            .accessibilityIdentifier("duck-feed")
+
             // The face's flashlight, where a hand would reach: a press
             // toggles, white, as `robot.flashlight` does.
             Button {

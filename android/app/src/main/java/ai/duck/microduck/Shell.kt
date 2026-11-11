@@ -71,6 +71,7 @@ fun Shell(
     surface: Surface,
     onSurface: (Surface) -> Unit,
     quack: (() -> Unit)? = null,
+    onFeed: (() -> Unit)? = null,
     onWheee: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -325,6 +326,9 @@ fun Shell(
                     onHold = { onWheee?.invoke(it) },
                 )
             }
+            // A treat on the floor: the official ground-pick peck, counted
+            // in the life record. POST /feed; the loop refuses when busy.
+            RoundChip(Copy.feed, size = 48.dp) { onFeed?.invoke() }
         }
         // Pick the duck up or put it down: the biggest target on screen, in
         // the corner a thumb reaches first.

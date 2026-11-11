@@ -1007,6 +1007,20 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.pet_glow_until = Some(self.clock.tick + 150);
     }
 
+    /// A treat on the floor: the official ground-pick peck serves as the
+    /// bite, and a satisfied sound seals it. Digital-only ritual, but every
+    /// part of it is an official move — the robot eats nothing, and this
+    /// one pretends to no hardware.
+    pub fn feed(&mut self) -> Result<bool, &'static str> {
+        let started = self.trigger_skill("ground_pick")?;
+        if started {
+            self.book.life.fed += 1;
+            self.book.note("feed".to_owned());
+            self.queue_sound("yes");
+        }
+        Ok(started)
+    }
+
     /// The lifetime record, for `/state.life` and the shell's own storage.
     pub fn book(&self) -> &crate::vetbook::Book {
         &self.book
