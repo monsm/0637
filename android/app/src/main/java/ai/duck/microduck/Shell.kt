@@ -204,6 +204,7 @@ fun Shell(
         var lastSoundTick = -1
         var lastRuleTick = -1
         var lastPeerTick = -1
+        var lastCompanionSave = 0L
         while (true) {
             val line = withContext(Dispatchers.IO) { fetchCare()?.line() }
             if (line != null) careLine = line
@@ -225,6 +226,12 @@ fun Shell(
                 soundLine = peerEvent.text
             }
             val now = System.currentTimeMillis()
+            // Save on a cadence as well as onPause: a process killed without a
+            // lifecycle callback still leaves the duck's tummy on disk.
+            if (now - lastCompanionSave >= 10_000) {
+                lastCompanionSave = now
+                withContext(Dispatchers.IO) { saveCompanionNow(context) }
+            }
             if (aiConfig.enabled && !aiThinking &&
                 now - lastAIThink >= maxOf(10, aiConfig.interval) * 1000L
             ) {

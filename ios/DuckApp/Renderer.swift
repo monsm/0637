@@ -377,10 +377,13 @@ final class Renderer: NSObject, MTKViewDelegate {
         // a second rendering that could disagree with it.
         if let completion = captureCompletion {
             captureCompletion = nil
+            // Present and read the same finished drawable. The command buffer
+            // must be committed before waiting; the drawable stays valid until
+            // the next frame.
+            buffer.present(drawable)
             buffer.commit()
             buffer.waitUntilCompleted()
             let image = readTexture(drawable.texture)
-            buffer.present(drawable)
             completion(image)
         } else {
             buffer.present(drawable)

@@ -248,7 +248,7 @@ struct ContentView: View {
         }
         // The model's own line, when it decides something.
         .onChange(of: controller.aiDecision) { _, decision in
-            guard let decision, !decision.isEmpty else { return }
+            guard !decision.isEmpty else { return }
             withAnimation(.easeIn(duration: 0.2)) { moodText = decision }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                 guard moodText == decision else { return }

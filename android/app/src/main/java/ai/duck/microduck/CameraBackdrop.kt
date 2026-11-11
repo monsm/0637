@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -181,21 +182,42 @@ class CameraCapture {
             onImage(null)
             return
         }
-        val directory = java.io.File(context.cacheDir, "captures").apply { mkdirs() }
-        val file = java.io.File(directory, "room-${System.currentTimeMillis()}.jpg")
-        val options = ImageCapture.OutputFileOptions.Builder(file).build()
         capture.takePicture(
-            options,
             ContextCompat.getMainExecutor(context),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
-                    file.delete()
-                    onImage(bitmap)
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    val bitmap = try {
+                        val buffer = image.planes[0].buffer
+                        val bytes = ByteArray(buffer.remaining())
+                        buffer.get(bytes)
+                        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    val degrees = image.imageInfo.rotationDegrees
+                    image.close()
+                    if (bitmap == null) {
+                        onImage(null)
+                        return
+                    }
+                    // CameraX records the display rotation in EXIF rather
+                    // than rotating pixels; apply it so the room is upright
+                    // in the screen-space composite.
+                    if (degrees != 0) {
+                        val matrix = android.graphics.Matrix().apply {
+                            postRotate(degrees.toFloat())
+                        }
+                        val rotated = android.graphics.Bitmap.createBitmap(
+                            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true,
+                        )
+                        if (rotated !== bitmap) bitmap.recycle()
+                        onImage(rotated)
+                    } else {
+                        onImage(bitmap)
+                    }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
-                    file.delete()
                     onImage(null)
                 }
             },

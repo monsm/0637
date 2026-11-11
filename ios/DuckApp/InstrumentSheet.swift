@@ -41,6 +41,14 @@ struct InstrumentSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("ai-open")
+                // Attached to the button, not the scroll view: the sheet for
+                // the export file already lives on the scroll view, and
+                // SwiftUI is more reliable with one sheet per view.
+                .sheet(isPresented: $showAI) {
+                    AISheet(controller: controller)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { showDetails.toggle() }
                 } label: {
@@ -72,11 +80,6 @@ struct InstrumentSheet: View {
             if let shareURL {
                 ShareSheet(items: [shareURL])
             }
-        }
-        .sheet(isPresented: $showAI) {
-            AISheet(controller: controller)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
         }
     }
 

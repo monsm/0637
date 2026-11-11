@@ -265,20 +265,27 @@ fun fetchLastHeard(): String? = try {
  * /state is not kept - only the two objects the core can take back.
  */
 fun saveCompanion(context: Context) {
-    Thread {
-        try {
-            val state = JSONObject(getJson("/state"))
-            val saved = JSONObject()
-            state.optJSONObject("care")?.let { saved.put("care", it) }
-            state.optJSONObject("life")?.let { saved.put("life", it) }
-            if (saved.length() > 0) {
-                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .edit().putString(COMPANION_KEY, saved.toString()).apply()
-            }
-        } catch (_: Throwable) {
-            // The server may not be up yet; the next pause tries again.
+    Thread { saveCompanionNow(context) }.start()
+}
+
+/**
+ * The write itself. Runs on a caller-chosen thread; onPause waits for it, and
+ * the shell also saves every ten seconds so a process killed without a
+ * lifecycle callback keeps the duck's tummy.
+ */
+fun saveCompanionNow(context: Context) {
+    try {
+        val state = JSONObject(getJson("/state"))
+        val saved = JSONObject()
+        state.optJSONObject("care")?.let { saved.put("care", it) }
+        state.optJSONObject("life")?.let { saved.put("life", it) }
+        if (saved.length() > 0) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(COMPANION_KEY, saved.toString()).commit()
         }
-    }.start()
+    } catch (_: Throwable) {
+        // The server may not be up yet; the next save tries again.
+    }
 }
 
 /**

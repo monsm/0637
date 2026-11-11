@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import UIKit
 
 /// The rear camera as the backdrop of Director mode.
 ///
@@ -33,6 +34,10 @@ final class CameraFeed: NSObject, ObservableObject {
     }
 
     func start() {
+        // The still capture needs the device's orientation to rotate the room
+        // with the screen; without generating notifications the orientation
+        // reads unknown and every landscape photo comes out sideways.
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
         let status = AVCaptureDevice.authorizationStatus(for: .video)
         switch status {
         case .authorized:
@@ -61,6 +66,7 @@ final class CameraFeed: NSObject, ObservableObject {
                 session.stopRunning()
             }
         }
+        UIDevice.current.endGeneratingDeviceOrientationNotifications()
         available = false
     }
 
@@ -125,10 +131,21 @@ final class CameraFeed: NSObject, ObservableObject {
     /// Ask the camera for one still. Completion always runs on the main
     /// thread; nil means no camera, not yet running, or the capture failed.
     func capture(completion: @escaping (UIImage?) -> Void) {
+        let angle: CGFloat
+        switch UIDevice.current.orientation {
+        case .landscapeLeft: angle = 0
+        case .landscapeRight: angle = 180
+        case .portraitUpsideDown: angle = 270
+        default: angle = 90
+        }
         queue.async { [weak self] in
             guard let self, self.configured, self.session.isRunning else {
                 DispatchQueue.main.async { completion(nil) }
                 return
+            }
+            if let connection = self.photoOutput.connection(with: .video),
+               connection.isVideoRotationAngleSupported(angle) {
+                connection.videoRotationAngle = angle
             }
             self.photoCompletion = completion
             let settings = AVCapturePhotoSettings()

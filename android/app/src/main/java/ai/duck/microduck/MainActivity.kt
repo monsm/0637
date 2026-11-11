@@ -99,7 +99,16 @@ class MainActivity : ComponentActivity() {
         }.start()
         // The companion state is the duck's, not the activity's: hunger, mood
         // and the bond must survive the process being killed at any moment.
-        if (core != null) saveCompanion(this)
+        // Wait for the write: force-stop can follow this callback immediately,
+        // and a fire-and-forget thread would die with the process.
+        if (core != null) {
+            val save = Thread { saveCompanionNow(this) }
+            save.start()
+            try {
+                save.join(1500)
+            } catch (_: InterruptedException) {
+            }
+        }
     }
 
     override fun onDestroy() {
