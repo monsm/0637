@@ -422,6 +422,17 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 
 ---
 
+## 四之十四、家庭多鸭 · 合唱 Chorus（2026-11-12）
+
+多机的完整表达：**一只鸭子发起，整个房间的鸭子倒计时后一起做同一套动作**。
+
+- **协议**：LAN 第五动词 `chorus`——只收已知邻居、1–3 个官方情绪（wire 层校验）、每人 10 秒一条、id 去重、本机正在唱时忽略新的；`POST /chorus` 默认 `laugh + yes_fast`，非法动作即时拒绝且不广播不排队。
+- **真实编排**：收包后 1.5 秒倒计时，每个动作间隔 1.5 秒走真实 `trigger_emotion`；被忙碌技能拒绝的动作诚实跳过（歌降级但不停摆），最后一拍落定时 vetbook 记 `chorus`。入夜取消待唱合唱。`/state.chorus` 发布 role/moves/started_tick/真实房间人数。
+- **两端**：邻居表「一起唱」按钮（无邻居时可见但禁用）+「和 N 只鸭子一起唱」药丸。
+- **验证**：核心 2 个 LAN 门禁单测 + 1 个路由单测；iOS **192/192**（join→完成→vetbook、未知动作拒绝、lead 排队、role=lead 全过）；Android smoke `chorus joined, performed and led ok` 且 `chorus` 两次入账。工作流核心 agent 半途停止，核心与 Android 由我按对抗审查的 7 个 blocker 清单手写完成；CI 抓到并修复一个真实回归（ButtonChip 位置参数契约）。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
