@@ -543,7 +543,11 @@ python3 - <<'PY' > /tmp/duck-peer-ack.txt &
 import json, socket, time
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("127.0.0.1", 8799))
-sock.settimeout(6.0)
+# Long enough to cover the whole retry loop below: the script keeps asking
+# for up to twelve seconds, and a listener that leaves after six makes every
+# later ask a no-op — which is exactly how this check flakes on a loaded
+# runner.
+sock.settimeout(20.0)
 announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
 sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
 time.sleep(0.2)
