@@ -1294,7 +1294,12 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// A celebration the duck performs by itself (a completed quest). It must
     /// not count as a touch: the pet that completed the goal is the touch,
     /// and an automatic cheer would otherwise reset a doze or a neglect timer.
+    /// A dozing duck — a nap of its own or a night — is not stirred by its
+    /// own celebration; the quest is still counted, the emotion waits.
     pub fn celebrate_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        if self.care.asleep {
+            return Ok(false);
+        }
         self.start_emotion(name)
     }
 
@@ -1390,6 +1395,58 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.care
     }
 
+    /// Put the duck to bed on purpose: the same doze a long neglect reaches,
+    /// chosen. Idempotent, and it travels with the rest of the care numbers
+    /// through a checkpoint and a mode switch.
+    pub fn enter_night(&mut self) {
+        // A duck going to bed stops walking: a painted route must not drive
+        // it in its sleep.
+        self.cancel_path();
+        self.care.enter_night(self.clock.tick);
+    }
+
+    /// Morning: end a night that is running and wake the duck. `Some(quiet_s)`
+    /// when a night was running, `None` when the duck was not in night (a
+    /// no-op: a duck merely dozing on its own is not in night).
+    ///
+    /// The wake plays the official "yes" emotion when this build loaded it,
+    /// and the synth's chirp otherwise. The vet book keeps "morning" — or
+    /// "woken_by_touch" when a hand got there first.
+    pub fn end_night(&mut self) -> Option<f64> {
+        let quiet_s = self.care.end_night(self.clock.tick)?;
+        self.book.note("morning".to_owned());
+        // The official greeting, when this build loaded it; a move already
+        // owning the body still gets its voice. A build without the emotion
+        // answers with the synth's chirp.
+        if self.start_emotion("yes").is_err() {
+            let voice = if self.emotions.get("yes").is_some() {
+                "emotion:yes"
+            } else {
+                "chirp"
+            };
+            self.queue_sound(voice);
+        }
+        Some(quiet_s)
+    }
+
+    /// The night as `/state` publishes it, on every publish: whether one is
+    /// running, how quiet it has been, and the tick it began. `quiet_s` is
+    /// recomputed from the simulated tick delta and never taken from a client.
+    pub fn night_summary(&self) -> serde_json::Value {
+        match self.care.night {
+            Some(night) => serde_json::json!({
+                "active": true,
+                "quiet_s": self.care.quiet_s(self.clock.tick),
+                "started_tick": night.started_tick.min(u32::MAX as u64) as u32,
+            }),
+            None => serde_json::json!({
+                "active": false,
+                "quiet_s": 0.0,
+                "started_tick": 0,
+            }),
+        }
+    }
+
     /// How fast care ages. 1.0 is real time; a client may speed it up for a
     /// demo or a test, exactly as `idle_ritual_s` shortens the duck's
     /// self-entertainment clock.
@@ -1414,6 +1471,27 @@ impl<T: RobotIo> DuckRuntime<T> {
             // Legacy payload from another boot: its tick cannot be mapped.
             // Treat it as long ago rather than as "touched now".
             self.care.last_touch = 0;
+        }
+        // The night's start tick has the same boot problem. A number from a
+        // previous process's clock is in the future here, so the night
+        // restarts from this boot instead of publishing a quiet span that
+        // waits minutes to count at all.
+        if let Some(night) = &mut self.care.night {
+            if night.started_tick > self.clock.tick {
+                night.started_tick = self.clock.tick;
+            }
+        }
+        // `/care` with `asleep:false` is a hand, not the morning button: a
+        // live night ends honestly. A wholesale launch restore carries
+        // `asleep:true` with its night, so it does not land here.
+        if saved.get("asleep").and_then(serde_json::Value::as_bool) == Some(false)
+            && self.care.night.is_some()
+        {
+            self.care.touch(self.clock.tick);
+            // The note is written now; the touch's own flag would write it
+            // again on the next tick.
+            self.care.woken_by_touch = false;
+            self.book.note("woken_by_touch".to_owned());
         }
     }
 
@@ -2037,6 +2115,12 @@ impl<T: RobotIo> DuckRuntime<T> {
             // Five simulated seconds: enough for the coo (or the hand's
             // skill) to own the moment, not enough to hide a sad duck.
             self.sad_grace_until = Some(self.clock.tick.saturating_add(250));
+        }
+        if self.care.woken_by_touch {
+            // A hand ended the night: the book keeps the honest reason, the
+            // way a morning gets its own note and the same wake gets a coo.
+            self.care.woken_by_touch = false;
+            self.book.note("woken_by_touch".to_owned());
         }
         let now = TickTime::of(&self.clock);
         let sensors: Sensors = self.safety.read()?;

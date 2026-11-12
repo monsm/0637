@@ -207,6 +207,24 @@ final class DuckController: ObservableObject {
     private var companionRestored = false
     private var companionRestoreStarted = false
     private var lastCompanionSave = Date.distantPast
+    /// Sleep mode: the duck put to bed on purpose, read from /state.night.
+    /// The night is the same doze neglect reaches — `care.asleep` gates the
+    /// ordinary wake rules — but chosen, and the quiet number is the core's.
+    /// It is simulated seconds at the care's own scale: `(tick -
+    /// started_tick) * 0.02`, never wall time, so a paused or slowed duck
+    /// ages its night at the pace its care does.
+    @Published var nightActive = false
+    @Published var nightQuietSeconds: Double = 0
+    /// Raised on the active → inactive edge, and only when a real stretch of
+    /// quiet lay behind it, so the morning pill has something to say. A
+    /// launch into an already-inactive night is silent.
+    @Published var nightWakeTick = 0
+    /// The whole quiet minutes at the moment the night ended, for the
+    /// morning line; the wire's inactive quiet_s reads 0, so this is held
+    /// from the last active publish instead of trusting the transition poll.
+    @Published var nightWakeMinutes = 0
+    private var nightWasActive = false
+    private var lastNightQuietSeconds: Double = 0
     /// The last /state slices the 1 Hz poll read. A synchronous copy at the
     /// door cannot be killed with the process like an in-flight URLSession.
     private var latestCare: [String: Any]?
@@ -1414,6 +1432,15 @@ final class DuckController: ObservableObject {
         URLSession.shared.dataTask(with: request).resume()
     }
 
+    /// Sleep mode's two faces. POST /night: on puts the duck to bed on
+    /// purpose; off is the morning, which clears the night and writes the
+    /// vetbook note "morning". A pet or a real hand ends the night too, with
+    /// its own note, so the next /state poll reports whichever came last.
+    /// Fire-and-forget; `nightActive` updates when the poll reads it back.
+    func postNight(on: Bool) {
+        postJSON("/night", ["on": on])
+    }
+
     /// Paint a route: POST /path with body-frame waypoints in metres (+x
     /// forward, +y left at the route's start). The core drops the first
     /// point (the duck's own origin), refuses a route over its caps without
@@ -1552,6 +1579,12 @@ final class DuckController: ObservableObject {
                             self.giftTick += 1
                         }
                     }
+                    // Sleep mode's nightly slice sits beside care in the
+                    // same publish; parse it before the care block so the
+                    // wake edge is seen exactly once.
+                    if let night = json["night"] as? [String: Any] {
+                        self.parseNight(night)
+                    }
                     if let care = json["care"] as? [String: Any] {
                         self.careHunger = care["hunger"] as? Double ?? 0
                         self.careMood = care["mood"] as? Double ?? 0
@@ -1657,6 +1690,25 @@ final class DuckController: ObservableObject {
         pathActive = true
         pathReached = path["reached"] as? Int ?? 0
         pathTotal = path["total"] as? Int ?? 0
+    }
+
+    /// The night's slice of /state: whether the chosen sleep is running and
+    /// how long it has been quiet. An inactive answer publishes quiet_s 0,
+    /// so the wake pill's minutes come from the last active publish, held
+    /// here for the single transition poll that follows. The wake tick only
+    /// fires when that held stretch was real: a duck that was put to bed and
+    /// taken out again within the same tick has no morning to announce.
+    private func parseNight(_ night: [String: Any]) {
+        let active = night["active"] as? Bool ?? false
+        let quiet = night["quiet_s"] as? Double ?? 0
+        if nightWasActive && !active && lastNightQuietSeconds > 0 {
+            nightWakeMinutes = Int(lastNightQuietSeconds / 60)
+            nightWakeTick += 1
+        }
+        nightWasActive = active
+        lastNightQuietSeconds = active ? quiet : 0
+        nightActive = active
+        nightQuietSeconds = quiet
     }
 
     /// `robot.flashlight` on a phone: a press toggles, in white. The core is

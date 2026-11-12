@@ -12,6 +12,7 @@
 //! POST /sit         {}
 //! POST /ground_pick {}
 //! POST /push        {"vx":0.6,"vy":0,"vz":0}
+//! POST /night       {"on":true}                         good night / morning
 //! POST /reload      {"dir":"/path/to/policies"}
 //! GET  /state
 //! GET  /skills
@@ -101,6 +102,9 @@ pub enum Intent {
     /// A stroke of the hand on the duck.
     Pet,
     Feed,
+    /// The night: put the duck to bed on purpose (`true`), or end it with the
+    /// morning (`false`) and learn how quiet the night was.
+    Night(bool),
     /// The lifetime record a shell saved across launches, handed back so the
     /// duck's history survives an app restart.
     RestoreLife(serde_json::Value),
@@ -877,6 +881,18 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Ok(json!({ "ok": true, "queued": true }).to_string())
         }
         ("POST", "/feed") => Ok(queue.request(Intent::Feed).to_string()),
+        // A good night is a tap: the next tick applies it, so its answer is
+        // the queue's, like /pet. Morning must answer how quiet the night
+        // was, which only the tick knows, so it waits for the verdict.
+        // Anything but a boolean `on` is refused before the queue.
+        ("POST", "/night") => match value["on"].as_bool() {
+            Some(true) => {
+                queue.push(Intent::Night(true));
+                Ok(json!({ "ok": true, "queued": true }).to_string())
+            }
+            Some(false) => Ok(queue.request(Intent::Night(false)).to_string()),
+            None => Ok(json!({ "ok": false, "error": "send {on:true|false}" }).to_string()),
+        },
         // The companion state is public read / restore-only write: a client
         // can hand back what it saved, but cannot claim the duck loves it.
         ("GET", "/care") => Ok(queue.care_json()),
@@ -1266,5 +1282,57 @@ mod tests {
         let result = queue.request(Intent::Sit);
         assert_eq!(result["ok"], json!(false));
         assert_eq!(result["pending"], json!(true));
+    }
+
+    /// `/night` is a two-state switch: a body without a boolean `on` is
+    /// refused before the queue, a good night is queued like a tap, and the
+    /// morning passes the tick's quiet span through untouched.
+    #[test]
+    fn http_queues_a_night_and_refuses_a_body_without_on() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for body in [r#"{}"#, r#"{"on":null}"#, r#"{"on":1}"#, r#"{"on":"true"}"#] {
+            let response = request(port, "POST", "/night", body);
+            assert!(response.contains(r#""ok":false"#), "{body}: {response}");
+            assert!(response.contains(r#""error":"#), "{body}: {response}");
+            assert!(
+                queue.drain().is_empty(),
+                "a refused night was queued: {body}"
+            );
+        }
+
+        let response = request(port, "POST", "/night", r#"{"on":true}"#);
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        assert!(response.contains(r#""queued":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        assert!(matches!(intents[0].intent, Intent::Night(true)));
+
+        // Morning waits for the tick because only it knows the quiet span;
+        // the duck's side of the conversation answers as the tick would.
+        let worker = {
+            let queue = queue.clone();
+            std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while Instant::now() < deadline {
+                    for item in queue.drain() {
+                        let answer = match item.intent {
+                            Intent::Night(false) => {
+                                json!({ "ok": true, "queued": true, "quiet_s": 12.5 })
+                            }
+                            _ => json!({ "ok": true }),
+                        };
+                        queue.answer(item.id, answer);
+                    }
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            })
+        };
+        let response = request(port, "POST", "/night", r#"{"on":false}"#);
+        assert!(response.contains(r#""quiet_s":12.5"#), "{response}");
+        let _ = worker.join();
     }
 }

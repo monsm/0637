@@ -272,6 +272,11 @@ fun Shell(
         var lastRuleTick = -1
         var lastPeerTick = -1
         var lastGiftTick = -1
+        // The night is a state, not an event, so the edge is the guard: the
+        // inactive object is zeroed, and only the last active publish knows
+        // how long the quiet lasted.
+        var lastNightActive = false
+        var lastNightQuiet = 0.0
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.
@@ -307,6 +312,17 @@ fun Shell(
             if (giftEvent != null && giftEvent.tick != lastGiftTick) {
                 lastGiftTick = giftEvent.tick
                 soundLine = giftEvent.text
+            }
+            // The night: a chosen sleep, ended by the morning verb or by a
+            // real hand. Its end is the active->inactive edge, and the pill
+            // uses the quiet the last active publish carried.
+            val nightNow = stateText?.let(::parseNight)
+            if (nightNow != null) {
+                if (lastNightActive && !nightNow.active && lastNightQuiet > 0.0) {
+                    soundLine = Copy.goodMorningLine((lastNightQuiet / 60.0).roundToInt())
+                }
+                lastNightActive = nightNow.active
+                if (nightNow.active) lastNightQuiet = nightNow.quietSeconds
             }
             // The path runner: the same publish carries whether a walk is on,
             // the progress through it and the waypoints as accepted.
@@ -2423,6 +2439,33 @@ private fun CareCard(care: CareUi) {
     }
 }
 
+/**
+ * The night row: one chip to say good night, and while the night runs the
+ * quiet it has kept plus the chip that ends it. The chips post the one
+ * night verb; neither feeds the duck or otherwise counts as a hand.
+ */
+@Composable
+private fun NightRow(night: NightUi, onNight: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (night.active) {
+            Text(
+                Copy.nightQuiet((night.quietSeconds / 60.0).roundToInt()),
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 11.sp,
+                modifier = Modifier.testTag("night-quiet"),
+            )
+            ButtonChip(Copy.goodMorning, "night-wake") { onNight(false) }
+        } else {
+            Spacer(Modifier.weight(1f))
+            ButtonChip(Copy.goodNight, "night-sleep") { onNight(true) }
+        }
+    }
+}
+
 @Composable
 private fun CareBar(
     label: String,
@@ -2540,6 +2583,9 @@ private fun InstrumentSheet(
     var trickBook by remember { mutableStateOf("—") }
     // The companion layer, read from /state.care on the same 1 Hz loop.
     var care by remember { mutableStateOf(CareUi()) }
+    // The chosen night, the top-level /state.night beside that care: the
+    // row says whether the duck is down for the night and how quietly.
+    var night by remember { mutableStateOf(NightUi()) }
     // The vet book's three headline numbers, from the same /state.life.
     var lifeRecord by remember { mutableStateOf(LifeUi()) }
     // What the duck logged while the app was away; remembered across closes
@@ -2576,9 +2622,23 @@ private fun InstrumentSheet(
             face = fetchFace()
             trickBook = fetchTrickBook()
             fetchCare()?.let { care = it }
+            // The night rides the same /state: the row is only ever what the
+            // core published, and a failed read keeps the last one.
+            night = withContext(Dispatchers.IO) { fetchNight() } ?: night
             fetchLifeRecord()?.let { lifeRecord = it }
             branches = withContext(Dispatchers.IO) { fetchBranchCount() }
             delay(1000)
+        }
+    }
+
+    // One night verb: the chip posts, and the row shows what the core
+    // accepted. The 1 Hz loop above is the fallback when the tick is slow.
+    val setNight: (Boolean) -> Unit = { on ->
+        scope.launch {
+            val queued = withContext(Dispatchers.IO) {
+                postJson("/night", org.json.JSONObject().put("on", on).toString())
+            }
+            if (queued) withContext(Dispatchers.IO) { fetchNight() }?.let { night = it }
         }
     }
 
@@ -2610,6 +2670,7 @@ private fun InstrumentSheet(
             ButtonChip(if (showDetails) Copy.showLess else Copy.showMore) { showDetails = !showDetails }
             QuestCard(quests)
             CareCard(care)
+            NightRow(night, setNight)
             if (showDetails && status.size >= 14) {
                 Text(
                     buildString {

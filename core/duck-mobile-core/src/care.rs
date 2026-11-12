@@ -1,4 +1,4 @@
-//! The duck's care loop: hunger, mood and bond.
+//! The duck's care loop: hunger, mood, bond and the night.
 //!
 //! The physical duck has no such state — this is the companion layer a phone
 //! can add without lying about the robot. It changes *when* the duck chooses
@@ -22,6 +22,14 @@ const BOND_PER_PET: f64 = 0.02;
 const BOND_PER_FEED: f64 = 0.03;
 const BOND_DECAY_PER_S: f64 = 1.0 / (24.0 * 3600.0);
 
+/// A night: the duck was put to bed on purpose rather than dozing off from
+/// neglect. Only the start is stored; "how quiet" is always derived from the
+/// tick delta, so a client cannot claim a longer night than the duck slept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Night {
+    pub started_tick: u64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Care {
@@ -39,6 +47,15 @@ pub struct Care {
     /// a short break before a low mood can play the sad timeline.
     #[serde(default)]
     pub woke: bool,
+    /// A night the person put the duck to bed for. The same doze a long
+    /// neglect reaches, chosen: a night keeps `asleep` true until a hand or
+    /// the morning button ends it.
+    #[serde(default)]
+    pub night: Option<Night>,
+    /// A hand just ended a night. The loop reads this once to write the vet
+    /// book's honest note, the way `woke` marks the wake for the sad grace.
+    #[serde(skip)]
+    pub woken_by_touch: bool,
 }
 
 impl Default for Care {
@@ -50,6 +67,8 @@ impl Default for Care {
             asleep: false,
             last_touch: 0,
             woke: false,
+            night: None,
+            woken_by_touch: false,
         }
     }
 }
@@ -70,28 +89,78 @@ impl Care {
 
         self.bond = (self.bond - BOND_DECAY_PER_S * dt).max(0.0);
 
+        // A night is a sleep by construction: no ordinary rule may stir it,
+        // and a restored payload that forgot `asleep` is corrected here.
+        if self.night.is_some() {
+            self.asleep = true;
+        }
         if !self.asleep && idle_s >= DOZE_AFTER_S {
             self.asleep = true;
         }
-        // Waking is an interaction (pet/feed/touch) and is handled there.
-        // Deciding it from the idle span would make a restored nap look like
-        // a fresh touch, because a new process's tick starts at zero.
+        // Waking is an interaction (pet/feed/touch) or the morning button and
+        // is handled there. Deciding it from the idle span would make a
+        // restored nap look like a fresh touch, because a new process's tick
+        // starts at zero.
+    }
+
+    /// Put the duck to bed on purpose: the doze a neglected duck reaches,
+    /// chosen. Idempotent — a second good night does not restart the clock,
+    /// so the quiet span still begins at the first.
+    pub fn enter_night(&mut self, now: u64) {
+        if self.night.is_none() {
+            self.night = Some(Night { started_tick: now });
+        }
+        self.asleep = true;
+    }
+
+    /// Morning: end the night and wake the duck. `Some(quiet_s)` when a night
+    /// was running, `None` when it was not — a duck that is merely dozing on
+    /// its own is not in night, and the morning button does not stir it.
+    ///
+    /// The span counts simulated ticks at 20 ms each, the clock every shell
+    /// reads, deliberately not the care time scale: "quiet for ten minutes"
+    /// must mean the same ten minutes whatever a demo sped the tummy clock
+    /// up to.
+    pub fn end_night(&mut self, now: u64) -> Option<f64> {
+        let quiet_s = self.quiet_s(now);
+        self.night.take()?;
+        self.wake_up(now);
+        Some(quiet_s)
+    }
+
+    /// The night so far, in simulated seconds. Zero when no night is running.
+    pub fn quiet_s(&self, now: u64) -> f64 {
+        self.night
+            .map_or(0.0, |night| now.saturating_sub(night.started_tick) as f64 * 0.02)
+    }
+
+    /// The shared tail of every wake: the duck is up, the idle clock restarts
+    /// (so it cannot fall straight back into the doze it just left), and the
+    /// loop knows to give the moment a short grace before the sad timeline.
+    fn wake_up(&mut self, now: u64) {
+        self.woke = self.woke || self.asleep;
+        self.last_touch = now;
+        self.asleep = false;
+    }
+
+    /// A hand: it wakes the duck and, when it was in a night, ends the night
+    /// and flags the reason. The morning button has its own path so the vet
+    /// book can tell "morning" from "woken_by_touch".
+    fn wake(&mut self, now: u64) {
+        self.woken_by_touch = self.woken_by_touch || self.night.take().is_some();
+        self.wake_up(now);
     }
 
     /// A hand: pets are the strongest bond signal.
     pub fn pet(&mut self, now: u64) {
-        self.woke = self.woke || self.asleep;
-        self.last_touch = now;
-        self.asleep = false;
+        self.wake(now);
         self.bond = (self.bond + BOND_PER_PET).min(1.0);
         self.mood = (self.mood + 0.12).min(1.0);
     }
 
     /// A treat: the only thing that lowers hunger.
     pub fn feed(&mut self, now: u64) {
-        self.woke = self.woke || self.asleep;
-        self.last_touch = now;
-        self.asleep = false;
+        self.wake(now);
         self.hunger = (self.hunger - 0.45).max(0.0);
         self.bond = (self.bond + BOND_PER_FEED).min(1.0);
         self.mood = (self.mood + 0.1).min(1.0);
@@ -99,9 +168,7 @@ impl Care {
 
     /// Driving, carrying, a skill: attention, but weaker than a pet.
     pub fn touch(&mut self, now: u64) {
-        self.woke = self.woke || self.asleep;
-        self.last_touch = now;
-        self.asleep = false;
+        self.wake(now);
     }
 
     /// Whether it is sad enough to show it, given the cooldown.
@@ -116,6 +183,15 @@ impl Care {
             "bond": self.bond,
             "asleep": self.asleep,
             "last_touch": self.last_touch,
+            // The night travels with the three numbers: the shells save this
+            // object wholesale and hand it back, and the quiet span is always
+            // recomputed from the tick delta rather than trusted.
+            "night": {
+                "active": self.night.is_some(),
+                "started_tick": self.night.map_or(0, |night| {
+                    night.started_tick.min(u32::MAX as u64) as u32
+                }),
+            },
         })
     }
 
@@ -136,6 +212,27 @@ impl Care {
         }
         if let Some(v) = value.get("last_touch").and_then(serde_json::Value::as_u64) {
             self.last_touch = v;
+        }
+        if let Some(night) = value.get("night") {
+            // Only a well-formed night starts one; a malformed row is
+            // ignored rather than putting the duck to bed on a guess.
+            match night.get("active").and_then(serde_json::Value::as_bool) {
+                Some(true) => {
+                    if let Some(started_tick) = night
+                        .get("started_tick")
+                        .and_then(serde_json::Value::as_u64)
+                    {
+                        self.night = Some(Night { started_tick });
+                    }
+                }
+                Some(false) => self.night = None,
+                None => {}
+            }
+        }
+        // A night is a sleep by construction: no saved payload may leave a
+        // night duck awake.
+        if self.night.is_some() {
+            self.asleep = true;
         }
     }
 }
@@ -204,5 +301,88 @@ mod tests {
         back.restore(&json);
         assert!((back.hunger - care.hunger).abs() < 1e-9);
         assert_eq!(back.last_touch, 12);
+    }
+
+    #[test]
+    fn a_good_night_holds_the_duck_asleep_until_the_morning() {
+        let mut care = Care::default();
+        care.enter_night(100);
+        assert!(care.asleep);
+        // A second good night is idempotent: the quiet clock begins at the
+        // first press, not the last.
+        care.enter_night(400);
+        assert_eq!(care.night.map(|night| night.started_tick), Some(100));
+        // Ten simulated minutes of ticks go by: a night duck is asleep by
+        // construction and no ordinary rule may stir it.
+        let ticks = 10 * 60 * 50;
+        for tick in 0..=ticks {
+            care.tick(tick, 0.02, 1.0);
+        }
+        assert!(care.asleep, "a night duck must stay asleep across ticks");
+        let quiet = care.end_night(ticks + 100).expect("a night was running");
+        // 30 000 ticks at 20 ms each, measured from the first press.
+        assert!((quiet - 600.0).abs() < 1e-9, "quiet {quiet}");
+        assert!(!care.asleep);
+        assert!(care.night.is_none());
+        assert_eq!(care.last_touch, ticks + 100, "the morning is a hand");
+        // Morning again is a no-op, not a second wake.
+        assert!(care.end_night(40_000).is_none());
+
+        // A demo's sped-up care clock must not age a night duck awake either.
+        let mut fast = Care::default();
+        fast.enter_night(0);
+        fast.tick(200, 0.02, 200.0);
+        assert!(fast.asleep);
+    }
+
+    #[test]
+    fn a_hand_ends_the_night_and_flags_the_honest_note() {
+        for hand in [Care::pet as fn(&mut Care, u64), Care::feed, Care::touch] {
+            let mut care = Care::default();
+            care.enter_night(10);
+            hand(&mut care, 60);
+            assert!(care.night.is_none(), "a hand must end the night");
+            assert!(!care.asleep);
+            assert!(
+                care.woken_by_touch,
+                "the loop must note a hand, not the morning"
+            );
+        }
+        // A hand that wakes an ordinary doze is not a night wake: there is
+        // no "woken_by_touch" to note when no night was running.
+        let mut dozy = Care::default();
+        dozy.asleep = true;
+        dozy.pet(5);
+        assert!(!dozy.woken_by_touch);
+    }
+
+    #[test]
+    fn the_night_round_trips_and_quiet_comes_from_the_tick_delta() {
+        let mut care = Care::default();
+        care.enter_night(321);
+        let saved = care.summary();
+        assert_eq!(saved["night"]["active"], serde_json::json!(true));
+        assert_eq!(saved["night"]["started_tick"], serde_json::json!(321));
+        let mut back = Care::default();
+        back.restore(&saved);
+        assert_eq!(back.night.map(|night| night.started_tick), Some(321));
+        assert!(back.asleep, "a restored night is asleep by construction");
+        // The span comes from the tick delta, never from a saved number.
+        let quiet = back.end_night(321 + 50).expect("the restored night");
+        assert!((quiet - 1.0).abs() < 1e-9);
+        // An inactive night in the payload clears one the duck had.
+        let mut woken = Care::default();
+        woken.enter_night(10);
+        woken.restore(&serde_json::json!({
+            "night": { "active": false, "started_tick": 0 },
+        }));
+        assert!(woken.night.is_none());
+        // A payload that forgot `asleep` cannot leave a night duck awake.
+        let mut forgot = Care::default();
+        forgot.restore(&serde_json::json!({
+            "asleep": false,
+            "night": { "active": true, "started_tick": 7 },
+        }));
+        assert!(forgot.asleep);
     }
 }

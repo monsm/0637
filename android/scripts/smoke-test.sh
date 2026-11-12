@@ -257,6 +257,69 @@ fi
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null || true
 echo "care: hunger $CARE_HUNGER_BEFORE -> $CARE_HUNGER_AFTER, bond $CARE_BOND_BEFORE -> $CARE_BOND_AFTER, doze and wake ok"
+# The chosen night: good night puts the duck to sleep on purpose, and the
+# state says so. A hand is a real hand: a pet ends it, and the vet book
+# names that ending rather than "morning".
+echo "--- night ---"
+if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"on":true}' http://127.0.0.1:8765/night | grep -q '"ok":true'; then
+  echo "::error::the duck refused to go to sleep on purpose"
+  exit 1
+fi
+NIGHT=""
+for _ in $(seq 1 20); do
+  NIGHT=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    print(1 if (d.get('night') or {}).get('active') and (d.get('care') or {}).get('asleep') else 0)
+except Exception: print(0)
+" 2>/dev/null || echo 0)
+  [ "$NIGHT" = "1" ] && break
+  sleep 0.2
+done
+if [ "$NIGHT" != "1" ]; then
+  echo "::error::/night did not put the duck to sleep"
+  exit 1
+fi
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' \
+  http://127.0.0.1:8765/pet > /dev/null || true
+NIGHT_AWAKE=""
+for _ in $(seq 1 20); do
+  NIGHT_AWAKE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try: print(1 if not (json.load(sys.stdin).get('night') or {}).get('active') else 0)
+except Exception: print(0)
+" 2>/dev/null || echo 0)
+  [ "$NIGHT_AWAKE" = "1" ] && curl -sf --max-time 5 http://127.0.0.1:8765/life | grep -q 'woken_by_touch' && break
+  sleep 0.2
+done
+if [ "$NIGHT_AWAKE" != "1" ] || ! curl -sf --max-time 5 http://127.0.0.1:8765/life | grep -q 'woken_by_touch'; then
+  echo "::error::a stroke did not end the night with woken_by_touch"
+  exit 1
+fi
+# The morning verb on an awake duck is a no-op that still answers: the
+# good-morning chip must never leave the row stuck in night.
+if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"on":false}' http://127.0.0.1:8765/night | grep -q '"ok":true'; then
+  echo "::error::the morning verb refused an awake duck"
+  exit 1
+fi
+NIGHT_OFF=""
+for _ in $(seq 1 20); do
+  NIGHT_OFF=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try: print(1 if not (json.load(sys.stdin).get('night') or {}).get('active') else 0)
+except Exception: print(0)
+" 2>/dev/null || echo 0)
+  [ "$NIGHT_OFF" = "1" ] && break
+  sleep 0.2
+done
+if [ "$NIGHT_OFF" != "1" ]; then
+  echo "::error::the night is still active after the morning verb"
+  exit 1
+fi
+echo "night: on -> asleep and quiet, pet -> woken_by_touch, off ok"
 # The microphone channel, classified: clap and whistle reach the duck's own
 # reaction and the published event. The RMS is the room, never a sense.
 sound_tick() { python3 -c 'import time; print(int(time.time()*1000))'; }

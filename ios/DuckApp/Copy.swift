@@ -177,6 +177,20 @@ enum Copy {
         if mood < -0.2 { return pick("a little sad · bond \(Int(bond * 100))%", "有点难过 · 亲密 \(Int(bond * 100))%") }
         return pick("content · mood \(moodPercent)%", "心情不错 · 心情 \(moodPercent)%")
     }
+    // Sleep mode: the chosen night, and the morning that wakes it. The quiet
+    // numbers are the core's own simulated seconds; the shells only divide
+    // them into minutes for the person reading.
+    static var goodNight: String { pick("Good night", "晚安") }
+    static var goodMorning: String { pick("Good morning", "早安") }
+    static func nightQuiet(_ minutes: Int) -> String {
+        String(format: pick("Quiet for %d min", "已经安静 %d 分钟"), minutes)
+    }
+    static func goodMorningLine(_ minutes: Int) -> String {
+        String(format: pick(
+            "Good morning! Quiet for %d min",
+            "早安！昨晚安静了 %d 分钟"
+        ), minutes)
+    }
     static var menu: String { pick("Menu", "菜单") }
     static var cameraUnavailable: String { pick("NO CAMERA", "无相机") }
     static var feed: String { pick("Feed", "喂食") }

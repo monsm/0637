@@ -916,6 +916,18 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             core.runtime.restore_care(&saved);
             json!({ "ok": true, "care": core.runtime.care_summary() })
         }
+        // The night is the care layer's own sleep, not a power state: the
+        // loop keeps running and only the doze overlay owns the duck.
+        Intent::Night(true) => {
+            core.runtime.enter_night();
+            json!({ "ok": true, "queued": true })
+        }
+        Intent::Night(false) => match core.runtime.end_night() {
+            Some(quiet_s) => json!({ "ok": true, "queued": true, "quiet_s": quiet_s }),
+            // Not in night: waking is a no-op, and the answer says so with
+            // the zero span rather than a fake "queued".
+            None => json!({ "ok": true, "quiet_s": 0.0 }),
+        },
         Intent::CareScale(scale) => {
             core.runtime.set_care_scale(scale);
             json!({ "ok": true, "care_time_scale": core.runtime.care_scale() })
@@ -1441,6 +1453,10 @@ fn publish_state(core: &DuckCore) {
         // power state — the control loop is running either way.
         "care": active.care_summary(),
         "care_time_scale": active.care_scale(),
+        // The night the person put the duck to bed for, if any. `care.night`
+        // is what a save carries; this is what a shell draws, with the quiet
+        // span derived from the tick delta on every publish.
+        "night": active.night_summary(),
         "leds": {
             "status": active.face().status,
             "gauge": active.face().gauge,

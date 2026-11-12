@@ -151,6 +151,30 @@ fun parseCare(text: String): CareUi? = try {
     null
 }
 
+/**
+ * The chosen night, from the top-level `night` object of GET /state.
+ * `quiet_s` grows while the night runs; an inactive night publishes zeros,
+ * so a shell that wants the length must remember the last active reading.
+ */
+data class NightUi(
+    val active: Boolean = false,
+    val quietSeconds: Double = 0.0,
+    val startedTick: Int = 0,
+)
+
+fun fetchNight(): NightUi? = fetchRawState()?.let(::parseNight)
+
+fun parseNight(text: String): NightUi? = try {
+    val night = JSONObject(text).optJSONObject("night") ?: return null
+    NightUi(
+        active = night.optBoolean("active", false),
+        quietSeconds = night.optDouble("quiet_s", 0.0),
+        startedTick = night.optInt("started_tick", 0),
+    )
+} catch (_: Throwable) {
+    null
+}
+
 /** One other duck on the LAN. */
 data class PeerUi(
     val id: String,

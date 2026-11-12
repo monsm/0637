@@ -127,6 +127,15 @@ val quack get() = pick("Quack", "叫一声")
         )
         return pick("content · mood $moodPercent%", "心情不错 · 心情 $moodPercent%")
     }
+    // The chosen night: the child puts the duck to sleep on purpose, the row
+    // says how long it has been quiet, and morning wakes it.
+    val goodNight get() = pick("Good night", "晚安")
+    val goodMorning get() = pick("Good morning", "早安")
+    fun nightQuiet(minutes: Int) = pick("Quiet for $minutes min", "已经安静 $minutes 分钟")
+    fun goodMorningLine(minutes: Int) = pick(
+        "Good morning! Quiet for $minutes min",
+        "早安！昨晚安静了 $minutes 分钟",
+    )
     val trickBook get() = pick("Trick book", "技巧图鉴")
     // Daily quests.
     val quests get() = pick("Today's quests", "今日小挑战")

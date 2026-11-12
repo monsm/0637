@@ -712,6 +712,107 @@ done
 # Leave a distinctive state for the restart check at the end of the run.
 api POST /care '{"hunger":0.42,"mood":0.6,"bond":0.33,"asleep":false}' > /dev/null || true
 
+# Sleep mode: a chosen night is the same doze a long neglect reaches, but on
+# purpose. The night holds the duck asleep through the ordinary rules, the
+# morning says how quiet it was and notes itself in the vet book, and a real
+# hand ends it with its own honest note instead of "morning".
+echo "--- night ---"
+NIGHT_ON=$(api POST /night '{"on":true}' || true)
+printf '%s' "$NIGHT_ON" | grep -q '"ok":true'
+check $? "a good night is accepted" "$(printf '%s' "$NIGHT_ON" | head -c 120)"
+NIGHT_HELD=""
+for _ in $(seq 1 25); do
+  NIGHT_HELD=$(api GET /state | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    n=d.get('night') or {}
+    c=d.get('care') or {}
+    print('yes' if n.get('active') and c.get('asleep') else 'no')
+except Exception:
+    print('no')
+" 2>/dev/null || echo "no")
+  [ "$NIGHT_HELD" = "yes" ] && break
+  sleep 0.2
+done
+[ "$NIGHT_HELD" = "yes" ]; check $? "the night puts the duck to sleep on purpose" "active/asleep=$NIGHT_HELD"
+# Let the night's own clock advance before the morning, or the span would be
+# zero. That clock is simulated seconds, not wall time, so a short real wait
+# is still a real stretch of quiet.
+sleep 0.5
+NIGHT_OFF=$(api POST /night '{"on":false}' || true)
+printf '%s' "$NIGHT_OFF" | grep -q '"ok":true'
+check $? "the morning is accepted" "$(printf '%s' "$NIGHT_OFF" | head -c 120)"
+NIGHT_QUIET=$(printf '%s' "$NIGHT_OFF" | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('quiet_s',0))
+except Exception: print(0)
+" 2>/dev/null || echo 0)
+python3 -c "
+import sys
+sys.exit(0 if float('${NIGHT_QUIET:-0}') > 0 else 1)
+" 2>/dev/null
+check $? "the morning reports how quiet the night was" "quiet_s=$NIGHT_QUIET"
+NIGHT_AWAKE=$(api GET /state | python3 -c "
+import json,sys
+try: print('yes' if not (json.load(sys.stdin).get('night') or {}).get('active') else 'no')
+except Exception: print('no')
+" 2>/dev/null || echo "no")
+[ "$NIGHT_AWAKE" = "yes" ]; check $? "the morning clears the night" "active=$NIGHT_AWAKE"
+# The note lands with the same tick's book; poll rather than race the publish.
+NIGHT_MORNING=""
+for _ in $(seq 1 25); do
+  NIGHT_MORNING=$(api GET /life | python3 -c "
+import json,sys
+try:
+    e=json.load(sys.stdin).get('events') or []
+except Exception:
+    e=[]
+print('yes' if 'morning' in e else 'no')
+" 2>/dev/null || echo "no")
+  [ "$NIGHT_MORNING" = "yes" ] && break
+  sleep 0.1
+done
+[ "$NIGHT_MORNING" = "yes" ]; check $? "the vet book names the morning" "morning=$NIGHT_MORNING"
+# A hand is a real hand: a stroke ends a live night, and the book says which
+# ending it was.
+api POST /night '{"on":true}' > /dev/null || true
+for _ in $(seq 1 25); do
+  api GET /state | python3 -c "
+import json,sys
+try: active=(json.load(sys.stdin).get('night') or {}).get('active')
+except Exception: active=False
+sys.exit(0 if active else 1)
+" 2>/dev/null && break
+  sleep 0.2
+done
+api POST /pet '{}' > /dev/null || true
+NIGHT_TOUCH=""
+for _ in $(seq 1 25); do
+  NIGHT_TOUCH=$(api GET /state | python3 -c "
+import json,sys
+try: print('yes' if not (json.load(sys.stdin).get('night') or {}).get('active') else 'no')
+except Exception: print('no')
+" 2>/dev/null || echo "no")
+  [ "$NIGHT_TOUCH" = "yes" ] && break
+  sleep 0.2
+done
+[ "$NIGHT_TOUCH" = "yes" ]; check $? "a stroke ends the night" "active=$NIGHT_TOUCH"
+NIGHT_WOKEN=""
+for _ in $(seq 1 25); do
+  NIGHT_WOKEN=$(api GET /life | python3 -c "
+import json,sys
+try:
+    e=json.load(sys.stdin).get('events') or []
+except Exception:
+    e=[]
+print('yes' if 'woken_by_touch' in e else 'no')
+" 2>/dev/null || echo "no")
+  [ "$NIGHT_WOKEN" = "yes" ] && break
+  sleep 0.1
+done
+[ "$NIGHT_WOKEN" = "yes" ]; check $? "the vet book names the hand that woke it" "woken_by_touch=$NIGHT_WOKEN"
+
 # The lifetime record as a file: the core writes it, the sheet shares it.
 echo "--- vet book export ---"
 VETBOOK_MD=$(api GET /export/vetbook.md || true)

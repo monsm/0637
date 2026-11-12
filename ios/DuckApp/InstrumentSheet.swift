@@ -246,7 +246,71 @@ struct InstrumentSheet: View {
                 .font(.system(size: 11, design: .rounded))
                 .foregroundStyle(.secondary)
             }
+            nightRow
         }
+    }
+
+    /// Sleep mode: the chosen night, and the morning that ends it. This is
+    /// not a skill the duck performs — it is the same doze a long neglect
+    /// reaches, entered on purpose. The quiet number is the core's own
+    /// simulated clock, divided into whole minutes for the reader; the
+    /// morning is the same chip in reverse.
+    @ViewBuilder private var nightRow: some View {
+        if controller.nightActive {
+            HStack(spacing: 10) {
+                Text(Copy.nightQuiet(nightMinutes))
+                    .font(.system(size: 12, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .accessibilityIdentifier("night-quiet")
+                Spacer()
+                nightChip(Copy.goodMorning, icon: "sun.max.fill", id: "night-wake") {
+                    controller.postNight(on: false)
+                }
+            }
+        } else {
+            HStack {
+                nightChip(Copy.goodNight, icon: "moon.zzz.fill", id: "night-sleep") {
+                    controller.postNight(on: true)
+                }
+                Spacer()
+            }
+        }
+    }
+
+    /// The night's chip, in the sheet's own treatment: a rounded tile over
+    /// the card, a small glyph and a word, plain style so the row reads like
+    /// the time machine's buttons rather than a system button.
+    private func nightChip(
+        _ title: String,
+        icon: String,
+        id: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 12)
+            .frame(minHeight: 44)
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(id)
+    }
+
+    /// Whole minutes of quiet, floored: "Quiet for 1 min" only once a full
+    /// minute has passed on the night's own clock.
+    private var nightMinutes: Int {
+        Int(max(controller.nightQuietSeconds, 0) / 60)
     }
 
     private func careBar(_ label: String, value: Double, tint: Color, id: String) -> some View {

@@ -328,6 +328,19 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
+        // The morning after a chosen night: the same one-line pill, saying
+        // how long the duck stayed quiet. The tick only fires when a real
+        // stretch lay behind the wake, so a duck that was put to bed and
+        // picked up again at once has no morning to announce.
+        .onChange(of: controller.nightWakeTick) { _, tick in
+            guard tick > 0 else { return }
+            let notice = Copy.goodMorningLine(controller.nightWakeMinutes)
+            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                guard moodText == notice else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
         // The accepted walk renders from /state.path; the drawn draft has
         // done its job the moment the route starts.
         .onChange(of: controller.pathActive) { _, active in
