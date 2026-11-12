@@ -381,8 +381,24 @@ final class DuckUITests: XCTestCase {
         let paste = app.buttons["rules-paste"]
         XCTAssertTrue(paste.waitForExistence(timeout: 5), "no paste chip in the editor")
         paste.tap()
+        // iOS asks permission for a programmatic pasteboard read; that
+        // prompt is part of the real path a child sees too. It can be served
+        // by the app or by SpringBoard depending on the release.
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        for host in [app, springboard] {
+            let alert = host.alerts.firstMatch
+            if alert.waitForExistence(timeout: 4) {
+                for label in ["Allow Paste", "允许粘贴", "Allow", "允许"] {
+                    if alert.buttons[label].exists {
+                        alert.buttons[label].tap()
+                        break
+                    }
+                }
+                break
+            }
+        }
         XCTAssertTrue(
-            app.staticTexts["rules-import-note"].waitForExistence(timeout: 5),
+            app.staticTexts["rules-import-note"].waitForExistence(timeout: 15),
             "the import never reported a verdict"
         )
         // The paste did not fail: a successful import says how many blocks
