@@ -399,6 +399,9 @@ enum Copy {
     static var showLess: String { pick("Less", "收起") }
     static var depth: String { pick("depth", "深度") }
     static var provenance: String { pick("Provenance", "出处") }
+    /// The label for the API token: what a tool on another machine has to
+    /// send, so the duck's own history cannot be rewritten from the network.
+    static var apiToken: String { pick("API token (for other machines)", "API 令牌（给别的机器）") }
     static var reload: String { pick("Reload AI", "重载 AI") }
     static var api: String { "AI API :8765 · MCP /mcp" }
     static var languageLabel: String { pick("Language", "语言") }

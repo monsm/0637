@@ -58,6 +58,10 @@ pub struct DuckCore {
     /// What this build is: a hash over every asset that decides behaviour.
     provenance: crate::provenance::Provenance,
     fingerprint: CString,
+    /// The token a client that is not this phone has to send. The apps reach
+    /// the duck over the loopback address and never need it; a tool on
+    /// another machine does.
+    intent_token: CString,
     /// The time machine: the last minute of checkpoints, newest last.
     timeline: VecDeque<crate::runtime::Checkpoint>,
     /// A restore that must land before the next tick (the tick it replaces).
@@ -270,6 +274,7 @@ pub unsafe extern "C" fn duck_core_new(
             server: None,
             provenance,
             fingerprint,
+            intent_token: CString::default(),
             timeline: VecDeque::new(),
             pending_restore: None,
             branches: Vec::new(),
@@ -484,11 +489,17 @@ pub unsafe extern "C" fn duck_core_start_intent_server(
     if core.server.is_some() {
         return 0;
     }
+    // The API answers on the LAN, so it gets a token: the phone's own apps
+    // are trusted over the loopback address, and anybody else has to say
+    // this. The token is handed to the phone so it can show it.
+    let token = crate::intent::new_token();
+    core.intents.set_token(token.clone());
     match crate::intent::start(port as u16, core.intents.clone()) {
         Ok(server) => {
             core.server = Some(server);
+            core.intent_token = CString::new(token.clone()).unwrap_or_default();
             publish_state(core);
-            stage("intent server listening");
+            stage(&format!("intent server listening (token {token})"));
             0
         }
         Err(error) => {
@@ -496,6 +507,19 @@ pub unsafe extern "C" fn duck_core_start_intent_server(
             -1
         }
     }
+}
+
+/// The token a client that is not this phone has to send.
+///
+/// The apps never need it — they reach the duck over the loopback address —
+/// but a tool on another machine does, and the phone shows it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn duck_core_intent_token(core: *mut DuckCore) -> *const c_char {
+    if core.is_null() {
+        return std::ptr::null();
+    }
+    let core = &*core;
+    core.intent_token.as_ptr()
 }
 
 /// The verbs a client may ask for. `robotd`'s list is the manifest's

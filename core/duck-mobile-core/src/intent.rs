@@ -197,6 +197,10 @@ pub struct IntentQueue {
     /// Daily quests: the board the loop publishes and the day the shell owns.
     quests: Mutex<Value>,
     day: Mutex<String>,
+    /// The token a client that is not the phone has to say. The phone's own
+    /// apps are trusted over the loopback address; this is for the rest of
+    /// the network.
+    token: Mutex<String>,
 }
 
 impl Default for IntentQueue {
@@ -235,6 +239,7 @@ impl IntentQueue {
             life: Mutex::new(crate::vetbook::Book::default()),
             quests: Mutex::new(json!({ "day": "", "quests": [], "streak": 0 })),
             day: Mutex::new(String::new()),
+            token: Mutex::new(String::new()),
             time: Mutex::new(json!({
                 "tick": 0,
                 "paused": false,
@@ -338,6 +343,19 @@ impl IntentQueue {
 
     pub fn state_json(&self) -> String {
         self.state.lock().expect("intent state").to_string()
+    }
+
+    /// The token a client from outside this machine has to present.
+    pub fn token(&self) -> String {
+        self.token.lock().expect("intent token").clone()
+    }
+
+    /// Give the API its token. The server is started once per core, and the
+    /// token is what a client that is not the phone has to say.
+    pub fn set_token(&self, token: String) {
+        if let Ok(mut slot) = self.token.lock() {
+            *slot = token;
+        }
     }
 
     pub fn set_skills(&self, skills: Vec<String>) {
@@ -573,6 +591,10 @@ impl IntentQueue {
 }
 
 /// Start the server on `0.0.0.0:port`.
+///
+/// The phone's own apps reach it over the loopback address and are trusted.
+/// Everything else on the network has to say the token, which the queue
+/// carries: `queue.set_token(new_token())` before the server starts.
 pub fn start(port: u16, queue: Arc<IntentQueue>) -> std::io::Result<IntentServer> {
     let listener = TcpListener::bind(("0.0.0.0", port))?;
     Ok(start_listener(listener, queue))
@@ -628,8 +650,13 @@ pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) -> IntentS
                 if flag.load(Ordering::SeqCst) {
                     break;
                 }
-                let mut stream = match listener.accept() {
-                    Ok((stream, _)) => stream,
+                let (mut stream, remote) = match listener.accept() {
+                    Ok((stream, peer)) => {
+                        // The peer decides whether this connection is the
+                        // phone talking to itself or somebody on the network.
+                        let remote = peer.ip();
+                        (stream, remote)
+                    }
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                         std::thread::sleep(Duration::from_millis(ACCEPT_POLL_MS));
                         continue;
@@ -660,7 +687,7 @@ pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) -> IntentS
                     .name("duck-intent-conn".to_owned())
                     .spawn(move || {
                         live.fetch_add(1, Ordering::SeqCst);
-                        let _ = handle(stream, queue);
+                        let _ = handle(stream, queue, remote);
                         live.fetch_sub(1, Ordering::SeqCst);
                     });
             }
@@ -693,7 +720,89 @@ fn chorus_moves(value: &Value) -> Result<Vec<String>, String> {
     Ok(names)
 }
 
-fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()> {
+/// A token for the clients that are not the phone.
+///
+/// The intent API answers on the LAN, and the duck's own state — its
+/// history, its rules, its body — is behind it. The phone talks to itself
+/// over the loopback address and is the duck's owner; anyone else has to
+/// say this. It is built from what the machine can offer (the clock, the
+/// process, the OS's hash seed, the heap's address) and hashed, so it is not
+/// guessable from outside.
+pub fn new_token() -> String {
+    use sha2::Digest;
+    use std::hash::{BuildHasher, Hasher};
+
+    let clock = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_nanos() as u64)
+        .unwrap_or(0);
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u64(clock);
+    hasher.write_u32(std::process::id());
+    let seed = hasher.finish();
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u64(seed);
+    hasher.write_usize(std::process::id() as usize);
+    hasher.write_usize(&seed as *const u64 as usize);
+    let digest = sha2::Sha256::digest(hasher.finish().to_le_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Whether this connection may use the API.
+///
+/// Two things decide it.
+///
+/// **The peer.** The phone's own apps reach the duck over the loopback
+/// address and are the duck's owner; they are trusted. A connection from
+/// anywhere else is on the network, and has to say the token.
+///
+/// **The origin.** A browser sends an `Origin` header, and a web page is
+/// not the owner of the duck, whatever address it reaches the duck from —
+/// including a page open on the phone itself. Only a page served from this
+/// machine may talk to it.
+fn authorised(
+    peer: std::net::IpAddr,
+    origin: Option<&str>,
+    presented: Option<&str>,
+    token: &str,
+) -> bool {
+    if let Some(origin) = origin {
+        let local = ["http://localhost", "http://127.0.0.1", "https://localhost", "https://127.0.0.1"]
+            .iter()
+            .any(|prefix| origin.starts_with(prefix));
+        if !local {
+            return false;
+        }
+    }
+    let loopback = match peer {
+        std::net::IpAddr::V4(v4) => v4.is_loopback(),
+        std::net::IpAddr::V6(v6) => v6.is_loopback(),
+    };
+    if loopback {
+        return true;
+    }
+    match presented {
+        Some(given) if !token.is_empty() => {
+            // Compared byte by byte: a token is not long enough for a
+            // cleverer attack, but there is no reason to leak its prefix.
+            let given = given.as_bytes();
+            let token = token.as_bytes();
+            given.len() == token.len()
+                && given
+                    .iter()
+                    .zip(token.iter())
+                    .fold(0u8, |diff, (a, b)| diff | (a ^ b))
+                    == 0
+        }
+        _ => false,
+    }
+}
+
+fn handle(
+    mut stream: TcpStream,
+    queue: Arc<IntentQueue>,
+    remote: std::net::IpAddr,
+) -> std::io::Result<()> {
     stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 4096];
@@ -720,10 +829,36 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
     let method = parts.next().unwrap_or_default();
     let path = parts.next().unwrap_or_default().split('?').next().unwrap_or_default();
 
-    let content_length = lines
+    // The headers, once: the length and the access rules both read them.
+    let headers: Vec<(String, String)> = lines
         .filter_map(|line| line.split_once(':'))
-        .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
-        .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+        .map(|(name, value)| (name.trim().to_owned(), value.trim().to_owned()))
+        .collect();
+    let header = |name: &str| {
+        headers
+            .iter()
+            .find(|(header, _)| header.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
+    };
+
+    // The phone talks to itself over the loopback address and is the duck's
+    // owner. A connection from anywhere else has to say the token: without
+    // it, anybody on the same Wi-Fi could rewrite the duck's history, drive
+    // its body, or change its rules. A page is never the owner, so a
+    // request with an origin from elsewhere is refused outright.
+    let origin = header("origin");
+    let presented = header("x-duck-token");
+    if !authorised(remote, origin, presented, &queue.token()) {
+        return respond(
+            &mut stream,
+            403,
+            "Forbidden",
+            "{\"ok\":false,\"error\":\"the duck's API needs the token\"}",
+        );
+    }
+
+    let content_length = header("content-length")
+        .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(0)
         .min(1024 * 1024);
 
@@ -1122,13 +1257,13 @@ fn find_headers_end(buffer: &[u8]) -> Option<usize> {
 }
 
 fn respond(stream: &mut TcpStream, status: u16, reason: &str, body: &str) -> std::io::Result<()> {
+    // No CORS headers: the clients are the phone's own apps and the tools
+    // that know the token, and a browser has no business driving a duck.
+    // A page that asks anyway is refused by the origin rule.
     let response = format!(
         "HTTP/1.1 {status} {reason}\r\n\
          Content-Type: application/json\r\n\
          Content-Length: {}\r\n\
-         Access-Control-Allow-Origin: *\r\n\
-         Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
-         Access-Control-Allow-Headers: Content-Type\r\n\
          Connection: close\r\n\
          \r\n{body}",
         body.len()
@@ -1140,6 +1275,36 @@ fn respond(stream: &mut TcpStream, status: u16, reason: &str, body: &str) -> std
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Who may use the duck's API.
+    ///
+    /// The phone is the owner and reaches the duck over the loopback
+    /// address. Anybody else on the network has to say the token, and a web
+    /// page is never the owner, wherever it runs.
+    #[test]
+    fn only_the_phone_or_the_token_may_use_the_api() {
+        let loopback = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+        let remote = std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, 20));
+
+        assert!(authorised(loopback, None, None, "t0ken"));
+        assert!(authorised(remote, None, Some("t0ken"), "t0ken"));
+        assert!(!authorised(remote, None, None, "t0ken"));
+        assert!(!authorised(remote, None, Some("wrong"), "t0ken"));
+        assert!(!authorised(remote, None, Some("t0ken"), ""));
+        // A page is not the owner, even from the phone's own address.
+        assert!(!authorised(loopback, Some("https://example.com"), None, "t0ken"));
+        assert!(authorised(loopback, Some("http://localhost:8000"), None, "t0ken"));
+        assert!(authorised(remote, Some("http://127.0.0.1"), Some("t0ken"), "t0ken"));
+    }
+
+    /// The token is not a constant, and two cores do not share one.
+    #[test]
+    fn the_token_is_fresh() {
+        let first = new_token();
+        let second = new_token();
+        assert_eq!(first.len(), 64, "a sha256 in hex");
+        assert_ne!(first, second, "two cores do not share a token");
+    }
 
     fn request(port: u16, method: &str, path: &str, body: &str) -> String {
         let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect");

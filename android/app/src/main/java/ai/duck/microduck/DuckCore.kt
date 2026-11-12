@@ -115,6 +115,15 @@ class DuckCore(
         if (handle != 0L) nativeMode(handle) ?: "walk" else "walk"
     }
 
+    /**
+     * The token a client that is not this phone has to send. The app never
+     * needs it — it reaches the duck over the loopback address — but a tool
+     * on another machine does, and the sheet shows it.
+     */
+    fun intentToken(): String = synchronized(lock) {
+        if (handle != 0L) nativeIntentToken(handle) ?: "" else ""
+    }
+
     /** Bumped when the body model changed (a mode switch). */
     fun modelGeneration(): Long = synchronized(lock) {
         if (handle != 0L) nativeModelGeneration(handle) else 0L
@@ -260,6 +269,7 @@ class DuckCore(
         @JvmStatic private external fun nativeLoadPickup(handle: Long, path: String): Int
         @JvmStatic private external fun nativeSetPerformance(handle: Long, fps: Double, tps: Double)
         @JvmStatic private external fun nativeMode(handle: Long): String?
+        @JvmStatic private external fun nativeIntentToken(handle: Long): String?
         @JvmStatic private external fun nativeSetMode(handle: Long, mode: String): Int
         @JvmStatic private external fun nativeModelGeneration(handle: Long): Long
         @JvmStatic private external fun nativeQueueSound(handle: Long, tag: String): Int

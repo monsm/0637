@@ -19,7 +19,7 @@ use crate::ffi::{
     duck_core_queue_sound, duck_core_render_sound, duck_core_set_mode,
     duck_core_voice_rate, duck_core_wheee, duck_core_body_pose, duck_core_carry, duck_core_free,
     duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_flashlight,
-    duck_core_load_emotions, duck_core_load_pickup,
+    duck_core_load_emotions, duck_core_load_pickup, duck_core_intent_token,
     duck_core_mesh_name, duck_core_mesh_soup,
     duck_core_fork, duck_core_new, duck_core_oldest_tick, duck_core_paused, duck_core_seek,
     duck_core_set_paused,
@@ -299,6 +299,24 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMode(
     }
 }
 
+/// The token a client that is not this phone has to send.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeIntentToken(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jstring {
+    let pointer = unsafe { duck_core_intent_token(handle as *mut DuckCore) };
+    if pointer.is_null() {
+        return std::ptr::null_mut();
+    }
+    let token = unsafe { CStr::from_ptr(pointer) };
+    match env.new_string(token.to_string_lossy()) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetMode(
     mut env: JNIEnv,
@@ -316,8 +334,7 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetMode(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeModelGeneration(
-    _env: JNIEnv,
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeModelGeneration(    _env: JNIEnv,
     _class: JClass,
     handle: jlong,
 ) -> jlong {

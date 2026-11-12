@@ -149,6 +149,9 @@ val quack get() = pick("Quack", "叫一声")
         "早安！昨晚安静了 $minutes 分钟",
     )
     val trickBook get() = pick("Trick book", "技巧图鉴")
+    /** The label for the API token: what a tool on another machine has to
+     *  send, so the duck's own history cannot be rewritten from the network. */
+    val apiToken get() = pick("API token (for other machines)", "API 令牌（给别的机器）")
     // Daily quests.
     val quests get() = pick("Today's quests", "今日小挑战")
     val questDone get() = pick("Done", "完成")

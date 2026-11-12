@@ -138,6 +138,11 @@ final class DuckController: ObservableObject {
     @Published var speed = 1.0
     @Published var branchCount = 0
     @Published var fingerprint = ""
+    /// The token a tool on another machine has to send to the duck's
+    /// API. The apps never need it — they reach the duck over the
+    /// loopback address — but a parent pointing an AI client at this
+    /// phone does.
+    @Published var intentToken = ""
     /// The latest phone-sensor readings, already formatted for display.
     /// Denied permissions replace the summary (see `pollSensors`); depth keeps
     /// "—" on devices with no LiDAR (see `hasLiDAR`).
@@ -2106,6 +2111,9 @@ final class DuckController: ObservableObject {
         guard let core else { return }
         if let pointer = duck_core_fingerprint(core) {
             fingerprint = String(cString: pointer)
+        }
+        if let pointer = duck_core_intent_token(core) {
+            intentToken = String(cString: pointer)
         }
     }
 

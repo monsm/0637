@@ -34,6 +34,11 @@ void duck_core_free(DuckCore* core);
 int duck_core_reload_policies(DuckCore* core, const char* policies_dir);
 int duck_core_start_intent_server(DuckCore* core, int port);
 
+/* The token a client that is not this phone has to send in the
+   X-Duck-Token header. The apps reach the duck over the loopback address
+   and never need it; a tool on another machine does. */
+const char* duck_core_intent_token(DuckCore* core);
+
 int duck_core_enable(DuckCore* core);
 int duck_core_disable(DuckCore* core);
 int duck_core_tick(DuckCore* core);

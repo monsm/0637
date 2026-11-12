@@ -2866,6 +2866,26 @@ private fun InstrumentSheet(
                     modifier = Modifier.weight(1f, fill = false),
                 )
             }
+            // The token a tool on another machine has to send. The app itself
+            // never needs it — it reaches the duck over the loopback address
+            // — but a parent pointing an AI client at this phone does.
+            val token = core.intentToken()
+            if (token.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(Copy.apiToken, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                    Text(
+                        token,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 10.sp,
+                        maxLines = 3,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+            }
             LifeCard(lifeRecord) { shareVetbook(context) }
             ButtonChip(Copy.postcardShelf, "postcards-open", onPostcards)
             ButtonChip(Copy.dex, "dex-open", onDex)
@@ -3167,7 +3187,7 @@ internal fun fetchLifeEvents(): List<String> {
         // Parsed as JSON, not scraped with a regular expression and split
         // on commas: a comma inside one event used to split it in two, and
         // the diary counted the halves.
-        val events = JSONObject(text).optJSONObject("life")?.optJSONArray("events")
+        val events = org.json.JSONObject(text).optJSONObject("life")?.optJSONArray("events")
             ?: return emptyList()
         (0 until events.length()).mapNotNull { index ->
             if (events.isNull(index)) null else events.optString(index, null)

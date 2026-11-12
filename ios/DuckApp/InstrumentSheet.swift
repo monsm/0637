@@ -708,6 +708,18 @@ struct InstrumentSheet: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(3)
                 .textSelection(.enabled)
+            // The token a tool on another machine has to send. The duck's own
+            // apps never need it, so it is here rather than in the way.
+            if !controller.intentToken.isEmpty {
+                Text(Copy.apiToken)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Text(controller.intentToken)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
