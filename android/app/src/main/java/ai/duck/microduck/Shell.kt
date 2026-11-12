@@ -1240,10 +1240,11 @@ private fun PeersSheet(
                 ButtonChip(Copy.peerSayAll, "peer-greet-all") { onGreet(null) }
                 // A chorus needs someone to sing with: a lone duck sees the
                 // disabled affordance rather than losing the idea of it.
-                ButtonChip(
+                // PathChip is the shared chip face that carries `enabled`.
+                PathChip(
                     Copy.chorus,
-                    "chorus-start",
                     enabled = peers.peers.isNotEmpty(),
+                    testTag = "chorus-start",
                 ) { startChorus() }
             }
             if (peers.name.isEmpty()) {
@@ -2931,23 +2932,19 @@ private fun InstrumentSheet(
 internal fun ButtonChip(
     label: String,
     testTag: String? = null,
-    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Box(
         Modifier
             // A 48 dp floor: the sheet's controls were ~34 dp tall.
             .heightIn(min = 48.dp)
-            .background(
-                Color.White.copy(alpha = if (enabled) 0.10f else 0.05f),
-                RoundedCornerShape(10.dp),
-            )
+            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClickLabel = label,
                 role = Role.Button,
-            ) { if (enabled) onClick() }
+            ) { onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
