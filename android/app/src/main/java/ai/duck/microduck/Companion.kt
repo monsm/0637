@@ -58,7 +58,11 @@ fun isFall(event: String): Boolean = event == "fell" || event.startsWith("fall")
  * refuses the whole program when one value is empty.
  */
 internal fun trimLikeCore(value: String): String =
-    value.trim { it.isWhitespace() || Character.isSpaceChar(it) }
+    // Java's isWhitespace() covers every Unicode space except the
+    // non-breaking ones; Rust's trim() also takes U+00A0 and U+202F, so
+    // they are named here rather than pulled from an API this toolchain
+    // does not resolve.
+    value.trim { it.isWhitespace() || it == '\u00A0' || it == '\u202F' }
 
 /** The program the core is running, read from GET /rules. */
 fun fetchRules(): List<RuleUi>? = try {
