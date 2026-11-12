@@ -509,6 +509,13 @@ pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) -> IntentS
                         continue;
                     }
                 };
+                // BSD and macOS hand back a stream that inherited the
+                // listener's non-blocking mode (Linux does not): left that
+                // way, a read before the client's bytes arrive returns
+                // WouldBlock and the connection dies unanswered. The handler
+                // owns the stream and wants blocking reads with its own
+                // timeouts.
+                stream.set_nonblocking(false).ok();
                 if live.load(Ordering::SeqCst) >= MAX_CONNECTIONS {
                     let _ = respond(&mut stream, 503, "Service Unavailable", "{}");
                     continue;
