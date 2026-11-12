@@ -177,6 +177,15 @@ for _ in $(seq 1 90); do
 done
 echo "$STATE" | tee "$OUT/state-initial.json" > /dev/null
 
+# Ready is not yet walking: the policy's first target lands a tick or two
+# after bring-up, and a loaded runner can stretch that. Poll for the label
+# rather than reading once at the moment ready appeared.
+for _ in $(seq 1 60); do
+  case "$LABEL" in walk|stand) break ;; esac
+  STATE=$(api GET /state || true)
+  LABEL=$(printf '%s' "$STATE" | field label)
+  sleep 0.1
+done
 [ -n "$STATE" ]; check $? "intent API answers on :8765" "$LABEL"
 [ "$LABEL" != "idle" ]; check $? "the 50 Hz control loop is ticking" "label=$LABEL"
 
@@ -1173,14 +1182,23 @@ except Exception: print('')
 # dynamic-tag fix this was silently dropped by next_sound's static match.
 SOUND=$(api GET /state | field last_emotion_sound)
 [ "$SOUND" = "emotion:curious" ]; check $? "an emotion's voice is queued" "last_emotion_sound=$SOUND"
-sleep 0.5
-EMOTION_LATER=$(api GET /state | python3 -c "
+# The clock advances with the loop; a loaded runner can take a moment, so
+# poll for a non-zero reading rather than trusting one read half a second
+# later.
+EMOTION_LATER=""
+for _ in $(seq 1 40); do
+  EMOTION_LATER=$(api GET /state | python3 -c "
 import json,sys
 try:
     e=json.load(sys.stdin).get('emotion') or {}
     print(e.get('elapsed_s',0), e.get('name',''))
 except Exception: print('0 ')
 " 2>/dev/null || true)
+  case "$EMOTION_LATER" in
+    0\ *|0.0\ *|"") sleep 0.1 ;;
+    *) break ;;
+  esac
+done
 case "$EMOTION_LATER" in
   0\ *|0.0\ *|"") check 1 "the emotion clock advances" "$EMOTION_LATER" ;;
   *) check 0 "the emotion clock advances" "$EMOTION_LATER" ;;
