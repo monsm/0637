@@ -317,6 +317,15 @@ enum Copy {
     static func peerReplied(_ name: String) -> String {
         pick("\(name) answered!", "\(name) 回应了！")
     }
+    // Gifts between neighbours: a treat on the floor, or a cheer.
+    static var giftTreat: String { pick("Treat", "喂一颗") }
+    static var giftEmotion: String { pick("Cheer", "逗逗它") }
+    static func giftReceivedTreat(_ name: String) -> String {
+        pick("\(name) sent a treat", "\(name) 送来一颗零食")
+    }
+    static func giftReceivedEmotion(_ name: String) -> String {
+        pick("\(name) cheered you up", "\(name) 逗你笑了")
+    }
     // Bring your own model.
     static var ai: String { pick("AI companion", "AI 伙伴") }
     static var aiOn: String { pick("watching", "观察中") }

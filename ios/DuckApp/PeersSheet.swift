@@ -52,33 +52,39 @@ struct PeersSheet: View {
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier("peers-start")
                 }
-            } else {                ForEach(Array(controller.peers.enumerated()), id: \.element.id) { index, peer in
-                    HStack(spacing: 10) {
-                        Circle()
-                            .fill(peer.replied ? Color.green : Color.cyan)
-                            .frame(width: 8, height: 8)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(peer.name)
-                                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                            Text(peer.replied ? Copy.peerRepliedLabel : Copy.peerNew)
-                                .font(.system(size: 10, design: .rounded))
-                                .foregroundStyle(.secondary)
+            } else {
+                ForEach(Array(controller.peers.enumerated()), id: \.element.id) { index, peer in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(peer.replied ? Color.green : Color.cyan)
+                                .frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(peer.name)
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                Text(peer.replied ? Copy.peerRepliedLabel : Copy.peerNew)
+                                    .font(.system(size: 10, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            chip(Copy.peerSayHi, id: "peer-greet-\(index)") {
+                                controller.greetPeer(peer.id)
+                            }
                         }
-                        Spacer()
-                        Button {
-                            controller.greetPeer(peer.id)
-                        } label: {
-                            Text(Copy.peerSayHi)
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                .padding(.horizontal, 14)
-                                .frame(minHeight: 44)
-                                .background(Color.white.opacity(0.12), in: Capsule())
-                                .contentShape(Capsule())
+                        // Gifts in the greeting's own chip language: a treat
+                        // feeds through the real peck, a cheer runs the
+                        // official excited timeline on the other duck.
+                        HStack(spacing: 8) {
+                            chip(Copy.giftTreat, id: "gift-treat-\(peer.id)") {
+                                controller.giftPeer(peer.id, gift: "treat", value: "")
+                            }
+                            chip(Copy.giftEmotion, id: "gift-emotion-\(peer.id)") {
+                                controller.giftPeer(peer.id, gift: "emotion", value: "excited")
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("peer-greet-\(index)")
                     }
                     .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
                     .frame(minHeight: 56)
                     .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
                     .accessibilityIdentifier("peer-row-\(index)")
@@ -100,5 +106,24 @@ struct PeersSheet: View {
         }
         .padding(20)
         .preferredColorScheme(.dark)
+    }
+
+    /// The sheet's one chip shape: the greeting's capsule, reused by gifts.
+    private func chip(
+        _ title: String,
+        id: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 14)
+                .frame(minHeight: 44)
+                .background(Color.white.opacity(0.12), in: Capsule())
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(id)
     }
 }

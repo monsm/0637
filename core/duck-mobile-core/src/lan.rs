@@ -2,12 +2,15 @@
 //!
 //! The physical robot has no such feature; this is the phone's social layer.
 //! Each app announces itself on UDP 8766 every two seconds, keeps the peers
-//! it has heard from, and can send a greet. A greet is answered with a hello
-//! back and both ducks react with their own official voices.
+//! it has heard from, and can send a greet or a small gift. A greet is
+//! answered with a hello back and both ducks react with their own official
+//! voices. A gift is one of the duck's own reactions too: a treat becomes the
+//! ground-pick peck, an emotion becomes that official emotion.
 //!
 //! The protocol is deliberately tiny and cannot command anything: the only
-//! verbs are announce, greet and hello. A greeting reaches the duck as one of
-//! its own reactions, never as a control input or an observation.
+//! verbs are announce, greet, hello and gift. A greeting or a gift reaches
+//! the duck as one of its own reactions, never as a control input or an
+//! observation.
 
 use serde_json::{json, Value};
 use std::net::{SocketAddr, UdpSocket};
@@ -20,6 +23,26 @@ const ANNOUNCE_EVERY: Duration = Duration::from_secs(2);
 const PEER_TTL_MS: u128 = 8_000;
 const MAX_PEERS: usize = 16;
 const MAX_MESSAGE: usize = 2_048;
+/// One gift per peer in each direction per three seconds; a flood is one
+/// gift. Public because the HTTP sender keeps the same window.
+pub const GIFT_EVERY_MS: u128 = 3_000;
+
+/// The two things a duck can gift. A treat is food; an emotion is a mood by
+/// its official name (`value`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GiftKind {
+    Treat,
+    Emotion,
+}
+
+impl GiftKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            GiftKind::Treat => "treat",
+            GiftKind::Emotion => "emotion",
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PeerEvent {
@@ -27,6 +50,16 @@ pub enum PeerEvent {
     Greeted { from: String, name: String },
     /// A duck we greeted answered.
     Replied { from: String, name: String },
+    /// A known peer sent a gift, addressed to us or to every duck. The
+    /// emotion name is carried through unvalidated: lan.rs has no runtime
+    /// and cannot know which official emotions this build loaded, so the
+    /// apply layer (ffi.rs) checks the name and drops an unknown gift.
+    Gift {
+        from: String,
+        name: String,
+        gift: GiftKind,
+        value: String,
+    },
 }
 
 struct Peer {
@@ -40,6 +73,10 @@ struct Peer {
     awaiting: bool,
     /// The last greet we answered, so a flood of datagrams is one greeting.
     last_greet_ms: u128,
+    /// The last gift we accepted from this duck: one per three seconds.
+    last_gift_ms: u128,
+    /// The last gift we sent this duck: the sender's own window.
+    last_sent_gift_ms: u128,
 }
 
 struct Inner {
@@ -47,6 +84,10 @@ struct Inner {
     name: String,
     peers: Vec<Peer>,
     events: Vec<PeerEvent>,
+    /// The official emotion names this build loaded: an emotion gift for a
+    /// name that is not on the list is refused at the wire, so a junk packet
+    /// spends neither the window nor a place in the event queue.
+    emotions: Vec<String>,
 }
 
 /// The shared half: the listener thread and the shell both use it.
@@ -70,6 +111,9 @@ impl Lan {
             name: clean_name(name),
             peers: Vec::new(),
             events: Vec::new(),
+            // Empty until duck_core_load_emotions publishes the official
+            // list; an emotion gift before then is simply refused.
+            emotions: Vec::new(),
         }));
         let socket = Arc::new(socket);
         let listener_socket = socket.clone();
@@ -86,6 +130,13 @@ impl Lan {
             inner.name = clean_name(name);
         }
         let _ = self.announce();
+    }
+
+    /// The official emotion names, for refusing an unknown mood at the wire.
+    pub fn set_emotions(&self, names: Vec<String>) {
+        if let Ok(mut inner) = self.inner.lock() {
+            inner.emotions = names;
+        }
     }
 
     /// Say hello to one peer, or to every duck when `target` is None.
@@ -132,6 +183,62 @@ impl Lan {
                     .send_to(&bytes, ("255.255.255.255", PORT));
             }
         }
+    }
+
+    /// Send one gift to a known peer: a treat, or an emotion by its official
+    /// name. The packet is unicast to the address greet uses, so a gift never
+    /// becomes a broadcast to ducks that were never chosen. Validation (an
+    /// unknown peer) is checked before anything leaves the socket; the one
+    /// per-peer window is spent only when the send succeeds. `claim` says the
+    /// HTTP layer has already promised this send the window, so an in-flight
+    /// queued send cannot be refused as too soon at the last moment.
+    pub fn gift(&self, target: &str, gift: GiftKind, value: &str) -> Result<(), String> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| "the peer table is busy".to_owned())?;
+        let now = now_ms();
+        let (from, name) = (inner.id.clone(), inner.name.clone());
+        let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == target) else {
+            return Err("no such peer".to_owned());
+        };
+        let message = json!({
+            "v": VERSION,
+            "type": "gift",
+            "from": from,
+            "name": name,
+            "to": target,
+            "gift": gift.as_str(),
+            // A treat carries no mood; an emotion carries its name.
+            "value": match gift {
+                GiftKind::Emotion => value,
+                GiftKind::Treat => "",
+            },
+        });
+        // Only a packet that really left spends the window: a failed send
+        // must not silence the next try.
+        self.socket
+            .send_to(message.to_string().as_bytes(), peer.addr)
+            .map_err(|error| error.to_string())?;
+        peer.last_sent_gift_ms = now;
+        Ok(())
+    }
+
+    /// Whether a gift to `target` may leave now under the one-per-peer
+    /// window, without sending. The HTTP route calls this synchronously so
+    /// "too soon" is answered while the client still waits, and the queued
+    /// send then rides on the promise. False does not spend the window.
+    pub fn gift_window_open(&self, target: &str) -> bool {
+        let inner = match self.inner.lock() {
+            Ok(inner) => inner,
+            Err(_) => return false,
+        };
+        let now = now_ms();
+        inner
+            .peers
+            .iter()
+            .find(|peer| peer.id == target)
+            .is_some_and(|peer| now.saturating_sub(peer.last_sent_gift_ms) >= GIFT_EVERY_MS)
     }
 
     /// What `/state.peers` shows. Expired ducks are pruned here, so the list
@@ -228,9 +335,9 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
         return None;
     }
     let kind = message.get("type").and_then(Value::as_str)?;
-    // Only the three real verbs may touch the peer table: any other type is
+    // Only the four real verbs may touch the peer table: any other type is
     // noise, and noise must not create peers or evict the ducks we know.
-    if !matches!(kind, "announce" | "greet" | "hello") {
+    if !matches!(kind, "announce" | "greet" | "hello" | "gift") {
         return None;
     }
     let from = message
@@ -306,6 +413,53 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             }
             None
         }
+        "gift" => {
+            // A gift is not a discovery: only a duck already in the table may
+            // send one, so announce/greet remain the only verbs that create
+            // peers. A gift may refresh that peer's last_seen.
+            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            if to != "all" && to != inner.id {
+                return None;
+            }
+            let gift = match message.get("gift").and_then(Value::as_str) {
+                Some("treat") => GiftKind::Treat,
+                Some("emotion") => GiftKind::Emotion,
+                _ => return None,
+            };
+            let value = message
+                .get("value")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            // An emotion gift must name a mood this build actually has: the
+            // wire refuses it here, so a junk packet spends neither the
+            // window nor a place in the event queue. The runtime stays the
+            // authority at apply time (a mood could have been swapped since
+            // the snapshot).
+            if gift == GiftKind::Emotion && !inner.emotions.iter().any(|n| *n == value) {
+                return None;
+            }
+            let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) else {
+                return None;
+            };
+            // One gift per peer per three seconds; extra packets inside the
+            // window are dropped silently, exactly like a greet flood.
+            if now.saturating_sub(peer.last_gift_ms) < GIFT_EVERY_MS {
+                return None;
+            }
+            peer.last_gift_ms = now;
+            peer.last_seen_ms = now;
+            inner.events.push(PeerEvent::Gift {
+                from: from.to_owned(),
+                name,
+                gift,
+                value,
+            });
+            if inner.events.len() > 32 {
+                inner.events.remove(0);
+            }
+            None
+        }
         _ => None,
     }
 }
@@ -336,6 +490,8 @@ fn upsert(inner: &mut Inner, id: &str, name: &str, source: SocketAddr, now: u128
         replied: false,
         awaiting: false,
         last_greet_ms: 0,
+        last_gift_ms: 0,
+        last_sent_gift_ms: 0,
     });
 }
 
@@ -376,6 +532,7 @@ mod tests {
             name: "Mine".to_owned(),
             peers: Vec::new(),
             events: Vec::new(),
+            emotions: vec!["laugh".to_owned(), "excited".to_owned()],
         }
     }
 
@@ -496,6 +653,195 @@ mod tests {
             .filter(|event| matches!(event, PeerEvent::Replied { .. }))
             .count();
         assert_eq!(replies, 1, "one greet, one answer, however many hellos");
+    }
+
+    #[test]
+    fn a_gift_from_a_known_peer_becomes_an_event() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "self0001", "gift": "treat", "value": "" }),
+            source(8767),
+            10_000,
+        );
+        assert_eq!(duck.peers.len(), 1);
+        // The gift is not a discovery, but it keeps the sender alive.
+        assert_eq!(duck.peers[0].last_seen_ms, 10_000);
+        assert_eq!(duck.peers[0].last_gift_ms, 10_000);
+        match duck.events.first() {
+            Some(PeerEvent::Gift {
+                from,
+                name,
+                gift,
+                value,
+            }) => {
+                assert_eq!(from, "peer01");
+                assert_eq!(name, "Sunny");
+                assert_eq!(*gift, GiftKind::Treat);
+                assert!(value.is_empty());
+            }
+            other => panic!("expected a gift, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_gift_from_a_stranger_creates_no_peer_and_no_event() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "ghost01", "name": "Ghost", "to": "all", "gift": "treat", "value": "" }),
+            source(8767),
+            10_000,
+        );
+        assert!(duck.peers.is_empty(), "a gift must not create a peer");
+        assert!(duck.events.is_empty());
+    }
+
+    #[test]
+    fn a_gift_for_another_duck_is_ignored() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "peer02", "gift": "treat", "value": "" }),
+            source(8767),
+            10_000,
+        );
+        assert!(duck.events.is_empty());
+    }
+
+    #[test]
+    fn a_gift_flood_is_one_gift() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        for index in 0..20 {
+            ingest(
+                &mut duck,
+                &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "treat", "value": "" }),
+                source(8767),
+                10_000 + index * 100,
+            );
+        }
+        let gifts = duck
+            .events
+            .iter()
+            .filter(|event| matches!(event, PeerEvent::Gift { .. }))
+            .count();
+        assert_eq!(gifts, 1, "one gift per peer per three seconds");
+        // One millisecond past the window it is a new gift.
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "emotion", "value": "excited" }),
+            source(8767),
+            13_000,
+        );
+        assert_eq!(duck.events.len(), 2);
+    }
+
+    #[test]
+    fn an_unknown_emotion_is_refused_at_the_wire() {
+        // The official list lives here now: an emotion gift for a mood this
+        // build does not have is refused before it can spend the window or
+        // take a place in the event queue. The runtime stays the authority
+        // at apply time (a mood could have been swapped since the snapshot).
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "emotion", "value": "moonwalk" }),
+            source(8767),
+            10_000,
+        );
+        assert!(duck.events.is_empty());
+        // The window is not spent by a refused gift: a real one right after
+        // still lands.
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "emotion", "value": "laugh" }),
+            source(8767),
+            10_000,
+        );
+        assert!(matches!(
+            duck.events.first(),
+            Some(PeerEvent::Gift { gift: GiftKind::Emotion, value, .. }) if value == "laugh"
+        ));
+    }
+
+    #[test]
+    fn an_unknown_gift_is_ignored() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "rocket", "value": "" }),
+            source(8767),
+            10_000,
+        );
+        assert!(duck.events.is_empty());
+    }
+
+    #[test]
+    fn the_sender_keeps_one_gift_per_peer() {
+        let socket = UdpSocket::bind(("127.0.0.1", 0)).expect("bind a test socket");
+        let peer = Peer {
+            id: "peer01".to_owned(),
+            name: "Sunny".to_owned(),
+            addr: "127.0.0.1:9".parse().unwrap(),
+            last_seen_ms: 1,
+            replied: false,
+            awaiting: false,
+            last_greet_ms: 0,
+            last_gift_ms: 0,
+            last_sent_gift_ms: 0,
+        };
+        let lan = Lan {
+            inner: Arc::new(Mutex::new(Inner {
+                id: "self0001".to_owned(),
+                name: "Mine".to_owned(),
+                peers: vec![peer],
+                events: Vec::new(),
+                emotions: vec!["laugh".to_owned()],
+            })),
+            socket: Arc::new(socket),
+        };
+        assert_eq!(lan.gift("peer01", GiftKind::Treat, ""), Ok(()));
+        // One gift per peer per three seconds, across kinds: the route asks
+        // gift_window_open before queueing, and the send itself trusts the
+        // promise the route made.
+        assert!(!lan.gift_window_open("peer01"));
+        assert_eq!(lan.gift("peer01", GiftKind::Emotion, "excited"), Ok(()));
+        // An unknown peer has no window at all.
+        assert!(!lan.gift_window_open("ghost01"));
+        assert_eq!(
+            lan.gift("ghost01", GiftKind::Treat, ""),
+            Err("no such peer".to_owned())
+        );
     }
 
     #[test]

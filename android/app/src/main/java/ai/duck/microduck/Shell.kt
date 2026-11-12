@@ -271,6 +271,7 @@ fun Shell(
         var lastSoundTick = -1
         var lastRuleTick = -1
         var lastPeerTick = -1
+        var lastGiftTick = -1
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.
@@ -299,6 +300,13 @@ fun Shell(
             if (peerEvent != null && peerEvent.tick != lastPeerTick) {
                 lastPeerTick = peerEvent.tick
                 soundLine = peerEvent.text
+            }
+            // A neighbour's gift lands on a published tick; the guard keeps
+            // the same gift from raising its pill on every poll.
+            val giftEvent = stateText?.let(::parseGiftEvent)
+            if (giftEvent != null && giftEvent.tick != lastGiftTick) {
+                lastGiftTick = giftEvent.tick
+                soundLine = giftEvent.text
             }
             // The path runner: the same publish carries whether a walk is on,
             // the progress through it and the waypoints as accepted.
@@ -1072,7 +1080,8 @@ private fun AISheet(
 /**
  * Other ducks on this Wi-Fi. Discovery is the core's UDP announce; the list
  * updates from /state while this sheet is open. A greeting is one of the
- * duck's social reactions, and the answer comes back as "X answered!".
+ * duck's social reactions, and the answer comes back as "X answered!". A
+ * gift is a treat or a cheer aimed at one duck, sent through /peers/gift.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1083,6 +1092,26 @@ private fun PeersSheet(
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    // One gift on the wire; the POST is IO-bound and a refusal is the core's
+    // to say, so the sheet stays as it was either way.
+    val sendGift: (String, String, String) -> Unit = { id, gift, value ->
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    postJson(
+                        "/peers/gift",
+                        org.json.JSONObject()
+                            .put("id", id)
+                            .put("gift", gift)
+                            .put("value", value)
+                            .toString(),
+                    )
+                } catch (_: Throwable) {
+                }
+            }
+        }
+    }
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(
             Modifier
@@ -1121,37 +1150,53 @@ private fun PeersSheet(
                 )
             } else {
                 peers.peers.forEachIndexed { index, peer ->
-                    Row(
+                    Column(
                         Modifier
                             .fillMaxWidth()
                             .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .background(
-                                    if (peer.replied) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
-                                    CircleShape,
-                                ),
-                        )
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                peer.name,
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.testTag("peer-row-$index"),
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(8.dp)
+                                    .background(
+                                        if (peer.replied) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
+                                        CircleShape,
+                                    ),
                             )
-                            Text(
-                                if (peer.replied) Copy.peerRepliedLabel else Copy.peerNew,
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 10.sp,
-                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    peer.name,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.testTag("peer-row-$index"),
+                                )
+                                Text(
+                                    if (peer.replied) Copy.peerRepliedLabel else Copy.peerNew,
+                                    color = Color.White.copy(alpha = 0.6f),
+                                    fontSize = 10.sp,
+                                )
+                            }
+                            ButtonChip(Copy.peerSayHi, "peer-greet-$index") { onGreet(peer.id) }
                         }
-                        ButtonChip(Copy.peerSayHi, "peer-greet-$index") { onGreet(peer.id) }
+                        // Gifts in the greeting's own chip language: a treat
+                        // feeds through the real peck, a cheer runs the
+                        // official excited timeline on the other duck.
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ButtonChip(Copy.giftTreat, "gift-treat-${peer.id}") {
+                                sendGift(peer.id, "treat", "")
+                            }
+                            ButtonChip(Copy.giftEmotion, "gift-emotion-${peer.id}") {
+                                sendGift(peer.id, "emotion", "excited")
+                            }
+                        }
                     }
                 }
                 ButtonChip(Copy.peerSayAll, "peer-greet-all") { onGreet(null) }

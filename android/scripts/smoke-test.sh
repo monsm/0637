@@ -344,8 +344,10 @@ curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"rules":[
 echo "block rules: clap -> roulade ok ($ROLLS_BEFORE -> $ROLLS_AFTER)"
 
 # The LAN social layer starts on demand and publishes its own identity and
-# an (empty in CI) peer list. Two emulators are not available here, so the
-# protocol itself is exercised by the iOS host-peer test and the unit tests.
+# peer list. Two emulators are not available here, so the host plays the
+# second duck: its datagrams reach the app through the emulator's UDP
+# redirect, and the app's own unicast replies and gifts come back out the
+# same way. adb forwards only TCP, so the console adds the UDP side.
 echo "--- neighbours ---"
 if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"name":"CI Android"}' http://127.0.0.1:8765/peers/start | grep -q '"ok":true'; then
@@ -365,7 +367,133 @@ if ! echo "$PEERS" | grep -q '"peers"'; then
   echo "::error::/peers does not publish the peer list"
   exit 1
 fi
-echo "neighbours: LAN socket and peer list ok"
+adb emu redir add udp:8766:8766 > /dev/null 2>&1 || true
+
+# Discovery and a greeting, the same protocol two phones use. The duck must
+# discover Sunny, answer the greet with a hello, and keep the peer.
+PEER_REPLY=$(python3 - <<'PY'
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8799))
+sock.settimeout(3.0)
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+greet = {"v": 1, "type": "greet", "from": "peerci01", "name": "Sunny", "to": "all"}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.15)
+sock.sendto(json.dumps(greet).encode(), ("127.0.0.1", 8766))
+try:
+    data, _ = sock.recvfrom(2048)
+    message = json.loads(data)
+    print(message.get("type", ""), message.get("to", ""))
+except Exception:
+    print("timeout", "")
+PY
+)
+if [ "${PEER_REPLY%% *}" != "hello" ]; then
+  echo "::error::the duck did not answer another duck's greet: reply=$PEER_REPLY"
+  exit 1
+fi
+echo "neighbours: the host peer is greeted with hello"
+PEER_FOUND=""
+for _ in $(seq 1 20); do
+  PEER_FOUND=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    peers=(json.load(sys.stdin).get('peers') or {}).get('peers') or []
+    print(1 if any(p.get('name') == 'Sunny' for p in peers) else 0)
+except Exception: print(0)
+" 2>/dev/null || echo 0)
+  [ "$PEER_FOUND" = "1" ] && break
+  sleep 0.2
+done
+if [ "$PEER_FOUND" != "1" ]; then
+  echo "::error::the host peer never reached /state.peers"
+  exit 1
+fi
+APP_PEER_ID=$(curl -sf --max-time 5 http://127.0.0.1:8765/peers | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('id',''))
+except Exception: print('')
+" 2>/dev/null || echo "")
+if [ -z "$APP_PEER_ID" ]; then
+  echo "::error::/peers does not publish the duck's own id"
+  exit 1
+fi
+
+# A gift through the real receiver path: the official laugh timeline runs
+# and the vet book keeps the gift. The announce keeps the peer inside its
+# 8 s TTL while the packet lands.
+python3 - "$APP_PEER_ID" <<'PY'
+import json, socket, sys, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+gift = {"v": 1, "type": "gift", "from": "peerci01", "name": "Sunny",
+        "to": sys.argv[1], "gift": "emotion", "value": "laugh"}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.15)
+sock.sendto(json.dumps(gift).encode(), ("127.0.0.1", 8766))
+PY
+GIFT=""
+for _ in $(seq 1 20); do
+  GIFT=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    e=json.load(sys.stdin).get('gift_event') or {}
+    print(e.get('kind',''), e.get('from_name',''), e.get('value',''))
+except Exception: print('')
+" 2>/dev/null || echo "")
+  [ "$GIFT" = "emotion Sunny laugh" ] && break
+  sleep 0.2
+done
+if [ "$GIFT" != "emotion Sunny laugh" ]; then
+  echo "::error::a neighbour's gift never reached the duck: gift_event=$GIFT"
+  exit 1
+fi
+if ! curl -sf --max-time 5 http://127.0.0.1:8765/life | grep -q 'gift:emotion:laugh'; then
+  echo "::error::the vet book did not record the neighbour's gift"
+  exit 1
+fi
+echo "neighbours: gift emotion laugh received and recorded"
+
+# The app's own sender path: one treat to the known peer is queued, not
+# refused, and the packet really leaves the app — a listener on the host
+# catches the unicast the emulator redirects to us. A fresh announce first,
+# or the TTL may retire the peer while the receiver poll ran.
+python3 - <<'PY'
+import json, socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.sendto(json.dumps({"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}).encode(), ("127.0.0.1", 8766))
+PY
+sleep 0.2
+python3 - <<'PY' > /tmp/duck-gift-ack.txt &
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8799))
+sock.settimeout(6.0)
+try:
+    data, _ = sock.recvfrom(2048)
+    message = json.loads(data)
+    print(message.get("type", ""), message.get("gift", ""))
+except Exception:
+    print("timeout", "")
+PY
+ACK_PID=$!
+sleep 0.3
+GIFT_SENT=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"id":"peerci01","gift":"treat"}' http://127.0.0.1:8765/peers/gift || true)
+if ! echo "$GIFT_SENT" | grep -q '"queued":true'; then
+  echo "::error::the duck refused to send a neighbour a treat: $GIFT_SENT"
+  exit 1
+fi
+wait "$ACK_PID" 2>/dev/null || true
+GIFT_ACK=$(cat /tmp/duck-gift-ack.txt 2>/dev/null || echo "")
+rm -f /tmp/duck-gift-ack.txt
+if [ "$GIFT_ACK" != "gift treat" ]; then
+  echo "::error::the queued treat never left the app as a gift packet: ack=$GIFT_ACK"
+  exit 1
+fi
+echo "neighbours: treat sent to the host peer and the packet left the app"
+echo "neighbours: LAN socket, peer list and gifts ok"
 # Leave a calm, awake duck for the walk and screenshots.
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"hunger":0.15,"mood":0.35,"bond":0.2,"asleep":false}' \

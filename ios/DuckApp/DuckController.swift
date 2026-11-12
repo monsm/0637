@@ -173,6 +173,12 @@ final class DuckController: ObservableObject {
     @Published var peerName = ""
     @Published var peerNotice: String?
     private var lastPeerTick = -1
+    /// The latest gift a neighbour sent, as one line over the stage. The
+    /// core's tick dedupes repeated publishes; giftTick is a fresh counter
+    /// so even the first event (at wire tick 0) fires the pill's onChange.
+    @Published var giftTick = 0
+    @Published var giftLine: String?
+    private var lastGiftTick = -1
     /// The user's own model. The shell makes the call; the core never talks
     /// to the internet. Config lives in UserDefaults beside the language.
     @Published var aiConfig = AIConfig.load()
@@ -1153,6 +1159,13 @@ final class DuckController: ObservableObject {
         post("/peers/greet", body)
     }
 
+    /// Send a neighbour a treat or a cheer. The core validates the peer and
+    /// the gift, and its own 3 s throttle answers a double tap with
+    /// "too soon"; a refusal never queues a packet, so nothing to wait for.
+    func giftPeer(_ id: String, gift: String, value: String) {
+        postJSON("/peers/gift", ["id": id, "gift": gift, "value": value])
+    }
+
     /// The block program the core is running. A GET, because the core is the
     /// authority; the local copy is only the editor's working set.
     func loadRules() {
@@ -1520,6 +1533,23 @@ final class DuckController: ObservableObject {
                             self.peerNotice = kind == "greeted"
                                 ? Copy.peerGreeted(name)
                                 : Copy.peerReplied(name)
+                        }
+                    }
+                    // A null gift_event (nobody has sent one this session) is
+                    // ignored; the last pill simply stays in memory. Only the
+                    // two real gifts raise a line: an unknown kind is not
+                    // invented.
+                    if let event = json["gift_event"] as? [String: Any],
+                       let kind = event["kind"] as? String,
+                       kind == "treat" || kind == "emotion",
+                       let tick = event["tick"] as? Int {
+                        if tick != self.lastGiftTick {
+                            self.lastGiftTick = tick
+                            let name = event["from_name"] as? String ?? "Duck"
+                            self.giftLine = kind == "emotion"
+                                ? Copy.giftReceivedEmotion(name)
+                                : Copy.giftReceivedTreat(name)
+                            self.giftTick += 1
                         }
                     }
                     if let care = json["care"] as? [String: Any] {

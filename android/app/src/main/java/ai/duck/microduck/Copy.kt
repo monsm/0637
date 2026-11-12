@@ -217,6 +217,12 @@ val quack get() = pick("Quack", "叫一声")
     val peerNew get() = pick("new", "新朋友")
     fun peerGreeted(name: String) = pick("$name says hi!", "$name 向你问好！")
     fun peerReplied(name: String) = pick("$name answered!", "$name 回应了！")
+    // Gifts between neighbours: a treat for the tummy, a cheer for the mood,
+    // and the one-line pill the receiver shows.
+    val giftTreat get() = pick("Treat", "喂一颗")
+    val giftEmotion get() = pick("Cheer", "逗逗它")
+    fun giftReceivedTreat(name: String) = pick("$name sent a treat", "$name 送来一颗零食")
+    fun giftReceivedEmotion(name: String) = pick("$name cheered you up", "$name 逗你笑了")
     // Bring your own model.
     val ai get() = pick("AI companion", "AI 伙伴")
     val aiOn get() = pick("watching", "观察中")

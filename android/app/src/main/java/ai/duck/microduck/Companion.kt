@@ -235,6 +235,24 @@ fun parsePeerEvent(text: String): PeerEventUi? = try {
     null
 }
 
+/** The last gift a neighbour sent, formatted for the pill. */
+data class GiftEventUi(val tick: Int, val text: String)
+
+fun parseGiftEvent(text: String): GiftEventUi? = try {
+    val event = JSONObject(text).optJSONObject("gift_event") ?: return null
+    val kind = event.optString("kind", "")
+    val name = event.optString("from_name", "Duck")
+    // Only the two real gifts raise a pill: an unknown kind is not invented.
+    val line = when (kind) {
+        "treat" -> Copy.giftReceivedTreat(name)
+        "emotion" -> Copy.giftReceivedEmotion(name)
+        else -> return null
+    }
+    GiftEventUi(event.optInt("tick", -1), line)
+} catch (_: Throwable) {
+    null
+}
+
 /** The last room sound the duck answered: kind and the tick it happened. */
 data class SoundEvent(val kind: String, val tick: Int)
 

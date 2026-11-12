@@ -18,6 +18,7 @@ use duck_control::safety::SafetyConfig;
 
 use crate::control::Tuning;
 use crate::intent::{Intent, IntentQueue};
+use crate::lan::GiftKind;
 use crate::mujoco::MujocoIo;
 use crate::runtime::{BringupState, DuckRuntime, TickReport};
 
@@ -411,9 +412,18 @@ pub unsafe extern "C" fn duck_core_load_emotions(
         Ok(count) => {
             (*core).emotions_dir = Some(dir);
             // `/skills` is a snapshot the intent server owns, so publish the
-            // enlarged list before a client asks for it.
+            // enlarged list before a client asks for it. The gift route needs
+            // the official emotion names separately from the skills list.
             let names = published_skills((*core).runtime.skill_names());
             (*core).intents.set_skills(names.clone());
+            (*core)
+                .intents
+                .set_emotions((*core).runtime.emotion_names());
+            // The wire refuses an emotion gift for a mood this build does not
+            // have, so the same list feeds the LAN layer.
+            if let Some(lan) = &(*core).lan {
+                lan.set_emotions((*core).runtime.emotion_names());
+            }
             (*core).skills = names
                 .iter()
                 .map(|name| CString::new(name.clone()).unwrap_or_default())
@@ -617,6 +627,10 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
         .map(|skill| CString::new(skill.clone()).unwrap_or_default())
         .collect();
     core.intents.set_skills(names);
+    // The gift route's official-name list follows the body: a switch may
+    // re-attach the emotions, and a switch without them must clear the old
+    // names rather than leave a mood the new duck cannot play.
+    core.intents.set_emotions(core.runtime.emotion_names());
     // The roller's meshes are its own; the debug name table has to move too.
     core.meshes = (0..core.runtime.io().mesh_count())
         .map(|mesh| {
@@ -943,6 +957,26 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             None => refuse(core, "the LAN peer port is not available".to_owned()),
         },
+        Intent::SendGift { id, gift, value } => {
+            // The route checked the published list; the runtime is the
+            // authority on which official emotions this build loaded (a mode
+            // switch or a fresh emotion directory could move it).
+            if gift == GiftKind::Emotion
+                && !core
+                    .runtime
+                    .emotion_names()
+                    .iter()
+                    .any(|loaded| loaded == &value)
+            {
+                return refuse(core, "no such emotion".to_owned());
+            }
+            let sent = core.lan.as_ref().map(|lan| lan.gift(&id, gift, &value));
+            match sent {
+                Some(Ok(())) => json!({ "ok": true, "queued": true }),
+                Some(Err(error)) => refuse(core, format!("gift refused: {error}")),
+                None => refuse(core, "the LAN peer port is not available".to_owned()),
+            }
+        }
         Intent::PeerName(name) => match &core.lan {
             Some(lan) => {
                 lan.set_name(&name);
@@ -1205,6 +1239,57 @@ fn on_active(core: &mut DuckCore, f: impl FnOnce(&mut DuckRuntime<MujocoIo>)) {
     }
 }
 
+/// One gift another duck sent, through the same runtime entries a person's
+/// treat or mood takes: `feed` for a treat, `trigger_emotion` for a mood.
+///
+/// The emotion NAME is validated here rather than in lan.rs: the peer module
+/// has no runtime and cannot know which official emotions this build loaded.
+/// An unknown name drops the whole gift — no event, no book note, nothing
+/// invented — exactly as the wire contract says.
+fn apply_gift(core: &mut DuckCore, from: String, name: String, gift: GiftKind, value: String) {
+    let value = if gift == GiftKind::Emotion {
+        value
+    } else {
+        String::new()
+    };
+    if gift == GiftKind::Emotion
+        && !active_runtime(core)
+            .emotion_names()
+            .iter()
+            .any(|loaded| loaded == &value)
+    {
+        return;
+    }
+    let mut ok = false;
+    on_active(core, |runtime| {
+        // The gift is in the lifetime record either way; `feed` and
+        // `trigger_emotion` add their own counters, and this note says where
+        // the treat or the mood came from.
+        let note = match gift {
+            GiftKind::Treat => {
+                ok = matches!(runtime.feed(), Ok(true));
+                "gift:treat".to_owned()
+            }
+            GiftKind::Emotion => {
+                ok = runtime.trigger_emotion(&value).is_ok();
+                format!("gift:emotion:{value}")
+            }
+        };
+        runtime.book_mut().note(note);
+    });
+    // The tick the gift landed on, on the duck the client is watching. The
+    // shells compare it to avoid showing the same pill twice.
+    let tick = active_runtime(core).clock().tick as u32;
+    core.intents.set_gift_event(json!({
+        "kind": gift.as_str(),
+        "value": value,
+        "from": from,
+        "from_name": name,
+        "tick": tick,
+        "ok": ok,
+    }));
+}
+
 fn publish_state(core: &DuckCore) {
     let active = active_runtime(core);
     let trunk = active.io().trunk();
@@ -1332,6 +1417,10 @@ fn publish_state(core: &DuckCore) {
         // Other ducks on the LAN, and the last greeting or reply.
         "peers": core.intents.peers_value(),
         "peer_event": active.last_peer_event(),
+        // The last gift another duck sent, for the shells' one-line pill;
+        // null until one arrives this session. The receiver's window and the
+        // packet gate live in lan.rs.
+        "gift_event": core.intents.gift_event_value(),
         // The last words a person said, for a user-supplied model. The audio
         // itself never leaves the phone; only these words are published.
         "last_heard": active.last_heard().map(|(text, tick)| {
@@ -1434,8 +1523,25 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     if let Some(snapshot) = peer_snapshot {
         core.intents.set_peers(snapshot);
     }
+    let mut gifts = Vec::new();
     for event in peer_events {
-        on_active(core, |runtime| runtime.peer_event(&event));
+        match event {
+            // A gift is not a greeting: collect it and apply it after the
+            // greetings, so a hello's own reaction cannot be mistaken for the
+            // gift's (or vice versa).
+            crate::lan::PeerEvent::Gift {
+                from,
+                name,
+                gift,
+                value,
+            } => gifts.push((from, name, gift, value)),
+            event => on_active(core, |runtime| runtime.peer_event(&event)),
+        }
+    }
+    // Gifts feed the duck or play one of its official emotions, with the same
+    // verdicts the API path gives.
+    for (from, name, gift, value) in gifts {
+        apply_gift(core, from, name, gift, value);
     }
     for queued in core.intents.drain() {
         let result = apply_intent(core, queued.intent);

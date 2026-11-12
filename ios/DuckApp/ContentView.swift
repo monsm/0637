@@ -298,6 +298,16 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
+        // A neighbour's gift — a treat or a cheer — in the same one-line
+        // pill. The tick fires even when two gifts read the same.
+        .onChange(of: controller.giftTick) { _, _ in
+            guard let line = controller.giftLine, !line.isEmpty else { return }
+            withAnimation(.easeIn(duration: 0.2)) { moodText = line }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                guard moodText == line else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
         // The model's own line, when it decides something.
         .onChange(of: controller.aiDecision) { _, decision in
             guard !decision.isEmpty else { return }

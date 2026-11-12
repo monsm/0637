@@ -38,6 +38,10 @@ const ACTION_TIMEOUT: Duration = Duration::from_millis(300);
 /// body: the same work as core creation, and worth waiting for.
 const MODE_TIMEOUT: Duration = Duration::from_secs(30);
 
+/// The sender keeps the wire's one-gift-per-peer window here too, so a tap
+/// repeated three times in a second is refused before it reaches the tick.
+const GIFT_INTERVAL: Duration = Duration::from_millis(crate::lan::GIFT_EVERY_MS as u64);
+
 #[derive(Debug, Clone)]
 pub enum Intent {
     Twist([f64; 3]),
@@ -112,6 +116,13 @@ pub enum Intent {
     Posture(bool),
     /// Say hello to another duck on the LAN (None = every duck).
     GreetPeer(Option<String>),
+    /// A treat or an official emotion for one known peer, unicast to the
+    /// address its announce/greet came from.
+    SendGift {
+        id: String,
+        gift: crate::lan::GiftKind,
+        value: String,
+    },
     /// The name this duck announces.
     PeerName(String),
     /// Open the LAN socket and announce as `name`. On-demand because iOS
@@ -157,6 +168,14 @@ pub struct IntentQueue {
     fingerprint: Mutex<String>,
     /// The LAN peers as the loop last published them.
     peers: Mutex<Value>,
+    /// The official emotion names this build loaded, as the core last
+    /// published them. The gift route refuses a mood that is not in here.
+    emotions: Mutex<Vec<String>>,
+    /// When each peer last got a gift from this duck, for the sender's
+    /// one-per-peer window. Keyed by peer id.
+    gifts_sent: Mutex<HashMap<String, Instant>>,
+    /// The last gift that arrived from another duck, as /state publishes it.
+    gift_event: Mutex<Value>,
     /// The time machine's answers, filled by the core on the next tick.
     time: Mutex<Value>,
     /// The forks: one entry per branch, filled by the core.
@@ -197,6 +216,9 @@ impl IntentQueue {
             skills: Mutex::new(Vec::new()),
             fingerprint: Mutex::new("{}".to_owned()),
             peers: Mutex::new(json!({ "peers": [] })),
+            emotions: Mutex::new(Vec::new()),
+            gifts_sent: Mutex::new(HashMap::new()),
+            gift_event: Mutex::new(Value::Null),
             branches: Mutex::new(json!({ "branches": [], "selected": "" })),
             sensors: Mutex::new(json!({ "mode": "twin" })),
             life: Mutex::new(crate::vetbook::Book::default()),
@@ -388,6 +410,91 @@ impl IntentQueue {
 
     pub fn peers_value(&self) -> Value {
         self.peers.lock().expect("intent peers").clone()
+    }
+
+    /// The official emotion names the core has loaded. The gift route reads
+    /// this snapshot so a client's typo is refused before anything is queued.
+    pub fn set_emotions(&self, names: Vec<String>) {
+        *self.emotions.lock().expect("intent emotions") = names;
+    }
+
+    fn emotion_loaded(&self, name: &str) -> bool {
+        self.emotions
+            .lock()
+            .expect("intent emotions")
+            .iter()
+            .any(|loaded| loaded == name)
+    }
+
+    /// Claim one peer's sender window. False means a gift went to that peer
+    /// less than three seconds ago. The window is spent only when this
+    /// returns true, so callers validate first and never lose it to a
+    /// refused gift.
+    pub fn take_gift_window(&self, id: &str) -> bool {
+        let now = Instant::now();
+        let mut sent = self.gifts_sent.lock().expect("intent gifts");
+        // Entries outside the window throttle nothing any more; dropping
+        // them keeps the map the size of the peers actually in play.
+        sent.retain(|_, last| now.saturating_duration_since(*last) < GIFT_INTERVAL);
+        if sent.contains_key(id) {
+            return false;
+        }
+        sent.insert(id.to_owned(), now);
+        true
+    }
+
+    /// Validate one `/peers/gift` body. `Ok` carries the peer id, the kind
+    /// and the value to send; `Err` is the client-facing reason. Nothing is
+    /// queued and no sender window is spent here.
+    fn validate_gift(
+        &self,
+        value: &Value,
+    ) -> Result<(String, crate::lan::GiftKind, String), String> {
+        let id = value["id"].as_str().unwrap_or_default();
+        // A gift's address is the one greet uses, so the peer must still be
+        // in the published table. No table row, no send.
+        let known = self
+            .peers_value()
+            .get("peers")
+            .and_then(Value::as_array)
+            .is_some_and(|rows| {
+                rows.iter()
+                    .any(|row| row.get("id").and_then(Value::as_str) == Some(id))
+            });
+        if id.is_empty() || !known {
+            return Err("no such peer".to_owned());
+        }
+        match value["gift"].as_str() {
+            Some("treat") => Ok((
+                id.to_owned(),
+                crate::lan::GiftKind::Treat,
+                String::new(),
+            )),
+            Some("emotion") => {
+                let mood = value["value"].as_str().unwrap_or_default();
+                // Official names only: the same set the runtime loads, so a
+                // gift can never invent a mood the duck does not have.
+                if !self.emotion_loaded(mood) {
+                    return Err("no such emotion".to_owned());
+                }
+                Ok((
+                    id.to_owned(),
+                    crate::lan::GiftKind::Emotion,
+                    mood.to_owned(),
+                ))
+            }
+            _ => Err("gift must be treat or emotion".to_owned()),
+        }
+    }
+
+    /// The latest received gift for `/state.gift_event`; `null` until one
+    /// arrives this session.
+    pub fn set_gift_event(&self, event: Value) {
+        *self.gift_event.lock().expect("intent gift") = event;
+    }
+
+    pub fn gift_event_value(&self) -> Value {
+        self.gift_event.lock().expect("intent gift").clone()
     }
 
     /// The care slice of the published state: one GET for a shell that wants
@@ -790,6 +897,25 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
                 value["id"].as_str().filter(|id| !id.is_empty()).map(str::to_owned),
             ))
             .to_string()),
+        // A gift is fire-and-forget like /pet: the duck answers with its body,
+        // and a tap must not become a 300 ms timeout. Everything a client can
+        // get wrong is refused here, before the queue and before the sender's
+        // window is spent.
+        ("POST", "/peers/gift") => match queue.validate_gift(&value) {
+            Err(error) => Ok(json!({ "ok": false, "error": error }).to_string()),
+            Ok((id, gift, gift_value)) => {
+                if !queue.take_gift_window(&id) {
+                    Ok(json!({ "ok": false, "error": "too soon" }).to_string())
+                } else {
+                    queue.push(Intent::SendGift {
+                        id,
+                        gift,
+                        value: gift_value,
+                    });
+                    Ok(json!({ "ok": true, "queued": true }).to_string())
+                }
+            }
+        },
         ("POST", "/peers/name") => match value["name"].as_str() {
             Some(name) => Ok(queue
                 .request(Intent::PeerName(name.to_owned()))
@@ -1038,6 +1164,99 @@ mod tests {
         assert!(response.contains(r#""ok":false"#), "{response}");
         assert!(response.contains("no such skill"), "{response}");
         let _ = worker.join();
+    }
+
+    /// `/peers/gift` validates before queueing and keeps the sender's window:
+    /// an unknown peer, a bad kind or an emotion this build did not load are
+    /// refused without spending it, and one gift per peer per three seconds
+    /// is enforced at the route.
+    #[test]
+    fn http_queues_a_gift_and_refuses_bad_or_early_ones() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_peers(json!({
+            "peers": [
+                { "id": "peer01", "name": "Sunny" },
+                { "id": "peer02", "name": "Rainy" },
+            ]
+        }));
+        queue.set_emotions(vec!["excited".to_owned()]);
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        // An unknown peer is refused before the queue and before any window.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"ghost","gift":"treat","value":""}"#,
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("no such peer"), "{response}");
+        assert!(queue.drain().is_empty(), "an unknown peer was queued");
+
+        // An emotion this build did not load is refused too, and the refusal
+        // does not spend peer01's window: the treat right after is accepted.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer01","gift":"emotion","value":"flying"}"#,
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("no such emotion"), "{response}");
+        assert!(queue.drain().is_empty(), "an unknown emotion was queued");
+
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer01","gift":"treat","value":""}"#,
+        );
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        assert!(response.contains(r#""queued":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::SendGift { id, gift, value } => {
+                assert_eq!(id, "peer01");
+                assert_eq!(*gift, crate::lan::GiftKind::Treat);
+                assert!(value.is_empty());
+            }
+            other => panic!("unexpected intent: {other:?}"),
+        }
+
+        // The window is spent: a second gift inside three seconds is refused
+        // without queueing.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer01","gift":"emotion","value":"excited"}"#,
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("too soon"), "{response}");
+        assert!(queue.drain().is_empty(), "a throttled gift was queued");
+
+        // A different peer has its own window and an official emotion rides
+        // along with its name.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer02","gift":"emotion","value":"excited"}"#,
+        );
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::SendGift { id, gift, value } => {
+                assert_eq!(id, "peer02");
+                assert_eq!(*gift, crate::lan::GiftKind::Emotion);
+                assert_eq!(value, "excited");
+            }
+            other => panic!("unexpected intent: {other:?}"),
+        }
     }
 
     /// A route whose tick never runs says so instead of pretending success.

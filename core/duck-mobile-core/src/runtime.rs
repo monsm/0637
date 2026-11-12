@@ -1562,6 +1562,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             crate::lan::PeerEvent::Replied { from, name } => {
                 ("replied", from, name, "yes", "yes")
             }
+            // A gift is not a greeting: the tick applies it through feed or
+            // trigger_emotion (ffi.rs), so it never reaches this voice path
+            // and must not publish a peer_event.
+            crate::lan::PeerEvent::Gift { .. } => return,
         };
         self.last_peer_event = Some(serde_json::json!({
             "kind": kind,
