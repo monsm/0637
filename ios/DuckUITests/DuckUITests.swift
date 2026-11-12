@@ -17,6 +17,11 @@ final class DuckUITests: XCTestCase {
         // landscape would otherwise validate the wrong shell.
         XCUIDevice.shared.orientation = .portrait
         app = XCUIApplication()
+        // The paste-permission prompt is a system trust dialog: on a
+        // headless simulator it never becomes a queryable alert, and the
+        // app blocks behind it for a minute. Apple's own UI tests disable
+        // it with this launch default; production behaviour is untouched.
+        app.launchArguments += ["-UIPasteboardTrustPromptDisabled", "YES"]
         app.launch()
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline && app.frame.height <= app.frame.width {
