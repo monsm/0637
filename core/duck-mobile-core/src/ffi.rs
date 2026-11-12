@@ -1286,7 +1286,11 @@ fn on_active(core: &mut DuckCore, f: impl FnOnce(&mut DuckRuntime<MujocoIo>)) {
 }
 
 /// One gift another duck sent, through the same runtime entries a person's
-/// treat or mood takes: `feed` for a treat, `trigger_emotion` for a mood.
+/// treat or mood takes: `gift_treat` for a treat, `gift_emotion` for a mood.
+///
+/// The gift is not a hand. It feeds the duck and it can cheer it, but it
+/// does not end the night, it is not written as a touch, and it does not
+/// raise the bond — that belongs to the person holding the phone.
 ///
 /// The emotion NAME is validated here rather than in lan.rs: the peer module
 /// has no runtime and cannot know which official emotions this build loaded.
@@ -1308,20 +1312,20 @@ fn apply_gift(core: &mut DuckCore, from: String, name: String, gift: GiftKind, v
     }
     let mut ok = false;
     on_active(core, |runtime| {
-        // The gift is in the lifetime record either way; `feed` and
-        // `trigger_emotion` add their own counters, and this note says where
-        // the treat or the mood came from.
-        let note = match gift {
-            GiftKind::Treat => {
-                ok = matches!(runtime.feed(), Ok(true));
-                "gift:treat".to_owned()
-            }
+        // Each gift writes its own single line in the book: `gift:treat` or
+        // `gift:emotion:<name>`. The counter it moves is the duck's own.
+        ok = match gift {
+            GiftKind::Treat => matches!(runtime.gift_treat(), Ok(true)),
             GiftKind::Emotion => {
-                ok = runtime.trigger_emotion(&value).is_ok();
-                format!("gift:emotion:{value}")
+                let played = runtime.gift_emotion(&value);
+                if played.is_ok() {
+                    runtime
+                        .book_mut()
+                        .note(format!("gift:emotion:{value}"));
+                }
+                played.is_ok()
             }
         };
-        runtime.book_mut().note(note);
     });
     // The tick the gift landed on, on the duck the client is watching. The
     // shells compare it to avoid showing the same pill twice.

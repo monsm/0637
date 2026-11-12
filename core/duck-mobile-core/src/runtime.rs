@@ -1328,6 +1328,40 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.start_emotion(name)
     }
 
+    /// A treat that arrived from a neighbour.
+    ///
+    /// The duck really eats it — that is the gift — but nobody's hand was
+    /// here: it must not end the night, it must not be written as a touch,
+    /// and it must not raise the bond, which is between the duck and the
+    /// person holding the phone. One gift is one line in the book.
+    pub fn gift_treat(&mut self) -> Result<bool, &'static str> {
+        if self.powered_off
+            || self.shutting_down()
+            || !matches!(self.bringup, Bringup::Ready)
+        {
+            return Err("the duck is not standing");
+        }
+        self.start_ground_pick()?;
+        self.book.life.fed += 1;
+        self.book.note("gift:treat".to_owned());
+        self.queue_sound("yes");
+        self.care.feed_from_away();
+        Ok(true)
+    }
+
+    /// A mood a neighbour sent.
+    ///
+    /// The emotion plays if the duck is awake — somebody else's cheer does
+    /// not stir a sleeping duck — and the cheer is not a touch. The book
+    /// says where it came from; it does not also claim the duck felt it on
+    /// its own.
+    pub fn gift_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        if self.care.asleep {
+            return Ok(false);
+        }
+        self.play_emotion(name, false)
+    }
+
     /// A celebration the duck performs by itself (a completed quest). It must
     /// not count as a touch: the pet that completed the goal is the touch,
     /// and an automatic cheer would otherwise reset a doze or a neglect timer.
@@ -1341,6 +1375,13 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     fn start_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        self.play_emotion(name, true)
+    }
+
+    /// The emotion itself. `record` says whether the book gets a line of its
+    /// own: a caller that says where the emotion came from does not also
+    /// want the duck's own note, or one cheer is two lines.
+    fn play_emotion(&mut self, name: &str, record: bool) -> Result<bool, &'static str> {
         if self.controller.busy() || self.controller.is_sitting() {
             return Err("a move is running; the duck must be standing still");
         }
@@ -1350,7 +1391,11 @@ impl<T: RobotIo> DuckRuntime<T> {
         if emotion.duration() <= 0.0 {
             return Err("emotion has no keyframes");
         }
-        self.book.emotion(name);
+        if record {
+            self.book.emotion(name);
+        } else {
+            self.book.count_emotion(name);
+        }
         self.emotion_playing = Some(crate::emotion::Playing {
             name: name.to_owned(),
             elapsed: 0.0,
@@ -2810,7 +2855,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             }
         }
         for move_name in due_moves {
-            let _ = self.trigger_emotion(&move_name);
+            // The room is singing, not a hand: a beat is not attention, so
+            // it must not end a night or reset a neglect timer.
+            let _ = self.celebrate_emotion(&move_name);
         }
         if self.chorus.as_ref().is_some_and(|task| {
             !task.moves.is_empty()

@@ -120,8 +120,16 @@ impl Book {
 
     /// Count an emotion, by name.
     pub fn emotion(&mut self, name: &str) {
-        *self.life.emotions.entry(name.to_owned()).or_insert(0) += 1;
+        self.count_emotion(name);
         self.note(format!("emotion:{name}"));
+    }
+
+    /// Count an emotion without saying it happened on its own.
+    ///
+    /// The caller says where the emotion came from — a neighbour's gift, a
+    /// room singing — and one event is one line in the book, not two.
+    pub fn count_emotion(&mut self, name: &str) {
+        *self.life.emotions.entry(name.to_owned()).or_insert(0) += 1;
     }
 
     /// A dated moment, capped so the list cannot grow without bound.

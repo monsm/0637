@@ -166,6 +166,17 @@ impl Care {
         self.mood = (self.mood + 0.1).min(1.0);
     }
 
+    /// A treat that arrived from somewhere else — a neighbour's gift.
+    ///
+    /// The duck is less hungry and in a better mood, because it really ate.
+    /// But nobody's hand was here: the night stays as it was, and the bond
+    /// does not move, because the bond is between the duck and the person
+    /// holding the phone.
+    pub fn feed_from_away(&mut self) {
+        self.hunger = (self.hunger - 0.45).max(0.0);
+        self.mood = (self.mood + 0.1).min(1.0);
+    }
+
     /// Driving, carrying, a skill: attention, but weaker than a pet.
     pub fn touch(&mut self, now: u64) {
         self.wake(now);
@@ -384,5 +395,44 @@ mod tests {
             "night": { "active": true, "started_tick": 7 },
         }));
         assert!(forgot.asleep);
+    }
+
+    /// A neighbour's treat fills the duck, and nothing else.
+    ///
+    /// The night stays: a gift is not a hand, and a hand is what ends a
+    /// night. The bond stays: the intimacy is between the duck and the
+    /// person holding the phone, not between the duck and a neighbour.
+    #[test]
+    fn a_treat_from_away_fills_the_duck_without_waking_it() {
+        let mut care = Care::default();
+        care.enter_night(100);
+        let bond = care.bond;
+        let hunger = care.hunger;
+
+        care.feed_from_away();
+
+        assert!(care.asleep, "a gift must not end the night");
+        assert!(!care.woken_by_touch, "a gift is not a touch");
+        assert_eq!(care.bond, bond, "the bond did not move");
+        assert!(
+            care.hunger < hunger,
+            "the duck really ate: {} < {hunger}",
+            care.hunger
+        );
+    }
+
+    /// The same for a hand: a treat in the room is a touch, and it ends the
+    /// night. The two paths have to stay apart.
+    #[test]
+    fn a_treat_from_a_hand_wakes_the_duck_and_raises_the_bond() {
+        let mut care = Care::default();
+        care.enter_night(100);
+        let bond = care.bond;
+
+        care.feed(101);
+
+        assert!(!care.asleep, "a hand ends the night");
+        assert!(care.woken_by_touch, "a hand is a touch");
+        assert!(care.bond > bond, "the bond moved");
     }
 }
