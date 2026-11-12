@@ -456,20 +456,16 @@ fi
 echo "neighbours: gift emotion laugh received and recorded"
 
 # The app's own sender path: one treat to the known peer is queued, not
-# refused, and the packet really leaves the app — a listener on the host
-# catches the unicast the emulator redirects to us. A fresh announce first,
-# or the TTL may retire the peer while the receiver poll ran.
-python3 - <<'PY'
-import json, socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.sendto(json.dumps({"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}).encode(), ("127.0.0.1", 8766))
-PY
-sleep 0.2
+# refused, and the packet really leaves the app. The listener IS the socket
+# that announces: the app stores a peer's address from the announce's
+# source, so a reply can only come back to the exact port that spoke.
 python3 - <<'PY' > /tmp/duck-gift-ack.txt &
 import json, socket, time
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("127.0.0.1", 8799))
-sock.settimeout(6.0)
+sock.settimeout(8.0)
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
 try:
     data, _ = sock.recvfrom(2048)
     message = json.loads(data)
@@ -478,7 +474,7 @@ except Exception:
     print("timeout", "")
 PY
 ACK_PID=$!
-sleep 0.3
+sleep 0.5
 GIFT_SENT=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"id":"peerci01","gift":"treat"}' http://127.0.0.1:8765/peers/gift || true)
 if ! echo "$GIFT_SENT" | grep -q '"queued":true'; then
