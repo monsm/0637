@@ -37,7 +37,10 @@ pub fn workspace_root() -> PathBuf {
 /// official files, so a bundle that is not there is a broken build — not a
 /// developer who has not downloaded anything yet.
 pub fn required() -> bool {
-    std::env::var_os("DUCK_REQUIRE_FIXTURES").is_some_and(|value| value != "0")
+    match std::env::var("DUCK_REQUIRE_FIXTURES") {
+        Ok(value) => value != "0",
+        Err(_) => false,
+    }
 }
 
 /// The places the official policy bundle is looked for, in order.

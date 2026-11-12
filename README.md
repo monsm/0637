@@ -41,12 +41,17 @@ D:\AI\Duck\work\.venv\Scripts\python.exe D:\AI\Duck\work\run_trace.py `
 
 | 工作流 | Runner | 产物 |
 |---|---|---|
+| `.github/workflows/core.yml` | Ubuntu | 核心 Rust 单元测试（两端共用的那颗心脏） |
 | `.github/workflows/ios.yml` | macOS 14 | `Duck.app`（模拟器，未签名） |
 | `.github/workflows/android.yml` | Ubuntu | `Duck-android`（debug APK） |
 
-两个工作流都会自行拉取上游 MJCF/STL 与官方 ONNX（`upstream/`、`policies/` 不入库），
+三个工作流都会自行拉取上游 MJCF/STL 与官方 ONNX（`upstream/`、`policies/` 不入库），
 构建 MuJoCo/ONNX Runtime 并编译 Rust 核心；本地不需要 Android SDK 或 Xcode。
 iOS 真机安装才需要 Apple Developer 签名。
+
+核心的测试在 `core.yml` 里跑：它按工作区解析官方策略与训练场景
+（`DUCK_POLICIES_DIR` 可改），CI 设 `DUCK_REQUIRE_FIXTURES=1`，所以**缺一个官方文件就是失败，
+不是跳过**——一个什么都没验的绿灯比红灯更糟。
 
 ## 关键约束
 

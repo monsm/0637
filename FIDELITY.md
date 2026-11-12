@@ -12,24 +12,29 @@
 - 对**某一台真实鸭子 + 真实物理世界**：做不到 100%。不是工程能力问题，是信息与定义问题（见 §3）。
 - 手机传感器可以全部接入，但**不能直接当成鸭子的本体感知**——那样反而会破坏 1:1（见 §4）。
 
-### 0.1 当前实现状态（2026-11-09）
+### 0.1 当前实现状态（2026-11-12）
+
+> 这一节以前停在 2026-11-09（iOS 32/32 检查、相机与麦克风「未开始」）。下面按仓库现状重写；
+> 逐项的验证证据见 [REPORT.md](REPORT.md)，玩法见 [COMPANION.md](COMPANION.md)。
 
 | 项 | 状态 |
 |---|---|
 | 官方 MJCF / BAM M6 / ONNX / 61 维 / 50 Hz | ✅ 桌面 + 端内 MuJoCo 验证；BAM 与官方 Python 对拍 < 1e-9 |
 | 全技能调度（walk / sit / rise / roulade / kick / ground pick） | ✅ 模拟器实测逐项通过 |
 | manifest 解析 / 自定义策略热加载 | ✅ |
-| 本地 intent API（HTTP） | ✅ `/state /skills /twist /head /body /skill /sit /ground_pick /push /reload` |
-| iOS SwiftUI + Metal + C ABI | ✅ CI 模拟器 **32/32** 检查通过（构建、启动、行走 0.7 m、坐/站、3 技能、抓取、推挤、热重载、3D 视口点亮、帧在动、鸭子材质颜色、XCUITest 点按钮）；未签名 IPA 已产出 |
-| 3D 外观 | ✅ 几何直接取 MuJoCo `mesh_vert`+`mesh_face`，颜色按 `mat_rgba` 解析，头灯照明；与官方渲染对照一致（白壳、橙嘴/橙脚） |
-| Android（Kotlin + GLES3） | ✅ CI 模拟器冒烟通过（行走、意图 API、画面检查） |
-| 手机 IMU 扰动 | ✅（shake → trunk push） |
-| 相机 / LiDAR / AR / 麦克风 | 未开始 |
-| 真机 | 未验证（需要 Apple 签名或自签工具；CI 无物理设备） |
+| 本地 intent API（HTTP） | ✅ **54 条路由**：`/state /skills /twist /head /body /skill /sit /posture /ground_pick /push /reload /checkpoint /restore /fork /branches /branch/select /branch/drop /seek /step /care /feed /pet /night /rules /quests /life /export/vetbook.{json,md} /peers /peers/name /peers/start /peers/greet /peers/gift /chorus /path /path/cancel /heard /sound /mouth /look /wheee /flashlight /mode /power /fingerprint /sensor /sensors /timeline /config /time /carry /shutdown /mcp` |
+| iOS SwiftUI + Metal + C ABI | ✅ CI 模拟器 **192/192** 会话断言 + XCUITest + 设备切片 + 未签名 IPA（详见 REPORT.md） |
+| 3D 外观 | ✅ 几何直接取 MuJoCo `mesh_vert`+`mesh_face`，颜色按 `mat_rgba` 解析；PBR + 接触阴影 + 两 tick 位姿插值；与官方渲染对照一致（白壳、橙嘴/橙脚） |
+| Android（Kotlin + GLES3） | ✅ CI 模拟器冒烟通过 + 16 KB 页对齐检查 + 可安装 debug APK |
+| 官方声音合成 | ✅ `sounds/` 原样编译进核心（7 个音色、12 变体），两端接扬声器 |
+| 麦克风 | ✅ 两端真实拾音（RMS + 过零主频；iOS 10 Hz、Android 256 ms 窗，带真实时间戳进 `/sensor`） |
+| 相机 | ✅ Director 模式：系统相机取静帧 + 鸭子按屏幕取景合成；无相机时走棚拍背景，不假死 |
+| 手机 IMU 扰动 | ⚠️ iOS 已接（shake → trunk push）；**Android 未接**（`DuckCore.push` 存在，但没有 SensorManager 监听器） |
+| LiDAR / AR | ❌ 未做 ARKit/ARCore 跟踪与平面锚定；`/sensors` 只发布 LiDAR 深度读数与 8×8 ToF 降采样 |
+| 真机 | 未验证（iOS 需签名凭据、Android arm64 未跑；CI 无物理设备） |
 
-> 2026-11-09 的 CI 证据（iOS run `42553736386`，commit `307b839`）：
-> 视口中心区域点亮 100%、70 个渲染 geom、三帧互不相同、`/twist` 后 trunk 位移 0.696 m、
-> `label` 依次出现 `walk → sit → rise → roulade → kick_left → kick_right → ground_pick`。
+> CI 证据随每次发布记录在 [REPORT.md](REPORT.md) §四之十七；本节只写状态，不复述数字，
+> 免得两处各说各话。
 
 ---
 

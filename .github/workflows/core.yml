@@ -79,7 +79,12 @@ jobs:
         run: |
           set -euo pipefail
           cd core
-          cargo test --locked --workspace 2>&1 | tee "$RUNNER_TEMP/cargo-test.log"
+          # --include-ignored: upstream marks eight of its own control tests
+          # "requires ONNX Runtime >= 1.23", which is why they never ran on
+          # the machine that wrote them. This job ships 1.24.2, so they run
+          # here — they are the sit/stand and move-in-flight rules, which are
+          # exactly the semantics worth having a gate on.
+          cargo test --locked --workspace -- --include-ignored 2>&1 | tee "$RUNNER_TEMP/cargo-test.log"
 
       - name: Publish the test log
         if: always()
