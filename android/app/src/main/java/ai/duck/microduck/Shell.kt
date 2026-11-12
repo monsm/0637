@@ -3164,12 +3164,14 @@ internal fun fetchLifeEvents(): List<String> {
         connection.readTimeout = 1500
         val text = connection.inputStream.bufferedReader().use { it.readText() }
         connection.disconnect()
-        Regex(""""events"\s*:\s*\[(.*?)]""", RegexOption.DOT_MATCHES_ALL)
-            .find(text)?.groupValues?.get(1)
-            ?.split(",")
-            ?.mapNotNull { entry ->
-                Regex(""""([^"]+)"""").find(entry)?.groupValues?.get(1)
-            } ?: emptyList()
+        // Parsed as JSON, not scraped with a regular expression and split
+        // on commas: a comma inside one event used to split it in two, and
+        // the diary counted the halves.
+        val events = JSONObject(text).optJSONObject("life")?.optJSONArray("events")
+            ?: return emptyList()
+        (0 until events.length()).mapNotNull { index ->
+            if (events.isNull(index)) null else events.optString(index, null)
+        }
     } catch (_: Exception) {
         emptyList()
     }

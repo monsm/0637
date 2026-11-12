@@ -887,7 +887,16 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 life.emotions = m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_u64()?))).collect();
             }
             if let Some(a) = saved.get("events").and_then(|v| v.as_array()) {
-                book.events = a.iter().filter_map(|v| v.as_str().map(str::to_owned)).collect();
+                // Only the words the core itself writes. The restore route
+                // answers on the network, and the events are what the diary
+                // shows and what the model is told — a client could not put
+                // its own sentences into the duck's history.
+                book.events = a
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .filter(|event| crate::vetbook::is_known_event(event))
+                    .map(str::to_owned)
+                    .collect();
             }
             core.intents.set_life(core.runtime.book());
             json!({ "ok": true })

@@ -49,6 +49,10 @@ fun DiarySheet(onClose: () -> Unit) {
         val facts = withContext(Dispatchers.IO) {
             val events = fetchLifeEvents()
             val metres = fetchLifeRecord()?.metres ?: 0.0
+            // The same numbers the iOS diary gives the model. One duck, one
+            // set of facts: two clients that assemble different facts write
+            // two different diaries about the same day.
+            val care = fetchCare()
             val lines = buildList {
                 val pets = events.count { it == "pet" }
                 val feeds = events.count { it == "feed" }
@@ -73,8 +77,18 @@ fun DiarySheet(onClose: () -> Unit) {
                 append(events.count { it == "feed" })
                 append(" rituals=")
                 append(events.count { it == "idle_ritual" })
-                append(" metres=")
+                append(" falls=")
+                append(events.count { isFall(it) })
+                append(" moods=")
+                append(events.count { it.startsWith("emotion:") })
+                append(" gifts=")
+                append(events.count { it.startsWith("gift:") })
+                append("\nmetres=")
                 append("%.1f".format(metres))
+                append(" hunger=")
+                append("%.2f".format(care?.hunger ?: 0.0))
+                append(" mood=")
+                append("%.2f".format(care?.mood ?: 0.0))
                 append("\nWrite in ")
                 append(if (Copy.language == Copy.Language.Chinese) "Chinese." else "English.")
             }

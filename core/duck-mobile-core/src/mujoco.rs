@@ -545,6 +545,7 @@ impl MujocoIo {
             actuator_dof: self.actuator_dof.clone(),
             actuator_wire: self.actuator_wire.clone(),
             base_gain: self.base_gain.clone(),
+            motor_kt: self.motor_kt,
             held_trunk: self.held_trunk,
             held_joints: self.held_joints,
             kp: self.kp,
