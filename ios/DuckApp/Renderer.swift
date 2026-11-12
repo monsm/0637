@@ -11,6 +11,16 @@ private struct Uniforms {
     var light: SIMD4<Float>
     /// x: metalness, y: roughness, z: exposure.
     var material: SIMD4<Float>
+    /// Live 舞台的"房间"字段。只允许追加在尾部，且必须与 Shaders.metal
+    /// 的 Uniforms 逐字段对齐，两边谁都不能单独改。
+    /// x: 地板观感（0 = Live 暖石，1 = Instrument 冷棋盘）；y: 全屏背景板标志。
+    var stage: SIMD4<Float>
+    /// xy: 鸭子投到屏幕的 NDC（背景光晕中心）；z: 光晕半径；w: 屏幕宽高比。
+    var halo: SIMD4<Float>
+    /// rgb: 晨昏光色；w: 曝光系数。Swift 按 Date() 算好，shader 只做乘法。
+    var daylight: SIMD4<Float>
+    /// xy: 鸭子躯干的世界 xy（接触阴影中心）；z: 影子浓度；w 备用。
+    var shadow: SIMD4<Float>
 }
 
 private struct Mesh {
@@ -66,6 +76,7 @@ final class Renderer: NSObject, MTKViewDelegate {
     private var meshes: [Int32: Mesh] = [:]
     private var instances: [Instance] = []
     private let floor: Mesh
+    private let backdrop: Mesh
     private var aspect: Float = 1
     /// The body model this renderer's meshes and instances were built for.
     /// A mode switch loads a different MJCF, so everything cached has to go.
@@ -133,6 +144,7 @@ final class Renderer: NSObject, MTKViewDelegate {
         }
         self.depthState = depthState
         self.floor = Renderer.makeFloor(device: device)
+        self.backdrop = Renderer.makeBackdrop(device: device)
         super.init()
 
         view.device = device
@@ -141,7 +153,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         // The Director shutter reads the drawable back with a blit. A
         // framebuffer-only drawable cannot be used as a copy source on device.
         view.framebufferOnly = false
-        view.clearColor = MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+        // 房间底色：STAGE_LOOK §2.2 的暖褐地平线色乘晨昏光。渐变墙由
+        // 背景板每帧画满整屏，这里只是它画上之前的第一帧兜底。
+        view.clearColor = Renderer.roomClear()
         // **Clear, not the studio colour.** The view must be able to composite
         // over the camera in Director mode; an opaque background colour would
         // paint the studio over the room even with a transparent clear colour.
@@ -279,7 +293,75 @@ final class Renderer: NSObject, MTKViewDelegate {
         return Mesh(buffer: buffer, vertices: vertices.count / 6)
     }
 
-    // MARK: - MTKViewDelegate
+    /// 全屏背景板：一个盖住 NDC 的大三角，顶点直接给 NDC 坐标，MVP 用
+    /// 单位阵；深度贴着远平面，先画它，地板和鸭子都赢得过它。相机打开
+    /// 时它不参与绘制——画面底是真实的房间（Director 合成模式不许挡）。
+    private static func makeBackdrop(device: MTLDevice) -> Mesh {
+        let z: Float = 0.9995
+        let vertices: [Float] = [
+            -1, -1, z, 0, 0, 1,
+             3, -1, z, 0, 0, 1,
+            -1,  3, z, 0, 0, 1,
+        ]
+        let buffer = device.makeBuffer(
+            bytes: vertices,
+            length: vertices.count * MemoryLayout<Float>.stride,
+            options: .storageModeShared
+        )!
+        return Mesh(buffer: buffer, vertices: vertices.count / 6)
+    }
+
+    // MARK: - 晨昏光
+
+    /// 晨昏光锚点：(本地小时, 光色 rgb, 曝光)。夜里深暖褐加低曝光，清晨
+    /// 暖金，正午中性全曝光，傍晚橙红，入夜再落回去。任务 §4：时间在
+    /// Swift 侧算好，shader 只做混合。
+    private static let daylightStops: [(hour: Float, tint: SIMD3<Float>, exposure: Float)] = [
+        (0,    SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
+        (5,    SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
+        (6.5,  SIMD3<Float>(1.12, 0.92, 0.72), 0.90),
+        (9,    SIMD3<Float>(1.00, 1.00, 1.00), 1.00),
+        (16,   SIMD3<Float>(1.00, 1.00, 1.00), 1.00),
+        (18,   SIMD3<Float>(1.15, 0.78, 0.55), 0.88),
+        (20,   SIMD3<Float>(1.05, 0.80, 0.62), 0.80),
+        (21.5, SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
+        (24,   SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
+    ]
+
+    /// 按真实本地时间在锚点之间做 smoothstep 插值，整点不跳变。
+    private static func daylight(at date: Date = Date())
+        -> (tint: SIMD3<Float>, exposure: Float) {
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+        let hour = Float(parts.hour ?? 12) + Float(parts.minute ?? 0) / 60
+        for index in 0..<(daylightStops.count - 1) {
+            let from = daylightStops[index]
+            let to = daylightStops[index + 1]
+            guard hour >= from.hour, hour <= to.hour else { continue }
+            let span = to.hour - from.hour
+            let raw = span > 0 ? (hour - from.hour) / span : 0
+            let t = raw * raw * (3 - 2 * raw)
+            return (
+                from.tint + (to.tint - from.tint) * t,
+                from.exposure + (to.exposure - from.exposure) * t
+            )
+        }
+        return (daylightStops[0].tint, daylightStops[0].exposure)
+    }
+
+    /// 房间的清屏底色：STAGE_LOOK §2.2 的暖褐地平线色 #1A1714，乘上
+    /// 当下的晨昏光。init、每帧的清屏和 MetalView 的层底色都走这里，
+    /// 三处颜色才不会各说各话。
+    fileprivate static func roomClear(at date: Date = Date()) -> MTLClearColor {
+        let light = daylight(at: date)
+        let base = SIMD3<Float>(0.102, 0.090, 0.078)
+        let color = base * light.tint * light.exposure
+        return MTLClearColor(
+            red: Double(color.x),
+            green: Double(color.y),
+            blue: Double(color.z),
+            alpha: 1
+        )
+    }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
         aspect = Float(size.width / max(size.height, 1))
@@ -289,11 +371,12 @@ final class Renderer: NSObject, MTKViewDelegate {
         controller.noteFrame()
         // Director mode composites the duck over the live camera. The clear
         // colour must be transparent *and* black: CAMetalLayer's contents are
-        // premultiplied, so a dark-blue clear would veil the image.
+        // premultiplied, so any opaque clear would veil the image. 其余时刻
+        // 是晨昏光调过的暖房间，与背景板同一套颜色。
         let camera = controller.cameraActive
         view.clearColor = camera
             ? MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-            : MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+            : Renderer.roomClear()
         guard let core = controller.core,
               let drawable = view.currentDrawable,
               let descriptor = view.currentRenderPassDescriptor,
@@ -349,13 +432,37 @@ final class Renderer: NSObject, MTKViewDelegate {
         // world light left the front of the duck almost black.
         let forward = simd_normalize(focus - eye)
 
+        // —— Live 房间的三件套，每个 draw call 都带一份 ——
+        // 晨昏光：Swift 按真实本地时间算好光色与曝光，shader 只做乘法。
+        let day = Renderer.daylight()
+        let daylight = SIMD4<Float>(day.tint.x, day.tint.y, day.tint.z, day.exposure)
+        // 接触阴影跟着鸭子走：躯干的世界 xy 就是脚的位置（任务 §3）。
+        // 0.62 是 STAGE_LOOK §2.1 的影子浓度。
+        let shadow = SIMD4<Float>(focus.x, focus.y, 0.62, 0)
+        // 光晕中心：把躯干投到屏幕 NDC（STAGE_LOOK §2.2 的暖光晕）。
+        let clip = viewProjection * SIMD4<Float>(focus.x, focus.y, focus.z, 1)
+        let haloNDC = abs(clip.w) > 1e-4
+            ? SIMD2<Float>(clip.x / clip.w, clip.y / clip.w)
+            : SIMD2<Float>(0, 0.1)
+        let halo = SIMD4<Float>(haloNDC.x, haloNDC.y, 0.8, aspect)
+
         // The studio floor is the one thing that must not be drawn over a
         // camera image: a 4 m opaque plane at z=-0.002 hides the room and the
-        // duck's feet. Physics ground stays at z=0 either way.
+        // duck's feet. Physics ground stays at z=0 either way. 背景板排在
+        // 地板之前：它贴着远平面，地板和鸭子都赢得过它。
         if !camera {
+            draw(mesh: backdrop, model: matrix_identity_float4x4,
+                 color: SIMD4<Float>(1, 1, 1, 1),
+                 light: forward, look: 3, viewProjection: viewProjection,
+                 halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
+            // 暖石地板 #38322C（STAGE_LOOK §2.1），棋盘退场。Instrument 的
+            // 冷棋盘路径在 shader 里保留（look 2），但 iOS 的 Instrument 是
+            // 一张 SwiftUI sheet，渲染器看不见它的开关；等控制器有了
+            // surface 标志，把这里的 look 换成 2 即可（TODO）。
             draw(mesh: floor, model: matrix_identity_float4x4,
-                 color: SIMD4<Float>(0.14, 0.15, 0.18, 1),
-                 light: forward, checker: true, viewProjection: viewProjection, encoder: encoder)
+                 color: SIMD4<Float>(0.220, 0.196, 0.173, 1),
+                 light: forward, look: 1, viewProjection: viewProjection,
+                 halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
         }
 
         var poses: [Int: (SIMD3<Float>, SIMD4<Float>)] = [:]
@@ -370,7 +477,8 @@ final class Renderer: NSObject, MTKViewDelegate {
             guard let (position, rotation) = poses[instance.body] else { continue }
             let model = translation(position) * quaternionMatrix(rotation) * instance.local
             draw(mesh: instance.mesh, model: model, color: instance.color,
-                 light: forward, checker: false, viewProjection: viewProjection, encoder: encoder)
+                 light: forward, look: 0, viewProjection: viewProjection,
+                 halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
         }
 
         encoder.endEncoding()
@@ -483,23 +591,39 @@ final class Renderer: NSObject, MTKViewDelegate {
         model: simd_float4x4,
         color: SIMD4<Float>,
         light: SIMD3<Float>,
-        checker: Bool,
+        look: Int,
         viewProjection: simd_float4x4,
+        halo: SIMD4<Float>,
+        daylight: SIMD4<Float>,
+        shadow: SIMD4<Float>,
         encoder: MTLRenderCommandEncoder
     ) {
+        // look：0 = 鸭子部件；1 = Live 暖石地板；2 = Instrument 冷棋盘地板；
+        // 3 = 全屏背景板。light.w 继续当"这是地板"的标志用，棋盘与否由
+        // stage.x 再分一次（STAGE_LOOK §7.1）。
         var uniforms = Uniforms(
             mvp: viewProjection * model,
             model: model,
             color: color,
             // The shader negates this and dots it with the normal, so the
             // vector points the way the light travels; w carries the floor's
-            // checker flag.
-            light: SIMD4<Float>(light.x, light.y, light.z, checker ? 1 : 0),
+            // flag.
+            light: SIMD4<Float>(light.x, light.y, light.z, look == 1 || look == 2 ? 1 : 0),
             // The duck is painted plastic over a few metal parts; the floor is
             // matte. Roughness is what keeps the shells from looking like chrome.
-            material: checker
-                ? SIMD4<Float>(0.0, 0.85, 1.0, 0)
-                : SIMD4<Float>(0.05, 0.42, 1.0, 0)
+            // Live 的地板按 STAGE_LOOK §2.1 提到 0.92（哑光打磨水泥地），
+            // Instrument 维持 0.85，背景板不走 PBR、参数只是占位。
+            material: look == 1
+                ? SIMD4<Float>(0.0, 0.92, 1.0, 0)
+                : look == 2
+                    ? SIMD4<Float>(0.0, 0.85, 1.0, 0)
+                    : look == 3
+                        ? SIMD4<Float>(0.0, 1.0, 1.0, 0)
+                        : SIMD4<Float>(0.05, 0.42, 1.0, 0),
+            stage: SIMD4<Float>(look == 2 ? 1 : 0, look == 3 ? 1 : 0, 0, 0),
+            halo: halo,
+            daylight: daylight,
+            shadow: shadow
         )
         encoder.setVertexBuffer(mesh.buffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
@@ -553,7 +677,13 @@ struct MetalView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView()
-        view.backgroundColor = UIColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+        // 与舞台同一套暖色底（roomClear，含晨昏光）：层在 drawable 之下，
+        // 只在 Metal 画上第一帧之前可见。isOpaque 仍要关——Director 得能
+        // 把相机垫在这层后面。
+        let room = Renderer.roomClear()
+        view.backgroundColor = UIColor(
+            red: room.red, green: room.green, blue: room.blue, alpha: 1
+        )
         // Able to composite over a camera preview: an opaque layer would
         // paint the studio colour over the room in Director mode.
         view.isOpaque = false

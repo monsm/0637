@@ -50,6 +50,7 @@ struct ContentView: View {
         case peers
         case ai
         case dance
+        case progress
 
         var id: String {
             switch self {
@@ -59,6 +60,7 @@ struct ContentView: View {
             case .peers: return "peers"
             case .ai: return "ai"
             case .dance: return "dance"
+            case .progress: return "progress"
             }
         }
     }
@@ -151,18 +153,13 @@ struct ContentView: View {
                         showRing = false
                     }
                 }
-                // The core takes seconds to load; until it is ready the
-                // controls look alive but every call would be a no-op. Say so.
-                if !controller.ready && controller.renderError == nil {
-                    VStack(spacing: 10) {
-                        ProgressView()
-                            .tint(.white)
-                        Text(Copy.waking)
-                            .font(.system(size: 12, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.75))
-                    }
-                    .allowsHitTesting(false)
-                    .zIndex(3)
+                // 核要几秒钟才起得来；在那之前控件看着是活的，其实每一下
+                // 都是空操作。用一只鸭子说这件事，不用转圈：里面有个东西
+                // 正在醒。失败时例外——失败不能被这句承诺盖住。
+                if !controller.ready && failureMessage == nil {
+                    WakingView()
+                        .allowsHitTesting(false)
+                        .zIndex(3)
                 }
             }
             // Halfway through a rotation the thumb's old translation means
@@ -227,6 +224,10 @@ struct ContentView: View {
                     )
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
+                case .progress:
+                    ProgressSheet()
+                        .presentationDetents(portrait ? [.medium, .large] : [.large])
+                        .presentationDragIndicator(.visible)
                 }
             }
             .onChange(of: showInstrument) { _, show in
@@ -503,7 +504,7 @@ struct ContentView: View {
     /// area would otherwise move it onto a button.
     private var hintCapsule: some View {
         Text(Copy.firstLaunchHint)
-            .font(.system(size: 11, weight: .medium, design: .rounded))
+            .font(.system(.caption, design: .rounded, weight: .medium))
             .foregroundStyle(.white.opacity(0.85))
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
@@ -525,35 +526,50 @@ struct ContentView: View {
 
     // MARK: - Portrait shell (Stage Deck)
 
-    /// The one-thumb composition: status on top, the duck's stage in the
-    /// middle, and a 48 pt time rail plus a 76 pt deck under the thumb. The
-    /// landscape chrome is untouched and still used whenever the window is
-    /// wider than it is tall.
+    /// 单手构图：状态在上，舞台在中，拇指下面是 48 pt 时间条和 76 pt 托盘。
+    /// 横屏走 `chrome(in:)`，两边共用同一张失败卡片、同一行说人话的状态、
+    /// 同一套语义字号。
     private func portraitChrome(in size: CGSize) -> some View {
-        VStack(spacing: 0) {
+        // 核失败的时候，以前只剩一块深灰空屏和一排看着还活着的死按钮。
+        // 现在把发生了什么说出来，并把还不能干活的控件压灰。
+        let failure = failureMessage
+        let usable = controller.ready && failure == nil
+        return VStack(spacing: 0) {
             topBar(showSurface: false)
-            Spacer(minLength: 0)
-                // The stage keeps the drive gesture; the chrome above it must
-                // not swallow it.
-                .allowsHitTesting(false)
-            if stickMode == .path {
-                pathChips(in: size)
-                    .disabled(!controller.ready)
-                    .opacity(controller.ready ? 1 : 0.4)
-            }
-            if showHint {
-                hintCapsule
-            } else if let mood = moodText {
-                moodPill(mood)
-            } else if let care = controller.careLine {
-                moodPill(care)
+            if let failure {
+                Spacer(minLength: 12)
+                failureCard(failure)
+                Spacer(minLength: 12)
+            } else {
+                Spacer(minLength: 0)
+                    // The stage keeps the drive gesture; the chrome above it
+                    // must not swallow it.
+                    .allowsHitTesting(false)
+                if stickMode == .path {
+                    pathChips(in: size)
+                        .disabled(!usable)
+                        .opacity(usable ? 1 : 0.4)
+                }
+                if showHint {
+                    hintCapsule
+                } else if let mood = moodText {
+                    moodPill(mood)
+                } else if usable {
+                    // 只说一种心情，不带百分比：数字住在仪表盘里，
+                    // 想读的人自己去看。
+                    moodPill(Copy.moodLine(
+                        hunger: controller.careHunger,
+                        mood: controller.careMood,
+                        asleep: controller.careAsleep
+                    ))
+                }
             }
             timeRail
-                .disabled(!controller.ready)
-                .opacity(controller.ready ? 1 : 0.4)
+                .disabled(!usable)
+                .opacity(usable ? 1 : 0.4)
             thumbDeck
-                .disabled(!controller.ready)
-                .opacity(controller.ready ? 1 : 0.4)
+                .disabled(!usable)
+                .opacity(usable ? 1 : 0.4)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -564,7 +580,7 @@ struct ContentView: View {
     /// line: what happened while you were away, or what the duck feels now.
     private func moodPill(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 11, weight: .medium, design: .rounded))
+            .font(.system(.caption, design: .rounded, weight: .medium))
             .foregroundStyle(.white.opacity(0.85))
             .lineLimit(1)
             .minimumScaleFactor(0.8)
@@ -584,9 +600,11 @@ struct ContentView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 15))
-                    Text("t \(controller.simTick)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.body)
+                    // 真实时间，不是 tick。这个按钮通向时间机器，标签就该
+                    // 像一只钟；鸭子冻结了，钟也照走。
+                    Text(Date.now, style: .time)
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                     GeometryReader { proxy in
                         ZStack(alignment: .leading) {
@@ -601,7 +619,7 @@ struct ContentView: View {
                     }
                     .frame(height: 18)
                     Image(systemName: "chevron.up")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 12)
@@ -616,7 +634,7 @@ struct ContentView: View {
                 controller.setPaused(!controller.paused)
             } label: {
                 Image(systemName: controller.paused ? "play.fill" : "pause.fill")
-                    .font(.system(size: 16))
+                    .font(.body)
                     .frame(width: 48, height: 48)
                     .background(
                         controller.paused
@@ -636,7 +654,7 @@ struct ContentView: View {
                 showPeers = true
             } label: {
                 Image(systemName: "dot.radiowaves.left.and.right")
-                    .font(.system(size: 16))
+                    .font(.body)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -649,7 +667,7 @@ struct ContentView: View {
                 toggleSurface()
             } label: {
                 Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -685,7 +703,7 @@ struct ContentView: View {
                 stickMode = stickMode == .path ? .drive : .path
             } label: {
                 Image(systemName: "scribble")
-                    .font(.system(size: 17))
+                    .font(.body)
                     .frame(width: 44, height: 44)
                     .background(
                         stickMode == .path
@@ -702,7 +720,7 @@ struct ContentView: View {
                 quackTapped()
             } label: {
                 Image(systemName: "waveform")
-                    .font(.system(size: 19))
+                    .font(.title3)
                     .frame(width: 50, height: 50)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -720,7 +738,7 @@ struct ContentView: View {
                 }
             } label: {
                 Image(systemName: controller.carrying ? "hand.raised.fill" : "hand.point.up.left.fill")
-                    .font(.system(size: 20))
+                    .font(.title3)
                     .frame(width: 56, height: 56)
                     .background(
                         controller.carrying
@@ -738,7 +756,7 @@ struct ContentView: View {
                 showRules = true
             } label: {
                 Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 16))
+                    .font(.body)
                     .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -767,7 +785,7 @@ struct ContentView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.title3)
                 .frame(width: 46, height: 46)
                 .background(.ultraThinMaterial, in: Circle())
                 .contentShape(Circle())
@@ -988,7 +1006,7 @@ struct ContentView: View {
             Spacer(minLength: 0)
             if controller.pathActive {
                 Text(progress)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -1022,9 +1040,9 @@ struct ContentView: View {
         Button(action: action) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.caption.weight(.semibold))
                 Text(label)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -1042,10 +1060,14 @@ struct ContentView: View {
 
     @ViewBuilder
     private func chrome(in size: CGSize) -> some View {
+        // 和竖屏同一条规矩：失败要有话说，身后的控件不许假装
+        // 还能驱动一只没起来的鸭子。
+        let failure = failureMessage
+        let usable = controller.ready && failure == nil
         VStack(spacing: 0) {
             topBar()
             Spacer()
-            if let failure = failureMessage {
+            if let failure {
                 failureCard(failure)
             } else {
                 // No card: the space between the bars stays transparent to taps.
@@ -1054,14 +1076,14 @@ struct ContentView: View {
             if showHint { hintCapsule }
             if stickMode == .path {
                 pathChips(in: size)
-                    .disabled(!controller.ready)
-                    .opacity(controller.ready ? 1 : 0.4)
+                    .disabled(!usable)
+                    .opacity(usable ? 1 : 0.4)
             }
             bottomBar
                 // Until the core is ready every control is a no-op; dim and
                 // disable them rather than letting them look alive.
-                .disabled(!controller.ready)
-                .opacity(controller.ready ? 1 : 0.4)
+                .disabled(!usable)
+                .opacity(usable ? 1 : 0.4)
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)
@@ -1075,32 +1097,42 @@ struct ContentView: View {
         return nil
     }
 
+    /// 名字下面那一行：活着时是鸭子此刻的状态，核加载时是正在叫醒它的
+    /// 承诺，起不来时是一句诚实的结论。原因由舞台下方的卡片来说。
+    private var statusLine: String {
+        if failureMessage != nil { return Copy.wakeFailed }
+        if controller.ready { return Copy.behaviourOf(raw: controller.label) }
+        return Copy.waking
+    }
+
     private func topBar(showSurface: Bool = true) -> some View {
         HStack(alignment: .top) {
             // The duck's name and what it is doing, in words rather than numbers.
             VStack(alignment: .leading, spacing: 2) {
                 Text(Copy.name)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                Text(controller.ready ? controller.label : Copy.waking)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.system(.headline, design: .rounded))
+                // 核的 label 是协议原文（`held`、`limp_fall`、`mode: walk`）；
+                // 人读翻译，不读 wire。仪表盘里还留着原话。
+                Text(statusLine)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("duck-label")
                 // The ring's verdict outlives the skill's brief label. A slow
                 // CI runner must be able to read it after the move finishes.
                 if !controller.lastSkill.isEmpty {
-                    Text(controller.lastSkill)
-                        .font(.system(size: 9, design: .monospaced))
+                    Text(SkillLabel.of(controller.lastSkill))
+                        .font(.system(.caption2, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("duck-last-skill")
                 }
                 if controller.fallen {
                     Text(Copy.fell)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
                         .foregroundStyle(.orange)
                 }
                 if controller.pickedUp && !controller.carrying {
                     Text(Copy.held)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
                         .foregroundStyle(.cyan)
                 }
             }
@@ -1116,7 +1148,7 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.body.weight(.semibold))
                         .frame(width: 48, height: 48)
                         .background(.ultraThinMaterial, in: Circle())
                         .contentShape(Circle())
@@ -1204,7 +1236,7 @@ struct ContentView: View {
                 .accessibilityIdentifier("open-dance")
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.body.weight(.semibold))
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1224,7 +1256,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.time, systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 18))
+                    .font(.title3)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1238,7 +1270,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.skills, systemImage: "sparkles")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 18))
+                    .font(.title3)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1256,7 +1288,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.quack, systemImage: "waveform")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 18))
+                    .font(.title3)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1266,13 +1298,28 @@ struct ContentView: View {
             .accessibilityLabel(Copy.quack)
             .accessibilityIdentifier("duck-quack")
 
+            // 今日任务与成就墙：每天回来的理由。
+            Button {
+                modal = .progress
+            } label: {
+                Label(Copy.progress, systemImage: "flame")
+                    .labelStyle(.iconOnly)
+                    .font(.title3)
+                    .frame(width: 48, height: 48)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.progress)
+            .accessibilityIdentifier("duck-progress")
+
             // A treat on the floor: the official ground-pick peck.
             Button {
                 controller.feed()
             } label: {
                 Label(Copy.feed, systemImage: "fork.knife")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 18))
+                    .font(.title3)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1288,7 +1335,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.flashlight, systemImage: "flashlight.on.fill")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 18))
+                    .font(.title3)
                     .frame(width: 48, height: 48)
                     .background(
                         controller.flashlightColor == nil
@@ -1314,7 +1361,7 @@ struct ContentView: View {
                     systemImage: controller.carrying ? "hand.raised.slash.fill" : "hand.draw.fill"
                 )
                 .labelStyle(.iconOnly)
-                .font(.system(size: 18))
+                .font(.title3)
                 .frame(width: 48, height: 48)
                 .background(
                     controller.carrying
@@ -1335,7 +1382,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
                     .labelStyle(.iconOnly)
-                    .font(.system(size: 17))
+                    .font(.body)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1347,7 +1394,7 @@ struct ContentView: View {
             Spacer()
 
             Text(controller.carrying ? Copy.held : Copy.tapHint)
-                .font(.system(size: 10, design: .rounded))
+                .font(.system(.caption2, design: .rounded))
                 .foregroundStyle(.secondary)
                 .opacity(controller.ready ? 1 : 0)
                 .allowsHitTesting(false)
@@ -1394,12 +1441,17 @@ struct ContentView: View {
         }
     }
 
+    /// 唯一的失败出口，横竖屏共用。诊断信息要翻成人话：一个人对
+    /// "Bundle resources not found" 做不了任何事，读懂了也唤不醒鸭子。
     private func failureCard(_ message: String) -> some View {
         VStack(spacing: 10) {
+            Image(systemName: "exclamationmark.bubble.fill")
+                .font(.title2)
+                .foregroundStyle(.orange.opacity(0.9))
             Text(Copy.couldNotStart)
-                .font(.system(size: 15, weight: .semibold, design: .rounded))
-            Text(message)
-                .font(.system(size: 12, design: .rounded))
+                .font(.system(.headline, design: .rounded))
+            Text(Copy.humanError(raw: message))
+                .font(.system(.footnote, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
         }
@@ -1407,6 +1459,73 @@ struct ContentView: View {
         .frame(maxWidth: 360)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .padding(.vertical, 24)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("failure-card")
+    }
+}
+
+/// 一个人第一眼看到的东西：不是盖在死屏上的转圈，而是一只鸭子形状的
+/// 东西在暗处呼吸，等核醒过来。故意半透明——它是承诺，不是肖像。
+struct WakingView: View {
+    /// 尊重手机的设置：呼吸剪影是装饰，不是信息，而装饰是第一个该停的。
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 一次慢呼吸：2.6 秒吸，2.6 秒呼。一只睡在地板上的鸭子差不多就动这么多。
+    @State private var breathing = false
+
+    var body: some View {
+        VStack(spacing: 18) {
+            ZStack {
+                // 它将站上的影子，跟着一起呼吸。
+                Ellipse()
+                    .fill(Color.black.opacity(0.35))
+                    .frame(width: 96, height: 14)
+                    .offset(y: 38)
+                // 身体：一只低低的椭圆，像鸭子坐在自己的脚上。
+                Ellipse()
+                    .fill(Color.orange.opacity(0.42))
+                    .frame(width: 88, height: 58)
+                    .offset(y: 8)
+                // 头，往前探一点、抬一点。
+                Circle()
+                    .fill(Color.orange.opacity(0.52))
+                    .frame(width: 46, height: 46)
+                    .offset(x: 27, y: -22)
+                // 嘴：整个剪影里唯一一条硬边。
+                Beak()
+                    .fill(Color.orange.opacity(0.75))
+                    .frame(width: 16, height: 12)
+                    .offset(x: 54, y: -18)
+            }
+            // 给影子和头留出地方，呼吸时不会压到下面那行字。
+            .frame(width: 120, height: 96)
+            .scaleEffect(breathing ? 1.05 : 0.96, anchor: .bottom)
+            .opacity(breathing ? 0.95 : 0.6)
+            .animation(
+                reduceMotion
+                    ? nil
+                    : .easeInOut(duration: 2.6).repeatForever(autoreverses: true),
+                value: breathing
+            )
+
+            Text(Copy.waking)
+                .font(.system(.callout, design: .rounded))
+                .foregroundStyle(.white.opacity(0.75))
+        }
+        .onAppear { breathing = true }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Copy.waking)
+    }
+}
+
+/// 鸭子拿来当鼻子用的小楔子。
+private struct Beak: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -1486,14 +1605,14 @@ struct SkillRing: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                 Text(Copy.skills)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
                         // 48 pt, the same floor as every other control; the
                         // 28 pt icon-only target was the smallest thing in
@@ -1533,7 +1652,7 @@ struct SkillRing: View {
     private func section(_ title: String, names: [String]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(.caption2, design: .rounded, weight: .semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
             LazyVGrid(
@@ -1546,7 +1665,7 @@ struct SkillRing: View {
                         onPick(name)
                     } label: {
                         Text(SkillLabel.of(name))
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.system(.footnote, design: .rounded, weight: .medium))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .padding(.horizontal, 10)
@@ -1591,15 +1710,17 @@ struct DirectorOverlay: View {
                     // without one) Director is a dark studio, not a room.
                     // Say that instead of drawing a viewfinder over it.
                     Text(controller.cameraActive ? Copy.viewfinder : Copy.cameraUnavailable)
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.85))
                 }
                 .padding(.top, bar / 2 - 5)
                 .padding(.leading, 14)
             }
             .overlay(alignment: .bottomTrailing) {
-                Text(String(format: "t %llu · %.2fx", controller.simTick, controller.speed))
-                    .font(.system(size: 9, design: .monospaced))
+                // 取景器的时间码，不是仿真的 tick：构图的人要的是几点，
+                // 不是引擎数到哪了。
+                Text(Date.now, style: .time)
+                    .font(.system(.caption2, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.7))
                     .padding(.bottom, bar / 2 - 5)
                     .padding(.trailing, 14)

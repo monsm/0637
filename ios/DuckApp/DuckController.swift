@@ -15,6 +15,14 @@ final class DuckController: ObservableObject {
     let dance = DanceStudio()
     /// The morning postcard shelf.
     let postcards = PostcardShelf()
+
+    /// 成长系统的散步计：life 里的 metres 是核心累计值，这里只记**本次观察到的**
+    /// 增量，并按「连续两个 poll 不再前进」切成一次散步——「一次散步 30 米」
+    /// 的成就才有语义。首次读到只立基线，不记数。
+    private var walkBaselineMetres: Double?
+    private var walkSessionMetres = 0
+    /// 翻滚同理：只记第一次读到之后的新增，首读立基线。
+    private var lastRecordedRolls: Int?
     /// The live renderer, for the Director shutter's frame read-back. Weak:
     /// the view owns the renderer, not the controller.
     weak var renderer: Renderer?
@@ -1533,6 +1541,7 @@ final class DuckController: ObservableObject {
                 self.photoInFlight = false
                 let url = self.writePhoto(image)
                 self.capturedPhoto = Self.CapturedPhoto(image: image, url: url)
+                ProgressStore.shared.record(.photo)
             }
             if self.cameraActive {
                 self.camera.capture { [weak self] room in
@@ -1625,6 +1634,7 @@ final class DuckController: ObservableObject {
     /// lively a little longer; `/state` and the away recap read it back.
     func pet() {
         dance.record("pet", label: Copy.danceStepPet)
+        ProgressStore.shared.record(.pet)
         guard let url = URL(string: "http://127.0.0.1:8765/pet") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1638,6 +1648,7 @@ final class DuckController: ObservableObject {
     /// the sheet shows the skill when it starts.
     func feed() {
         dance.record("feed", label: Copy.feed)
+        ProgressStore.shared.record(.feed)
         guard let url = URL(string: "http://127.0.0.1:8765/feed") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -1819,6 +1830,36 @@ final class DuckController: ObservableObject {
                         self.vetbookMetres = life["metres"] as? Double ?? 0
                         self.vetbookRolls = skills["roulade"] as? Int ?? 0
                         self.vetbookPickups = life["pickups"] as? Int ?? 0
+                        // 成长系统：散步按增量记账，停走一条 poll 后结一次。
+                        let metres = self.vetbookMetres
+                        if let base = self.walkBaselineMetres {
+                            let delta = metres - base
+                            if delta > 0.05 {
+                                self.walkSessionMetres += Int(delta.rounded())
+                                self.walkBaselineMetres = metres
+                            } else if self.walkSessionMetres > 0 {
+                                let session = self.walkSessionMetres
+                                self.walkSessionMetres = 0
+                                self.walkBaselineMetres = metres
+                                ProgressStore.shared.record(.walk, metric: session)
+                            } else {
+                                self.walkBaselineMetres = metres
+                            }
+                        } else {
+                            self.walkBaselineMetres = metres
+                        }
+                        // 翻滚：只记首读之后新增的次数。
+                        let rolls = self.vetbookRolls
+                        if let last = self.lastRecordedRolls {
+                            if rolls > last {
+                                for _ in 0..<min(rolls - last, 10) {
+                                    ProgressStore.shared.record(.trick)
+                                }
+                            }
+                            self.lastRecordedRolls = rolls
+                        } else {
+                            self.lastRecordedRolls = rolls
+                        }
                         self.trickBook = String(
                             format: "%d/13 moods · %d tricks",
                             emotions.count,

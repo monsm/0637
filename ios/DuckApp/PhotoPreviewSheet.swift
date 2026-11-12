@@ -2,9 +2,10 @@ import Photos
 import SwiftUI
 
 /// The Director photo, before it leaves the phone: one look at the framed
-/// shot, then Save to Photos or Share. The PNG is a cache file; Save copies
-/// it into the photo library, Keep into Documents/Postcards, Share hands the
-/// file to the system, and dismissing deletes it.
+/// shot, then Save to Photos or Share. Save and Share hand the system the
+/// composed postcard (frame + caption band + date), never the bare frame.
+/// Keep asks the shelf to store the same composed card beside the untouched
+/// frame. The raw PNG is a cache file; dismissing deletes it unless kept.
 struct PhotoPreviewSheet: View {
     let photo: DuckController.CapturedPhoto
     @ObservedObject var shelf: PostcardShelf
@@ -50,6 +51,7 @@ struct PhotoPreviewSheet: View {
             }
             HStack(spacing: 12) {
                 Button {
+                    // 货架里存成片（字幕 + 日期），原帧由货架另存一份并在元数据里区分。
                     kept = shelf.keep(image: photo.image, caption: caption)
                 } label: {
                     Label(
@@ -78,14 +80,7 @@ struct PhotoPreviewSheet: View {
                 .accessibilityIdentifier("photo-save")
 
                 Button {
-                    shareURL = photo.url
-                    if shareURL == nil {
-                        // No file (a write failure): share the image itself.
-                        // Save Image is still offered by the system sheet.
-                        shareURL = FileManager.default.temporaryDirectory
-                            .appendingPathComponent("MicroDuck-photo.png")
-                        try? photo.image.pngData()?.write(to: shareURL!, options: .atomic)
-                    }
+                    sharePostcard()
                 } label: {
                     Label(Copy.share, systemImage: "square.and.arrow.up")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -98,9 +93,9 @@ struct PhotoPreviewSheet: View {
         .padding(20)
         .preferredColorScheme(.dark)
         .onDisappear {
-            // A preview is not a keepsake: an un-kept shot's PNG (a cache
-            // file) goes with it. Keep copied it into Postcards already;
-            // Share has handed the file to the system by now.
+            // A preview is not a keepsake: an un-kept shot's raw PNG (a cache
+            // file) goes with it. Keep has already copied the composed card
+            // into Postcards; Share hands over its own temporary composed PNG.
             if !kept, let url = photo.url {
                 try? FileManager.default.removeItem(at: url)
             }
@@ -152,16 +147,42 @@ struct PhotoPreviewSheet: View {
         return parts.isEmpty ? Copy.postcardQuiet : parts.joined(separator: " · ")
     }
 
+    /// 分享成片：字幕、日期、品牌标都烙进 PNG，离开 App 也还在。
+    private func sharePostcard() {
+        let postcard = PostcardCompose.make(from: photo.image, caption: caption, date: Date())
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MicroDuck-postcard.png")
+        if let data = postcard.pngData(),
+           (try? data.write(to: url, options: .atomic)) != nil
+        {
+            shareURL = url
+            return
+        }
+        // 成片写不出来时退回原帧（旧行为）：宁可分享一张裸图，也别让分享按钮失声。
+        shareURL = photo.url
+        if shareURL == nil {
+            let fallback = FileManager.default.temporaryDirectory
+                .appendingPathComponent("MicroDuck-photo.png")
+            if let data = photo.image.pngData(),
+               (try? data.write(to: fallback, options: .atomic)) != nil
+            {
+                shareURL = fallback
+            }
+        }
+    }
+
     /// The photo library, add-only. A denial is a real answer: the button
     /// says so rather than claiming a save that did not happen.
     private func saveToPhotos() {
+        // 相册里放成片：原帧 + 字幕带 + 日期，而不是一张裸渲染帧。
+        let postcard = PostcardCompose.make(from: photo.image, caption: caption, date: Date())
         PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
             guard status == .authorized || status == .limited else {
                 DispatchQueue.main.async { saveFailed = true }
                 return
             }
             PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.creationRequestForAsset(from: photo.image)
+                PHAssetChangeRequest.creationRequestForAsset(from: postcard)
             } completionHandler: { success, _ in
                 DispatchQueue.main.async {
                     saved = success

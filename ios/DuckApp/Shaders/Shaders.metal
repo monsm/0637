@@ -20,10 +20,20 @@ struct Uniforms {
     float4x4 mvp;
     float4x4 model;
     float4 color;
-    // xyz: the light's travel direction; w: the floor's checker flag.
+    // xyz: the light's travel direction; w: the floor flag（1 = 地板，
+    // 才有棋盘与接触阴影）。棋盘与否由下面 stage.x 再分一次。
     float4 light;
     // x: metalness, y: roughness, z: the scene exposure.
     float4 material;
+    // —— Live 舞台的"房间"字段，只追加在尾部，与 Swift Uniforms 对齐 ——
+    // x: 地板观感（0 = Live 暖石，1 = Instrument 冷棋盘）；y: 全屏背景板标志。
+    float4 stage;
+    // xy: 鸭子投到屏幕的 NDC（背景光晕中心）；z: 光晕半径；w: 屏幕宽高比。
+    float4 halo;
+    // rgb: 晨昏光色；w: 曝光系数。Swift 按真实本地时间算好，这里只做乘法。
+    float4 daylight;
+    // xy: 鸭子躯干的世界 xy（接触阴影中心）；z: 影子浓度（越大越实）；w 备用。
+    float4 shadow;
 };
 
 // A cheap analytic environment: a sky gradient plus a ground bounce, so a
@@ -72,6 +82,30 @@ fragment float4 duck_fragment(
     VertexOut in [[stage_in]],
     constant Uniforms& uniforms [[buffer(0)]]
 ) {
+    // 全屏背景板：不走 PBR，直接给出竖向渐变墙加鸭身后的暖光晕
+    // （STAGE_LOOK §2.2）。渐变取 NDC 的 y 而不是世界高度——不管横竖屏、
+    // 相机怎么动，地平线以上永远有一层从暖褐到冷蓝黑的墙。
+    if (uniforms.stage.y > 0.5) {
+        float2 ndc = in.position.xy / in.position.w;
+        float t = ndc.y * 0.5 + 0.5;
+        float3 horizon = float3(0.102, 0.090, 0.078);  // #1A1714 暖褐
+        float3 zenith = float3(0.047, 0.055, 0.071);   // #0C0E12 冷蓝黑
+        float3 bg = mix(horizon, zenith, smoothstep(0.62, 1.15, t));
+        // 鸭身后的径向暖光 #FFD9A8 @ 8%：x 先乘宽高比，光晕才是圆的。
+        float dx = (ndc.x - uniforms.halo.x) * uniforms.halo.w;
+        float dy = ndc.y - uniforms.halo.y;
+        float glow = exp(-(dx * dx + dy * dy)
+            / max(uniforms.halo.z * uniforms.halo.z, 1e-5) * 2.2);
+        bg += float3(1.0, 0.851, 0.659) * glow * 0.08;
+        // 晨昏光与曝光：Swift 按真实本地时间算好，这里只做乘法。
+        bg *= uniforms.daylight.rgb * uniforms.daylight.w;
+        // 与主体同一套软膝压高光，背景和鸭子才像在同一台相机里。
+        bg = clamp(bg, 0.0, 4.0);
+        bg = mix(bg, bg / (bg + float3(0.55)) * 1.55,
+            smoothstep(0.72, 1.6, max(max(bg.r, bg.g), bg.b)));
+        return float4(clamp(bg, 0.0, 1.0), 1.0);
+    }
+
     float3 n = normalize(in.normal);
     float3 v = normalize(-in.world);
     // The shader negates the stored vector, so `light` points the way the
@@ -83,9 +117,11 @@ fragment float4 duck_fragment(
     float roughness = clamp(uniforms.material.y, 0.04, 1.0);
     float exposure = uniforms.material.z;
 
-    // The official scene's groundplane: a blue-grey checker.
+    // 地板颜色：Live 用 Swift 传来的暖石单色；Instrument 的冷棋盘
+    // （STAGE_LOOK §3，0.2 m 一格）只在 stage.x 点名时画——网格是
+    // 仪表盘的语言，Live 不再用它。
     float3 base = uniforms.color.rgb;
-    if (uniforms.light.w > 0.5) {
+    if (uniforms.light.w > 0.5 && uniforms.stage.x > 0.5) {
         float2 cell = floor(in.world.xy / 0.2);
         float odd = fmod(cell.x + cell.y, 2.0);
         base = mix(float3(0.20, 0.30, 0.40), float3(0.10, 0.20, 0.30), odd);
@@ -110,26 +146,36 @@ fragment float4 duck_fragment(
 
     // The duck is a painted toy: most of what you see is diffuse. The albedo
     // term carries the material's colour, and the ambient lift keeps the
-    // shadowed side from going black.
-    float3 color = diffuse_albedo * (0.45 + 0.75 * ndotl)
-                 + specular * ndotl
-                 + ambient * diffuse_albedo * 0.85
+    // shadowed side from going black. 晨昏光把直射光染成时辰色，环境光只沾
+    // 一半；白天 key 近似纯白，照明与原来一致。
+    float3 key = uniforms.daylight.rgb;
+    float3 color = diffuse_albedo * (0.45 + 0.75 * ndotl) * key
+                 + specular * ndotl * key
+                 + ambient * diffuse_albedo * 0.85 * mix(float3(1.0), key, 0.5)
                  + ambient * f0 * (0.15 + 0.85 * rim);
 
-    // Soft contact shadow under the duck: the floor darkens toward the feet.
+    // 地板专属的三步：先保底、再压接触阴影、最后向地平线雾化。
     if (uniforms.light.w > 0.5) {
-        float radial = length(in.world.xy);
-        float shadow = smoothstep(0.02, 0.55, radial);
-        color *= mix(0.55, 1.0, shadow);
         // A ground plane seen from a shallow angle gets almost no key light,
         // so give it its own ambient floor or the room reads as a void.
+        // 保底放在阴影之前，影子才能真正压得下去。
         color = max(color, base * 0.55);
+        // 接触阴影跟着鸭子走：中心是 Swift 传来的躯干世界 xy，不再写死
+        // 在家的位置。系数 0.62，影子更实，鸭脚踩得住（STAGE_LOOK §2.1）。
+        float radial = length(in.world.xy - uniforms.shadow.xy);
+        float shadow = smoothstep(0.02, 0.55, radial);
+        color *= mix(1.0 - uniforms.shadow.z, 1.0, shadow);
+        // 地平线处的极淡雾化：地板远端融进墙面，8 m 平面不再露出硬边。
+        float fog = smoothstep(1.5, 4.0, in.world.y) * 0.35;
+        color = mix(color,
+            float3(0.102, 0.090, 0.078) * uniforms.daylight.rgb, fog);
     }
 
     // The scene's colours are authored in display space, so the albedo must
     // reach the screen unchanged; only highlights get a soft knee. A Reinhard
     // curve over the whole surface washed the duck's orange out to beige.
-    color *= exposure;
+    // 曝光乘上晨昏光系数：夜里整体低一档（任务 §4）。
+    color *= exposure * uniforms.daylight.w;
     color = clamp(color, 0.0, 4.0);
     color = mix(color, color / (color + float3(0.55)) * 1.55, smoothstep(0.72, 1.6, max(max(color.r, color.g), color.b)));
     color = clamp(color, 0.0, 1.0);

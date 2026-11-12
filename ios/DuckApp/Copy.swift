@@ -30,7 +30,9 @@ enum Copy {
     // Live view
     static var name: String { "MicroDuck" }
     static var fell: String { pick("it fell", "摔倒了") }
-    static var waking: String { pick("waking up…", "正在唤醒…") }
+    static var waking: String { pick("waking the duck…", "正在叫醒鸭子…") }
+    /// 核没起来时状态行就显示这句；下面的卡片负责解释原因。
+    static var wakeFailed: String { pick("did not wake up", "没能醒来") }
     static var tapHint: String {
         // The gesture is a drag from wherever the thumb lands; "tap ahead"
         // described a walk-to-point the app never had.
@@ -54,6 +56,29 @@ enum Copy {
     static var emotions: String { pick("Emotions", "情绪") }
     static var close: String { pick("Close", "关闭") }
     static var couldNotStart: String { pick("MicroDuck could not start", "MicroDuck 无法启动") }
+    /// 启动失败翻成人话。日志里那句 "Bundle resources not found" 和 Metal
+    /// 报错是给工程师看的，不是给站在屏幕前的人看的。
+    static func humanError(raw: String) -> String {
+        let lower = raw.lowercased()
+        if lower.contains("bundle") || lower.contains("resource")
+            || lower.contains("no such file") || lower.contains("not found") {
+            return pick(
+                "The app's files are incomplete. Reinstall the app.",
+                "应用资源不完整，请重新安装"
+            )
+        }
+        if lower.contains("metal") || lower.contains("render") || lower.contains("shader")
+            || lower.contains("gpu") {
+            return pick(
+                "The picture could not start on this phone. Open the app again.",
+                "画面没能启动，请重新打开 App"
+            )
+        }
+        return pick(
+            "The duck could not wake up. Open the app again.",
+            "鸭子没能醒来，请重新打开 App"
+        )
+    }
     static var viewfinder: String { pick("VIEWFINDER", "取景器") }
     static var sit: String { pick("sit", "坐下") }
     static var pickUp: String { pick("pick", "抓取") }
@@ -162,6 +187,39 @@ enum Copy {
         )
     }
     static var behavior: String { pick("behaviour", "此刻") }
+
+    /// 核的状态机，翻成一个人会说的话。
+    ///
+    /// `controller.label` 是协议里的 `char label[64]` 原文：`held`、
+    /// `limp_fall`、`mode: walk`、`policy reloaded`，有时还留着一条被拒绝
+    /// 技能的错误。这些都不是该摆到舞台上的句子。仪表盘留给想知道原话的
+    /// 人，首屏读这一层。
+    ///
+    /// 英文里 `walk` 和 `stand` 照旧：它们本来就是英文，而且 UI 测试盯着
+    /// 这一行找这两个词。
+    static func behaviourOf(raw: String) -> String {
+        switch raw {
+        case "held": return pick("in a hand", "被拎着")
+        case "limp", "limp_fall": return pick("fell over", "摔倒了")
+        case "homing": return pick("steadying itself", "正在站稳")
+        case "mode: walk": return pick("walk", "散步中")
+        case "mode: roller": return pick("rolling", "滚轮中")
+        case "policy reloaded": return pick("just woke up", "刚睡醒")
+        case "idle": return pick("hanging out", "待着")
+        // 步态的动词：和手柄给驾驶员看的字一样。
+        case "walk": return pick("walk", "散步中")
+        case "stand": return pick("stand", "站着")
+        case "sit": return pick("sit", "坐着")
+        case "ready": return pick("on its feet", "站稳了")
+        case "rest": return pick("dozing", "打盹中")
+        case "off": return pick("resting", "歇着")
+        case "pose": return pick("posing", "摆姿势")
+        case "shutdown": return pick("lying down", "趴下了")
+        // 被拒绝的技能会把整条错误写进 label。label 不是调试的地方，
+        // 认不出来的一律当成一只正在做鸭子的鸭子。
+        default: return pick("hanging out", "待着")
+        }
+    }
     // The companion layer: three numbers and a nap. "Fullness" is shown
     // because a full bar should mean "fed", not "starving".
     static var care: String { pick("Companion", "陪伴") }
@@ -176,6 +234,14 @@ enum Copy {
         if hunger > 0.65 { return pick("hungry · fullness \(full)%", "饿了 · 饱腹 \(full)%") }
         if mood < -0.2 { return pick("a little sad · bond \(Int(bond * 100))%", "有点难过 · 亲密 \(Int(bond * 100))%") }
         return pick("content · mood \(moodPercent)%", "心情不错 · 心情 \(moodPercent)%")
+    }
+    /// 首屏心情胶囊的一行话：只说感觉，不带数字。百分比是仪表盘上的读数，
+    /// 不是宠物该挂在脸上的东西。
+    static func moodLine(hunger: Double, mood: Double, asleep: Bool) -> String {
+        if asleep { return pick("fast asleep", "睡着了") }
+        if hunger > 0.65 { return pick("a little hungry", "有点饿了") }
+        if mood < -0.2 { return pick("a little sad", "有点难过") }
+        return pick("in a good mood", "心情不错")
     }
     // Sleep mode: the chosen night, and the morning that wakes it. The quiet
     // numbers are the core's own simulated seconds; the shells only divide
@@ -194,6 +260,8 @@ enum Copy {
     static var menu: String { pick("Menu", "菜单") }
     static var cameraUnavailable: String { pick("NO CAMERA", "无相机") }
     static var feed: String { pick("Feed", "喂食") }
+    /// 每日任务与成就墙（成长系统）的入口。
+    static var progress: String { pick("Daily", "每日") }
     static var awayTitle: String { pick("While you were away", "你不在时") }
     static func awayRituals(_ n: Int) -> String {
         String(format: pick("played by itself ×%d", "自己演了 %d 出"), n)
