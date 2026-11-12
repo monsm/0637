@@ -23,6 +23,8 @@ struct InstrumentSheet: View {
     @State private var showPostcards = false
     /// The collection page.
     @State private var showDex = false
+    /// The duck's diary.
+    @State private var showDiary = false
 
     var body: some View {
         ScrollView {
@@ -63,6 +65,20 @@ struct InstrumentSheet: View {
                 .accessibilityIdentifier("postcards-open")
                 .sheet(isPresented: $showPostcards) {
                     PostcardShelfView(shelf: controller.postcards)
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
+                Button {
+                    showDiary = true
+                } label: {
+                    Label(Copy.diary, systemImage: "book.closed.fill")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("diary-open")
+                .sheet(isPresented: $showDiary) {
+                    DiarySheet(controller: controller)
                         .presentationDetents([.large])
                         .presentationDragIndicator(.visible)
                 }

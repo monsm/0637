@@ -1347,6 +1347,83 @@ final class DuckController: ObservableObject {
         return added
     }
 
+    // MARK: - The diary
+
+    /// Today's record as the diary page shows it: the real event lines, and
+    /// the paragraph the person's own model writes from them.
+    @Published var diaryLines: [String] = []
+    @Published var diaryModelText = ""
+    @Published var diaryError: String?
+    @Published var diaryBusy = false
+    private var diaryLoaded = false
+
+    /// Load the diary's facts from the duck's own record; ask the configured
+    /// model to tell the day in its own words. Without a model the facts
+    /// stand alone — nothing is fabricated.
+    func loadDiary(force: Bool = false) {
+        if diaryBusy || (diaryLoaded && !force) { return }
+        diaryBusy = true
+        diaryLoaded = true
+        diaryError = nil
+        diaryModelText = ""
+        guard let url = URL(string: "http://127.0.0.1:8765/state") else {
+            diaryBusy = false
+            return
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 2.0
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let self else { return }
+            let json = data.flatMap {
+                try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+            } ?? [:]
+            let life = json["life"] as? [String: Any] ?? [:]
+            let events = life["events"] as? [String] ?? []
+            let care = json["care"] as? [String: Any] ?? [:]
+            func count(_ name: String) -> Int { events.filter { $0 == name }.count }
+            func prefix(_ head: String) -> Int { events.filter { $0.hasPrefix(head) }.count }
+            var lines: [String] = []
+            let pets = count("pet")
+            let feeds = count("feed")
+            let rituals = count("idle_ritual")
+            let falls = prefix("fall")
+            let moods = prefix("emotion:")
+            let gifts = prefix("gift:")
+            if pets > 0 { lines.append(Copy.awayPets(pets)) }
+            if feeds > 0 { lines.append(Copy.awayFeeds(feeds)) }
+            if rituals > 0 { lines.append(Copy.awayRituals(rituals)) }
+            if falls > 0 { lines.append(Copy.awayFalls(falls)) }
+            if moods > 0 { lines.append(Copy.awayMoods(moods)) }
+            if gifts > 0 {
+                lines.append(Copy.diaryGifts(gifts))
+            }
+            let metres = life["metres"] as? Double ?? 0
+            if metres >= 0.5 { lines.append(Copy.postcardMetres(metres)) }
+            let facts = """
+            events: \(events.suffix(40).joined(separator: ","))
+            pets=\(pets) feeds=\(feeds) rituals=\(rituals) falls=\(falls) moods=\(moods) gifts=\(gifts)
+            metres=\(String(format: "%.1f", metres)) hunger=\(care["hunger"] ?? 0) mood=\(care["mood"] ?? 0)
+            Write in \(Copy.language == .chinese ? "Chinese" : "English").
+            """
+            let hasModel = self.aiConfig.enabled
+                && !self.aiConfig.endpoint.trimmingCharacters(in: .whitespaces).isEmpty
+            DispatchQueue.main.async {
+                self.diaryLines = lines
+                if !hasModel {
+                    self.diaryBusy = false
+                    return
+                }
+                self.aiBrain.writeDiary(config: self.aiConfig, dayFacts: facts) { text, error in
+                    DispatchQueue.main.async {
+                        self.diaryModelText = text ?? ""
+                        self.diaryError = error
+                        self.diaryBusy = false
+                    }
+                }
+            }
+        }.resume()
+    }
+
     /// The app comes back: whatever the duck logged on its own - rituals,
     /// falls, feeds - becomes one line on the sheet. The 1 Hz poll is
     /// suspended in the background, so fetch the current events first;

@@ -65,6 +65,84 @@ final class AIBrain {
         """
     }
 
+    /// Ask the model for a short first-person diary paragraph, built ONLY
+    /// from the real facts the caller passes in. Nothing is invented here:
+    /// the facts come from the duck's own record, and the prompt forbids
+    /// adding anything else. Completion is on the main thread.
+    func writeDiary(
+        config: AIConfig,
+        dayFacts: String,
+        completion: @escaping (String?, String?) -> Void
+    ) {
+        guard var endpoint = URL(string: config.endpoint.trimmingCharacters(in: .whitespacesAndNewlines)),
+              endpoint.scheme != nil
+        else {
+            completion(nil, "Set a model endpoint first")
+            return
+        }
+        if !endpoint.path.contains("chat/completions") {
+            endpoint = endpoint.appendingPathComponent("chat/completions")
+        }
+        let system = """
+        You write MicroDuck's diary: one short first-person paragraph (2-4 \
+        sentences) in the duck's gentle voice, based ONLY on the real facts \
+        the person gives below. Never invent events, names or numbers. If the \
+        day was quiet, say so softly. Write in the language the facts ask for.
+        """
+        let body: [String: Any] = [
+            "model": config.model.isEmpty ? "gpt-4o-mini" : config.model,
+            "temperature": 0.6,
+            "messages": [
+                ["role": "system", "content": system],
+                ["role": "user", "content": dayFacts],
+            ],
+        ]
+        guard let payload = try? JSONSerialization.data(withJSONObject: body) else {
+            completion(nil, "could not encode the request")
+            return
+        }
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 25
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !config.key.isEmpty {
+            request.setValue("Bearer \(config.key)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = payload
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                DispatchQueue.main.async { completion(nil, "HTTP \(http.statusCode)") }
+                return
+            }
+            guard let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                DispatchQueue.main.async {
+                    completion(nil, error?.localizedDescription ?? "the model did not return JSON")
+                }
+                return
+            }
+            let content: String? = {
+                if let choices = json["choices"] as? [[String: Any]],
+                   let message = choices.first?["message"] as? [String: Any] {
+                    return message["content"] as? String
+                }
+                if let message = json["message"] as? [String: Any] {
+                    return message["content"] as? String
+                }
+                return nil
+            }()
+            let trimmed = content?.trimmingCharacters(in: .whitespacesAndNewlines)
+            DispatchQueue.main.async {
+                if let trimmed, !trimmed.isEmpty {
+                    completion(trimmed, nil)
+                } else {
+                    completion(nil, "The model's answer was empty")
+                }
+            }
+        }.resume()
+    }
+
     /// Ask the model. Completion is on the main thread; nil means no usable
     /// answer (network, HTTP, JSON) and `error` says which.
     func think(

@@ -67,6 +67,18 @@ fun awayFalls(n: Int) = pick("fell ×$n", "摔了 $n 次")
 fun awayFeeds(n: Int) = pick("ate ×$n", "吃了 $n 次")
 fun awayPets(n: Int) = pick("petted ×$n", "被摸 $n 次")
 fun awayMoods(n: Int) = pick("$n moods", "$n 种心情")
+    // The duck's diary: today's real record, and the paragraph the person's
+    // own model writes from it. Without a model the facts stand alone.
+    val diary get() = pick("Ducky diary", "鸭子日记")
+    val diaryFactsTitle get() = pick("Today, for real", "今天的真实记录")
+    val diaryModelTitle get() = pick("Your model wrote", "你的模型写道")
+    val diaryBusy get() = pick("Writing…", "正在写…")
+    val diaryEmpty get() = pick("Nothing happened yet today.", "今天还什么都没发生。")
+    val diaryNeedModel get() = pick(
+        "Set a model endpoint in AI companion to hear the day in the duck's own words.",
+        "在 AI 伙伴里配置接口，就能听鸭子用自己的话讲这一天。",
+    )
+    fun diaryGifts(n: Int) = pick("$n gift(s) from neighbours", "收到邻居 $n 份礼物")
 val quack get() = pick("Quack", "叫一声")
     val drive get() = pick("drive", "驱动")
     fun stick(mode: String): String = when (mode) {

@@ -303,6 +303,22 @@ enum Copy {
     static func rulesPasted(_ count: Int) -> String {
         String(format: pick("Imported %d block(s)", "导入了 %d 条积木"), count)
     }
+    // The duck's diary: today's real record, and the paragraph the person's
+    // own model writes from it. Without a model the facts stand alone.
+    static var diary: String { pick("Ducky diary", "鸭子日记") }
+    static var diaryFactsTitle: String { pick("Today, for real", "今天的真实记录") }
+    static var diaryModelTitle: String { pick("Your model wrote", "你的模型写道") }
+    static var diaryBusy: String { pick("Writing…", "正在写…") }
+    static var diaryEmpty: String { pick("Nothing happened yet today.", "今天还什么都没发生。") }
+    static var diaryNeedModel: String {
+        pick(
+            "Set a model endpoint in AI companion to hear the day in the duck's own words.",
+            "在 AI 伙伴里配置接口，就能听鸭子用自己的话讲这一天。"
+        )
+    }
+    static func diaryGifts(_ n: Int) -> String {
+        String(format: pick("%d gift(s) from neighbours", "收到邻居 %d 份礼物"), n)
+    }
     static var rulesEmpty: String {
         pick("No rules yet. Build one: when I clap, roll over.",
              "还没有规则。拼一个：拍手，就翻滚。")

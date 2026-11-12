@@ -132,6 +132,7 @@ fun Shell(
     var showDance by remember { mutableStateOf(false) }
     var showPostcards by remember { mutableStateOf(false) }
     var showDex by remember { mutableStateOf(false) }
+    var showDiary by remember { mutableStateOf(false) }
     var dex by remember { mutableStateOf(emptyList<DexEntryUi>()) }
     val dance = remember(context) { DanceStudio(context) }
     var danceShow by remember { mutableStateOf(0) }
@@ -901,7 +902,12 @@ fun Shell(
             quests = quests,
             onPostcards = { showPostcards = true },
             onDex = { showDex = true },
+            onDiary = { showDiary = true },
         ) { showSheet = false }
+    }
+
+    if (showDiary) {
+        DiarySheet(onClose = { showDiary = false })
     }
 
     if (showDex) {
@@ -2614,6 +2620,7 @@ private fun InstrumentSheet(
     quests: QuestBoardUi,
     onPostcards: () -> Unit,
     onDex: () -> Unit,
+    onDiary: () -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -2862,6 +2869,7 @@ private fun InstrumentSheet(
             LifeCard(lifeRecord) { shareVetbook(context) }
             ButtonChip(Copy.postcardShelf, "postcards-open", onPostcards)
             ButtonChip(Copy.dex, "dex-open", onDex)
+            ButtonChip(Copy.diary, "diary-open", onDiary)
             awaySummary?.let { summary ->
                 Row(
                     Modifier.fillMaxWidth(),

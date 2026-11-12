@@ -165,6 +165,66 @@ object AIBrain {
         }
     }
 
+    /**
+     * Ask the model for a short first-person diary paragraph, built ONLY from
+     * the real facts the caller passes in. Nothing is invented here: the
+     * prompt forbids adding anything beyond those facts.
+     */
+    fun writeDiary(config: AIConfig, dayFacts: String): Pair<String?, String?> {
+        val endpointText = config.endpoint.trim()
+        if (endpointText.isEmpty()) return null to "Set a model endpoint first"
+        val endpoint = try {
+            val url = URL(endpointText)
+            if (url.path.contains("chat/completions")) url
+            else URL(endpointText.trimEnd('/') + "/chat/completions")
+        } catch (_: Throwable) {
+            return null to "The endpoint is not a URL"
+        }
+        val system = """
+            You write MicroDuck's diary: one short first-person paragraph (2-4
+            sentences) in the duck's gentle voice, based ONLY on the real facts
+            the person gives below. Never invent events, names or numbers. If
+            the day was quiet, say so softly. Write in the language the facts
+            ask for.
+        """.trimIndent()
+        val body = JSONObject()
+            .put("model", config.model.ifBlank { "gpt-4o-mini" })
+            .put("temperature", 0.6)
+            .put(
+                "messages",
+                JSONArray()
+                    .put(JSONObject().put("role", "system").put("content", system))
+                    .put(JSONObject().put("role", "user").put("content", dayFacts)),
+            )
+        return try {
+            val connection = endpoint.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.connectTimeout = 8000
+            connection.readTimeout = 25000
+            connection.setRequestProperty("Content-Type", "application/json")
+            if (config.key.isNotEmpty()) {
+                connection.setRequestProperty("Authorization", "Bearer ${config.key}")
+            }
+            connection.outputStream.use { it.write(body.toString().toByteArray()) }
+            val code = connection.responseCode
+            val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader()?.use { it.readText() } ?: ""
+            connection.disconnect()
+            if (code !in 200..299) return null to "HTTP $code"
+            val json = JSONObject(text)
+            val content = json.optJSONArray("choices")
+                ?.optJSONObject(0)
+                ?.optJSONObject("message")
+                ?.optString("content")
+                ?: json.optJSONObject("message")?.optString("content")
+            val trimmed = content?.trim().orEmpty()
+            if (trimmed.isEmpty()) null to "The model's answer was empty" else trimmed to null
+        } catch (error: Throwable) {
+            null to (error.message ?: "The model did not answer")
+        }
+    }
+
     private fun finite(json: JSONObject, key: String, fallback: Double): Double? {
         val value = json.optDouble(key, fallback)
         return value.takeIf { it.isFinite() }
