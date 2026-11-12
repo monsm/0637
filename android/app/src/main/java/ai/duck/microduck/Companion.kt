@@ -58,7 +58,7 @@ fun isFall(event: String): Boolean = event == "fell" || event.startsWith("fall")
  * refuses the whole program when one value is empty.
  */
 internal fun trimLikeCore(value: String): String =
-    value.trim { it.isWhitespace() || it.isSpaceChar() }
+    value.trim { it.isWhitespace() || Character.isSpaceChar(it) }
 
 /** The program the core is running, read from GET /rules. */
 fun fetchRules(): List<RuleUi>? = try {

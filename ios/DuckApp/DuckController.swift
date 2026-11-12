@@ -1317,9 +1317,8 @@ final class DuckController: ObservableObject {
         }
         // The core trims with Rust's `trim()`, which knows the whole Unicode
         // White_Space set. `.whitespaces` does not include a newline, so a
-        // value of "
-" looked fine here and was refused there — and a
-        // refused program is a program the core is not running.
+        // value of a single newline looked fine here and was refused there —
+        // and a refused program is a program the core is not running.
         let imported = list.compactMap { item -> DuckRule? in
             guard let trigger = item["trigger"] as? String,
                   let action = item["action"] as? String,
