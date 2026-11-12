@@ -1315,22 +1315,29 @@ final class DuckController: ObservableObject {
         } else {
             return nil
         }
+        // The core trims with Rust's `trim()`, which knows the whole Unicode
+        // White_Space set. `.whitespaces` does not include a newline, so a
+        // value of "
+" looked fine here and was refused there — and a
+        // refused program is a program the core is not running.
         let imported = list.compactMap { item -> DuckRule? in
             guard let trigger = item["trigger"] as? String,
                   let action = item["action"] as? String,
-                  let value = item["value"] as? String,
+                  let raw = item["value"] as? String,
                   triggers.contains(trigger),
-                  actions.contains(action),
-                  !value.trimmingCharacters(in: .whitespaces).isEmpty
+                  actions.contains(action)
             else { return nil }
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { return nil }
             let then = (item["then"] as? [[String: Any]] ?? [])
                 .prefix(4)
                 .compactMap { step -> DuckRuleStep? in
                     guard let action = step["action"] as? String,
-                          let value = step["value"] as? String,
-                          actions.contains(action),
-                          !value.trimmingCharacters(in: .whitespaces).isEmpty
+                          let raw = step["value"] as? String,
+                          actions.contains(action)
                     else { return nil }
+                    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !value.isEmpty else { return nil }
                     return DuckRuleStep(action: action, value: value)
                 }
             return DuckRule(trigger: trigger, action: action, value: value, then: then)

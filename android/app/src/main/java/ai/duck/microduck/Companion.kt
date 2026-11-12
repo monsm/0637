@@ -49,6 +49,17 @@ data class RuleStep(val action: String, val value: String)
  */
 fun isFall(event: String): Boolean = event == "fell" || event.startsWith("fall")
 
+/**
+ * Trim a value the way the core trims it.
+ *
+ * The core uses Rust's `trim()`, which knows the whole Unicode White_Space
+ * set — the no-break space included. Kotlin's `trim()` does not, so a value
+ * the phone thought was fine could be refused by the core, and the core
+ * refuses the whole program when one value is empty.
+ */
+internal fun trimLikeCore(value: String): String =
+    value.trim { it.isWhitespace() || it.isSpaceChar() }
+
 /** The program the core is running, read from GET /rules. */
 fun fetchRules(): List<RuleUi>? = try {
     val summary = JSONObject(getJson("/rules")).optJSONObject("rules") ?: return null
@@ -135,7 +146,7 @@ internal fun parseSharedRules(text: String): List<RuleUi>? = try {
         val item = array.optJSONObject(index) ?: return@mapNotNull null
         val trigger = item.optString("trigger", "")
         val action = item.optString("action", "")
-        val value = item.optString("value", "").trim()
+        val value = trimLikeCore(item.optString("value", ""))
         if (trigger !in RULE_TRIGGERS || action !in RULE_ACTIONS || value.isEmpty()) {
             return@mapNotNull null
         }
@@ -146,7 +157,7 @@ internal fun parseSharedRules(text: String): List<RuleUi>? = try {
             (0 until minOf(chain.length(), RULE_MAX_STEPS)).mapNotNull { at ->
                 val step = chain.optJSONObject(at) ?: return@mapNotNull null
                 val stepAction = step.optString("action", "")
-                val stepValue = step.optString("value", "").trim()
+                val stepValue = trimLikeCore(step.optString("value", ""))
                 if (stepAction !in RULE_ACTIONS || stepValue.isEmpty()) {
                     null
                 } else {

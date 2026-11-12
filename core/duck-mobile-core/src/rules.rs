@@ -119,14 +119,17 @@ impl Rules {
                     }
                     then.push(Action {
                         action: step_action.to_owned(),
-                        value: step_value.to_owned(),
+                        // Trimmed, so the value the core runs is the value
+                        // the shells wrote: a program that says " laugh "
+                        // must not sit in the book with spaces around it.
+                        value: step_value.trim().to_owned(),
                     });
                 }
             }
             rules.push(Rule {
                 trigger: trigger.to_owned(),
                 action: action.to_owned(),
-                value: name.to_owned(),
+                value: name.trim().to_owned(),
                 then,
             });
         }
@@ -166,6 +169,43 @@ mod tests {
             .unwrap();
         assert_eq!(rules.matching("clap").len(), 1);
         assert!(rules.matching("whistle").is_empty());
+    }
+
+    /// The value the core runs is the value the shells wrote.
+    ///
+    /// The core trims with Rust's `trim()`, which knows the whole Unicode
+    /// White_Space set. The shells have to trim the same way: a value that
+    /// looked fine on the phone and was empty here would refuse the whole
+    /// program — and a refused program is one the duck is not running.
+    #[test]
+    fn a_value_is_trimmed_the_way_the_shells_trim_it() {
+        let mut rules = Rules::default();
+        rules
+            .set(&serde_json::json!({
+                "rules": [{ "trigger": "clap", "action": "skill", "value": "  roulade  " }]
+            }))
+            .unwrap();
+        let matching = rules.matching("clap");
+        assert_eq!(matching.len(), 1);
+        assert_eq!(matching[0].value, "roulade");
+
+        // A no-break space is white space for the core, so it is empty.
+        let mut rules = Rules::default();
+        let error = rules
+            .set(&serde_json::json!({
+                "rules": [{ "trigger": "clap", "action": "skill", "value": "\u{00a0}" }]
+            }))
+            .unwrap_err();
+        assert!(error.contains("empty value"), "{error}");
+
+        // And so is a newline, which the iOS shell used to accept.
+        let mut rules = Rules::default();
+        let error = rules
+            .set(&serde_json::json!({
+                "rules": [{ "trigger": "clap", "action": "skill", "value": "\n" }]
+            }))
+            .unwrap_err();
+        assert!(error.contains("empty value"), "{error}");
     }
 
     #[test]
