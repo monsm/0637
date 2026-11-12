@@ -401,6 +401,17 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 
 ---
 
+## 四之十二、邻居互送 Neighbour Gifts（2026-11-12）
+
+多机从「互相打招呼」升级为真实互动：**朋友可以喂你的鸭子一颗零食、或者逗它笑**。
+
+- **协议**：LAN 第四个动词 `gift`——只接受已认识邻居（announce/greet 才建 peer）、每邻居双向各 3 秒一条、情绪名按本机官方名单在 wire 层校验（乱名不耗窗口不占队列）；发送走 `POST /peers/gift`（未知 peer / 非法礼物 / too soon 都即时拒绝且不排队，treat 包单播到 greet 用的地址）。
+- **真实效果**：treat = 官方啄地 feed（吃不到的状态诚实拒绝），emotion = 官方情绪时间线；vetbook 记 `gift:treat` / `gift:emotion:<name>`，`/state.gift_event` 带 tick 供两端防重复弹窗。
+- **UI**：邻居列表每行「喂一颗 / 逗逗它」（无障碍齐全）；收礼弹「Sunny 送来一颗零食 / 逗你笑了」。
+- **验证**：核心 8 个新单测（已知邻居才收、陌生人建不了 peer、to 门、洪泛一礼、官方名单 wire 校验、未知礼物忽略、发送窗口、HTTP 路由拒绝语义）；Android CI 双向实测（收到 laugh 并入账 + treat 包真的离机）；iOS CI 全绿（含新的一键「画路走」戴克按钮把 SwiftUI Menu 不可点的测试缺陷变成真 UX 改进）。修复复核 4 项（双重节流归一、wire 层名单校验、死代码、发包断言）+ CI 抓出的 2 个真缺陷（LAN 启动时名单未同步、菜单项不可点）。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
