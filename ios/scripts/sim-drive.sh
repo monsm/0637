@@ -751,11 +751,17 @@ print(json.load(sys.stdin).get('tick',0))
 # waits twelve real minutes, and a user can speed the same dial.
 api POST /config '{"care_time_scale":200}' > /dev/null || true
 api POST /care "{\"hunger\":0.9,\"mood\":0.2,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((CARE_TICK - 400))}" > /dev/null || true
-sleep 0.5
-DOZING=$(api GET /care | python3 -c "
+# The restore is queued for the next tick and the doze follows on the care
+# clock; poll instead of racing one publish on a loaded runner.
+DOZING=""
+for _ in $(seq 1 30); do
+  DOZING=$(api GET /care | python3 -c "
 import json,sys
 print('yes' if (json.load(sys.stdin).get('care') or {}).get('asleep') else 'no')
 " 2>/dev/null || echo "no")
+  [ "$DOZING" = "yes" ] && break
+  sleep 0.2
+done
 [ "$DOZING" = "yes" ]; check $? "a long neglect puts the duck to sleep" "asleep=$DOZING"
 
 api POST /pet '{}' > /dev/null || true
