@@ -1416,8 +1416,15 @@ PAUSED_FLAG=$(api GET /state | field paused)
 check $? "state reports the duck is paused" "paused=$PAUSED_FLAG"
 
 api POST /step '{"ticks":10}' > /dev/null
-sleep 0.6
-TICK_STEPPED=$(api GET /state | field tick)
+# The step is a one-shot that waits for a tick; on a stalled frame the
+# answer arrives late. A paused clock changes by exactly the step, so poll
+# for the exact value rather than reading once after a fixed nap.
+TICK_STEPPED=$TICK_PAUSED
+for _ in $(seq 1 30); do
+  TICK_STEPPED=$(api GET /state | field tick)
+  [ "$TICK_STEPPED" = "$((TICK_PAUSED + 10))" ] && break
+  sleep 0.2
+done
 [ "$TICK_STEPPED" = "$((TICK_PAUSED + 10))" ]
 check $? "step advances exactly the ticks asked for" "$TICK_PAUSED -> $TICK_STEPPED (want +10)"
 
