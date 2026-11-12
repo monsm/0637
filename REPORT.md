@@ -412,6 +412,16 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 
 ---
 
+## 四之十三、睡眠模式 Sleep Mode（2026-11-12）
+
+「晚安」不是技能，是**选择进入的真安睡**——与长时间被忽视后自然打盹是同一个状态，但由人按下。
+
+- **核心**：`Care.night` 状态机——入夜强制 asleep 且普通规则叫不醒（庆祝、仪式都被挡）；`quiet_s` 永远由 tick 差推导（客户端无法伪造更长的夜晚）；`POST /night {"on":true|false}`，早安同步返回安静时长；早晨播官方 `yes` 情绪（无则 chirp）并记 vetbook `morning`；**任何真实的触摸**（抚摸/喂食/驾驶/`/care asleep:false`）结束夜晚并记 `woken_by_touch`；夜晚随 `/care` 存档往返（启动 tick 钳制，重启后仍在夜里）；入睡取消进行中的画路走；`/state.night` 每帧发布。
+- **两端**：仪表表「晚安」→ 变成「已经安静 X 分钟」+「早安」；早晨弹「早安！昨晚安静了 X 分钟」。
+- **验证**：核心 4 个新单测（入夜保持睡着、触摸诚实笔记、存档往返 tick 差、路由拒绝形状）；iOS CI **187/187**（晚安接受/入睡/早安 quiet_s=0.74/夜晚清除/`morning` 入账/触摸唤醒）；Android smoke `night: on -> asleep and quiet, pet -> woken_by_touch, off ok` 全绿。
+
+---
+
 ## 五、iOS 真机安装说明
 
 当前 iOS 产物是**模拟器版**（ad-hoc 签名），装不进物理 iPhone —— 平台限制，非配置问题。
