@@ -125,6 +125,17 @@ impl BamModel {
     }
 }
 
+/// The motor current behind a torque, in milliamperes.
+///
+/// The bus reads each servo's `present_current` register, and that register is
+/// what `currents_ma` means everywhere downstream: upstream's pickup
+/// classifier divides it by 1000 to get amps, and its own fixture writes
+/// `420.0 // left knee, mA`. The motor's torque constant turns a torque back
+/// into that current: I = τ / kt.
+pub fn current_ma(torque: f64, kt: f64) -> f64 {
+    torque.abs() / kt * 1000.0
+}
+
 fn sign(value: f64) -> i8 {
     if value > 0.0 {
         1
@@ -168,6 +179,22 @@ mod tests {
         let (frictionloss, damping) = model.frictions(0.1, -0.2, 0.5);
         assert!(frictionloss >= model.friction_base);
         assert_eq!(damping, model.friction_viscous);
+    }
+
+    /// The current the bus would report for a torque: milliamperes, not
+    /// newton-metres in a milliampere's clothes.
+    #[test]
+    fn a_torque_reads_back_as_the_current_the_servo_would_report() {
+        let model = BamModel::xl330_m6();
+        // One ampere of motor current makes exactly kt newton-metres.
+        let milliamps = current_ma(model.kt, model.kt);
+        assert!((milliamps - 1000.0).abs() < 1e-6, "{milliamps}");
+        // The old reading was newton-metres times 100, which for this motor
+        // is about 27 times too small: a leg pushing with 0.3 N*m read as
+        // 30 "mA" instead of the 820 mA the real servo reports.
+        let old = model.kt * 100.0;
+        let ratio = milliamps / old;
+        assert!((ratio - 27.3).abs() < 0.1, "the correction is {ratio}x");
     }
 
     /// Values from the official Python `bam` implementation for the same states.

@@ -17,7 +17,7 @@ use duck_control::imu::ImuData;
 use duck_control::io::{JointTargets, Result, RobotIo, Sensors, SlowSensors};
 use duck_control::model::{DEFAULT_POSITION, NUM_JOINTS};
 
-use crate::bam::BamModel;
+use crate::bam::{current_ma, BamModel};
 
 #[repr(C)]
 struct DuckMj {
@@ -184,6 +184,10 @@ pub struct MujocoIo {
     actuator_wire: Vec<Option<usize>>,
     /// BAM M6 torque path; `None` keeps the XML position actuators.
     bam: Option<BamState>,
+    /// The motor's torque constant, in newton-metres per ampere. A hardware
+    /// number, not a modelling choice: it turns an actuator's torque back
+    /// into the current the servo's `present_current` register would report.
+    motor_kt: f64,
     /// The XML's own position gain per actuator (0.55 for this model). The
     /// daemon's kp=200 is a Dynamixel register value; the position path maps it
     /// to `base_gain * kp / 200`, not to kp directly.
@@ -301,6 +305,7 @@ impl MujocoIo {
             }
         }
 
+        let model = BamModel::xl330_m6();
         let mut io = Self {
             handle,
             nq,
@@ -317,10 +322,11 @@ impl MujocoIo {
             actuator_dof,
             actuator_wire,
             bam: use_bam.then(|| BamState {
-                model: BamModel::xl330_m6(),
+                model: model.clone(),
                 q_target: vec![0.0; nu],
                 previous_torque: vec![0.0; nu],
             }),
+            motor_kt: model.kt,
             base_gain,
             held_trunk: [0.0; 7],
             held_joints: [0.0; NUM_JOINTS],
@@ -761,7 +767,15 @@ impl RobotIo for MujocoIo {
                 let backlash_dof = self.wire_backlash_dof[wire];
                 velocities[wire] =
                     qvel[servo_dof] + backlash_dof.map_or(0.0, |address| qvel[address]);
-                currents[wire] = force[actuator].abs() * 100.0;
+                // The bus reads each servo's `present_current` register, and
+                // that is what `currents_ma` means downstream: upstream's
+                // pickup classifier divides it by 1000 to get amps. The
+                // actuator's force is a torque, so it goes through the
+                // motor's torque constant first: I = τ / kt. Reading the
+                // torque as milliamperes directly (it used to be torque ×
+                // 100) made the current feature about 27 times too small,
+                // and a duck held in a hand was never seen as held.
+                currents[wire] = current_ma(force[actuator], self.motor_kt);
             }
         }
 
