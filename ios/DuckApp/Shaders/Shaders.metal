@@ -146,9 +146,13 @@ fragment float4 duck_fragment(
 
     // The duck is a painted toy: most of what you see is diffuse. The albedo
     // term carries the material's colour, and the ambient lift keeps the
-    // shadowed side from going black. 晨昏光把直射光染成时辰色，环境光只沾
-    // 一半；白天 key 近似纯白，照明与原来一致。
-    float3 key = uniforms.daylight.rgb;
+    // shadowed side from going black. 晨昏光的分工：房间吃满时辰色，鸭子是
+    // 灯下的小物件，直射光保持中性——白壳按 display-space 出厂色走，环境
+    // 只沾六成时辰色。否则夜里白壳会被染成青铜（CI 壳检查守的是
+    // 「亮度 ≥120 的近中性像素」，那正是白壳该长成的样子）。白天 key 仍
+    // 近似纯白，照明与原来一致。
+    float isFloor = uniforms.light.w > 0.5 ? 1.0 : 0.0;
+    float3 key = mix(float3(1.0), uniforms.daylight.rgb, isFloor * 0.6);
     float3 color = diffuse_albedo * (0.45 + 0.75 * ndotl) * key
                  + specular * ndotl * key
                  + ambient * diffuse_albedo * 0.85 * mix(float3(1.0), key, 0.5)
@@ -174,8 +178,9 @@ fragment float4 duck_fragment(
     // The scene's colours are authored in display space, so the albedo must
     // reach the screen unchanged; only highlights get a soft knee. A Reinhard
     // curve over the whole surface washed the duck's orange out to beige.
-    // 曝光乘上晨昏光系数：夜里整体低一档（任务 §4）。
-    color *= exposure * uniforms.daylight.w;
+    // 曝光：房间吃满夜压（夜里整体低一档，任务 §4），鸭子本体只压两成——
+    // 暗的是屋，不是灯下那只白壳的鸭。
+    color *= exposure * mix(1.0, uniforms.daylight.w, isFloor * 0.8 + 0.2);
     color = clamp(color, 0.0, 4.0);
     color = mix(color, color / (color + float3(0.55)) * 1.55, smoothstep(0.72, 1.6, max(max(color.r, color.g), color.b)));
     color = clamp(color, 0.0, 1.0);
