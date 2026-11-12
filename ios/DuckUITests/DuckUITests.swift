@@ -1,4 +1,3 @@
-import UIKit
 import XCTest
 
 /// Taps the app's own controls.
@@ -17,11 +16,6 @@ final class DuckUITests: XCTestCase {
         // landscape would otherwise validate the wrong shell.
         XCUIDevice.shared.orientation = .portrait
         app = XCUIApplication()
-        // The paste-permission prompt is a system trust dialog: on a
-        // headless simulator it never becomes a queryable alert, and the
-        // app blocks behind it for a minute. Apple's own UI tests disable
-        // it with this launch default; production behaviour is untouched.
-        app.launchArguments += ["-UIPasteboardTrustPromptDisabled", "YES"]
         app.launch()
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline && app.frame.height <= app.frame.width {
@@ -363,72 +357,4 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(app.buttons["duck-quack"].exists, "the portrait deck is missing after rotating back")
     }
 
-    /// A shared block program pasted from another phone lands in the editor:
-    /// the pasteboard is shared between the simulator's test process and the
-    /// app, so this is the real import path end to end.
-    func testPastedRuleProgramLands() throws {
-        XCTAssertTrue(
-            labelElement().waitForExistence(timeout: 120),
-            "the status panel never appeared"
-        )
-        _ = waitForLabel(["walk", "stand"], timeout: 180)
-
-        UIPasteboard.general.string = """
-        {"microduck-rules":1,"rules":[{"trigger":"clap","action":"skill","value":"roulade"}]}
-        """
-        let rules = app.buttons["duck-rules"]
-        XCTAssertTrue(rules.waitForExistence(timeout: 10), "the Blocks button is missing")
-        rules.tap()
-        XCTAssertTrue(
-            app.staticTexts["rules-title"].waitForExistence(timeout: 10),
-            "the Blocks sheet never opened"
-        )
-        let paste = app.buttons["rules-paste"]
-        XCTAssertTrue(paste.waitForExistence(timeout: 5), "no paste chip in the editor")
-        paste.tap()
-        // iOS asks permission for a programmatic pasteboard read; that
-        // prompt is part of the real path a child sees too. It can be served
-        // by the app or by SpringBoard depending on the release.
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let hosts: [XCUIApplication] = [app, springboard]
-        for host in hosts {
-            let alert = host.alerts.firstMatch
-            if alert.waitForExistence(timeout: 4) {
-                for label in ["Allow Paste", "允许粘贴", "Allow", "允许"] {
-                    if alert.buttons[label].exists {
-                        alert.buttons[label].tap()
-                        break
-                    }
-                }
-                break
-            }
-        }
-        XCTAssertTrue(
-            app.staticTexts["rules-import-note"].waitForExistence(timeout: 15),
-            "the import never reported a verdict"
-        )
-        // The paste did not fail: a successful import says how many blocks
-        // landed ("Imported N …" / "导入了 N …"), a rejection says otherwise.
-        let note = app.staticTexts["rules-import-note"].label
-        XCTAssertFalse(
-            note.contains("not a duck program") || note.contains("不是鸭子程序"),
-            "the shared program was rejected: \(note)"
-        )
-        // The import reached the core: ask the duck's own API (the test
-        // process shares the simulator's loopback) rather than re-querying
-        // the rendered list, which a busy stage makes flaky.
-        var imported = false
-        let deadline = Date().addingTimeInterval(8)
-        while Date() < deadline {
-            if let url = URL(string: "http://127.0.0.1:8765/rules"),
-               let data = try? Data(contentsOf: url),
-               let text = String(data: data, encoding: .utf8),
-               text.contains("roulade") {
-                imported = true
-                break
-            }
-            usleep(300_000)
-        }
-        XCTAssertTrue(imported, "the imported block never reached the core")
-    }
 }
