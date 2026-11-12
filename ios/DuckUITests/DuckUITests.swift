@@ -300,14 +300,12 @@ final class DuckUITests: XCTestCase {
             "the 50 Hz loop never drove the duck: label=\(ready)"
         )
 
-        let menu = app.buttons["duck-menu"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 10), "the shell menu is missing")
-        menu.tap()
-        // The mode chooser is the shell menu; its entries carry the same
-        // mode-<name> ids. The title fallback covers either language.
-        let pathMode = menuButton("mode-path", ["Path", "画路走"])
-        XCTAssertTrue(pathMode.waitForExistence(timeout: 10), "the menu has no Path mode")
-        pathMode.tap()
+        // The deck's own scribble chip: one tap into the stage-as-canvas.
+        // (The mode menu carries the same entry, but SwiftUI menu items
+        // report an empty frame to XCUITest and cannot be tapped here.)
+        let pathChip = app.buttons["duck-path"]
+        XCTAssertTrue(pathChip.waitForExistence(timeout: 10), "the deck has no Path chip")
+        pathChip.tap()
 
         let go = app.buttons["path-go"]
         XCTAssertTrue(go.waitForExistence(timeout: 10), "path mode has no Go chip")

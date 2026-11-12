@@ -987,6 +987,12 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         Intent::StartLan(name) => {
             if core.lan.is_none() {
                 core.lan = crate::lan::Lan::start(&name);
+                // The wire refuses an emotion gift for a mood this build
+                // does not have. The emotion list joined the core before
+                // the LAN socket existed, so hand it over here too.
+                if let Some(lan) = &core.lan {
+                    lan.set_emotions(core.runtime.emotion_names());
+                }
             }
             match &core.lan {
                 Some(lan) => {

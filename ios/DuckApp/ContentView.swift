@@ -653,6 +653,26 @@ struct ContentView: View {
             Spacer(minLength: 0)
             deckButton("duck-feed", Copy.feed, "fork.knife") { controller.feed() }
             deckButton("duck-skills", Copy.skills, "sparkles") { showRing = true }
+            // Path mode's own door: a child should not dig through the menu
+            // to draw a route. Tap enters the stage-as-canvas; tap again
+            // hands the stick back.
+            Button {
+                stickMode = stickMode == .path ? .drive : .path
+            } label: {
+                Image(systemName: "scribble")
+                    .font(.system(size: 17))
+                    .frame(width: 44, height: 44)
+                    .background(
+                        stickMode == .path
+                            ? AnyShapeStyle(Color.cyan.opacity(0.35))
+                            : AnyShapeStyle(.ultraThinMaterial),
+                        in: Circle()
+                    )
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.pathMode)
+            .accessibilityIdentifier("duck-path")
             Button {
                 quackTapped()
             } label: {
