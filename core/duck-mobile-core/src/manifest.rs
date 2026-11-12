@@ -279,11 +279,10 @@ mod tests {
 
     #[test]
     fn official_manifest_resolves_walk_slots_and_skills() {
-        let dir = Path::new(r"D:\AI\Duck\policies");
-        if !dir.join("manifest.json").exists() {
+        let Some(dir) = crate::fixtures::policies_dir() else {
             return;
-        }
-        let bundle = load(dir).expect("manifest");
+        };
+        let bundle = load(&dir).expect("manifest");
         assert!(bundle.paths.walk.ends_with("velstand.onnx"));
         assert!(bundle
             .paths
@@ -325,12 +324,14 @@ mod tests {
     /// the same skills — upstream deliberately does not filter skills by mode.
     #[test]
     fn the_roller_manifest_swaps_the_bundle_and_keeps_the_skills() {
-        let dir = Path::new(r"D:\AI\Duck\policies");
-        if !dir.join("roller.onnx").exists() || !dir.join("roller_crouch.onnx").exists() {
+        let Some(dir) = crate::fixtures::policies_dir() else {
+            return;
+        };
+        if !crate::fixtures::has_all(&dir, &["roller.onnx", "roller_crouch.onnx"]) {
             return;
         }
-        let walk = load_mode(dir, Mode::Walk).expect("walk");
-        let roller = load_mode(dir, Mode::Roller).expect("roller");
+        let walk = load_mode(&dir, Mode::Walk).expect("walk");
+        let roller = load_mode(&dir, Mode::Roller).expect("roller");
 
         assert!(walker_walk(&walk), "walking keeps velstand: {:?}", walk.paths.walk);
         assert!(roller.paths.walk.ends_with("roller.onnx"));

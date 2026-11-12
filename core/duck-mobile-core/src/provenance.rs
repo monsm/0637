@@ -143,15 +143,14 @@ mod tests {
 
     #[test]
     fn the_same_files_give_the_same_fingerprint() {
-        let dir = Path::new(r"D:\AI\Duck\policies");
-        if !dir.join("manifest.json").exists() {
+        let Some(dir) = crate::fixtures::policies_dir() else {
             return;
-        }
-        let scene = Path::new(
-            r"D:\AI\Duck\upstream\microduck_rl\src\mjlab_microduck\robot\microduck\scene_backlash.xml",
-        );
-        let first = collect(scene, dir);
-        let second = collect(scene, dir);
+        };
+        let Some(scene) = crate::fixtures::scene_backlash() else {
+            return;
+        };
+        let first = collect(&scene, &dir);
+        let second = collect(&scene, &dir);
         assert_eq!(first.fingerprint, second.fingerprint);
         assert_eq!(first.fingerprint.len(), 64);
         assert!(first.parts.len() >= 10, "manifest + policies");

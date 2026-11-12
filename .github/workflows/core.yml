@@ -1,0 +1,90 @@
+name: Core
+
+# The core is the heart both platforms share: the official control stack plus
+# everything the companion features sit on. Its test suite existed, but it
+# only ever ran on one developer's machine — the fixtures pointed at
+# `D:\AI\Duck`, and the workspace could not even build without MuJoCo. So a
+# core regression was caught by the app smoke tests only if the smoke tests
+# happened to walk over it.
+#
+# This workflow is that gate. It runs the core's own tests on every change
+# to the core, the upstream patch, or the scripts that fetch the official
+# assets, with no simulator, no emulator and no signing identity — the
+# cheapest job in the repository, and the one that watches the code both
+# platforms depend on.
+
+on:
+  push:
+    paths:
+      - "core/**"
+      - "patches/**"
+      - "scripts/**"
+      - ".github/workflows/core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fetch upstream sources
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
+          git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
+          git -C upstream/microduck checkout da34a22
+          # The patch is what the core compiles against; a clean clone plus
+          # the patch is exactly what the platform workflows build.
+          git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
+
+      - name: Fetch the official policies
+        run: bash scripts/fetch-policies.sh
+
+      - name: ONNX Runtime (linux-x64)
+        id: ort
+        run: |
+          set -euo pipefail
+          LIB="$(bash scripts/fetch-ort-linux.sh)"
+          echo "lib=$LIB" >> "$GITHUB_OUTPUT"
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target list --toolchain 1.99.1 --installed
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-tests
+
+      - name: Core unit tests
+        env:
+          # The policy tests load the official ONNX networks, so the runtime
+          # has to be the one this build links against.
+          ORT_DYLIB_PATH: ${{ steps.ort.outputs.lib }}
+          # The assets are fetched above, so a missing one is a broken
+          # build — not a reason to skip the test and call it green.
+          DUCK_REQUIRE_FIXTURES: "1"
+        run: |
+          set -euo pipefail
+          cd core
+          cargo test --locked --workspace 2>&1 | tee "$RUNNER_TEMP/cargo-test.log"
+
+      - name: Publish the test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Duck-core-test-logs
+          path: ${{ runner.temp }}/cargo-test.log
+          if-no-files-found: ignore

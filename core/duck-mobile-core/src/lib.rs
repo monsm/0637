@@ -18,6 +18,7 @@ pub mod care;
 pub mod control;
 pub mod emotion;
 pub mod export;
+pub mod fixtures;
 pub mod intent;
 pub mod lan;
 pub mod leds;

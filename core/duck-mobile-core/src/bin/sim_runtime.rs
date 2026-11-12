@@ -6,7 +6,6 @@
 //! Set ORT_DYLIB_PATH first. The body is the BAM server (`work/body_bam.py`) or
 //! any protocol-1 server.
 
-use std::path::Path;
 use std::time::{Duration, Instant};
 
 use duck_control::policy::Policy;
@@ -15,14 +14,13 @@ use duck_control::sim::RemoteIo;
 use duck_mobile_core::manifest;
 use duck_mobile_core::runtime::DuckRuntime;
 
-const POLICIES: &str = r"D:\AI\Duck\policies";
-
 fn main() {
     let mut args = std::env::args().skip(1);
     let addr = args.next().unwrap_or_else(|| "127.0.0.1:7801".to_owned());
     let seconds: f64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(26.0);
 
-    let bundle = manifest::load(Path::new(POLICIES)).expect("policy manifest");
+    let policies = duck_mobile_core::fixtures::policies_dir().expect("the official policy bundle");
+    let bundle = manifest::load(&policies).expect("policy manifest");
     let policy = Policy::load(&bundle.paths, 0.05).expect("load official policy set");
     let tuning = bundle.tuning();
     let mut runtime = DuckRuntime::new(

@@ -22,9 +22,13 @@ fn main() {
         .unwrap_or_else(|| "127.0.0.1:7801".to_owned());
     let seconds: f64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(10.0);
     let vx: f64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(0.4);
-    let walk = args
-        .next()
-        .unwrap_or_else(|| r"D:\AI\Duck\policies\velstand.onnx".to_owned());
+    let walk = args.next().unwrap_or_else(|| {
+        duck_mobile_core::fixtures::policies_dir()
+            .expect("the official policy bundle")
+            .join("velstand.onnx")
+            .display()
+            .to_string()
+    });
 
     let paths = PolicyPaths {
         walk: walk.into(),

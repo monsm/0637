@@ -50,3 +50,12 @@ jni = "0.21"
 name = "sim_inproc"
 path = "src/bin/sim_inproc.rs"
 required-features = ["mujoco"]
+
+# The fall probe drives the in-process MuJoCo body, so it needs the same
+# feature. Without this declaration the workspace does not build without
+# MuJoCo at all — `cargo build` fails on this bin alone, and so does
+# `cargo test`, which is how the core's own test suite stayed out of CI.
+[[bin]]
+name = "fall_probe"
+path = "src/bin/fall_probe.rs"
+required-features = ["mujoco"]

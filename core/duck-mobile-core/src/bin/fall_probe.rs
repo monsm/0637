@@ -3,27 +3,23 @@
 //!
 //!   fall_probe <hold|release|release_at_fall> [push_vy]
 
-use std::path::Path;
-
 use duck_control::policy::Policy;
 use duck_control::safety::SafetyConfig;
 use duck_mobile_core::manifest;
 use duck_mobile_core::mujoco::MujocoIo;
 use duck_mobile_core::runtime::DuckRuntime;
 
-const POLICIES: &str = r"D:\AI\Duck\policies";
-const SCENE: &str =
-    r"D:\AI\Duck\upstream\microduck_rl\src\mjlab_microduck\robot\microduck\scene_backlash.xml";
-
 fn main() {
     let mut args = std::env::args().skip(1);
     let mode = args.next().unwrap_or_else(|| "hold".to_owned());
     let push_vy: f64 = args.next().and_then(|s| s.parse().ok()).unwrap_or(1.5);
 
-    let bundle = manifest::load(Path::new(POLICIES)).expect("policy manifest");
+    let policies = duck_mobile_core::fixtures::policies_dir().expect("the official policy bundle");
+    let scene = duck_mobile_core::fixtures::scene_backlash().expect("the training scene");
+    let bundle = manifest::load(&policies).expect("policy manifest");
     let policy = Policy::load(&bundle.paths, 0.05).expect("load official policy set");
     let tuning = bundle.tuning();
-    let body = MujocoIo::load(SCENE).expect("load MuJoCo scene");
+    let body = MujocoIo::load(&scene).expect("load MuJoCo scene");
     let mut runtime = DuckRuntime::new(
         body,
         policy,

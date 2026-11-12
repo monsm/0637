@@ -3132,7 +3132,7 @@ mod tests {
     /// A policy that fails every step: the loop holds the pose, so the state
     /// machine still advances and every checkpointed field is exercised.
     fn test_policy() -> Policy {
-        let dir = std::path::Path::new(r"D:\AI\Duck\policies");
+        let dir = crate::fixtures::policies_dir().expect("the official policy bundle");
         let paths = duck_control::policy::PolicyPaths {
             walk: dir.join("velstand.onnx"),
             stand: None,
