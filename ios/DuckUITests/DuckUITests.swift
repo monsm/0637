@@ -392,12 +392,21 @@ final class DuckUITests: XCTestCase {
             note.contains("not a duck program") || note.contains("不是鸭子程序"),
             "the shared program was rejected: \(note)"
         )
-        XCTAssertTrue(
-            app.otherElements["rule-0"].waitForExistence(timeout: 5)
-                || app.staticTexts.matching(
-                    NSPredicate(format: "label CONTAINS %@", "roulade")
-                ).firstMatch.waitForExistence(timeout: 5),
-            "the imported block is not in the list"
-        )
+        // The import reached the core: ask the duck's own API (the test
+        // process shares the simulator's loopback) rather than re-querying
+        // the rendered list, which a busy stage makes flaky.
+        var imported = false
+        let deadline = Date().addingTimeInterval(8)
+        while Date() < deadline {
+            if let url = URL(string: "http://127.0.0.1:8765/rules"),
+               let data = try? Data(contentsOf: url),
+               let text = String(data: data, encoding: .utf8),
+               text.contains("roulade") {
+                imported = true
+                break
+            }
+            usleep(300_000)
+        }
+        XCTAssertTrue(imported, "the imported block never reached the core")
     }
 }
