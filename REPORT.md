@@ -488,7 +488,7 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 | 项 | 状态 |
 |---|---|
 | iOS 真机 IPA | 流水线就绪，等签名凭据 |
-| 相机 / LiDAR / AR 模式 | ✅ 系统相机预览层作背景（Director 模式）；LiDAR 深度读数与 8×8 ToF 降采样在 `/sensors`；未做 ARKit/ARCore 跟踪与平面锚定 |
+| 相机 / LiDAR / AR 模式 | ✅ 系统相机预览层作背景（Director 模式）；LiDAR 深度读数与 8×8 ToF 降采样**未接入**（核心 `sensors::to_tof_grid` 只有单元测试在调，两端都没有深度数据源）；未做 ARKit/ARCore 跟踪与平面锚定 |
 | 扬声器 | ✅ 官方声码合成器编译进核心，两端已接扬声器 |
 | 麦克风 | ✅ 两端真实拾音（RMS + 过零主频；iOS 10 Hz、Android 256 ms 窗，带真实时间戳进 `/sensor`），用时才申请权限，拒绝显示「未授权」；常开监听按设计不做 |
 | roller 模式 | ✅ 整套 bundle + roller 场景切换；`/mode`、MCP `duck_mode`、两端界面切换 |

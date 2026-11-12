@@ -30,7 +30,7 @@
 | 麦克风 | ✅ 两端真实拾音（RMS + 过零主频；iOS 10 Hz、Android 256 ms 窗，带真实时间戳进 `/sensor`） |
 | 相机 | ✅ Director 模式：系统相机取静帧 + 鸭子按屏幕取景合成；无相机时走棚拍背景，不假死 |
 | 手机 IMU 扰动 | ⚠️ iOS 已接（shake → trunk push）；**Android 未接**（`DuckCore.push` 存在，但没有 SensorManager 监听器） |
-| LiDAR / AR | ❌ 未做 ARKit/ARCore 跟踪与平面锚定；`/sensors` 只发布 LiDAR 深度读数与 8×8 ToF 降采样 |
+| LiDAR / AR | ❌ 未做 ARKit/ARCore 跟踪与平面锚定；核心的 8×8 ToF 降采样只有单元测试在调，两端都没有深度数据源（`/sensors` 里那几行永远是空的） |
 | 真机 | 未验证（iOS 需签名凭据、Android arm64 未跑；CI 无物理设备） |
 
 > CI 证据随每次发布记录在 [REPORT.md](REPORT.md) §四之十七；本节只写状态，不复述数字，
