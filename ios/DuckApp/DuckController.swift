@@ -1788,8 +1788,12 @@ final class DuckController: ObservableObject {
                         if tick != self.lastGiftTick {
                             self.lastGiftTick = tick
                             let name = event["from_name"] as? String ?? "Duck"
+                            // A mood the duck was too busy to play still
+                            // arrived: say what happened, not what did not.
                             self.giftLine = kind == "emotion"
-                                ? Copy.giftReceivedEmotion(name)
+                                ? (event["ok"] as? Bool == true
+                                    ? Copy.giftReceivedEmotion(name)
+                                    : Copy.giftMissedEmotion(name))
                                 : Copy.giftReceivedTreat(name)
                             self.giftTick += 1
                         }

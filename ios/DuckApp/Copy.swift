@@ -364,6 +364,11 @@ enum Copy {
     static func giftReceivedEmotion(_ name: String) -> String {
         pick("\(name) cheered you up", "\(name) 逗你笑了")
     }
+    /// The mood arrived while the duck was busy: it was sent, it was not
+    /// played.
+    static func giftMissedEmotion(_ name: String) -> String {
+        pick("\(name) sent a cheer", "\(name) 送来一份心意")
+    }
     // A chorus between neighbours: one duck starts it, the room joins the
     // same moods 1.5 s later.
     static var chorus: String { pick("Chorus", "一起唱") }

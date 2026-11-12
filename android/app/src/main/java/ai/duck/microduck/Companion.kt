@@ -411,7 +411,13 @@ fun parseGiftEvent(text: String): GiftEventUi? = try {
     // Only the two real gifts raise a pill: an unknown kind is not invented.
     val line = when (kind) {
         "treat" -> Copy.giftReceivedTreat(name)
-        "emotion" -> Copy.giftReceivedEmotion(name)
+        // A mood the duck was too busy to play still arrived: say what
+        // happened, not what did not.
+        "emotion" -> if (event.optBoolean("ok", false)) {
+            Copy.giftReceivedEmotion(name)
+        } else {
+            Copy.giftMissedEmotion(name)
+        }
         else -> return null
     }
     GiftEventUi(event.optInt("tick", -1), line)

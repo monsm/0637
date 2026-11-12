@@ -1343,7 +1343,9 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
         self.start_ground_pick()?;
         self.book.life.fed += 1;
-        self.book.note("gift:treat".to_owned());
+        // The book's line says where the treat came from; the gift's arrival
+        // is recorded by the caller, once, whether or not the duck was in a
+        // state to eat it.
         self.queue_sound("yes");
         self.care.feed_from_away();
         Ok(true)

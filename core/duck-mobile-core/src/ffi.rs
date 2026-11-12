@@ -1345,20 +1345,18 @@ fn apply_gift(core: &mut DuckCore, from: String, name: String, gift: GiftKind, v
     }
     let mut ok = false;
     on_active(core, |runtime| {
-        // Each gift writes its own single line in the book: `gift:treat` or
-        // `gift:emotion:<name>`. The counter it moves is the duck's own.
         ok = match gift {
             GiftKind::Treat => matches!(runtime.gift_treat(), Ok(true)),
-            GiftKind::Emotion => {
-                let played = runtime.gift_emotion(&value);
-                if played.is_ok() {
-                    runtime
-                        .book_mut()
-                        .note(format!("gift:emotion:{value}"));
-                }
-                played.is_ok()
-            }
+            GiftKind::Emotion => runtime.gift_emotion(&value).is_ok(),
         };
+        // The gift arrived, whatever the duck was doing at the time: one
+        // line saying where it came from. What the duck then *did* — it ate,
+        // it played a mood — moves its own counter only when it really
+        // happened, so the two facts never pretend to be one.
+        runtime.book_mut().note(match gift {
+            GiftKind::Treat => "gift:treat".to_owned(),
+            GiftKind::Emotion => format!("gift:emotion:{value}"),
+        });
     });
     // The tick the gift landed on, on the duck the client is watching. The
     // shells compare it to avoid showing the same pill twice.
