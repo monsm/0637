@@ -296,12 +296,22 @@ try: print(sum(json.load(sys.stdin).get('emotions',{}).values()))
 except Exception: print('0')
 " 2>/dev/null || echo "0")
 api POST /config '{"idle_ritual_s":3.0}' > /dev/null || true
-sleep 9
-AFTER=$(api GET /life | python3 -c "
+# The ritual waits for deep stillness and an empty emotion stage; on a
+# loaded runner that can land a beat late. Poll for the count to grow
+# instead of reading once after a fixed nap.
+AFTER=$BEFORE
+for _ in $(seq 1 40); do
+  AFTER=$(api GET /life | python3 -c "
 import json,sys
 try: print(sum(json.load(sys.stdin).get('emotions',{}).values()))
 except Exception: print('0')
 " 2>/dev/null || echo "0")
+  python3 -c "
+import sys
+sys.exit(0 if int('${AFTER:-0}') > int('${BEFORE:-0}') else 1)
+" 2>/dev/null && break
+  sleep 0.5
+done
 python3 -c "
 import sys
 sys.exit(0 if int('${AFTER:-0}') > int('${BEFORE:-0}') else 1)
