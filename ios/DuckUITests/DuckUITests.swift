@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 /// Taps the app's own controls.
@@ -355,5 +356,48 @@ final class DuckUITests: XCTestCase {
         let after = waitForLabel(["walk", "stand"], timeout: 30)
         XCTAssertTrue(["walk", "stand"].contains(after), "the duck stopped after rotating back: label=\(after)")
         XCTAssertTrue(app.buttons["duck-quack"].exists, "the portrait deck is missing after rotating back")
+    }
+
+    /// A shared block program pasted from another phone lands in the editor:
+    /// the pasteboard is shared between the simulator's test process and the
+    /// app, so this is the real import path end to end.
+    func testPastedRuleProgramLands() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+
+        UIPasteboard.general.string = """
+        {"microduck-rules":1,"rules":[{"trigger":"clap","action":"skill","value":"roulade"}]}
+        """
+        let rules = app.buttons["duck-rules"]
+        XCTAssertTrue(rules.waitForExistence(timeout: 10), "the Blocks button is missing")
+        rules.tap()
+        XCTAssertTrue(
+            app.staticTexts["rules-title"].waitForExistence(timeout: 10),
+            "the Blocks sheet never opened"
+        )
+        let paste = app.buttons["rules-paste"]
+        XCTAssertTrue(paste.waitForExistence(timeout: 5), "no paste chip in the editor")
+        paste.tap()
+        XCTAssertTrue(
+            app.staticTexts["rules-import-note"].waitForExistence(timeout: 5),
+            "the import never reported a verdict"
+        )
+        // The paste did not fail: a successful import says how many blocks
+        // landed ("Imported N …" / "导入了 N …"), a rejection says otherwise.
+        let note = app.staticTexts["rules-import-note"].label
+        XCTAssertFalse(
+            note.contains("not a duck program") || note.contains("不是鸭子程序"),
+            "the shared program was rejected: \(note)"
+        )
+        XCTAssertTrue(
+            app.otherElements["rule-0"].waitForExistence(timeout: 5)
+                || app.staticTexts.matching(
+                    NSPredicate(format: "label CONTAINS %@", "roulade")
+                ).firstMatch.waitForExistence(timeout: 5),
+            "the imported block is not in the list"
+        )
     }
 }

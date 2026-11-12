@@ -200,6 +200,18 @@ val quack get() = pick("Quack", "叫一声")
     val ruleChainAdd get() = pick("Add step", "加一步")
     val ruleLimit get() = pick("Full (8/8)", "已满（8/8）")
     val deleteRule get() = pick("Delete", "删除")
+    // Sharing a program between phones: the share sheet carries it as text,
+    // the paste chip reads a program back.
+    val rulesShare get() = pick("Share program", "分享程序")
+    val rulesPaste get() = pick("Paste program", "粘贴程序")
+    val rulesPasteFailed get() = pick(
+        "That text is not a duck program",
+        "这段文字不是鸭子程序",
+    )
+    fun rulesPasted(count: Int) = pick(
+        "Imported $count block(s)",
+        "导入了 $count 条积木",
+    )
     val rulesEmpty get() = pick(
         "No rules yet. Build one: when I clap, roll over.",
         "还没有规则。拼一个：拍手，就翻滚。",

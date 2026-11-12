@@ -65,24 +65,109 @@ fun fetchRules(): List<RuleUi>? = try {
 /** Replace the core's program and keep the shell's copy for the next launch. */
 fun saveRules(context: Context, rules: List<RuleUi>) {
     val array = org.json.JSONArray()
-    rules.forEach { rule ->
-        val item = JSONObject()
-            .put("trigger", rule.trigger)
-            .put("action", rule.action)
-            .put("value", rule.value)
-        if (rule.then.isNotEmpty()) {
-            val chain = org.json.JSONArray()
-            rule.then.forEach { step ->
-                chain.put(JSONObject().put("action", step.action).put("value", step.value))
-            }
-            item.put("then", chain)
-        }
-        array.put(item)
-    }
+    rules.forEach { rule -> array.put(ruleJson(rule)) }
     val payload = JSONObject().put("rules", array).toString()
     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .edit().putString(RULES_KEY, payload).apply()
     Thread { try { postJson("/rules", payload) } catch (_: Throwable) {} }.start()
+}
+
+internal val RULE_TRIGGERS = setOf("clap", "whistle", "pet")
+internal val RULE_ACTIONS = setOf("skill", "emotion", "sound")
+internal const val RULE_MAX_STEPS = 4
+internal const val RULE_MAX_RULES = 8
+
+/** One rule as the core's wire object; save and share both use it. */
+internal fun ruleJson(rule: RuleUi): JSONObject {
+    val item = JSONObject()
+        .put("trigger", rule.trigger)
+        .put("action", rule.action)
+        .put("value", rule.value)
+    if (rule.then.isNotEmpty()) {
+        val chain = org.json.JSONArray()
+        rule.then.forEach { step ->
+            chain.put(JSONObject().put("action", step.action).put("value", step.value))
+        }
+        item.put("then", chain)
+    }
+    return item
+}
+
+/**
+ * The share document: a block program travels between phones as text (share
+ * sheet, message, clipboard). The version tag lets a future format change
+ * without guessing; the rules themselves are the exact wire shape the core
+ * accepts, so an imported program runs unchanged.
+ */
+internal fun rulesShareText(rules: List<RuleUi>): String {
+    val array = org.json.JSONArray()
+    rules.forEach { rule -> array.put(ruleJson(rule)) }
+    return JSONObject()
+        .put("microduck-rules", 1)
+        .put("rules", array)
+        .toString()
+}
+
+/**
+ * Read a shared program from pasted text: either the versioned document or a
+ * bare rules array. Every rule is validated against the same vocabulary the
+ * editor offers; a malformed entry is dropped rather than raining junk on the
+ * core, and `null` means the text was not a program at all.
+ */
+internal fun parseSharedRules(text: String): List<RuleUi>? = try {
+    val trimmed = text.trim()
+    val array = if (trimmed.startsWith("[")) {
+        org.json.JSONArray(trimmed)
+    } else {
+        val doc = JSONObject(trimmed)
+        if (doc.optInt("microduck-rules", 0) != 1) return null
+        doc.optJSONArray("rules") ?: return null
+    }
+    val rules = (0 until array.length()).mapNotNull { index ->
+        val item = array.optJSONObject(index) ?: return@mapNotNull null
+        val trigger = item.optString("trigger", "")
+        val action = item.optString("action", "")
+        val value = item.optString("value", "").trim()
+        if (trigger !in RULE_TRIGGERS || action !in RULE_ACTIONS || value.isEmpty()) {
+            return@mapNotNull null
+        }
+        val chain = item.optJSONArray("then")
+        val then = if (chain == null) {
+            emptyList()
+        } else {
+            (0 until minOf(chain.length(), RULE_MAX_STEPS)).mapNotNull { at ->
+                val step = chain.optJSONObject(at) ?: return@mapNotNull null
+                val stepAction = step.optString("action", "")
+                val stepValue = step.optString("value", "").trim()
+                if (stepAction !in RULE_ACTIONS || stepValue.isEmpty()) {
+                    null
+                } else {
+                    RuleStep(stepAction, stepValue)
+                }
+            }
+        }
+        RuleUi(trigger, action, value, then)
+    }
+    rules.ifEmpty { null }
+} catch (_: Throwable) {
+    null
+}
+
+/**
+ * Merge an imported program into the child's own: an identical rule (the
+ * same trigger, action and value) is not duplicated, the eight-block budget
+ * is kept, and everything the child already had survives.
+ */
+internal fun mergeRules(current: List<RuleUi>, imported: List<RuleUi>): List<RuleUi> {
+    val merged = current.toMutableList()
+    for (rule in imported) {
+        if (merged.size >= RULE_MAX_RULES) break
+        val exists = merged.any {
+            it.trigger == rule.trigger && it.action == rule.action && it.value == rule.value
+        }
+        if (!exists) merged.add(rule)
+    }
+    return merged
 }
 
 /** The three lifetime numbers the vet book is about. */

@@ -1259,6 +1259,94 @@ final class DuckController: ObservableObject {
         }
     }
 
+    // MARK: - Sharing the block program
+
+    /// The share document: a block program travels between phones as text
+    /// (share sheet, message, clipboard). The version tag lets a future
+    /// format change without guessing; the rules are the exact wire shape
+    /// the core accepts, so an imported program runs unchanged.
+    var rulesShareText: String {
+        let payload: [String: Any] = [
+            "microduck-rules": 1,
+            "rules": rules.map { rule -> [String: Any] in
+                var item: [String: Any] = [
+                    "trigger": rule.trigger,
+                    "action": rule.action,
+                    "value": rule.value,
+                ]
+                if !rule.then.isEmpty {
+                    item["then"] = rule.then.map {
+                        ["action": $0.action, "value": $0.value]
+                    }
+                }
+                return item
+            },
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let text = String(data: data, encoding: .utf8)
+        else { return "" }
+        return text
+    }
+
+    /// Read a shared program from pasted text and merge it into the child's
+    /// own. Returns how many blocks were added, or nil when the text was not
+    /// a program. Validation mirrors the editor's vocabulary; a malformed
+    /// entry is dropped rather than raining junk on the core.
+    @discardableResult
+    func importRules(from text: String) -> Int? {
+        let triggers: Set<String> = ["clap", "whistle", "pet"]
+        let actions: Set<String> = ["skill", "emotion", "sound"]
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data)
+        else { return nil }
+        let list: [[String: Any]]
+        if let array = root as? [[String: Any]] {
+            list = array
+        } else if let doc = root as? [String: Any],
+                  doc["microduck-rules"] as? Int == 1,
+                  let array = doc["rules"] as? [[String: Any]] {
+            list = array
+        } else {
+            return nil
+        }
+        let imported = list.compactMap { item -> DuckRule? in
+            guard let trigger = item["trigger"] as? String,
+                  let action = item["action"] as? String,
+                  let value = item["value"] as? String,
+                  triggers.contains(trigger),
+                  actions.contains(action),
+                  !value.trimmingCharacters(in: .whitespaces).isEmpty
+            else { return nil }
+            let then = (item["then"] as? [[String: Any]] ?? [])
+                .prefix(4)
+                .compactMap { step -> DuckRuleStep? in
+                    guard let action = step["action"] as? String,
+                          let value = step["value"] as? String,
+                          actions.contains(action),
+                          !value.trimmingCharacters(in: .whitespaces).isEmpty
+                    else { return nil }
+                    return DuckRuleStep(action: action, value: value)
+                }
+            return DuckRule(trigger: trigger, action: action, value: value, then: then)
+        }
+        guard !imported.isEmpty else { return nil }
+        var next = rules
+        var added = 0
+        for rule in imported {
+            if next.count >= 8 { break }
+            let exists = next.contains {
+                $0.trigger == rule.trigger && $0.action == rule.action && $0.value == rule.value
+            }
+            if !exists {
+                next.append(rule)
+                added += 1
+            }
+        }
+        saveRules(next)
+        return added
+    }
+
     /// The app comes back: whatever the duck logged on its own - rituals,
     /// falls, feeds - becomes one line on the sheet. The 1 Hz poll is
     /// suspended in the background, so fetch the current events first;

@@ -295,6 +295,14 @@ enum Copy {
     static var ruleChainAdd: String { pick("Add step", "加一步") }
     static var ruleLimit: String { pick("Full (8/8)", "已满（8/8）") }
     static var deleteRule: String { pick("Delete", "删除") }
+    // Sharing a program between phones: the share sheet carries it as text,
+    // the paste chip reads a program back.
+    static var rulesShare: String { pick("Share program", "分享程序") }
+    static var rulesPaste: String { pick("Paste program", "粘贴程序") }
+    static var rulesPasteFailed: String { pick("That text is not a duck program", "这段文字不是鸭子程序") }
+    static func rulesPasted(_ count: Int) -> String {
+        String(format: pick("Imported %d block(s)", "导入了 %d 条积木"), count)
+    }
     static var rulesEmpty: String {
         pick("No rules yet. Build one: when I clap, roll over.",
              "还没有规则。拼一个：拍手，就翻滚。")

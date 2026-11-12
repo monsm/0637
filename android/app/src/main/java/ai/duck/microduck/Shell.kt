@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -1311,6 +1312,44 @@ private fun RulesSheet(onClose: () -> Unit) {
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = 12.sp,
                 )
+            }
+            // A program travels between phones as text: the share sheet
+            // carries the versioned document, paste reads one back and
+            // merges it into what the child already built.
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ButtonChip(Copy.rulesShare, "rules-share") {
+                    if (rules.isNotEmpty()) {
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                            .setType("text/plain")
+                            .putExtra(android.content.Intent.EXTRA_TEXT, rulesShareText(rules))
+                        context.startActivity(
+                            android.content.Intent.createChooser(send, Copy.rulesShare),
+                        )
+                    }
+                }
+                ButtonChip(Copy.rulesPaste, "rules-paste") {
+                    val clip = (context.getSystemService(Context.CLIPBOARD_SERVICE)
+                        as? android.content.ClipboardManager)
+                        ?.primaryClip
+                        ?.takeIf { it.itemCount > 0 }
+                        ?.getItemAt(0)
+                        ?.coerceToText(context)
+                        ?.toString()
+                    val imported = clip?.let(::parseSharedRules)
+                    if (imported != null) {
+                        val next = mergeRules(rules, imported)
+                        val added = next.size - rules.size
+                        rules = next
+                        saveRules(context, next)
+                        Toast.makeText(
+                            context,
+                            Copy.rulesPasted(added.coerceAtLeast(0)),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    } else {
+                        Toast.makeText(context, Copy.rulesPasteFailed, Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
             rules.forEachIndexed { index, rule ->
                 Row(

@@ -12,6 +12,8 @@ struct RulesSheet: View {
     /// Ordered follow-ups staged before Add. Empty means a classic one-action
     /// rule; up to four keep the program comprehensible.
     @State private var chainDraft: [(String, String)] = []
+    /// The last import's verdict, shown under the share row.
+    @State private var importNote = ""
 
     private let triggers = ["clap", "whistle", "pet"]
     private let kinds = ["skill", "emotion", "sound"]
@@ -84,6 +86,42 @@ struct RulesSheet: View {
                             )
                             .accessibilityIdentifier("rule-\(index)")
                         }
+                    }
+
+                    Divider()
+
+                    // A program travels between phones as text: the share
+                    // sheet carries the versioned document, paste reads one
+                    // back and merges it into what the child already built.
+                    HStack(spacing: 10) {
+                        if !controller.rules.isEmpty {
+                            ShareLink(item: controller.rulesShareText) {
+                                Label(Copy.rulesShare, systemImage: "square.and.arrow.up")
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier("rules-share")
+                        }
+                        Button {
+                            if let text = UIPasteboard.general.string,
+                               let added = controller.importRules(from: text) {
+                                importNote = Copy.rulesPasted(added)
+                            } else {
+                                importNote = Copy.rulesPasteFailed
+                            }
+                        } label: {
+                            Label(Copy.rulesPaste, systemImage: "doc.on.clipboard")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("rules-paste")
+                        Spacer()
+                    }
+                    if !importNote.isEmpty {
+                        Text(importNote)
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("rules-import-note")
                     }
 
                     Divider()
