@@ -577,7 +577,7 @@ iOS 真机 IPA 仍等签名凭据，Android arm64 真机仍没跑，真实双手
 | wheee 长按 | ✅ `POST /wheee {"hold":true}`：官方 start/loop/end 三段经 `next_sound` 顺序流式播放，松开收尾；MCP `duck_wheee`、两端长按 quack 按钮 |
 | 开机姿态判定 | ✅ 上游 `posture.rs` 原样编译，其单元测试在核心里跑通；数字版 MuJoCo 永远从 HOME 启动，故没有「折叠开机」输入场景，判定作为 API 保留而不造假路径 |
 | 仍未移植 | 多鸭合唱 chorale（需多机无线电）、ToF 特雷门琴（需头部深度传感器）、pad 组合摇杆模式、`robot.rest` 的完整告别分支、渲染多光源/阴影贴图 —— 需硬件或超出手机范围 |
-| 第三轮 QA 的未关项 | 15 条里关了 5 条（核心门禁、礼物与夜、摔倒数、合唱形状、API 鉴权）。**仍排着**：规则导入的失败处理（两端都把核心的拒绝当成功，Android 还会拿空表去合并）、peer id 只有 32 位且 pid 被掩掉、合唱 id 只含 tick、日记没有「今天」（核心掉线会说「今天什么都没发生」）、模型输出零校验、Android 没接手机 IMU。逐条见 [docs/QA_ROUND3.md](docs/QA_ROUND3.md) |
+| 第三轮 QA 的未关项 | 15 条里关了 8 条（核心门禁、礼物与夜、摔倒数、合唱形状、API 鉴权、规则导入的三条：空值判定三端统一、核心拒绝的导入不再落盘/不再报成功、Android 不再拿空表合并、规则恢复失败不再连坐 care/life）。**仍排着**：peer id 只有 32 位且 pid 被掩掉、合唱 id 只含 tick、日记没有「今天」（核心掉线会说「今天什么都没发生」）、模型输出零校验、Android 没接手机 IMU。逐条见 [docs/QA_ROUND3.md](docs/QA_ROUND3.md) |
 | 界面的账 | 设计审计（[docs/UI_AUDIT_2026-11-12.md](docs/UI_AUDIT_2026-11-12.md)）：Live 页面还露着引擎（状态串、原始技能名、tick 计数）、没有令牌层（9 个强调色/12 种字号/8 种圆角散在各处）、iOS 全部固定字号（171 处，Dynamic Type 完全无效）、手势没有无障碍等价物。方案在 [docs/UI_TOKENS.md](docs/UI_TOKENS.md) 与 [docs/STAGE_LOOK.md](docs/STAGE_LOOK.md) |
 
 ---

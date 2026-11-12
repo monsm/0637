@@ -552,8 +552,12 @@ fun restoreCompanion(context: Context): Boolean {
             if (life != null && !postJson("/life", life.toString())) {
                 throw IllegalStateException("life not accepted")
             }
+            // The block program is the child's own; a core that refuses it —
+            // a stale program from an older build, say — must not also stop
+            // the duck's care and history from coming back. Care and life are
+            // the duck; the rules are a program it can live without.
             if (rules != null && !postJson("/rules", rules)) {
-                throw IllegalStateException("rules not accepted")
+                android.util.Log.w("duck-care", "the core refused the saved block program")
             }
             if (wantedBond >= 0.0) {
                 var seen = false
