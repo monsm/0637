@@ -989,6 +989,34 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 None => refuse(core, "the LAN peer port is not available".to_owned()),
             }
         }
+        Intent::Chorus(moves) => {
+            if active_runtime(core).chorus_active() {
+                return refuse(core, "a chorus is already playing".to_owned());
+            }
+            // The route checked the published list; the runtime is the
+            // authority on which official emotions this build loaded.
+            if !moves.iter().all(|name| {
+                active_runtime(core)
+                    .emotion_names()
+                    .iter()
+                    .any(|loaded| loaded == name)
+            }) {
+                return refuse(core, "no such emotion".to_owned());
+            }
+            let id = format!("chorus-{}", active_runtime(core).clock().tick);
+            let sent = core.lan.as_ref().map(|lan| lan.chorus(&id, &moves));
+            match sent {
+                Some(Ok(())) => {
+                    let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
+                    on_active(core, |runtime| {
+                        runtime.start_chorus("lead", moves.clone(), peers, Some(id))
+                    });
+                    json!({ "ok": true, "queued": true, "moves": moves })
+                }
+                Some(Err(error)) => refuse(core, format!("chorus refused: {error}")),
+                None => refuse(core, "the LAN peer port is not available".to_owned()),
+            }
+        }
         Intent::PeerName(name) => match &core.lan {
             Some(lan) => {
                 lan.set_name(&name);
@@ -1313,6 +1341,10 @@ fn publish_state(core: &DuckCore) {
     let trunk = active.io().trunk();
     let gravity = active.io().gravity();
     let clock = active.clock();
+    // The route refuses a second chorus without waiting a tick, so the
+    // published summary is mirrored onto the queue here.
+    let chorus = active.chorus_summary();
+    core.intents.set_chorus(chorus.clone());
     let checkpoints: Vec<u64> = core.timeline.iter().map(|saved| saved.tick).collect();
     let branches: Vec<serde_json::Value> = core
         .branches
@@ -1439,6 +1471,9 @@ fn publish_state(core: &DuckCore) {
         // null until one arrives this session. The receiver's window and the
         // packet gate live in lan.rs.
         "gift_event": core.intents.gift_event_value(),
+        // The room's chorus: the same moves performed together, and the
+        // honest count of ducks it is shared with.
+        "chorus": chorus,
         // The last words a person said, for a user-supplied model. The audio
         // itself never leaves the phone; only these words are published.
         "last_heard": active.last_heard().map(|(text, tick)| {
@@ -1546,6 +1581,7 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         core.intents.set_peers(snapshot);
     }
     let mut gifts = Vec::new();
+    let mut choruses = Vec::new();
     for event in peer_events {
         match event {
             // A gift is not a greeting: collect it and apply it after the
@@ -1557,6 +1593,11 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
                 gift,
                 value,
             } => gifts.push((from, name, gift, value)),
+            // A chorus is a room-wide performance, applied after the gifts;
+            // the runtime dedupes by id and the one-at-a-time rule.
+            crate::lan::PeerEvent::Chorus { id, moves, .. } => {
+                choruses.push((id, moves))
+            }
             event => on_active(core, |runtime| runtime.peer_event(&event)),
         }
     }
@@ -1564,6 +1605,16 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     // verdicts the API path gives.
     for (from, name, gift, value) in gifts {
         apply_gift(core, from, name, gift, value);
+    }
+    for (id, moves) in choruses {
+        if active_runtime(core).chorus_active() {
+            // One song at a time: a second lead heard mid-chorus is noise.
+            continue;
+        }
+        let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
+        on_active(core, |runtime| {
+            runtime.start_chorus("join", moves, peers, Some(id))
+        });
     }
     for queued in core.intents.drain() {
         let result = apply_intent(core, queued.intent);

@@ -272,6 +272,7 @@ fun Shell(
         var lastRuleTick = -1
         var lastPeerTick = -1
         var lastGiftTick = -1
+        var lastChorusTick = -1
         // The night is a state, not an event, so the edge is the guard: the
         // inactive object is zeroed, and only the last active publish knows
         // how long the quiet lasted.
@@ -323,6 +324,15 @@ fun Shell(
                 }
                 lastNightActive = nightNow.active
                 if (nightNow.active) lastNightQuiet = nightNow.quietSeconds
+            }
+            // A chorus is a shared moment: the pill names the room size on
+            // the inactive->active edge, once per song (started_tick guard).
+            val chorusNow = stateText?.let(::parseChorus)
+            if (chorusNow != null) {
+                if (chorusNow.active && chorusNow.startedTick != lastChorusTick) {
+                    lastChorusTick = chorusNow.startedTick
+                    soundLine = Copy.chorusLine(chorusNow.peers)
+                }
             }
             // The path runner: the same publish carries whether a walk is on,
             // the progress through it and the waypoints as accepted.
@@ -1128,6 +1138,18 @@ private fun PeersSheet(
             }
         }
     }
+    // A chorus is for the room: the default two official moves, posted on IO
+    // like a gift. The core broadcasts and starts the shared countdown.
+    val startChorus: () -> Unit = {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    postJson("/chorus", "{}")
+                } catch (_: Throwable) {
+                }
+            }
+        }
+    }
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(
             Modifier
@@ -1216,6 +1238,13 @@ private fun PeersSheet(
                     }
                 }
                 ButtonChip(Copy.peerSayAll, "peer-greet-all") { onGreet(null) }
+                // A chorus needs someone to sing with: a lone duck sees the
+                // disabled affordance rather than losing the idea of it.
+                ButtonChip(
+                    Copy.chorus,
+                    "chorus-start",
+                    enabled = peers.peers.isNotEmpty(),
+                ) { startChorus() }
             }
             if (peers.name.isEmpty()) {
                 ButtonChip(Copy.peerFind, "peers-start") { onStart() }
@@ -2902,19 +2931,23 @@ private fun InstrumentSheet(
 internal fun ButtonChip(
     label: String,
     testTag: String? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Box(
         Modifier
             // A 48 dp floor: the sheet's controls were ~34 dp tall.
             .heightIn(min = 48.dp)
-            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+            .background(
+                Color.White.copy(alpha = if (enabled) 0.10f else 0.05f),
+                RoundedCornerShape(10.dp),
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClickLabel = label,
                 role = Role.Button,
-            ) { onClick() }
+            ) { if (enabled) onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,

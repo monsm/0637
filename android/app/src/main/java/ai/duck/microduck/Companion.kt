@@ -162,6 +162,26 @@ data class NightUi(
     val startedTick: Int = 0,
 )
 
+/** The room's chorus, as /state publishes it every tick. */
+data class ChorusUi(
+    val active: Boolean = false,
+    val role: String = "",
+    val peers: Int = 0,
+    val startedTick: Int = 0,
+)
+
+fun parseChorus(text: String): ChorusUi? = try {
+    val c = JSONObject(text).optJSONObject("chorus") ?: return null
+    ChorusUi(
+        active = c.optBoolean("active", false),
+        role = c.optString("role", ""),
+        peers = c.optInt("peers", 0),
+        startedTick = c.optInt("started_tick", 0),
+    )
+} catch (_: Throwable) {
+    null
+}
+
 fun fetchNight(): NightUi? = fetchRawState()?.let(::parseNight)
 
 fun parseNight(text: String): NightUi? = try {

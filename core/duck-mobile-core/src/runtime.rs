@@ -85,6 +85,12 @@ const PATH_MAX_WZ: f64 = 1.2;
 /// at a waypoint behind it is how a biped falls over.
 const PATH_TURN_FIRST: f64 = 1.1;
 
+/// A chorus is a shared moment: every duck waits 1.5 s after hearing the
+/// packet (or pressing the chip) so the room lands together, and each move
+/// follows the previous one 1.5 s later.
+const CHORUS_START_TICKS: u64 = 75;
+const CHORUS_MOVE_TICKS: u64 = 75;
+
 /// Simulation time, in ticks.
 ///
 /// Every deadline in the loop is measured against this rather than the wall
@@ -262,6 +268,31 @@ enum PathDrive {
 /// route; `set_twist` and `set_api_twist` both apply this rule.
 fn steers(twist: [f64; 3]) -> bool {
     twist.iter().any(|value| value.abs() > 1e-3)
+}
+
+/// One chorus being performed: the same official moves as every other duck
+/// in the room, each landing on its own tick. The lead and the joiners share
+/// this task; only the role differs in what /state reports.
+#[derive(Debug, Clone)]
+struct ChorusTask {
+    role: &'static str,
+    moves: Vec<String>,
+    start_tick: u64,
+    next_move: usize,
+    /// The honest room size at the moment the chorus started.
+    peers: u32,
+}
+
+impl ChorusTask {
+    fn summary(&self) -> serde_json::Value {
+        serde_json::json!({
+            "active": true,
+            "role": self.role,
+            "moves": self.moves,
+            "started_tick": self.start_tick as u32,
+            "peers": self.peers,
+        })
+    }
 }
 
 /// The body-frame points of a `/path` request after the wire's own rules:
@@ -602,6 +633,10 @@ pub struct DuckRuntime<T: RobotIo> {
     /// command channel as the stick, so the real walk policy executes it and
     /// a fall is still possible — that is the point.
     path_task: Option<PathTask>,
+    /// The chorus being performed, if any, and the id of the last one heard
+    /// so a bounced packet cannot restart the same song.
+    chorus: Option<ChorusTask>,
+    last_chorus_id: Option<String>,
     /// The smoothed command, per tick, exactly as robotd keeps it.
     twist_ema: [f64; 3],
     head_ema: [f64; 4],
@@ -762,6 +797,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             twist_fresh: false,
             api_lease: ApiLease::default(),
             path_task: None,
+            chorus: None,
+            last_chorus_id: None,
             twist_ema: [0.0; 3],
             head_ema: [0.0; 4],
             body_ema: [0.0; 3],
@@ -1399,10 +1436,54 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// chosen. Idempotent, and it travels with the rest of the care numbers
     /// through a checkpoint and a mode switch.
     pub fn enter_night(&mut self) {
-        // A duck going to bed stops walking: a painted route must not drive
-        // it in its sleep.
+        // A duck going to bed stops walking and stops singing: a painted
+        // route and a pending chorus must not run in its sleep.
         self.cancel_path();
+        self.chorus = None;
         self.care.enter_night(self.clock.tick);
+    }
+
+    /// Start a chorus: the moves land one every 1.5 s after a 1.5 s count-in.
+    /// `id` is the room-wide identifier (the lead's own new id, or the one
+    /// heard from the peer that started it); a repeat of the same id is
+    /// refused so a bounced packet cannot restart the song.
+    pub fn start_chorus(
+        &mut self,
+        role: &'static str,
+        moves: Vec<String>,
+        peers: u32,
+        id: Option<String>,
+    ) {
+        if id.as_deref().is_some_and(|id| self.last_chorus_id.as_deref() == Some(id)) {
+            return;
+        }
+        self.last_chorus_id = id;
+        self.chorus = Some(ChorusTask {
+            role,
+            moves,
+            start_tick: self.clock.tick.saturating_add(CHORUS_START_TICKS),
+            next_move: 0,
+            peers,
+        });
+    }
+
+    /// Whether a chorus is being performed right now.
+    pub fn chorus_active(&self) -> bool {
+        self.chorus.is_some()
+    }
+
+    /// The chorus as /state publishes it, on every publish.
+    pub fn chorus_summary(&self) -> serde_json::Value {
+        match &self.chorus {
+            Some(task) => task.summary(),
+            None => serde_json::json!({
+                "active": false,
+                "role": "",
+                "moves": [],
+                "started_tick": 0,
+                "peers": 0,
+            }),
+        }
     }
 
     /// Morning: end a night that is running and wake the duck. `Some(quiet_s)`
@@ -1642,8 +1723,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             }
             // A gift is not a greeting: the tick applies it through feed or
             // trigger_emotion (ffi.rs), so it never reaches this voice path
-            // and must not publish a peer_event.
+            // and must not publish a peer_event. A chorus is not a greeting
+            // either: it is a scheduled performance of its own moves.
             crate::lan::PeerEvent::Gift { .. } => return,
+            crate::lan::PeerEvent::Chorus { .. } => return,
         };
         self.last_peer_event = Some(serde_json::json!({
             "kind": kind,
@@ -2710,6 +2793,35 @@ impl<T: RobotIo> DuckRuntime<T> {
         if let Some(tag) = reaction {
             self.queue_sound(tag);
             self.last_reaction = Some(self.clock.tick);
+        }
+        // The room's chorus: each move lands on its own tick. A move refused
+        // by a busy skill is skipped — the song degrades, it does not stall —
+        // and the last move closes the chorus with its honest note.
+        let mut due_moves: Vec<String> = Vec::new();
+        if let Some(task) = self.chorus.as_mut() {
+            while task.next_move < task.moves.len()
+                && self.clock.tick
+                    >= task
+                        .start_tick
+                        .saturating_add(task.next_move as u64 * CHORUS_MOVE_TICKS)
+            {
+                due_moves.push(task.moves[task.next_move].clone());
+                task.next_move += 1;
+            }
+        }
+        for move_name in due_moves {
+            let _ = self.trigger_emotion(&move_name);
+        }
+        if self.chorus.as_ref().is_some_and(|task| {
+            !task.moves.is_empty()
+                && task.next_move >= task.moves.len()
+                && self.clock.tick
+                    >= task
+                        .start_tick
+                        .saturating_add((task.moves.len() as u64 - 1) * CHORUS_MOVE_TICKS)
+        }) {
+            self.chorus = None;
+            self.book.note("chorus".to_owned());
         }
         self.room_loud = false;
         self.last_loud = loud;

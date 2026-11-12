@@ -553,6 +553,65 @@ if [ "$GIFT_ACK" != "gift treat" ]; then
 fi
 echo "neighbours: treat sent to the host peer and the packet left the app"
 echo "neighbours: LAN socket, peer list and gifts ok"
+
+# The room's chorus: a host packet from the known peer makes the duck join,
+# perform the official laugh and keep the moment in its lifetime record.
+python3 - <<'PY' > /tmp/duck-chorus.txt
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8799))
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+song = {"v": 1, "type": "chorus", "from": "peerci01", "name": "Sunny",
+        "to": "all", "id": "ci-chorus-1", "moves": ["laugh"]}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.15)
+sock.sendto(json.dumps(song).encode(), ("127.0.0.1", 8766))
+PY
+CHORUS=""
+for _ in $(seq 1 25); do
+  CHORUS=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    c=json.load(sys.stdin).get('chorus') or {}
+    print('yes' if c.get('active') and c.get('role') == 'join' else 'no')
+except Exception: print('no')
+" 2>/dev/null || echo "no")
+  [ "$CHORUS" = "yes" ] && break
+  sleep 0.2
+done
+if [ "$CHORUS" != "yes" ]; then
+  echo "::error::the duck never joined the room's chorus: $CHORUS"
+  exit 1
+fi
+CHORUS_NOTE=""
+for _ in $(seq 1 40); do
+  CHORUS_NOTE=$(curl -sf --max-time 5 http://127.0.0.1:8765/life | python3 -c "
+import json,sys
+try: print('yes' if 'chorus' in (json.load(sys.stdin).get('events') or []) else 'no')
+except Exception: print('no')
+" 2>/dev/null || echo "no")
+  [ "$CHORUS_NOTE" = "yes" ] && break
+  sleep 0.2
+done
+if [ "$CHORUS_NOTE" != "yes" ]; then
+  echo "::error::the vet book never named the chorus"
+  exit 1
+fi
+# The lead's own route: a move this build does not have is refused, and a
+# real one is queued. Both are answered before any broadcast.
+BAD_CHORUS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"moves":["moonwalk"]}' http://127.0.0.1:8765/chorus || true)
+if ! echo "$BAD_CHORUS" | grep -q '"ok":false'; then
+  echo "::error::an unknown chorus move was accepted: $BAD_CHORUS"
+  exit 1
+fi
+GOOD_CHORUS=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"moves":["laugh"]}' http://127.0.0.1:8765/chorus || true)
+if ! echo "$GOOD_CHORUS" | grep -q '"queued":true'; then
+  echo "::error::the duck refused to lead a chorus: $GOOD_CHORUS"
+  exit 1
+fi
+echo "neighbours: chorus joined, performed and led ok"
 # Leave a calm, awake duck for the walk and screenshots.
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d '{"hunger":0.15,"mood":0.35,"bond":0.2,"asleep":false}' \

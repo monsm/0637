@@ -100,6 +100,13 @@ struct PeersSheet: View {
                 .accessibilityIdentifier("peer-greet-all")
             }
 
+            // One song for the whole room: this duck leads and every known
+            // neighbour joins. A lone duck has nobody to sing with, so the
+            // chip stays visible but disabled rather than disappearing.
+            chip(Copy.chorus, id: "chorus-start", enabled: !controller.peers.isEmpty) {
+                controller.startChorus()
+            }
+
             Text(Copy.voiceNote)
                 .font(.system(size: 10, design: .rounded))
                 .foregroundStyle(.tertiary)
@@ -108,10 +115,13 @@ struct PeersSheet: View {
         .preferredColorScheme(.dark)
     }
 
-    /// The sheet's one chip shape: the greeting's capsule, reused by gifts.
+    /// The sheet's one chip shape: the greeting's capsule, reused by gifts
+    /// and the chorus. A disabled chip keeps its label readable, so the
+    /// affordance is discovered before there is anyone to use it with.
     private func chip(
         _ title: String,
         id: String,
+        enabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -121,8 +131,10 @@ struct PeersSheet: View {
                 .frame(minHeight: 44)
                 .background(Color.white.opacity(0.12), in: Capsule())
                 .contentShape(Capsule())
+                .opacity(enabled ? 1 : 0.45)
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
         .accessibilityLabel(title)
         .accessibilityIdentifier(id)
     }

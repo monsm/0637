@@ -583,6 +583,93 @@ done
 [ "$FIRED" = "True replied" ]; check $? "the other duck's answer is recorded" "state=$FIRED"
 rm -f /tmp/duck-peer-ack.txt
 
+# A chorus led by the neighbour: the packet names one official mood, this
+# duck joins the same song, plays it out and keeps the vet book note. The
+# announce travels on the socket that sends the chorus, the way the gift
+# checks do. The receiver's ten-second window is keyed to the peer, not to
+# socket liveness, so the sender exits as soon as the packet is away.
+python3 - <<'PY'
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8799))
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+chorus = {"v": 1, "type": "chorus", "from": "peerci01", "name": "Sunny",
+          "to": "all", "id": "ci-chorus-join", "moves": ["laugh"]}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.15)
+sock.sendto(json.dumps(chorus).encode(), ("127.0.0.1", 8766))
+PY
+CHORUS_JOIN=""
+for _ in $(seq 1 40); do
+  CHORUS_JOIN=$(api GET /state | python3 -c "
+import json,sys
+try:
+    c=json.load(sys.stdin).get('chorus') or {}
+    if c.get('active'):
+        print(c.get('role',''), ' '.join(c.get('moves') or []))
+    else:
+        print('')
+except Exception: print('')
+" 2>/dev/null || echo "")
+  [ "$CHORUS_JOIN" = "join laugh" ] && break
+  sleep 0.25
+done
+[ "$CHORUS_JOIN" = "join laugh" ]; check $? "a neighbour's chorus is joined" "state=$CHORUS_JOIN"
+# Only a chorus that was actually seen joining may be counted as done:
+# an absent object is a failed poll, not a finished song.
+if [ "$CHORUS_JOIN" != "join laugh" ]; then
+  CHORUS_DONE="not-seen"
+else
+  CHORUS_DONE=""
+  for _ in $(seq 1 80); do
+    CHORUS_DONE=$(api GET /state | python3 -c "
+import json,sys
+try:
+    c=json.load(sys.stdin).get('chorus') or {}
+    print('active' if c.get('active') else 'done')
+except Exception: print('')
+" 2>/dev/null || echo "")
+    [ "$CHORUS_DONE" = "done" ] && break
+    sleep 0.5
+  done
+fi
+CHORUS_NOTE=""
+for _ in $(seq 1 25); do
+  CHORUS_NOTE=$(api GET /life | python3 -c "
+import json,sys
+try:
+    e=json.load(sys.stdin).get('events') or []
+except Exception:
+    e=[]
+print('yes' if 'chorus' in e else 'no')
+" 2>/dev/null || echo "no")
+  [ "$CHORUS_NOTE" = "yes" ] && break
+  sleep 0.2
+done
+[ "$CHORUS_DONE" = "done" ] && [ "$CHORUS_NOTE" = "yes" ]
+check $? "the joined chorus finishes and the vet book notes it" "state=$CHORUS_DONE note=$CHORUS_NOTE"
+# This duck leads: an unknown mood is refused before anything is queued or
+# broadcast; a real one queues and /state says who leads.
+CHORUS_BAD=$(api POST /chorus '{"moves":["not_a_mood"]}' || true)
+printf '%s' "$CHORUS_BAD" | grep -q '"ok":false'
+check $? "an unknown chorus move is refused" "$(printf '%s' "$CHORUS_BAD" | head -c 120)"
+CHORUS_LEAD=$(api POST /chorus '{"moves":["laugh"]}' || true)
+printf '%s' "$CHORUS_LEAD" | grep -q '"queued":true'
+check $? "the duck queues its own chorus" "$(printf '%s' "$CHORUS_LEAD" | head -c 140)"
+CHORUS_ROLE=""
+for _ in $(seq 1 40); do
+  CHORUS_ROLE=$(api GET /state | python3 -c "
+import json,sys
+try:
+    c=json.load(sys.stdin).get('chorus') or {}
+    print(c.get('role','') if c.get('active') else '')
+except Exception: print('')
+" 2>/dev/null || echo "")
+  [ "$CHORUS_ROLE" = "lead" ] && break
+  sleep 0.25
+done
+[ "$CHORUS_ROLE" = "lead" ]; check $? "the lead chorus is published" "role=$CHORUS_ROLE"
+
 # A treat on the floor: the official ground-pick peck, counted in the
 # life record. Nothing about food exists on the robot; the ritual is
 # digital-only and made of official moves.

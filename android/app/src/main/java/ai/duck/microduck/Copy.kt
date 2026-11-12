@@ -232,6 +232,12 @@ val quack get() = pick("Quack", "叫一声")
     val giftEmotion get() = pick("Cheer", "逗逗它")
     fun giftReceivedTreat(name: String) = pick("$name sent a treat", "$name 送来一颗零食")
     fun giftReceivedEmotion(name: String) = pick("$name cheered you up", "$name 逗你笑了")
+    // The room's chorus: every duck performs the same moves together.
+    val chorus get() = pick("Chorus", "一起唱")
+    fun chorusLine(peers: Int) = pick(
+        "Singing together with $peers duck(s)",
+        "和 $peers 只鸭子一起唱",
+    )
     // Bring your own model.
     val ai get() = pick("AI companion", "AI 伙伴")
     val aiOn get() = pick("watching", "观察中")

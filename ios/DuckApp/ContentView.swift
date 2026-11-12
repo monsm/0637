@@ -308,6 +308,18 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
+        // A chorus starting on the Wi-Fi: the same pill, naming the ducks in
+        // the room. The tick only fires on the inactive -> active edge, so a
+        // long song does not re-announce itself on every publish.
+        .onChange(of: controller.chorusTick) { _, tick in
+            guard tick > 0 else { return }
+            let line = Copy.chorusLine(controller.chorusPeers)
+            withAnimation(.easeIn(duration: 0.2)) { moodText = line }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                guard moodText == line else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
         // The model's own line, when it decides something.
         .onChange(of: controller.aiDecision) { _, decision in
             guard !decision.isEmpty else { return }

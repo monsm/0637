@@ -340,6 +340,12 @@ enum Copy {
     static func giftReceivedEmotion(_ name: String) -> String {
         pick("\(name) cheered you up", "\(name) 逗你笑了")
     }
+    // A chorus between neighbours: one duck starts it, the room joins the
+    // same moods 1.5 s later.
+    static var chorus: String { pick("Chorus", "一起唱") }
+    static func chorusLine(_ peers: Int) -> String {
+        String(format: pick("Singing together with %d duck(s)", "和 %d 只鸭子一起唱"), peers)
+    }
     // Bring your own model.
     static var ai: String { pick("AI companion", "AI 伙伴") }
     static var aiOn: String { pick("watching", "观察中") }

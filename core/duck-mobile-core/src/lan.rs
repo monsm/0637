@@ -7,10 +7,14 @@
 //! voices. A gift is one of the duck's own reactions too: a treat becomes the
 //! ground-pick peck, an emotion becomes that official emotion.
 //!
+//! A chorus is the room singing together: one duck leads with one to three
+//! official emotions, and every duck that hears the packet plays the same
+//! moves on the same beat.
+//!
 //! The protocol is deliberately tiny and cannot command anything: the only
-//! verbs are announce, greet, hello and gift. A greeting or a gift reaches
-//! the duck as one of its own reactions, never as a control input or an
-//! observation.
+//! verbs are announce, greet, hello, gift and chorus. A greeting, a gift or a
+//! chorus reaches the duck as one of its own reactions, never as a control
+//! input or an observation.
 
 use serde_json::{json, Value};
 use std::net::{SocketAddr, UdpSocket};
@@ -26,7 +30,14 @@ const MAX_MESSAGE: usize = 2_048;
 /// One gift per peer in each direction per three seconds; a flood is one
 /// gift. Public because the HTTP sender keeps the same window.
 pub const GIFT_EVERY_MS: u128 = 3_000;
-
+/// The wire's chorus rules: one to three official emotion names per song.
+/// Public because the route and the apply layer check the same bounds.
+pub const CHORUS_MAX_MOVES: usize = 3;
+/// The lead's song when the request names no moves.
+pub const CHORUS_DEFAULT_MOVES: [&str; 2] = ["laugh", "yes_fast"];
+/// One chorus per sender per ten seconds on the receiving side; a second
+/// packet inside the window is dropped silently, like a gift flood.
+const CHORUS_EVERY_MS: u128 = 10_000;
 /// The two things a duck can gift. A treat is food; an emotion is a mood by
 /// its official name (`value`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,6 +71,15 @@ pub enum PeerEvent {
         gift: GiftKind,
         value: String,
     },
+    /// A known peer started a chorus: every duck in the room performs the
+    /// same official moves together. The id identifies one chorus across the
+    /// room; moves are official emotion names, already validated at the wire.
+    Chorus {
+        from: String,
+        name: String,
+        id: String,
+        moves: Vec<String>,
+    },
 }
 
 struct Peer {
@@ -77,6 +97,8 @@ struct Peer {
     last_gift_ms: u128,
     /// The last gift we sent this duck: the sender's own window.
     last_sent_gift_ms: u128,
+    /// The last chorus we accepted from this duck: one per ten seconds.
+    last_chorus_ms: u128,
 }
 
 struct Inner {
@@ -224,6 +246,29 @@ impl Lan {
         Ok(())
     }
 
+    /// Start a chorus for the room: one broadcast the other ducks join by
+    /// receipt. The caller (the intent route) has already validated the move
+    /// names against the same official list the wire checks.
+    pub fn chorus(&self, id: &str, moves: &[String]) -> Result<(), String> {
+        let (from, name) = match self.inner.lock() {
+            Ok(inner) => (inner.id.clone(), inner.name.clone()),
+            Err(_) => return Err("the peer table is busy".to_owned()),
+        };
+        let message = json!({
+            "v": VERSION,
+            "type": "chorus",
+            "from": from,
+            "name": name,
+            "to": "all",
+            "id": id,
+            "moves": moves,
+        });
+        self.socket
+            .send_to(message.to_string().as_bytes(), ("255.255.255.255", PORT))
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    }
+
     /// Whether a gift to `target` may leave now under the one-per-peer
     /// window, without sending. The HTTP route calls this synchronously so
     /// "too soon" is answered while the client still waits, and the queued
@@ -239,6 +284,20 @@ impl Lan {
             .iter()
             .find(|peer| peer.id == target)
             .is_some_and(|peer| now.saturating_sub(peer.last_sent_gift_ms) >= GIFT_EVERY_MS)
+    }
+
+    /// The room size right now: peers inside the TTL. The chorus publishes
+    /// this as its honest "singing with N ducks".
+    pub fn peer_count(&self) -> u32 {
+        let now = now_ms();
+        match self.inner.lock() {
+            Ok(inner) => inner
+                .peers
+                .iter()
+                .filter(|peer| now.saturating_sub(peer.last_seen_ms) <= PEER_TTL_MS)
+                .count() as u32,
+            Err(_) => 0,
+        }
     }
 
     /// What `/state.peers` shows. Expired ducks are pruned here, so the list
@@ -335,9 +394,9 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
         return None;
     }
     let kind = message.get("type").and_then(Value::as_str)?;
-    // Only the four real verbs may touch the peer table: any other type is
+    // Only the five real verbs may touch the peer table: any other type is
     // noise, and noise must not create peers or evict the ducks we know.
-    if !matches!(kind, "announce" | "greet" | "hello" | "gift") {
+    if !matches!(kind, "announce" | "greet" | "hello" | "gift" | "chorus") {
         return None;
     }
     let from = message
@@ -460,6 +519,61 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             }
             None
         }
+        "chorus" => {
+            // A chorus is not a discovery either: only a known duck may start
+            // one, and it is for the whole room by construction.
+            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            if to != "all" && to != inner.id {
+                return None;
+            }
+            let id = message
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            if id.is_empty() {
+                return None;
+            }
+            let moves: Vec<String> = message
+                .get("moves")
+                .and_then(Value::as_array)
+                .map(|rows| {
+                    rows.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_default();
+            // A chorus only performs moods this build actually has, and the
+            // same 1..=3 count the route enforces. Unknown or oversized
+            // packets are noise, not a partial song.
+            if moves.is_empty()
+                || moves.len() > CHORUS_MAX_MOVES
+                || !moves.iter().all(|m| inner.emotions.iter().any(|n| n == m))
+            {
+                return None;
+            }
+            let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) else {
+                return None;
+            };
+            // One chorus per duck per ten seconds: a bouncing packet must not
+            // become a bouncing song.
+            if now.saturating_sub(peer.last_chorus_ms) < CHORUS_EVERY_MS {
+                return None;
+            }
+            peer.last_chorus_ms = now;
+            peer.last_seen_ms = now;
+            inner.events.push(PeerEvent::Chorus {
+                from: from.to_owned(),
+                name,
+                id,
+                moves,
+            });
+            if inner.events.len() > 32 {
+                inner.events.remove(0);
+            }
+            None
+        }
         _ => None,
     }
 }
@@ -492,6 +606,7 @@ fn upsert(inner: &mut Inner, id: &str, name: &str, source: SocketAddr, now: u128
         last_greet_ms: 0,
         last_gift_ms: 0,
         last_sent_gift_ms: 0,
+        last_chorus_ms: 0,
     });
 }
 
@@ -755,6 +870,79 @@ mod tests {
     }
 
     #[test]
+    fn a_chorus_from_a_known_peer_becomes_an_event() {
+        let mut duck = inner();
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": "c1", "moves": ["laugh", "excited"] }),
+            source(8767),
+            10_000,
+        );
+        assert!(matches!(
+            duck.events.first(),
+            Some(PeerEvent::Chorus { id, moves, .. })
+                if id == "c1" && moves == &vec!["laugh".to_owned(), "excited".to_owned()]
+        ));
+    }
+
+    #[test]
+    fn a_chorus_gates_like_a_gift() {
+        let mut duck = inner();
+        // A stranger's chorus creates no peer and no event.
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "chorus", "from": "ghost01", "name": "Ghost", "to": "all", "id": "c1", "moves": ["laugh"] }),
+            source(8767),
+            1000,
+        );
+        assert!(duck.peers.is_empty());
+        assert!(duck.events.is_empty());
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+        // An unknown move refuses the whole song; the window is not spent.
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": "c1", "moves": ["moonwalk"] }),
+            source(8767),
+            10_000,
+        );
+        assert!(duck.events.is_empty());
+        // Four moves is over the budget.
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": "c1", "moves": ["laugh", "laugh", "laugh", "laugh"] }),
+            source(8767),
+            10_000,
+        );
+        assert!(duck.events.is_empty());
+        // A real one lands, and a flood inside ten seconds is one song.
+        for index in 0..20 {
+            ingest(
+                &mut duck,
+                &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": format!("c{index}"), "moves": ["laugh"] }),
+                source(8767),
+                10_000 + index * 100,
+            );
+        }
+        let songs = duck
+            .events
+            .iter()
+            .filter(|event| matches!(event, PeerEvent::Chorus { .. }))
+            .count();
+        assert_eq!(songs, 1, "one chorus per peer per ten seconds");
+    }
+
+    #[test]
     fn an_unknown_emotion_is_refused_at_the_wire() {
         // The official list lives here now: an emotion gift for a mood this
         // build does not have is refused before it can spend the window or
@@ -819,6 +1007,7 @@ mod tests {
             last_greet_ms: 0,
             last_gift_ms: 0,
             last_sent_gift_ms: 0,
+            last_chorus_ms: 0,
         };
         let lan = Lan {
             inner: Arc::new(Mutex::new(Inner {

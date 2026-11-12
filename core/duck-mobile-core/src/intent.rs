@@ -105,6 +105,9 @@ pub enum Intent {
     /// The night: put the duck to bed on purpose (`true`), or end it with the
     /// morning (`false`) and learn how quiet the night was.
     Night(bool),
+    /// Start a chorus: the listed official moves, performed by every duck in
+    /// the room together. One to three moves, already validated by the route.
+    Chorus(Vec<String>),
     /// The lifetime record a shell saved across launches, handed back so the
     /// duck's history survives an app restart.
     RestoreLife(serde_json::Value),
@@ -180,6 +183,9 @@ pub struct IntentQueue {
     gifts_sent: Mutex<HashMap<String, Instant>>,
     /// The last gift that arrived from another duck, as /state publishes it.
     gift_event: Mutex<Value>,
+    /// The chorus as the loop last published it, so the route can refuse a
+    /// second one without waiting a tick.
+    chorus: Mutex<Value>,
     /// The time machine's answers, filled by the core on the next tick.
     time: Mutex<Value>,
     /// The forks: one entry per branch, filled by the core.
@@ -223,6 +229,7 @@ impl IntentQueue {
             emotions: Mutex::new(Vec::new()),
             gifts_sent: Mutex::new(HashMap::new()),
             gift_event: Mutex::new(Value::Null),
+            chorus: Mutex::new(json!({ "active": false })),
             branches: Mutex::new(json!({ "branches": [], "selected": "" })),
             sensors: Mutex::new(json!({ "mode": "twin" })),
             life: Mutex::new(crate::vetbook::Book::default()),
@@ -499,6 +506,20 @@ impl IntentQueue {
 
     pub fn gift_event_value(&self) -> Value {
         self.gift_event.lock().expect("intent gift").clone()
+    }
+
+    /// The chorus as last published; the route reads `active` from here.
+    pub fn set_chorus(&self, value: Value) {
+        *self.chorus.lock().expect("intent chorus") = value;
+    }
+
+    pub fn chorus_active(&self) -> bool {
+        self.chorus
+            .lock()
+            .expect("intent chorus")
+            .get("active")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
     }
 
     /// The care slice of the published state: one GET for a shell that wants
@@ -893,6 +914,43 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
             Some(false) => Ok(queue.request(Intent::Night(false)).to_string()),
             None => Ok(json!({ "ok": false, "error": "send {on:true|false}" }).to_string()),
         },
+        // A chorus is a tap for the whole room: validated here, broadcast,
+        // and the tick starts the countdown. Defaults to laugh + yes_fast.
+        ("POST", "/chorus") => {
+            let moves: Vec<String> = value
+                .get("moves")
+                .and_then(Value::as_array)
+                .map(|rows| {
+                    rows.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect()
+                })
+                .unwrap_or_else(|| {
+                    crate::lan::CHORUS_DEFAULT_MOVES
+                        .iter()
+                        .map(|name| (*name).to_owned())
+                        .collect()
+                });
+            if moves.is_empty() || moves.len() > crate::lan::CHORUS_MAX_MOVES {
+                Ok(json!({
+                    "ok": false,
+                    "error": "a chorus needs 1 to 3 moves",
+                })
+                .to_string())
+            } else if !moves.iter().all(|name| queue.emotion_loaded(name)) {
+                Ok(json!({ "ok": false, "error": "no such emotion" }).to_string())
+            } else if queue.chorus_active() {
+                Ok(json!({
+                    "ok": false,
+                    "error": "a chorus is already playing",
+                })
+                .to_string())
+            } else {
+                queue.push(Intent::Chorus(moves.clone()));
+                Ok(json!({ "ok": true, "queued": true, "moves": moves }).to_string())
+            }
+        },
         // The companion state is public read / restore-only write: a client
         // can hand back what it saved, but cannot claim the duck loves it.
         ("GET", "/care") => Ok(queue.care_json()),
@@ -1273,6 +1331,50 @@ mod tests {
             }
             other => panic!("unexpected intent: {other:?}"),
         }
+    }
+
+    /// `/chorus` validates the move budget and the loaded official emotions
+    /// before anything is queued, and a running chorus refuses a second one.
+    #[test]
+    fn http_queues_a_chorus_and_refuses_bad_moves() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_emotions(vec!["laugh".to_owned(), "yes_fast".to_owned()]);
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for body in [
+            r#"{"moves":[]}"#,
+            r#"{"moves":["moonwalk"]}"#,
+            r#"{"moves":["laugh","laugh","laugh","laugh"]}"#,
+        ] {
+            let response = request(port, "POST", "/chorus", body);
+            assert!(response.contains(r#""ok":false"#), "{body}: {response}");
+            assert!(
+                queue.drain().is_empty(),
+                "a refused chorus was queued: {body}"
+            );
+        }
+
+        // A body without moves sings the default two.
+        let response = request(port, "POST", "/chorus", r#"{}"#);
+        assert!(response.contains(r#""queued":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::Chorus(moves) => assert_eq!(
+                moves,
+                &vec!["laugh".to_owned(), "yes_fast".to_owned()],
+                "the default chorus is laugh then yes_fast"
+            ),
+            other => panic!("unexpected intent: {other:?}"),
+        }
+
+        // While one is playing, the route refuses without queueing.
+        queue.set_chorus(json!({ "active": true }));
+        let response = request(port, "POST", "/chorus", r#"{"moves":["laugh"]}"#);
+        assert!(response.contains("already playing"), "{response}");
+        assert!(queue.drain().is_empty(), "a second chorus was queued");
     }
 
     /// A route whose tick never runs says so instead of pretending success.

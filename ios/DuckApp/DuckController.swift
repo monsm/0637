@@ -179,6 +179,17 @@ final class DuckController: ObservableObject {
     @Published var giftTick = 0
     @Published var giftLine: String?
     private var lastGiftTick = -1
+    /// The LAN chorus, from /state.chorus: whether it is playing, whether this
+    /// duck leads or joined, the moods it will perform and the honest room
+    /// size at its start. `chorusTick` is a fresh counter raised on the
+    /// inactive -> active edge, so the pill fires once per song rather than
+    /// on every 1 Hz publish.
+    @Published var chorusActive = false
+    @Published var chorusRole = ""
+    @Published var chorusMoves: [String] = []
+    @Published var chorusPeers = 0
+    @Published var chorusTick = 0
+    private var chorusWasActive = false
     /// The user's own model. The shell makes the call; the core never talks
     /// to the internet. Config lives in UserDefaults beside the language.
     @Published var aiConfig = AIConfig.load()
@@ -1184,6 +1195,14 @@ final class DuckController: ObservableObject {
         postJSON("/peers/gift", ["id": id, "gift": gift, "value": value])
     }
 
+    /// Start a chorus: POST /chorus asks the core to lead with its two-move
+    /// default. The core validates the names, refuses while one is already
+    /// playing and never queues a refusal; fire-and-forget, so the next
+    /// /state poll reports which answer it gave.
+    func startChorus() {
+        postJSON("/chorus", ["moves": ["laugh", "yes_fast"]])
+    }
+
     /// The block program the core is running. A GET, because the core is the
     /// authority; the local copy is only the editor's working set.
     func loadRules() {
@@ -1494,6 +1513,7 @@ final class DuckController: ObservableObject {
                     }
                     self.parseLeds(json["leds"])
                     self.parsePath(json["path"])
+                    self.parseChorus(json["chorus"])
                     if let board = json["quests"] as? [String: Any] {
                         let chinese = Copy.language == .chinese
                         let list = board["quests"] as? [[String: Any]] ?? []
@@ -1690,6 +1710,30 @@ final class DuckController: ObservableObject {
         pathActive = true
         pathReached = path["reached"] as? Int ?? 0
         pathTotal = path["total"] as? Int ?? 0
+    }
+
+    /// The chorus slice of /state: the room's shared song. A core without the
+    /// feature publishes no `chorus` object; that is the same honest answer
+    /// as an inactive one. The inactive -> active edge raises the pill's
+    /// tick, so a song announces itself once however long it plays.
+    private func parseChorus(_ chorus: Any?) {
+        guard let chorus = chorus as? [String: Any] else {
+            chorusWasActive = false
+            chorusActive = false
+            chorusRole = ""
+            chorusMoves = []
+            chorusPeers = 0
+            return
+        }
+        let active = chorus["active"] as? Bool ?? false
+        chorusActive = active
+        chorusRole = chorus["role"] as? String ?? ""
+        chorusMoves = chorus["moves"] as? [String] ?? []
+        chorusPeers = chorus["peers"] as? Int ?? 0
+        if active && !chorusWasActive {
+            chorusTick += 1
+        }
+        chorusWasActive = active
     }
 
     /// The night's slice of /state: whether the chosen sleep is running and
