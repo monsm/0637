@@ -69,6 +69,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         Copy.load(this)
+        // The stage's daylight is a function of the local hour. A launch
+        // extra pins it, so screenshots and frame checks do not change with
+        // the clock of whoever runs CI (`--ef daylight_hour 12`).
+        if (intent.hasExtra("daylight_hour")) {
+            val hour = intent.getFloatExtra("daylight_hour", Float.NaN)
+            if (hour.isFinite() && hour in 0f..24f) Daylight.hourOverride = hour
+        }
         input = DuckInput()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
@@ -189,7 +196,9 @@ private fun DuckScreen(
     val context = LocalContext.current
     var core by remember { mutableStateOf(coreProvider()) }
     var error by remember { mutableStateOf<String?>(null) }
-    var status by remember { mutableStateOf(DoubleArray(0)) }
+    // A retry is a fresh attempt, not a no-op: bumping this key reruns the
+    // loader that built the core.
+    var attempt by remember { mutableStateOf(0) }
     var skills by remember { mutableStateOf(emptyList<String>()) }
     var surface by remember { mutableStateOf(Surface.Live) }
     // Director's photo path: the shutter reads the GL frame, CameraX supplies
@@ -204,9 +213,11 @@ private fun DuckScreen(
 
     // MuJoCo scene + ONNX policy loading takes seconds; doing it on the main
     // thread froze the UI (Choreographer: Skipped 40 frames) and stalled the
-    // loader. Create the core on a worker thread.
-    LaunchedEffect(Unit) {
+    // loader. Create the core on a worker thread. `attempt` is the retry key:
+    // a failure card's Try again reruns exactly this block.
+    LaunchedEffect(attempt) {
         if (core != null) return@LaunchedEffect
+        error = null
         val created = withContext(Dispatchers.IO) {
             runCatching {
                 val root = AssetStager.stage(context)
@@ -231,16 +242,12 @@ private fun DuckScreen(
             }
         }
         created.onSuccess { if (it.ready) { onCoreCreated(it); core = it } else { error = "core failed" } }
-            .onFailure { error = it.message }
+            .onFailure { error = it.message ?: "core failed" }
     }
 
     LaunchedEffect(core) {
         val active = core ?: return@LaunchedEffect
         skills = (0 until active.skillCount()).mapNotNull { active.skillName(it) }
-        while (true) {
-            status = active.status()
-            delay(100)
-        }
     }
 
     Box(Modifier.fillMaxSize().background(Color(0xFF0E131A))) {
@@ -315,12 +322,26 @@ private fun DuckScreen(
                 PhotoPreviewDialog(shot) { photo = null }
             }
         } else {
-            Text(
-                error ?: "Loading MuJoCo + policies…",
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
-            )
-            StatusPanel(status, Modifier.align(Alignment.TopStart).padding(16.dp))
+            val failure = error
+            if (failure != null) {
+                FailureCard(
+                    failure,
+                    onRetry = { attempt += 1 },
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            } else {
+                // The loading screen is a promise, not an engineering log:
+                // no engine name, no port, no gain.
+                Text(
+                    Copy.waking,
+                    color = Color.White.copy(alpha = 0.75f),
+                    fontSize = 15.sp,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp)
+                        .testTag("waking-label"),
+                )
+            }
         }
     }
 }
@@ -456,22 +477,42 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
         }
     }
 }
+/**
+ * The one failure exit. The reason is translated to what a person can do
+ * about it; the raw exception stays in the log. The retry reruns the loader.
+ */
 @Composable
-private fun StatusPanel(status: DoubleArray, modifier: Modifier = Modifier) {
-    val bringup = status.getOrNull(0)?.toInt() ?: 0
-    val fallen = (status.getOrNull(1) ?: 0.0) != 0.0
-    val gain = status.getOrNull(2)?.toInt() ?: 200
-    val bringupText = Copy.bringup(bringup)
+private fun FailureCard(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(
         modifier
-            .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-            .padding(12.dp)
+            .padding(24.dp)
+            .background(Color(0xFF141A22), RoundedCornerShape(18.dp))
+            .padding(20.dp)
+            .testTag("failure-card"),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(Copy.name, color = Color.White, fontWeight = FontWeight.Bold)
-        Text("$bringupText · gain $gain", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-        Text("AI API :8765 · shake to push", color = Color.White.copy(alpha = 0.55f), fontSize = 11.sp)
-        if (fallen) {
-            Text(Copy.fell, color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        Text(
+            Copy.couldNotStart,
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            Copy.humanError(message),
+            color = Color.White.copy(alpha = 0.72f),
+            fontSize = 13.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+        Button(
+            onClick = onRetry,
+            modifier = Modifier.testTag("retry"),
+        ) {
+            Text(Copy.retry, fontSize = 13.sp)
         }
     }
 }

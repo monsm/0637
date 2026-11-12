@@ -363,6 +363,52 @@ jobs:
           # No failure here: the tests above already decided the step. A grep
           # that matches nothing must not turn a passing suite into a red run.
           grep -E "Test Suite|Test Case|Executed" ios/build/xcodebuild-test.log | tail -20 || true
+          # The composed postcard the UI test kept: frame + caption band +
+          # date. This is the acceptance artifact, not the bare frame.
+          CONTAINER=$(xcrun simctl get_app_container "$SIM_UDID" ai.duck.microduck data 2>/dev/null || true)
+          CARD=""
+          if [ -n "$CONTAINER" ]; then
+            CARD=$(ls -1t "$CONTAINER/Documents/Postcards"/card-*.png 2>/dev/null | grep -v -- '-frame.png' | head -1 || true)
+          fi
+          if [ -z "$CARD" ]; then
+            echo "::error::the UI test did not leave a composed postcard"
+            exit 1
+          fi
+          cp "$CARD" ui-b1-postcard.png
+          # The portrait Live acceptance screenshot, in the language a Chinese
+          # user sees, with the room's hour pinned so CI is reproducible.
+          xcrun simctl terminate "$SIM_UDID" ai.duck.microduck > /dev/null 2>&1 || true
+          xcrun simctl launch "$SIM_UDID" ai.duck.microduck \
+            -duck.language 中文 -duck.daylightHour 12 > /dev/null 2>&1 || true
+          STATE=""
+          for _ in $(seq 1 120); do
+            STATE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state || true)
+            if [ -n "$STATE" ] && ! printf '%s' "$STATE" | grep -q '"label":"idle"'; then break; fi
+            sleep 2
+          done
+          if [ -z "$STATE" ]; then
+            echo "::error::the app did not come back for the acceptance screenshot"
+            exit 1
+          fi
+          if printf '%s' "$STATE" | grep -q '"label":"idle"'; then
+            echo "::error::the core never ticked before the acceptance screenshot"
+            exit 1
+          fi
+          sleep 2
+          xcrun simctl io "$SIM_UDID" screenshot ui-b1-ios.png
+          # The acceptance screenshot is the portrait product. Fail loudly if
+          # the runner ended in landscape rather than publishing the wrong shot.
+          python3 - <<'PY'
+          import struct
+          with open('ui-b1-ios.png', 'rb') as handle:
+              header = handle.read(24)
+          if header[:8] != b'\x89PNG\r\n\x1a\n':
+              raise SystemExit("::error::the acceptance screenshot is not a PNG")
+          width, height = struct.unpack('>II', header[16:24])
+          if height <= width:
+              raise SystemExit(f"::error::the acceptance screenshot is not portrait: {width}x{height}")
+          print(f"portrait screenshot: {width}x{height}")
+          PY
           xcrun simctl shutdown "$SIM_UDID" || true
 
       - name: MuJoCo iOS (device slice)
@@ -525,6 +571,33 @@ jobs:
           # green build. But it must not be silent either.
           [ "$pushed" = "1" ] || echo "::warning::ci-logs could not be published this run"
 
+      - name: Publish UI acceptance screenshots
+        id: publishui
+        if: steps.uitest.outcome == 'success'
+        run: |
+          # The portrait Live screen and the composed postcard are acceptance
+          # artifacts: commit them to dist/ on this branch. [skip ci] and the
+          # workflow's path filter keep the commit from re-running CI.
+          mkdir -p dist
+          cp ui-b1-ios.png dist/ui-b1-ios.png
+          cp ui-b1-postcard.png dist/ui-b1-postcard.png
+          git config user.email "actions@github.com"
+          git config user.name "ui-bot"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            # Rebase-by-reset: hang the new commit off the branch head so a
+            # concurrent Android screenshot push cannot make this one a
+            # non-fast-forward, and so neither push drops the other's file.
+            if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
+              git reset --mixed FETCH_HEAD
+            fi
+            git add -f dist/ui-b1-ios.png dist/ui-b1-postcard.png
+            git commit -m "ui-b1: iOS portrait Live screenshot and postcard [skip ci]" || true
+            if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
+            sleep 2
+          done
+          [ "$pushed" = "1" ] || echo "::warning::the iOS screenshots could not be published"
+
       - uses: actions/upload-artifact@v4
         id: artifact
         if: always()
@@ -554,6 +627,8 @@ jobs:
           name: Duck-ios-smoke-logs
           path: |
             sim-screenshot.png
+            ui-b1-ios.png
+            ui-b1-postcard.png
             sim-syslog.log
             sim-syslog-all.log
             sim-console.log

@@ -315,24 +315,38 @@ final class Renderer: NSObject, MTKViewDelegate {
 
     /// 晨昏光锚点：(本地小时, 光色 rgb, 曝光)。夜里深暖褐加低曝光，清晨
     /// 暖金，正午中性全曝光，傍晚橙红，入夜再落回去。任务 §4：时间在
-    /// Swift 侧算好，shader 只做混合。
+    /// Swift 侧算好，shader 只做混合。夜间曝光有 0.80 的下限：0.72 叠在
+    /// 本来就暗的暖石房间上，凌晨三点的鸭子会看不清。
     private static let daylightStops: [(hour: Float, tint: SIMD3<Float>, exposure: Float)] = [
-        (0,    SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
-        (5,    SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
+        (0,    SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
+        (5,    SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
         (6.5,  SIMD3<Float>(1.12, 0.92, 0.72), 0.90),
         (9,    SIMD3<Float>(1.00, 1.00, 1.00), 1.00),
         (16,   SIMD3<Float>(1.00, 1.00, 1.00), 1.00),
         (18,   SIMD3<Float>(1.15, 0.78, 0.55), 0.88),
         (20,   SIMD3<Float>(1.05, 0.80, 0.62), 0.80),
-        (21.5, SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
-        (24,   SIMD3<Float>(0.95, 0.72, 0.55), 0.72),
+        (21.5, SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
+        (24,   SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
     ]
 
+    /// The floor under the curve. Raising the anchors alone would not stop a
+    /// future edit from dipping below it.
+    private static let daylightExposureFloor: Float = 0.80
+
     /// 按真实本地时间在锚点之间做 smoothstep 插值，整点不跳变。
+    ///
+    /// `at` 是可注入的：测试与 CI 传固定时间，截图和判帧就不随时钟漂移
+    /// （`-duck.daylightHour 12` 走 NSArgumentDomain）。生产调用不传参，
+    /// 用本地墙钟。
     private static func daylight(at date: Date = Date())
         -> (tint: SIMD3<Float>, exposure: Float) {
-        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
-        let hour = Float(parts.hour ?? 12) + Float(parts.minute ?? 0) / 60
+        let hour: Float
+        if UserDefaults.standard.object(forKey: "duck.daylightHour") != nil {
+            hour = Float(UserDefaults.standard.double(forKey: "duck.daylightHour"))
+        } else {
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+            hour = Float(parts.hour ?? 12) + Float(parts.minute ?? 0) / 60
+        }
         for index in 0..<(daylightStops.count - 1) {
             let from = daylightStops[index]
             let to = daylightStops[index + 1]
@@ -342,10 +356,10 @@ final class Renderer: NSObject, MTKViewDelegate {
             let t = raw * raw * (3 - 2 * raw)
             return (
                 from.tint + (to.tint - from.tint) * t,
-                from.exposure + (to.exposure - from.exposure) * t
+                max(from.exposure + (to.exposure - from.exposure) * t, daylightExposureFloor)
             )
         }
-        return (daylightStops[0].tint, daylightStops[0].exposure)
+        return (daylightStops[0].tint, daylightExposureFloor)
     }
 
     /// 房间的清屏底色：STAGE_LOOK §2.2 的暖褐地平线色 #1A1714，乘上
@@ -374,9 +388,14 @@ final class Renderer: NSObject, MTKViewDelegate {
         // premultiplied, so any opaque clear would veil the image. 其余时刻
         // 是晨昏光调过的暖房间，与背景板同一套颜色。
         let camera = controller.cameraActive
+        // Instrument is the lab, not the room: cold dark behind the sheet,
+        // and neutral light, whatever the hour is (STAGE_LOOK §3).
+        let instrument = controller.instrumentOpen
         view.clearColor = camera
             ? MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-            : Renderer.roomClear()
+            : instrument
+                ? MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+                : Renderer.roomClear()
         guard let core = controller.core,
               let drawable = view.currentDrawable,
               let descriptor = view.currentRenderPassDescriptor,
@@ -435,7 +454,9 @@ final class Renderer: NSObject, MTKViewDelegate {
         // —— Live 房间的三件套，每个 draw call 都带一份 ——
         // 晨昏光：Swift 按真实本地时间算好光色与曝光，shader 只做乘法。
         let day = Renderer.daylight()
-        let daylight = SIMD4<Float>(day.tint.x, day.tint.y, day.tint.z, day.exposure)
+        let daylight = instrument
+            ? SIMD4<Float>(1, 1, 1, 1)
+            : SIMD4<Float>(day.tint.x, day.tint.y, day.tint.z, day.exposure)
         // 接触阴影跟着鸭子走：躯干的世界 xy 就是脚的位置（任务 §3）。
         // 0.62 是 STAGE_LOOK §2.1 的影子浓度。
         let shadow = SIMD4<Float>(focus.x, focus.y, 0.62, 0)
@@ -451,17 +472,19 @@ final class Renderer: NSObject, MTKViewDelegate {
         // duck's feet. Physics ground stays at z=0 either way. 背景板排在
         // 地板之前：它贴着远平面，地板和鸭子都赢得过它。
         if !camera {
-            draw(mesh: backdrop, model: matrix_identity_float4x4,
-                 color: SIMD4<Float>(1, 1, 1, 1),
-                 light: forward, look: 3, viewProjection: viewProjection,
-                 halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
-            // 暖石地板 #38322C（STAGE_LOOK §2.1），棋盘退场。Instrument 的
-            // 冷棋盘路径在 shader 里保留（look 2），但 iOS 的 Instrument 是
-            // 一张 SwiftUI sheet，渲染器看不见它的开关；等控制器有了
-            // surface 标志，把这里的 look 换成 2 即可（TODO）。
+            // The room's wall belongs to Live only; the instrument keeps its
+            // cold void behind the sheet.
+            if !instrument {
+                draw(mesh: backdrop, model: matrix_identity_float4x4,
+                     color: SIMD4<Float>(1, 1, 1, 1),
+                     light: forward, look: 3, viewProjection: viewProjection,
+                     halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
+            }
+            // Live 暖石地板 #38322C（STAGE_LOOK §2.1）；Instrument 的冷棋盘
+            // 是 look 2，控制器把 surface 标志交给渲染器，两套语言不再混用。
             draw(mesh: floor, model: matrix_identity_float4x4,
                  color: SIMD4<Float>(0.220, 0.196, 0.173, 1),
-                 light: forward, look: 1, viewProjection: viewProjection,
+                 light: forward, look: instrument ? 2 : 1, viewProjection: viewProjection,
                  halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
         }
 

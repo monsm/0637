@@ -54,4 +54,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.3.4")
     implementation("androidx.camera:camera-view:1.3.4")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    // Pure-JVM assertions for the shell's colour maths (WCAG contrast) and
+    // the injectable daylight curve. No emulator needed.
+    testImplementation("junit:junit:4.13.2")
 }

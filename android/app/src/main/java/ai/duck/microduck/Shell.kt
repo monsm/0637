@@ -241,6 +241,10 @@ fun Shell(
     // The last skill the ring sent to the core. A skill's own label is brief;
     // this verdict outlives it, so the top bar can say what just ran.
     var lastSkill by remember { mutableStateOf("") }
+    // The core's own state word from /state.label. The raw string is the
+    // protocol's; the top bar maps it through Copy.behaviourOf before it is
+    // shown, and the instrument keeps the raw one.
+    var behaviourRaw by remember { mutableStateOf("") }
     // One tap flips the light, exactly like `robot.flashlight` on the duck.
     // The core takes its own lock, so this stays off the render thread's
     // critical path.
@@ -265,9 +269,9 @@ fun Shell(
     }
 
     // The companion layer: the pill reads the core's own numbers once a
-    // second, and the prefs save is handed back on the first frame the core
-    // is alive. Both are cheap; neither touches the tick thread.
-    var careLine by remember { mutableStateOf("") }
+    // second. The state is kept as numbers; the words are computed at
+    // composition, so a language switch is immediate.
+    var careUi by remember { mutableStateOf<CareUi?>(null) }
     LaunchedEffect(core) {
         val duck = core ?: return@LaunchedEffect
         var lastSoundTick = -1
@@ -284,8 +288,10 @@ fun Shell(
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.
             val stateText = withContext(Dispatchers.IO) { fetchRawState() }
-            val line = stateText?.let(::parseCare)?.line()
-            if (line != null) careLine = line
+            val careNow = stateText?.let(::parseCare)
+            if (careNow != null) careUi = careNow
+            val label = stateText?.let(::parseLabel)
+            if (label != null) behaviourRaw = label
             val event = stateText?.let(::parseSoundEvent)
             if (event != null && event.kind.isNotEmpty() && event.tick != lastSoundTick) {
                 lastSoundTick = event.tick
@@ -414,6 +420,10 @@ fun Shell(
             speechFeed.stop()
         }
     }
+    // The instrument is the lab, the live stage is the room. The renderer
+    // cannot see a Compose sheet, so the shell tells it which surface is up
+    // and the floor switches to the cold checkerboard there (STAGE_LOOK §3).
+    LaunchedEffect(showSheet) { input.instrumentOpen = showSheet }
 
     val _unused = languageTick
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -451,6 +461,7 @@ fun Shell(
                         core = duck,
                         carrying = carrying,
                         lastSkill = lastSkill,
+                        behaviourRaw = behaviourRaw,
                         menuOpen = menuOpen,
                         onMenuOpen = { menuOpen = it },
                         onStick = { stick = it },
@@ -467,6 +478,10 @@ fun Shell(
                                 Copy.Language.English
                             }
                             languageTick += 1
+                            // A transient event line was written in the old
+                            // language; drop it rather than leaving a stale
+                            // sentence on the stage.
+                            soundLine = null
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -521,9 +536,11 @@ fun Shell(
                         )
                     }
                     // Once the hint is gone, the same slot answers "how is it
-                    // doing": fullness, mood and a nap, from /state.care — or,
-                    // for a moment, what a clap or a whistle just did.
-                    val pill = soundLine ?: careLine
+                    // doing" — or, for a moment, what a clap or a whistle just
+                    // did. The care words are derived here, not stored, so a
+                    // language switch reaches the pill on the same frame.
+                    val mood = careUi?.let { Copy.moodLine(it.hunger, it.mood, it.asleep) }
+                    val pill = soundLine ?: mood ?: ""
                     if (!hintDismiss && pill.isNotEmpty()) {
                         Text(
                             pill,
@@ -722,6 +739,7 @@ fun Shell(
                 core = core,
                 carrying = carrying,
                 lastSkill = lastSkill,
+                behaviourRaw = behaviourRaw,
                 menuOpen = menuOpen,
                 onMenuOpen = { menuOpen = it },
                 onStick = { stick = it },
@@ -738,6 +756,7 @@ fun Shell(
                         Copy.Language.English
                     }
                     languageTick += 1
+                    soundLine = null
                 },
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -1547,6 +1566,7 @@ private fun TopBar(
     core: DuckCore?,
     carrying: Boolean,
     lastSkill: String,
+    behaviourRaw: String,
     menuOpen: Boolean,
     onMenuOpen: (Boolean) -> Unit,
     onStick: (String) -> Unit,
@@ -1571,7 +1591,12 @@ private fun TopBar(
                     core == null -> Copy.waking
                     carrying -> Copy.held
                     core.paused() -> Copy.freeze
-                    else -> Copy.live
+                    // The wire word is the core's; a person reads the
+                    // translated one. The sheet still keeps the raw label.
+                    // Until the first /state poll lands there is no word to
+                    // translate, so say the honest thing: Live.
+                    behaviourRaw.isEmpty() -> Copy.live
+                    else -> Copy.behaviourOf(behaviourRaw)
                 },
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 11.sp,
@@ -1579,10 +1604,11 @@ private fun TopBar(
             )
             if (lastSkill.isNotEmpty()) {
                 Text(
-                    lastSkill,
+                    // The ring's verdict outlives the move. The protocol name
+                    // is `kick_left`; the shell says what a person calls it.
+                    skillLabel(lastSkill),
                     color = Color.White.copy(alpha = 0.55f),
-                    fontSize = 9.sp,
-                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("duck-last-skill"),
@@ -1702,10 +1728,13 @@ private fun PortraitTimeRail(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(
-                "t $tick",
-                color = Color.White.copy(alpha = 0.7f),
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
+                // The rail opens the time machine: its label says what the
+                // button is for. The tick is a reading, and readings live in
+                // the instrument.
+                Copy.time,
+                color = Color.White.copy(alpha = 0.85f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 softWrap = false,
             )
@@ -1719,7 +1748,9 @@ private fun PortraitTimeRail(
                     Modifier
                         .fillMaxWidth(fraction.toFloat())
                         .fillMaxHeight()
-                        .background(Color(0xFF4FC3F7).copy(alpha = 0.6f), CircleShape),
+                        // accent.data #7FB2D9, solid: the retained-history
+                        // fill must read against the track (P1-10).
+                        .background(Color(0xFF7FB2D9), CircleShape),
                 )
             }
         }
@@ -2531,6 +2562,14 @@ private fun CareCard(care: CareUi) {
             CareBar(Copy.mood, care.moodFraction, Color(0xFFF48FB1), "care-mood", Modifier.weight(1f))
             CareBar(Copy.bond, care.bondFraction, Color(0xFF80DEEA), "care-bond", Modifier.weight(1f))
         }
+        // The numbers live here, in the instrument: the stage says how the
+        // duck feels, the dashboard says how much.
+        Text(
+            Copy.careLine(care.hunger, care.mood, care.bond, care.asleep),
+            color = Color.White.copy(alpha = 0.6f),
+            fontSize = 11.sp,
+            modifier = Modifier.testTag("care-detail"),
+        )
     }
 }
 
@@ -3317,7 +3356,9 @@ private fun fetchBehaviorSummary(): String {
         if (name != null) {
             val elapsed = Regex(""""elapsed_s"\s*:\s*([0-9.]+)"""").find(emotion)?.groupValues?.get(1) ?: "0"
             val duration = Regex(""""duration_s"\s*:\s*([0-9.]+)"""").find(emotion)?.groupValues?.get(1) ?: "0"
-            return "$name $elapsed/${duration}s"
+            // The wire name is `yes_fast`; the sheet says what a person calls
+            // it. The clock is the instrument's own reading.
+            return "${skillLabel(name)} $elapsed/${duration}s"
         }
         val gain = Regex(""""idle"\s*:\s*\{[^}]*\}""").find(text)?.value
             ?.let { Regex(""""takeover"\s*:\s*([0-9.]+)"""").find(it)?.groupValues?.get(1)?.toDoubleOrNull() }

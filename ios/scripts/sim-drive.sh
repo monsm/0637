@@ -147,13 +147,14 @@ APPDIR=$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" app 2>/dev/null || 
 echo "app container: $APPDIR"
 
 # --console sends the app's stdout (Swift print + NSLog) to the file, which
-# is where the renderer reports what it built.
+# is where the renderer reports what it built. Pin the room's hour: the frame
+# checks tint by local time and must not change with the runner's clock.
 xcrun simctl spawn "$UDID" log stream --style compact \
   --predicate 'process == "Duck"' > "$OUT/sim-console.log" 2>&1 &
 LOG_PID=$!
 trap 'kill "$LOG_PID" 2>/dev/null' EXIT
 
-xcrun simctl launch --console "$UDID" "$BUNDLE_ID" \
+xcrun simctl launch --console "$UDID" "$BUNDLE_ID" -duck.daylightHour 12 \
   > "$OUT/app-stdout.log" 2>&1 &
 LAUNCH_PID=$!
 

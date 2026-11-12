@@ -342,6 +342,12 @@ class DuckInput {
     @Volatile var wz: Double = 0.0
     /** Director mode with a live camera: the renderer goes transparent. */
     @Volatile var cameraActive: Boolean = false
+    /**
+     * The instrument sheet is up: the stage is the lab, and the floor draws
+     * the cold checkerboard there (STAGE_LOOK §3). Presentation only — no
+     * frame or command here reaches the duck's senses.
+     */
+    @Volatile var instrumentOpen: Boolean = false
     // Performance counters, reset once a second. The loop counts achieved
     // simulation ticks, the renderer counts frames on its own thread: an
     // atomic getAndSet is needed or a frame drawn between the read and the

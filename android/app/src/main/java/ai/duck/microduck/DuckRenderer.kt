@@ -38,11 +38,17 @@ class DuckRenderer(
     private var uLight = 0
     private var uChecker = 0
     private var uMaterial = 0
+    private var uStage = 0
+    private var uHalo = 0
+    private var uDaylight = 0
+    private var uShadow = 0
     private var aPos = 0
     private var aNormal = 0
     private val meshes = mutableMapOf<Int, Mesh>()
     private val instances = mutableListOf<Instance>()
     private var floor: Mesh? = null
+    /// 全屏背景板：盖住 NDC 的大三角，顶点就是 NDC 坐标，MVP 用单位阵。
+    private var backdrop: Mesh? = null
     private var aspect = 1f
     /// The body model this renderer was built for; a mode switch changes it.
     private var builtGeneration = -1L
@@ -71,6 +77,10 @@ class DuckRenderer(
         uLight = GLES30.glGetUniformLocation(program, "uLight")
         uChecker = GLES30.glGetUniformLocation(program, "uChecker")
         uMaterial = GLES30.glGetUniformLocation(program, "uMaterial")
+        uStage = GLES30.glGetUniformLocation(program, "uStage")
+        uHalo = GLES30.glGetUniformLocation(program, "uHalo")
+        uDaylight = GLES30.glGetUniformLocation(program, "uDaylight")
+        uShadow = GLES30.glGetUniformLocation(program, "uShadow")
         aPos = GLES30.glGetAttribLocation(program, "aPos")
         aNormal = GLES30.glGetAttribLocation(program, "aNormal")
         buildScene()
@@ -94,6 +104,7 @@ class DuckRenderer(
                 instances.clear()
                 meshes.clear()
                 floor = null
+                backdrop = null
             }
             buildScene()
             builtGeneration = generation
@@ -112,12 +123,23 @@ class DuckRenderer(
             floatArrayOf(0f, 0f, 0.12f)
         }
 
+        // The room's hour, fixed for this frame. The clear, the backdrop and
+        // every lit surface read the same sample, so they cannot disagree.
+        val hour = Daylight.localHour()
+        val day = Daylight.at(hour)
+        val instrument = input.instrumentOpen
+
         // Director mode: transparent and black, so the camera behind shows
-        // through and the studio colour does not veil it.
+        // through and the studio colour does not veil it. Instrument is the
+        // lab: cold and dark behind the sheet (STAGE_LOOK §3). Live is the
+        // room: a warm brown horizon, dimmed and tinted by the hour.
         if (input.cameraActive) {
             GLES30.glClearColor(0f, 0f, 0f, 0f)
-        } else {
+        } else if (instrument) {
             GLES30.glClearColor(0.055f, 0.075f, 0.10f, 1f)
+        } else {
+            val room = Daylight.roomClear(hour)
+            GLES30.glClearColor(room[0], room[1], room[2], 1f)
         }
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         GLES30.glUseProgram(program)
@@ -145,12 +167,15 @@ class DuckRenderer(
         Matrix.multiplyMM(viewProjection, 0, projection, 0, view, 0)
 
         // A headlight, like MuJoCo's own viewer: the light sits at the camera,
-        // so whatever the camera sees is lit. A fixed world light left the
-        // front of the duck almost black.
+        // so whatever the camera sees is lit. The shader negates the stored
+        // vector, so this one points the way the light travels: from the
+        // camera towards the duck (iOS Renderer.swift's `focus - eye`). The
+        // old `eye - trunk` here pointed the other way, so the key term was
+        // zero on every camera-facing surface and only ambient lit the duck.
         val headlight = floatArrayOf(
-            eye[0] - trunk[0],
-            eye[1] - trunk[1],
-            eye[2] - trunk[2],
+            trunk[0] - eye[0],
+            trunk[1] - eye[1],
+            trunk[2] - eye[2],
         )
         val lightLength = kotlin.math.sqrt(
             headlight[0] * headlight[0] + headlight[1] * headlight[1] + headlight[2] * headlight[2]
@@ -159,11 +184,49 @@ class DuckRenderer(
         headlight[1] /= lightLength
         headlight[2] /= lightLength
 
+        // The room's light, once per frame, shared by the backdrop, the floor
+        // and every duck part. The halo is the trunk projected into NDC: the
+        // warm glow sits behind the duck wherever the camera puts it. The
+        // instrument is a lab, not a room: its light is neutral at any hour.
+        val daylight = if (instrument) {
+            floatArrayOf(1f, 1f, 1f, 1f)
+        } else {
+            floatArrayOf(day.tint[0], day.tint[1], day.tint[2], day.exposure)
+        }
+        val shadow = floatArrayOf(trunk[0], trunk[1], 0.62f, 0f)
+        val clip = FloatArray(4)
+        Matrix.multiplyMV(
+            clip, 0, viewProjection, 0,
+            floatArrayOf(trunk[0], trunk[1], trunk[2], 1f), 0,
+        )
+        val halo = if (kotlin.math.abs(clip[3]) > 1e-4f) {
+            floatArrayOf(clip[0] / clip[3], clip[1] / clip[3], 0.8f, aspect)
+        } else {
+            floatArrayOf(0f, 0.1f, 0.8f, aspect)
+        }
+
         // The studio floor would hide the room (and the duck's feet) over a
-        // camera image. Physics ground stays at z=0 either way.
+        // camera image. Physics ground stays at z=0 either way. The backdrop
+        // sits at the far plane and is drawn first, so floor and duck win
+        // against it; the instrument keeps its own cold void and no backdrop.
         if (!input.cameraActive) {
+            if (!instrument) {
+                backdrop?.let {
+                    draw(
+                        it, identity(), floatArrayOf(1f, 1f, 1f, 1f), headlight,
+                        look = 3, viewProjection = viewProjection,
+                        halo = halo, daylight = daylight, shadow = shadow,
+                    )
+                }
+            }
             floor?.let {
-                draw(it, identity(), floatArrayOf(0.14f, 0.15f, 0.18f, 1f), headlight, 1f, viewProjection)
+                // Live: warm stone #38322C (STAGE_LOOK §2.1), no grid.
+                // Instrument: the cold checkerboard the lab has always had.
+                draw(
+                    it, identity(), floatArrayOf(0.220f, 0.196f, 0.173f, 1f), headlight,
+                    look = if (instrument) 2 else 1, viewProjection = viewProjection,
+                    halo = halo, daylight = daylight, shadow = shadow,
+                )
             }
         }
 
@@ -186,7 +249,11 @@ class DuckRenderer(
             Matrix.multiplyMM(world, 0, body, 0, rotation, 0)
             val model = FloatArray(16)
             Matrix.multiplyMM(model, 0, world, 0, instance.local, 0)
-            draw(instance.mesh, model, instance.color, headlight, 0f, viewProjection)
+            draw(
+                instance.mesh, model, instance.color, headlight,
+                look = 0, viewProjection = viewProjection,
+                halo = halo, daylight = daylight, shadow = shadow,
+            )
         }
         // The Director photo is the frame the user is looking at, read back
         // from the same default framebuffer. In Director the clear is
@@ -256,6 +323,7 @@ class DuckRenderer(
             )
         }
         floor = buildFloor()
+        backdrop = buildBackdrop()
         Log.i("DuckRenderer", "visual geoms: ${instances.size}")
     }
 
@@ -291,27 +359,75 @@ class DuckRenderer(
         return Mesh(buffer, floats.size / 6)
     }
 
+    /**
+     * The room's wall: a triangle that covers NDC, vertices given in NDC, so
+     * the vertex shader's MVP is the identity and depth 0.9995 keeps every
+     * floor and duck triangle in front of it. The fragment shader paints the
+     * vertical gradient and the warm halo (STAGE_LOOK §2.2).
+     */
+    private fun buildBackdrop(): Mesh {
+        val z = 0.9995f
+        val floats = floatArrayOf(
+            -1f, -1f, z, 0f, 0f, 1f,
+            3f, -1f, z, 0f, 0f, 1f,
+            -1f, 3f, z, 0f, 0f, 1f,
+        )
+        val buffer = ByteBuffer.allocateDirect(floats.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+        buffer.put(floats).position(0)
+        return Mesh(buffer, floats.size / 6)
+    }
+
+    /**
+     * look: 0 = duck parts; 1 = Live warm-stone floor; 2 = Instrument cold
+     * checkerboard; 3 = the full-screen backdrop. The backdrop's vertices are
+     * already NDC, so its MVP is the identity while everything else goes
+     * through the camera.
+     */
     private fun draw(
         mesh: Mesh,
         model: FloatArray,
         color: FloatArray,
         light: FloatArray,
-        checker: Float,
+        look: Int,
         viewProjection: FloatArray,
+        halo: FloatArray,
+        daylight: FloatArray,
+        shadow: FloatArray,
     ) {
         val mvp = FloatArray(16)
-        Matrix.multiplyMM(mvp, 0, viewProjection, 0, model, 0)
+        if (look == 3) {
+            System.arraycopy(model, 0, mvp, 0, 16)
+        } else {
+            Matrix.multiplyMM(mvp, 0, viewProjection, 0, model, 0)
+        }
         GLES30.glUniformMatrix4fv(uMvp, 1, false, mvp, 0)
         GLES30.glUniformMatrix4fv(uModel, 1, false, model, 0)
         GLES30.glUniform4fv(uColor, 1, color, 0)
         GLES30.glUniform3f(uLight, light[0], light[1], light[2])
-        GLES30.glUniform1f(uChecker, checker)
-        // The duck is painted plastic over a few metal parts; the floor is matte.
-        if (checker > 0.5f) {
-            GLES30.glUniform2f(uMaterial, 0f, 0.85f)
-        } else {
-            GLES30.glUniform2f(uMaterial, 0.05f, 0.42f)
+        // The floor flag and the checker flag are separate: both floor looks
+        // get the contact shadow and the horizon fog; only the instrument
+        // draws the 0.2 m grid.
+        GLES30.glUniform1f(uChecker, if (look == 1 || look == 2) 1f else 0f)
+        // The duck is painted plastic over a few metal parts; the floor is
+        // matte. Live stone is a little rougher than the lab's grid.
+        val material = when (look) {
+            1 -> floatArrayOf(0f, 0.92f)
+            2 -> floatArrayOf(0f, 0.85f)
+            3 -> floatArrayOf(0f, 1f)
+            else -> floatArrayOf(0.05f, 0.42f)
         }
+        GLES30.glUniform2f(uMaterial, material[0], material[1])
+        GLES30.glUniform4f(
+            uStage,
+            if (look == 2) 1f else 0f,
+            if (look == 3) 1f else 0f,
+            0f, 0f,
+        )
+        GLES30.glUniform4fv(uHalo, 1, halo, 0)
+        GLES30.glUniform4fv(uDaylight, 1, daylight, 0)
+        GLES30.glUniform4fv(uShadow, 1, shadow, 0)
 
         mesh.buffer.position(0)
         GLES30.glEnableVertexAttribArray(aPos)
@@ -470,10 +586,12 @@ class DuckRenderer(
             uniform mat4 uModel;
             out vec3 vNormal;
             out vec3 vWorld;
+            out vec2 vNdc;
             void main() {
                 gl_Position = uMvp * vec4(aPos, 1.0);
                 vNormal = normalize(mat3(uModel[0].xyz, uModel[1].xyz, uModel[2].xyz) * aNormal);
                 vWorld = (uModel * vec4(aPos, 1.0)).xyz;
+                vNdc = gl_Position.xy / gl_Position.w;
             }
         """.trimIndent()
 
@@ -482,10 +600,19 @@ class DuckRenderer(
             precision mediump float;
             in vec3 vNormal;
             in vec3 vWorld;
+            in vec2 vNdc;
             uniform vec4 uColor;
             uniform vec3 uLight;
             uniform float uChecker;
             uniform vec2 uMaterial;
+            // x: Instrument checkerboard; y: full-screen backdrop.
+            uniform vec4 uStage;
+            // xy: the duck's NDC; z: glow radius; w: aspect.
+            uniform vec4 uHalo;
+            // rgb: the hour's tint; w: exposure (never below 0.80).
+            uniform vec4 uDaylight;
+            // xy: trunk world xy (contact-shadow centre); z: strength.
+            uniform vec4 uShadow;
             out vec4 fragColor;
 
             // A cheap analytic environment: sky above, bounce below. Gives a
@@ -516,6 +643,28 @@ class DuckRenderer(
             }
 
             void main() {
+                // The room's wall (STAGE_LOOK §2.2): a vertical gradient from
+                // warm-brown horizon to cold-blue-black zenith, plus a warm
+                // halo behind the duck. Screen-space NDC, so it holds in both
+                // orientations and at any camera distance.
+                if (uStage.y > 0.5) {
+                    float t = vNdc.y * 0.5 + 0.5;
+                    vec3 horizon = vec3(0.102, 0.090, 0.078);  // #1A1714
+                    vec3 zenith = vec3(0.047, 0.055, 0.071);   // #0C0E12
+                    vec3 bg = mix(horizon, zenith, smoothstep(0.62, 1.15, t));
+                    float dx = (vNdc.x - uHalo.x) * uHalo.w;
+                    float dy = vNdc.y - uHalo.y;
+                    float glow = exp(-(dx * dx + dy * dy)
+                        / max(uHalo.z * uHalo.z, 1e-5) * 2.2);
+                    bg += vec3(1.0, 0.851, 0.659) * glow * 0.08;
+                    bg *= uDaylight.rgb * uDaylight.w;
+                    bg = clamp(bg, 0.0, 4.0);
+                    bg = mix(bg, bg / (bg + vec3(0.55)) * 1.55,
+                        smoothstep(0.72, 1.6, max(max(bg.r, bg.g), bg.b)));
+                    fragColor = vec4(clamp(bg, 0.0, 1.0), 1.0);
+                    return;
+                }
+
                 vec3 n = normalize(vNormal);
                 vec3 v = normalize(-vWorld);
                 vec3 l = normalize(-uLight);
@@ -524,8 +673,11 @@ class DuckRenderer(
                 float metalness = clamp(uMaterial.x, 0.0, 1.0);
                 float roughness = clamp(uMaterial.y, 0.04, 1.0);
 
+                // The floor's albedo: Live passes warm stone; Instrument's
+                // cold checkerboard is generated here, and only there
+                // (STAGE_LOOK §3: the grid is the dashboard's language).
                 vec3 base = uColor.rgb;
-                if (uChecker > 0.5) {
+                if (uChecker > 0.5 && uStage.x > 0.5) {
                     vec2 cell = floor(vWorld.xy / 0.2);
                     float odd = mod(cell.x + cell.y, 2.0);
                     base = mix(vec3(0.20, 0.30, 0.40), vec3(0.10, 0.20, 0.30), odd);
@@ -546,23 +698,33 @@ class DuckRenderer(
                 vec3 ambient = environment(ambientDir) * mix(0.35, 1.0, metalness);
                 float rim = pow(1.0 - ndotv, 3.0);
 
-                // The duck is a painted toy: most of what you see is diffuse.
-                vec3 color = diffuseAlbedo * (0.45 + 0.75 * ndotl)
-                           + specular * ndotl
-                           + ambient * diffuseAlbedo * 0.85
+                // The hour tints the room; the duck is an object under a lamp,
+                // so its key light stays neutral and the white shell keeps its
+                // authored colour at any hour (mirrors Shaders.metal's split:
+                // the floor takes 60% of the tint, the duck takes none).
+                float isFloor = uChecker > 0.5 ? 1.0 : 0.0;
+                vec3 key = mix(vec3(1.0), uDaylight.rgb, isFloor * 0.6);
+                vec3 color = diffuseAlbedo * (0.45 + 0.75 * ndotl) * key
+                           + specular * ndotl * key
+                           + ambient * diffuseAlbedo * 0.85 * mix(vec3(1.0), key, 0.5)
                            + ambient * f0 * (0.15 + 0.85 * rim);
 
+                // The floor's three steps: own ambient floor, then the
+                // contact shadow that follows the duck, then a faint fog that
+                // melts the 8 m plane into the wall.
                 if (uChecker > 0.5) {
-                    float radial = length(vWorld.xy);
-                    float shadow = smoothstep(0.02, 0.55, radial);
-                    color *= mix(0.55, 1.0, shadow);
-                    // A ground plane seen from a shallow angle gets almost no
-                    // key light; give it its own ambient floor.
                     color = max(color, base * 0.55);
+                    float radial = length(vWorld.xy - uShadow.xy);
+                    float shadow = smoothstep(0.02, 0.55, radial);
+                    color *= mix(1.0 - uShadow.z, 1.0, shadow);
+                    float fog = smoothstep(1.5, 4.0, vWorld.y) * 0.35;
+                    color = mix(color, vec3(0.102, 0.090, 0.078) * uDaylight.rgb, fog);
                 }
 
-                // Keep the albedo: only highlights get a soft knee, or the
-                // duck's orange washes out to beige.
+                // The room takes the night's full exposure; the duck, lit by
+                // the headlight, only loses a fifth of it. Same split as the
+                // Metal shader.
+                color *= mix(1.0, uDaylight.w, isFloor * 0.8 + 0.2);
                 color = clamp(color, 0.0, 4.0);
                 color = mix(
                     color,

@@ -301,7 +301,14 @@ object AIMotion {
  * a move is bounded and always ends with a zero twist.
  */
 fun executeAIDecision(decision: AIDecision): String {
-    val shown = if (decision.value.isEmpty()) decision.action else "${decision.action} · ${decision.value}"
+    // A skill arrives as its wire name (`kick_left`); the pill says what a
+    // person calls it. Other values (sound tags, prose) pass through.
+    val shownValue = if (decision.action == "skill" || decision.action == "emotion") {
+        skillLabel(decision.value)
+    } else {
+        decision.value
+    }
+    val shown = if (decision.value.isEmpty()) decision.action else "${decision.action} · $shownValue"
     val generation = AIMotion.next()
     if (decision.action != "move") {
         // Cancel any bounded walk before a new verb owns the duck; its last

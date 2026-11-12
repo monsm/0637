@@ -16,6 +16,10 @@ final class DuckUITests: XCTestCase {
         // landscape would otherwise validate the wrong shell.
         XCUIDevice.shared.orientation = .portrait
         app = XCUIApplication()
+        // The assertions below look for the English word the shell shows for
+        // `walk`/`stand`. Pin the language so a Chinese simulator does not
+        // turn every wait into a 180 s timeout.
+        app.launchArguments += ["-duck.language", "EN"]
         app.launch()
         let deadline = Date().addingTimeInterval(10)
         while Date() < deadline && app.frame.height <= app.frame.width {
@@ -272,6 +276,30 @@ final class DuckUITests: XCTestCase {
             .matching(identifier: "photo-preview")
             .firstMatch
         XCTAssertTrue(preview.waitForExistence(timeout: 15), "the Director photo never reached a preview")
+        // The caption is read from /state asynchronously; wait for the real
+        // line (never empty) before keeping, or the postcard band is bare.
+        XCTAssertTrue(
+            app.staticTexts["postcard-caption"].waitForExistence(timeout: 10),
+            "the postcard preview has no caption yet"
+        )
+        // Keep writes the composed postcard (frame + caption band + date)
+        // into Documents/Postcards; CI publishes the newest one as the
+        // acceptance artifact. The button must really flip to "kept".
+        let keep = app.buttons["photo-keep"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), "the photo preview has no keep button")
+        keep.tap()
+        let kept = XCTNSPredicateExpectation(
+            predicate: NSPredicate(
+                format: "label CONTAINS %@ OR label CONTAINS %@",
+                "Kept", "已收藏"
+            ),
+            object: keep
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [kept], timeout: 10),
+            .completed,
+            "keeping the photo did not write a postcard"
+        )
         let photoClose = app.buttons["photo-close"]
         XCTAssertTrue(photoClose.waitForExistence(timeout: 5), "the photo preview has no close button")
         photoClose.tap()
@@ -318,6 +346,52 @@ final class DuckUITests: XCTestCase {
         XCTAssertFalse(
             app.staticTexts["path-progress"].exists,
             "a step chip appeared with no route"
+        )
+    }
+
+    /// The B1 rule, asserted where it can regress: the live first screen
+    /// speaks human words. No protocol state token, no `t <number>` tick, no
+    /// percentage in the mood line, and a `kick_left` verdict without `_`.
+    func testFirstScreenSpeaksHuman() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        let ready = waitForLabel(["walk", "stand"], timeout: 180)
+        XCTAssertTrue(
+            ["walk", "stand"].contains(ready),
+            "the 50 Hz loop never drove the duck: label=\(ready)"
+        )
+
+        // The tick belongs to the time machine, not the first screen.
+        let tickTexts = app.staticTexts.matching(
+            NSPredicate(format: "label MATCHES %@", "t [0-9]+")
+        ).count
+        XCTAssertEqual(tickTexts, 0, "a raw tick is on the first screen")
+
+        // The mood capsule says how it feels, never a percentage.
+        let mood = app.staticTexts["mood-pill"]
+        XCTAssertTrue(mood.waitForExistence(timeout: 20), "the mood capsule never appeared")
+        XCTAssertFalse(mood.label.contains("%"), "the mood line still carries a percentage: \(mood.label)")
+
+        // The progress page has a portrait entry, not only the landscape bar.
+        XCTAssertTrue(
+            app.buttons["duck-progress"].waitForExistence(timeout: 5),
+            "portrait has no Daily/progress entry"
+        )
+
+        // A wire skill name must never reach the stage. `kick_left` is the
+        // case with an underscore the old bar printed verbatim.
+        try pickSkill("kick_left")
+        let verdict = app.staticTexts["duck-last-skill"]
+        XCTAssertTrue(verdict.waitForExistence(timeout: 20), "the kick never reached the core")
+        XCTAssertFalse(
+            verdict.label.contains("_"),
+            "the first screen shows a raw skill name: \(verdict.label)"
+        )
+        XCTAssertFalse(
+            labelElement().label.contains("_"),
+            "the first screen shows a raw state token: \(labelElement().label)"
         )
     }
 

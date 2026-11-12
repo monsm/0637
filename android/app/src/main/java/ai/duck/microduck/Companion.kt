@@ -23,8 +23,6 @@ data class CareUi(
     val fullness: Float get() = (1.0 - hunger).toFloat().coerceIn(0f, 1f)
     val moodFraction: Float get() = ((mood + 1.0) / 2.0).toFloat().coerceIn(0f, 1f)
     val bondFraction: Float get() = bond.toFloat().coerceIn(0f, 1f)
-
-    fun line(): String = Copy.careLine(hunger, mood, bond, asleep)
 }
 
 private const val PREFS = "duck"
@@ -260,6 +258,13 @@ fun shareVetbook(context: Context) {
 }
 
 fun fetchCare(): CareUi? = fetchRawState()?.let(::parseCare)
+
+/** The core's own state-machine word, from the top-level `label`. */
+fun parseLabel(text: String): String? = try {
+    org.json.JSONObject(text).optString("label", "").ifEmpty { null }
+} catch (_: Throwable) {
+    null
+}
 
 fun parseCare(text: String): CareUi? = try {
     val care = JSONObject(text).optJSONObject("care") ?: return null

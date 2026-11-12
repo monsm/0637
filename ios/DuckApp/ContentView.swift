@@ -233,6 +233,11 @@ struct ContentView: View {
             .onChange(of: showInstrument) { _, show in
                 if show { showInstrument = false; modal = .instrument }
             }
+            // The renderer cannot see a SwiftUI sheet: tell it when the
+            // instrument is up so the stage becomes the cold lab (look 2).
+            .onChange(of: modal?.id) { _, id in
+                controller.instrumentOpen = (id == "instrument")
+            }
             .onReceive(controller.$capturedPhoto) { photo in
                 if let photo {
                     controller.capturedPhoto = nil
@@ -535,7 +540,7 @@ struct ContentView: View {
         let failure = failureMessage
         let usable = controller.ready && failure == nil
         return VStack(spacing: 0) {
-            topBar(showSurface: false)
+            topBar(showSurface: false, showProgress: true)
             if let failure {
                 Spacer(minLength: 12)
                 failureCard(failure)
@@ -601,10 +606,10 @@ struct ContentView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.body)
-                    // 真实时间，不是 tick。这个按钮通向时间机器，标签就该
-                    // 像一只钟；鸭子冻结了，钟也照走。
-                    Text(Date.now, style: .time)
-                        .font(.system(.caption2, design: .monospaced))
+                    // 这个按钮通向时间机器，标签就该说它在做什么。墙钟会
+                    // 和状态栏的钟重复、还一直在变；时间读数住在仪表盘。
+                    Text(Copy.time)
+                        .font(.system(.caption, design: .rounded, weight: .medium))
                         .foregroundStyle(.secondary)
                     GeometryReader { proxy in
                         ZStack(alignment: .leading) {
@@ -612,7 +617,9 @@ struct ContentView: View {
                                 .fill(Color.white.opacity(0.08))
                                 .frame(height: 3)
                             Capsule()
-                                .fill(Color.accentColor.opacity(0.6))
+                                // accent.data #7FB2D9，实色：保留历史的
+                                // 进度条必须读得出来（原 60% 系统蓝 2.11:1）。
+                                .fill(Color(red: 0.498, green: 0.698, blue: 0.851))
                                 .frame(width: railProgress(width: proxy.size.width), height: 3)
                         }
                         .frame(maxHeight: .infinity, alignment: .center)
@@ -1105,7 +1112,7 @@ struct ContentView: View {
         return Copy.waking
     }
 
-    private func topBar(showSurface: Bool = true) -> some View {
+    private func topBar(showSurface: Bool = true, showProgress: Bool = false) -> some View {
         HStack(alignment: .top) {
             // The duck's name and what it is doing, in words rather than numbers.
             VStack(alignment: .leading, spacing: 2) {
@@ -1160,6 +1167,22 @@ struct ContentView: View {
             // the edge and nothing was legible; the stick modes, the surface,
             // the language and the flashlight now live behind one button a
             // thumb can open.
+            if showProgress {
+                // 每日任务与成就墙：竖屏主力形态的入口。放在顶栏而不是时间
+                // 栏：时间栏的进度条不能被第五个钮挤成一条缝。
+                Button {
+                    modal = .progress
+                } label: {
+                    Image(systemName: "flame")
+                        .font(.body)
+                        .frame(width: 48, height: 48)
+                        .background(.ultraThinMaterial, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Copy.progress)
+                .accessibilityIdentifier("duck-progress")
+            }
             Menu {
                 ForEach(StickMode.allCases, id: \.self) { option in
                     Button {
@@ -1454,12 +1477,22 @@ struct ContentView: View {
                 .font(.system(.footnote, design: .rounded))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
+            Button {
+                controller.retryStartup()
+            } label: {
+                Label(Copy.retry, systemImage: "arrow.clockwise")
+                    .font(.system(.footnote, design: .rounded, weight: .semibold))
+                    .frame(minWidth: 96, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("failure-retry")
         }
         .padding(20)
         .frame(maxWidth: 360)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
         .padding(.vertical, 24)
-        .accessibilityElement(children: .combine)
+        // Contain, not combine: the retry button must stay its own element.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("failure-card")
     }
 }

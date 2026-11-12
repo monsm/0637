@@ -1,6 +1,7 @@
 package ai.duck.microduck
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -136,12 +137,27 @@ fun DanceSheet(
                     }
                 }
                 itemsIndexed(studio.steps) { index, step ->
+                    // The playing tile is yellow, so its text is black: white
+                    // on #FFD54F is 1.36:1. Bold + a dark rim also carry the
+                    // "this one" state without relying on colour alone.
+                    val active = playing && activeStep == index
+                    val ink = if (active) {
+                        Color(DanceContrast.ACTIVE_TEXT)
+                    } else {
+                        Color.White.copy(alpha = 0.9f)
+                    }
                     Column(
                         Modifier
                             .background(
-                                if (playing && activeStep == index) Color(0xFFFFD54F)
+                                if (active) Color(DanceContrast.ACTIVE_BACKGROUND)
                                 else Color.White.copy(alpha = 0.08f),
                                 RoundedCornerShape(12.dp),
+                            )
+                            .border(
+                                width = 1.5.dp,
+                                color = if (active) Color.Black.copy(alpha = 0.55f)
+                                else Color.Transparent,
+                                shape = RoundedCornerShape(12.dp),
                             )
                             .padding(8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -149,13 +165,15 @@ fun DanceSheet(
                     ) {
                         Text(
                             "${index + 1}",
-                            color = Color.White.copy(alpha = 0.55f),
+                            color = ink.copy(alpha = if (active) 1f else 0.55f),
                             fontSize = 9.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                         )
                         Text(
                             step.label.ifEmpty { step.value },
-                            color = Color.White.copy(alpha = 0.9f),
+                            color = ink,
                             fontSize = 11.sp,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )

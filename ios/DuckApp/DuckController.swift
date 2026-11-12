@@ -339,6 +339,10 @@ final class DuckController: ObservableObject {
     /// Read by the renderer each frame; true only when Director is open *and*
     /// a camera actually started (the simulator has none).
     @Published var cameraActive = false
+    /// The instrument sheet is up: the renderer swaps the warm room for the
+    /// cold checkerboard lab (STAGE_LOOK §3). Presentation only; the duck's
+    /// observation and safety layer never see it.
+    @Published var instrumentOpen = false
     @Published private(set) var cameraDenied = false
     private var wantsCamera = false
     private var cameraCancellable: AnyCancellable?
@@ -508,6 +512,23 @@ final class DuckController: ObservableObject {
         // black screen. Build it on a worker queue and publish on the main
         // thread; the core itself is only touched from the main thread
         // afterwards (timer and renderer).
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.createCore()
+        }
+    }
+
+    /// The failure card's one action. A core that never came up is built
+    /// again; a Metal view that failed is dropped so SwiftUI makes a fresh
+    /// one on the next body pass. Nothing else is reset.
+    func retryStartup() {
+        if ready {
+            renderError = nil
+            return
+        }
+        // One retry in flight: the card's tap clears the error, so a second
+        // tap while the loader runs is a no-op rather than a second core.
+        guard errorMessage != nil else { return }
+        errorMessage = nil
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             self?.createCore()
         }
@@ -1140,9 +1161,14 @@ final class DuckController: ObservableObject {
     }
 
     private func executeAI(_ decision: AIDecision) {
+        // The model answers with wire names (`kick_left`). The stage says
+        // what a person calls them; the instrument/API keep the wire.
+        let shownValue = decision.action == "skill" || decision.action == "emotion"
+            ? SkillLabel.of(decision.value)
+            : decision.value
         let shown = decision.value.isEmpty
             ? decision.action
-            : "\(decision.action) · \(decision.value)"
+            : "\(decision.action) · \(shownValue)"
         aiDecision = decision.why.isEmpty ? "AI · \(shown)" : "AI · \(shown) — \(decision.why)"
         // Every decision cancels a previous bounded move. Otherwise an old
         // twist chain would keep posting after a stop or a new look.
@@ -1710,7 +1736,7 @@ final class DuckController: ObservableObject {
                     if let emotion = json["emotion"] as? [String: Any],
                        let name = emotion["name"] as? String {                        let elapsed = emotion["elapsed_s"] as? Double ?? 0
                         let duration = emotion["duration_s"] as? Double ?? 0
-                        self.behaviorSummary = String(format: "%@ %.1f/%.1fs", name, elapsed, duration)
+                        self.behaviorSummary = String(format: "%@ %.1f/%.1fs", SkillLabel.of(name), elapsed, duration)
                     } else if let idle = json["idle"] as? [String: Any],
                               let takeover = idle["takeover"] as? Double, takeover > 0.1 {
                         self.behaviorSummary = String(format: "looking around %.0f%%", takeover * 100)

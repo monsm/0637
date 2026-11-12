@@ -56,6 +56,9 @@ enum Copy {
     static var emotions: String { pick("Emotions", "情绪") }
     static var close: String { pick("Close", "关闭") }
     static var couldNotStart: String { pick("MicroDuck could not start", "MicroDuck 无法启动") }
+    /// The failure card's one action. Android's core loader can retry; the
+    /// key lives on both sides so the dictionaries stay aligned.
+    static var retry: String { pick("Try again", "重试") }
     /// 启动失败翻成人话。日志里那句 "Bundle resources not found" 和 Metal
     /// 报错是给工程师看的，不是给站在屏幕前的人看的。
     static func humanError(raw: String) -> String {
@@ -517,7 +520,12 @@ enum LifeEvent {
 /// same wire name in either language.
 enum SkillLabel {
     static func of(_ name: String) -> String {
-        guard Copy.language == .chinese else { return name }
+        // English keeps the protocol word, but a wire name is `kick_left`,
+        // not a label. The underscore is a protocol detail; the first screen
+        // must not show one.
+        guard Copy.language == .chinese else {
+            return name.replacingOccurrences(of: "_", with: " ")
+        }
         switch name {
         case "sit": return "坐下"
         case "stand": return "站起"

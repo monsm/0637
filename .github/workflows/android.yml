@@ -136,6 +136,10 @@ jobs:
             exit 1
           fi
 
+      - name: Unit tests
+        id: unittest
+        run: gradle -p android testDebugUnitTest --no-daemon
+
       - name: Publish failure logs
         if: failure()
         run: |
@@ -165,6 +169,7 @@ jobs:
             echo "rustcore=${{ steps.rustcore.outcome }}"
             echo "gradlesetup=${{ steps.gradlesetup.outcome }}"
             echo "apk=${{ steps.apk.outcome }}"
+            echo "unittest=${{ steps.unittest.outcome }}"
           } > ci-logs/android/steps.txt
           git config user.email "actions@github.com"
           git config user.name "ci-log-bot"
@@ -275,6 +280,32 @@ jobs:
             cat smoke-session.log
             exit $status
 
+      - name: Publish UI acceptance screenshot
+        id: publishui
+        if: steps.emulator.outcome == 'success'
+        run: |
+          # The portrait Live screenshot is an acceptance artifact, not a
+          # build product: commit it to dist/ on this branch. [skip ci] and
+          # the workflow's path filter keep the commit from re-running CI.
+          mkdir -p dist
+          cp ui-b1-android.png dist/ui-b1-android.png
+          git config user.email "actions@github.com"
+          git config user.name "ui-bot"
+          pushed=0
+          for attempt in 1 2 3 4 5; do
+            # Rebase-by-reset: hang the new commit off the branch head so a
+            # concurrent iOS screenshot push cannot make this one a
+            # non-fast-forward, and so neither push drops the other's file.
+            if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
+              git reset --mixed FETCH_HEAD
+            fi
+            git add -f dist/ui-b1-android.png
+            git commit -m "ui-b1: Android portrait Live screenshot [skip ci]" || true
+            if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
+            sleep 2
+          done
+          [ "$pushed" = "1" ] || echo "::warning::the Android screenshot could not be published"
+
       - name: Publish smoke-test logs
         id: publishlogs
         if: always()
@@ -302,6 +333,7 @@ jobs:
           echo "run=${{ github.run_id }}" > ci-logs/android/smoke.txt
           echo "sha=${{ github.sha }}" >> ci-logs/android/smoke.txt
           echo "emulator=${{ steps.emulator.outcome }}" >> ci-logs/android/smoke.txt
+          echo "unittest=${{ steps.unittest.outcome }}" >> ci-logs/android/smoke.txt
           echo "alignment=${{ steps.alignment.outcome }}" >> ci-logs/android/smoke.txt
           # The build chain's step outcomes: the failure publisher only runs
           # on failure, so without this a green run's steps.txt is a stale
@@ -317,6 +349,7 @@ jobs:
             echo "stage=${{ steps.stage.outcome }}"
             echo "rustcore=${{ steps.rustcore.outcome }}"
             echo "apk=${{ steps.apk.outcome }}"
+            echo "unittest=${{ steps.unittest.outcome }}"
             echo "gradlesetup=${{ steps.gradlesetup.outcome }}"
             echo "emulator=${{ steps.emulator.outcome }}"
             echo "alignment=${{ steps.alignment.outcome }}"
@@ -368,6 +401,7 @@ jobs:
             intent-skill-refused.json
             android-screen.png
             android-screen-2.png
+            ui-b1-android.png
             unstripped/
 
       - uses: actions/upload-artifact@v4

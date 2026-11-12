@@ -2,6 +2,7 @@ package ai.duck.microduck
 
 import android.content.Context
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * Every word the shell says, in both languages.
@@ -43,7 +44,7 @@ object Copy {
     // Live view
     val name get() = "MicroDuck"
     val fell get() = pick("it fell", "摔倒了")
-    val waking get() = pick("waking up…", "正在唤醒…")
+    val waking get() = pick("waking the duck…", "正在唤醒鸭子…")
     val tapHint get() = pick(
         "drag to walk · long-press for skills · tap the duck to pet",
         "拖动走路 · 长按出技能 · 点鸭子摸摸",
@@ -98,6 +99,31 @@ val quack get() = pick("Quack", "叫一声")
     val pathDone get() = pick("Walked the whole path", "走完全程啦")
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
+    /** Startup failure in words a person can act on. The raw text is a log line. */
+    fun humanError(raw: String): String {
+        val lower = raw.lowercase()
+        if (lower.contains("bundle") || lower.contains("resource") ||
+            lower.contains("no such file") || lower.contains("not found")
+        ) {
+            return pick(
+                "The app's files are incomplete. Reinstall the app.",
+                "应用资源不完整，请重新安装",
+            )
+        }
+        if (lower.contains("metal") || lower.contains("render") || lower.contains("shader") ||
+            lower.contains("gpu") || lower.contains("opengl")
+        ) {
+            return pick(
+                "The picture could not start on this phone. Open the app again.",
+                "画面没能启动，请重新打开 App",
+            )
+        }
+        return pick(
+            "The duck could not wake up. Open the app again.",
+            "鸭子没能醒来，请重新打开 App",
+        )
+    }
+    val retry get() = pick("Try again", "重试")
     // First-launch hint: shown once above the bottom bar, then never again.
     val dragHint get() = pick(
         "Drag to walk · long-press for skills · tap the duck to pet",
@@ -121,6 +147,35 @@ val quack get() = pick("Quack", "叫一声")
     val listening get() = pick("listening…", "聆听中…")
     val unavailable get() = pick("unavailable", "不可用")
     val behavior get() = pick("behaviour", "此刻")
+
+    /**
+     * The core's state machine, said in words a person would use.
+     *
+     * `/state.label` is the protocol's `char label[64]` copied verbatim:
+     * `held`, `limp_fall`, `mode: walk`, `policy reloaded`, sometimes a
+     * refused skill's error. None of that belongs on the stage. The
+     * instrument keeps the raw string; the first screen reads this.
+     */
+    fun behaviourOf(raw: String): String = when (raw) {
+        "held" -> pick("in a hand", "被拎着")
+        "limp", "limp_fall" -> pick("fell over", "摔倒了")
+        "homing" -> pick("steadying itself", "正在站稳")
+        "mode: walk" -> pick("walk", "散步中")
+        "mode: roller" -> pick("rolling", "滚轮中")
+        "policy reloaded" -> pick("just woke up", "刚睡醒")
+        "idle" -> pick("hanging out", "待着")
+        "walk" -> pick("walk", "散步中")
+        "stand" -> pick("stand", "站着")
+        "sit" -> pick("sit", "坐着")
+        "ready" -> pick("on its feet", "站稳了")
+        "rest" -> pick("dozing", "打盹中")
+        "off" -> pick("resting", "歇着")
+        "pose" -> pick("posing", "摆姿势")
+        "shutdown" -> pick("lying down", "趴下了")
+        // A refused skill can write a whole error into the label. The label
+        // is not a debug surface; anything unknown is a duck being a duck.
+        else -> pick("hanging out", "待着")
+    }
     // The companion layer: three numbers and a nap. "Fullness" is shown so a
     // full bar means fed, not starving.
     val care get() = pick("Companion", "陪伴")
@@ -129,8 +184,10 @@ val quack get() = pick("Quack", "叫一声")
     val bond get() = pick("bond", "亲密")
     val dozing get() = pick("dozing", "打盹中")
     fun careLine(hunger: Double, mood: Double, bond: Double, asleep: Boolean): String {
-        val full = ((1.0 - hunger) * 100).toInt()
-        val moodPercent = (((mood + 1) / 2) * 100).toInt()
+        // Same rounding as iOS: percentages are read, and 67.4999… must not
+        // read one point lower on one platform than the other.
+        val full = ((1.0 - hunger) * 100).roundToInt()
+        val moodPercent = (((mood + 1) / 2) * 100).roundToInt()
         if (asleep) return "$dozing · $fullness $full%"
         if (hunger > 0.65) return pick("hungry · fullness $full%", "饿了 · 饱腹 $full%")
         if (mood < -0.2) return pick(
@@ -138,6 +195,17 @@ val quack get() = pick("Quack", "叫一声")
             "有点难过 · 亲密 ${(bond * 100).toInt()}%",
         )
         return pick("content · mood $moodPercent%", "心情不错 · 心情 $moodPercent%")
+    }
+    /**
+     * The first screen's one-line mood: how it feels, with no numbers. The
+     * percentages are readings for the instrument, not something a pet wears
+     * on its face.
+     */
+    fun moodLine(hunger: Double, mood: Double, asleep: Boolean): String {
+        if (asleep) return pick("fast asleep", "睡着了")
+        if (hunger > 0.65) return pick("a little hungry", "有点饿了")
+        if (mood < -0.2) return pick("a little sad", "有点难过")
+        return pick("in a good mood", "心情不错")
     }
     // The chosen night: the child puts the duck to sleep on purpose, the row
     // says how long it has been quiet, and morning wakes it.
@@ -339,7 +407,10 @@ val quack get() = pick("Quack", "叫一声")
 
 /** A skill's display name; the wire name stays the protocol's. */
 fun skillLabel(name: String): String {
-    if (Copy.language != Copy.Language.Chinese) return name
+    // English keeps the protocol word, but a wire name is `kick_left`, not a
+    // label: the underscore is a protocol detail, not something a person
+    // reads on the first screen.
+    if (Copy.language != Copy.Language.Chinese) return name.replace('_', ' ')
     return when (name) {
         "stand" -> "站起"
         "roulade" -> "翻滚"

@@ -27,7 +27,9 @@ for _ in $(seq 1 3); do
 done
 [ "$INSTALL_OK" = "1" ] || { echo "::error::apk install failed"; exit 1; }
 adb logcat -c
-adb shell am start -n ai.duck.microduck/.MainActivity | tee am-start.log
+# Pin the room's hour: the frame checks below assert on colours and must not
+# change with the CI runner's wall clock (the stage tints by local time).
+adb shell am start -n ai.duck.microduck/.MainActivity --ef daylight_hour 12 | tee am-start.log
 
 # Wait for the process to appear (ActivityManager may take a while), then
 # give the core time to load MuJoCo and the policies.
@@ -931,4 +933,132 @@ done
   exit 1
 }
 echo "Director photo reached the preview with Save and Share"
+
+# ------------------------------------------------------------------ B1 screen
+# The first screen is a promise, not a debug console. Assert it in the real
+# UI, in Chinese, in portrait: no wire skill name (`_`), no raw tick
+# (`t 302`), no percentage pill, and no engine/port text. Then take the
+# acceptance screenshot from that exact screen.
+echo "--- first screen speaks human ---"
+adb shell am force-stop ai.duck.microduck > /dev/null 2>&1 || true
+sleep 1
+adb shell am start -n ai.duck.microduck/.MainActivity --ef daylight_hour 12 > /dev/null 2>&1 || true
+for _ in $(seq 1 90); do
+  SCREEN_STATE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
+  [ -n "$SCREEN_STATE" ] && break
+  sleep 2
+done
+if [ -z "${SCREEN_STATE:-}" ]; then
+  echo "::error::the core did not come back for the first-screen check"
+  exit 1
+fi
+# Let the first frame settle, then switch the shell to Chinese through its
+# own menu: the acceptance screen is the one a Chinese user sees.
+sleep 3
+tap_text "⋯" > /dev/null 2>&1 || true
+sleep 1
+# The menu shows the language it is IN. "EN" switches to Chinese; if it says
+# "中文" the shell is already Chinese, and tapping the anchor again dismisses
+# the menu without changing the language.
+if ! tap_text "EN" > /dev/null 2>&1; then
+  tap_text "⋯" > /dev/null 2>&1 || true
+fi
+sleep 2
+
+# A fresh dump or a clear failure: a swallowed dump that falls back to a
+# previous run's ui.xml would assert on stale text and "pass" by accident.
+rm -f ui.xml
+if ! adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
+  echo "::error::uiautomator could not dump the first screen"
+  exit 1
+fi
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+[ -s ui.xml ] || { echo "::error::the first-screen UI dump is empty"; exit 1; }
+python3 - <<'PY' || exit 1
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the UI dump: {exc}")
+texts = []
+for node in root.iter('node'):
+    if node.get('package') != 'ai.duck.microduck':
+        continue
+    for attr in ('text', 'content-desc'):
+        value = node.get(attr) or ''
+        if value:
+            texts.append(value)
+
+problems = []
+problems += [f"raw token on screen: {t!r}" for t in texts if '_' in t]
+problems += [f"raw tick on screen: {t!r}" for t in texts if re.fullmatch(r't \d+', t)]
+problems += [f"percentage on the first screen: {t!r}" for t in texts if '%' in t]
+problems += [f"engine/port text on the first screen: {t!r}" for t in texts
+             if re.search(r'MuJoCo|ONNX|8765', t, re.IGNORECASE)]
+if problems:
+    for problem in problems:
+        print(f"::error::{problem}")
+    sys.exit(1)
+
+joined = ' '.join(texts)
+if not any(word in joined for word in ('技能', '时间', '心情不错', '有点饿了', '待着', '散步中', '站着')):
+    raise SystemExit(f"::error::the shell did not switch to Chinese: {texts[:20]}")
+print("first screen: no raw tokens, ticks, percentages or engine names")
+PY
+
+# The idle Live screen itself, portrait, no skill line on it.
+adb exec-out screencap -p > ui-b1-android.png || true
+python3 - <<'PY' || exit 1
+import struct
+try:
+    with open('ui-b1-android.png', 'rb') as handle:
+        header = handle.read(24)
+except Exception as exc:
+    raise SystemExit(f"::error::no first-screen screenshot: {exc}")
+if header[:8] != b'\x89PNG\r\n\x1a\n':
+    raise SystemExit("::error::the first-screen screenshot is not a PNG")
+width, height = struct.unpack('>II', header[16:24])
+if height <= width:
+    raise SystemExit(f"::error::the acceptance screenshot is not portrait: {width}x{height}")
+print(f"portrait screenshot: {width}x{height}")
+PY
+
+# A real wire skill with an underscore: its verdict in the top bar must read
+# human too. This runs after the screenshot so the idle frame stays clean.
+tap_text "技能" > /dev/null 2>&1 || tap_text "Skills" > /dev/null 2>&1 || true
+sleep 1
+tap_text "左踢" > /dev/null 2>&1 || tap_text "kick left" > /dev/null 2>&1 || true
+sleep 2
+rm -f ui.xml
+if ! adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
+  echo "::error::uiautomator could not dump the screen after the skill"
+  exit 1
+fi
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+[ -s ui.xml ] || { echo "::error::the post-skill UI dump is empty"; exit 1; }
+python3 - <<'PY' || exit 1
+import sys
+import xml.etree.ElementTree as ET
+
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the post-skill UI dump: {exc}")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+raw = [t for t in texts if '_' in t]
+if raw:
+    raise SystemExit(f"::error::a raw skill name reached the top bar: {raw[:5]}")
+if not any(word in ' '.join(texts) for word in ('左踢', 'kick left')):
+    raise SystemExit(f"::error::the kick verdict did not reach the top bar: {texts[:20]}")
+print("skill verdict is human: no underscores")
+PY
+
 echo "smoke test passed"
