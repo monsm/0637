@@ -123,6 +123,12 @@ struct RulesSheet: View {
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("rules-import-note")
                     }
+                    if !controller.rulesError.isEmpty {
+                        Text(controller.rulesError)
+                            .font(.system(size: 11, design: .rounded))
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("rules-error")
+                    }
 
                     Divider()
 

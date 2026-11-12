@@ -227,6 +227,16 @@ val quack get() = pick("Quack", "叫一声")
         "Imported $count block(s)",
         "导入了 $count 条积木",
     )
+    /** The core refused the program: the editor puts the old one back. */
+    val rulesRefused get() = pick(
+        "The duck would not take that program, so nothing changed",
+        "鸭子没有接受这份程序，所以什么都没变",
+    )
+    /** The core's own program has not been read yet, so there is nothing to merge onto. */
+    val rulesNotReady get() = pick(
+        "The duck has not finished starting; try again in a moment",
+        "鸭子还没启动完，等一下再试",
+    )
     val rulesEmpty get() = pick(
         "No rules yet. Build one: when I clap, roll over.",
         "还没有规则。拼一个：拍手，就翻滚。",

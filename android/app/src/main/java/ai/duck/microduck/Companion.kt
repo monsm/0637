@@ -81,14 +81,28 @@ fun fetchRules(): List<RuleUi>? = try {
     null
 }
 
-/** Replace the core's program and keep the shell's copy for the next launch. */
-fun saveRules(context: Context, rules: List<RuleUi>) {
+/**
+ * Replace the core's program and keep the shell's copy for the next launch.
+ *
+ * The core is the authority, and the copy on disk is only updated when the
+ * core took the program. Keeping a copy it refused would restore a program
+ * the duck is not running — and the editor would keep showing it, so the
+ * child would see blocks that do nothing.
+ *
+ * [onResult] runs on the main thread with the core's answer.
+ */
+fun saveRules(context: Context, rules: List<RuleUi>, onResult: (Boolean) -> Unit = {}) {
     val array = org.json.JSONArray()
     rules.forEach { rule -> array.put(ruleJson(rule)) }
     val payload = JSONObject().put("rules", array).toString()
-    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        .edit().putString(RULES_KEY, payload).apply()
-    Thread { try { postJson("/rules", payload) } catch (_: Throwable) {} }.start()
+    Thread {
+        val accepted = try { postJson("/rules", payload) } catch (_: Throwable) { false }
+        if (accepted) {
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(RULES_KEY, payload).apply()
+        }
+        android.os.Handler(android.os.Looper.getMainLooper()).post { onResult(accepted) }
+    }.start()
 }
 
 internal val RULE_TRIGGERS = setOf("clap", "whistle", "pet")

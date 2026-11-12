@@ -402,6 +402,13 @@ enum Copy {
     /// The label for the API token: what a tool on another machine has to
     /// send, so the duck's own history cannot be rewritten from the network.
     static var apiToken: String { pick("API token (for other machines)", "API 令牌（给别的机器）") }
+    /// The core refused the program: the editor puts the old one back.
+    static var rulesRefusedText: String {
+        pick(
+            "The duck would not take that program, so nothing changed",
+            "鸭子没有接受这份程序，所以什么都没变"
+        )
+    }
     static var reload: String { pick("Reload AI", "重载 AI") }
     static var api: String { "AI API :8765 · MCP /mcp" }
     static var languageLabel: String { pick("Language", "语言") }

@@ -69,6 +69,8 @@ final class DuckController: ObservableObject {
         var value: String
     }
     @Published var rules: [DuckRule] = []
+    /// Why the core refused the last program, if it did. Empty otherwise.
+    @Published var rulesError = ""
     /// Today's three small goals. The core measures them from its own vet
     /// book; the shell only shows the board and hands it back across launches.
     struct QuestCard: Identifiable {
@@ -1242,6 +1244,7 @@ final class DuckController: ObservableObject {
     /// invalid block comes back refused rather than run.
     func saveRules(_ next: [DuckRule]) {
         guard next.count <= 8 else { return }
+        let previous = rules
         rules = next
         let payload = ["rules": next.map { rule -> [String: Any] in
             var item: [String: Any] = [
@@ -1256,11 +1259,27 @@ final class DuckController: ObservableObject {
             }
             return item
         }]
-        if let body = try? JSONSerialization.data(withJSONObject: payload) {
-            post("/rules", body)
-        }
-        if let data = try? JSONEncoder().encode(next) {
-            UserDefaults.standard.set(data, forKey: Self.rulesKey)
+        guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        // The core is the authority. It stays off the main thread, so the
+        // answer comes back on a worker; a refusal puts the old program back
+        // and says why, because an editor showing blocks the duck is not
+        // running is an editor telling a lie.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let accepted = Self.postSyncData("/rules", body)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if accepted {
+                    if let data = try? JSONEncoder().encode(next) {
+                        UserDefaults.standard.set(data, forKey: Self.rulesKey)
+                    }
+                    self.rulesError = ""
+                } else if self.rules == next {
+                    // Only if this is still the program the editor shows: a
+                    // newer edit has its own answer on the way.
+                    self.rules = previous
+                    self.rulesError = Copy.rulesRefusedText
+                }
+            }
         }
     }
 

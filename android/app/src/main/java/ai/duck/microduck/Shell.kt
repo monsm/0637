@@ -1272,11 +1272,31 @@ private fun RulesSheet(onClose: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var rules by remember { mutableStateOf(emptyList<RuleUi>()) }
+    // Whether the core's own program has been read. Until it has, the list
+    // here is not the duck's program but the default empty one, and merging
+    // an import into it would replace everything the child built.
+    var rulesLoaded by remember { mutableStateOf(false) }
     var trigger by remember { mutableStateOf("clap") }
     var action by remember { mutableStateOf("skill") }
     var value by remember { mutableStateOf("roulade") }
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) { fetchRules() }?.let { rules = it }
+        withContext(Dispatchers.IO) { fetchRules() }?.let {
+            rules = it
+            rulesLoaded = true
+        }
+    }
+    // Show the new program at once, then keep it only if the core took it.
+    // A refusal puts the old program back and says so: the editor must never
+    // show blocks the duck is not running.
+    fun applyRules(next: List<RuleUi>) {
+        val previous = rules
+        rules = next
+        saveRules(context, next) { accepted ->
+            if (!accepted) {
+                rules = previous
+                Toast.makeText(context, Copy.rulesRefused, Toast.LENGTH_LONG).show()
+            }
+        }
     }
     val triggers = listOf("clap", "whistle", "pet")
     val kinds = listOf("skill", "emotion", "sound")
@@ -1342,11 +1362,15 @@ private fun RulesSheet(onClose: () -> Unit) {
                         ?.coerceToText(context)
                         ?.toString()
                     val imported = clip?.let(::parseSharedRules)
-                    if (imported != null) {
+                    if (!rulesLoaded) {
+                        // The core's program has not been read yet, so there
+                        // is nothing to merge onto: doing it anyway would
+                        // replace everything the child built.
+                        Toast.makeText(context, Copy.rulesNotReady, Toast.LENGTH_LONG).show()
+                    } else if (imported != null) {
                         val next = mergeRules(rules, imported)
                         val added = next.size - rules.size
-                        rules = next
-                        saveRules(context, next)
+                        applyRules(next)
                         Toast.makeText(
                             context,
                             Copy.rulesPasted(added.coerceAtLeast(0)),
@@ -1380,9 +1404,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                             .testTag("rule-$index"),
                     )
                     CloseChip("rule-delete-$index", {
-                        val next = rules.filterIndexed { at, _ -> at != index }
-                        rules = next
-                        saveRules(context, next)
+                        applyRules(rules.filterIndexed { at, _ -> at != index })
                     })
                 }
             }
@@ -1469,10 +1491,8 @@ private fun RulesSheet(onClose: () -> Unit) {
                     "rule-add",
                 ) {
                     if (rules.size < 8) {
-                        val next = rules + RuleUi(trigger, action, value, chain)
-                        rules = next
+                        applyRules(rules + RuleUi(trigger, action, value, chain))
                         chain = emptyList()
-                        saveRules(context, next)
                     }
                 }
             }
