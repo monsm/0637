@@ -434,7 +434,11 @@ if [ "$MONTH_STREAK" != "3" ]; then
   exit 1
 fi
 echo "daily quests: a February streak survives March 1st (streak=$MONTH_STREAK)"
-SAVE_BOARD='{"day":"2026-11-11","quests":[{"id":"pet","target":3,"done":false,"progress":0.5},{"id":"roll","target":2,"done":false,"progress":0.0},{"id":"walk","target":2,"done":false,"progress":0.0}],"streak":1,"best_streak":1,"completed_today":0,"last_completed_day":"2026-11-10"}'
+# The same-day relaunch: the board's own day is today, so the core keeps
+# it instead of rolling a fresh board, and the shell's summary shape must
+# come back with the progress the child already earned.
+YDAY=$(python3 -c 'import datetime; print((datetime.date.today()-datetime.timedelta(days=1)).isoformat())')
+SAVE_BOARD="{\"day\":\"$QUEST_DAY\",\"quests\":[{\"id\":\"pet\",\"target\":3,\"done\":false,\"progress\":0.5},{\"id\":\"roll\",\"target\":2,\"done\":false,\"progress\":0.0},{\"id\":\"walk\",\"target\":2,\"done\":false,\"progress\":0.0}],\"streak\":1,\"best_streak\":1,\"completed_today\":0,\"last_completed_day\":\"$YDAY\"}"
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
   -d "{\"day\":\"$QUEST_DAY\",\"board\":$SAVE_BOARD}" http://127.0.0.1:8765/quests/day > /dev/null || true
 sleep 0.4
