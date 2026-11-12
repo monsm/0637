@@ -463,7 +463,7 @@ index 2b94eaa..1121af7 100644
      /// plane the anchor defines.
      pub fn position(&self) -> [f64; 3] {
 diff --git a/robotd/src/control.rs b/robotd/src/control.rs
-index 62c39c1..76bd742 100644
+index 62c39c1..456616f 100644
 --- a/robotd/src/control.rs
 +++ b/robotd/src/control.rs
 @@ -136,8 +136,8 @@ pub struct Step {
@@ -620,6 +620,52 @@ index 62c39c1..76bd742 100644
      /// Every one-shot skill this robot has, in priority order — what a client may ask for.
      pub fn skill_names(&self) -> Vec<String> {
          self.skills
+@@ -768,11 +859,33 @@ impl Controller {
+ mod tests {
+     use super::*;
+ 
++    /// One of the upstream test networks, wherever this file was compiled.
++    ///
++    /// In upstream's own tree the fixtures sit next door, at
++    /// `<robotd>/../duck-control/tests/fixtures`. The mobile core compiles
++    /// this file as a module of another crate, so `CARGO_MANIFEST_DIR` names
++    /// that crate instead and the neighbouring path is wrong. `DUCK_UPSTREAM_FIXTURES`
++    /// says where the checkout is when there is one; otherwise the
++    /// neighbouring path is tried, and then the upstream checkout beside the
++    /// mobile core.
++    fn fixture(name: &str) -> std::path::PathBuf {
++        if let Some(dir) = std::env::var_os("DUCK_UPSTREAM_FIXTURES") {
++            return std::path::PathBuf::from(dir).join(name);
++        }
++        let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
++        let beside = manifest.join("../duck-control/tests/fixtures").join(name);
++        if beside.is_file() {
++            return beside;
++        }
++        manifest
++            .join("../../upstream/microduck/duck-control/tests/fixtures")
++            .join(name)
++    }
++
+     #[test]
+     #[ignore = "requires ONNX Runtime >= 1.23"]
+     fn recurrent_memory_resets_with_controller_feedback() {
+-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+-            .join("../duck-control/tests/fixtures/lstm.onnx");
++        let path = fixture("lstm.onnx");
+         let policy = Policy::load(
+             &duck_control::policy::PolicyPaths {
+                 walk: path,
+@@ -861,8 +974,7 @@ mod tests {
+     /// A controller with every slot loaded — the feedforward fixture stands in for each net, which
+     /// is all the gating needs — and two skills: a kick that does not chain and a roll that does.
+     fn full_controller() -> Controller {
+-        let net = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+-            .join("../duck-control/tests/fixtures/feedforward.onnx");
++        let net = fixture("feedforward.onnx");
+         let policy = Policy::load(
+             &duck_control::policy::PolicyPaths {
+                 walk: net.clone(),
 diff --git a/robotd/src/idle_head.rs b/robotd/src/idle_head.rs
 index c41dadf..761c6bd 100644
 --- a/robotd/src/idle_head.rs

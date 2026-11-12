@@ -76,6 +76,10 @@ jobs:
           # The assets are fetched above, so a missing one is a broken
           # build — not a reason to skip the test and call it green.
           DUCK_REQUIRE_FIXTURES: "1"
+          # Upstream's own control tests load their networks from its
+          # checkout; this file is compiled into our crate, so it needs to be
+          # told where that checkout is.
+          DUCK_UPSTREAM_FIXTURES: ${{ github.workspace }}/upstream/microduck/duck-control/tests/fixtures
         run: |
           set -euo pipefail
           cd core
