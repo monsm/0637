@@ -385,7 +385,8 @@ final class DuckUITests: XCTestCase {
         // prompt is part of the real path a child sees too. It can be served
         // by the app or by SpringBoard depending on the release.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for host in [app, springboard] {
+        let hosts: [XCUIApplication] = [app, springboard]
+        for host in hosts {
             let alert = host.alerts.firstMatch
             if alert.waitForExistence(timeout: 4) {
                 for label in ["Allow Paste", "允许粘贴", "Allow", "允许"] {
