@@ -673,6 +673,26 @@ pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) -> IntentS
     IntentServer { shutdown }
 }
 
+/// The chorus's moves, read strictly.
+///
+/// A list that is not a list, or that holds something which is not a name,
+/// is an error rather than a shorter song: quietly dropping what could not
+/// be read would sing something other than what was asked for, and the
+/// caller would never know.
+fn chorus_moves(value: &Value) -> Result<Vec<String>, String> {
+    let items = value
+        .as_array()
+        .ok_or_else(|| "moves must be a list of emotion names".to_owned())?;
+    let mut names = Vec::with_capacity(items.len());
+    for item in items {
+        let name = item
+            .as_str()
+            .ok_or_else(|| "moves must be a list of emotion names".to_owned())?;
+        names.push(name.to_owned());
+    }
+    Ok(names)
+}
+
 fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()> {
     stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
     let mut buffer = Vec::new();
@@ -917,38 +937,41 @@ fn handle(mut stream: TcpStream, queue: Arc<IntentQueue>) -> std::io::Result<()>
         // A chorus is a tap for the whole room: validated here, broadcast,
         // and the tick starts the countdown. Defaults to laugh + yes_fast.
         ("POST", "/chorus") => {
-            let moves: Vec<String> = value
-                .get("moves")
-                .and_then(Value::as_array)
-                .map(|rows| {
-                    rows.iter()
-                        .filter_map(Value::as_str)
-                        .map(str::to_owned)
-                        .collect()
-                })
-                .unwrap_or_else(|| {
-                    crate::lan::CHORUS_DEFAULT_MOVES
-                        .iter()
-                        .map(|name| (*name).to_owned())
-                        .collect()
-                });
-            if moves.is_empty() || moves.len() > crate::lan::CHORUS_MAX_MOVES {
-                Ok(json!({
-                    "ok": false,
-                    "error": "a chorus needs 1 to 3 moves",
-                })
-                .to_string())
-            } else if !moves.iter().all(|name| queue.emotion_loaded(name)) {
-                Ok(json!({ "ok": false, "error": "no such emotion" }).to_string())
-            } else if queue.chorus_active() {
-                Ok(json!({
-                    "ok": false,
-                    "error": "a chorus is already playing",
-                })
-                .to_string())
-            } else {
-                queue.push(Intent::Chorus(moves.clone()));
-                Ok(json!({ "ok": true, "queued": true, "moves": moves }).to_string())
+            // A body without `moves` sings the default pair. A body *with*
+            // `moves` must be a list of names: a malformed list is refused
+            // rather than quietly reinterpreted. Silently dropping the
+            // moves it could not read would sing a different song than the
+            // one that was asked for, and a client that asked for one beat
+            // would get two.
+            let requested = match value.get("moves") {
+                None => Ok(crate::lan::CHORUS_DEFAULT_MOVES
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect()),
+                Some(list) => chorus_moves(list),
+            };
+            match requested {
+                Err(error) => Ok(json!({ "ok": false, "error": error }).to_string()),
+                Ok(moves) => {
+                    if moves.is_empty() || moves.len() > crate::lan::CHORUS_MAX_MOVES {
+                        Ok(json!({
+                            "ok": false,
+                            "error": "a chorus needs 1 to 3 moves",
+                        })
+                        .to_string())
+                    } else if !moves.iter().all(|name| queue.emotion_loaded(name)) {
+                        Ok(json!({ "ok": false, "error": "no such emotion" }).to_string())
+                    } else if queue.chorus_active() {
+                        Ok(json!({
+                            "ok": false,
+                            "error": "a chorus is already playing",
+                        })
+                        .to_string())
+                    } else {
+                        queue.push(Intent::Chorus(moves.clone()));
+                        Ok(json!({ "ok": true, "queued": true, "moves": moves }).to_string())
+                    }
+                }
             }
         },
         // The companion state is public read / restore-only write: a client
