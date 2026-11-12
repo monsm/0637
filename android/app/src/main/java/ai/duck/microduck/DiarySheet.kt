@@ -53,7 +53,7 @@ fun DiarySheet(onClose: () -> Unit) {
                 val pets = events.count { it == "pet" }
                 val feeds = events.count { it == "feed" }
                 val rituals = events.count { it == "idle_ritual" }
-                val falls = events.count { it.startsWith("fall") }
+                val falls = events.count { isFall(it) }
                 val moods = events.count { it.startsWith("emotion:") }
                 val gifts = events.count { it.startsWith("gift:") }
                 if (pets > 0) add(Copy.awayPets(pets))

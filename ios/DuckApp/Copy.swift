@@ -413,6 +413,20 @@ enum Copy {
     }
 }
 
+/// The words the core writes into the duck's life record.
+///
+/// The core says "fell", not "fall": the diary counted the prefix "fall",
+/// which matched nothing, so the fall count was always zero — and a zero
+/// in the facts is a claim about the duck that is not true. The names live
+/// here so every screen reads them the same way.
+enum LifeEvent {
+    /// A fall. The core's word is "fell"; the prefix form is accepted too,
+    /// so a future "fall:hard" would still be counted.
+    static func isFall(_ event: String) -> Bool {
+        event == "fell" || event.hasPrefix("fall")
+    }
+}
+
 /// A skill's display name. The wire name is the protocol's; the label is the
 /// shell's, so a Chinese interface can say 翻滚 while the API still says
 /// `roulade`. English intentionally reuses the wire name — it is already the

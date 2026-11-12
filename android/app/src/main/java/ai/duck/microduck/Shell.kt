@@ -2677,7 +2677,7 @@ private fun InstrumentSheet(
                 if (fresh.isNotEmpty()) {
                     val parts = mutableListOf<String>()
                     val rituals = fresh.count { it == "idle_ritual" }
-                    val falls = fresh.count { it.startsWith("fall") }
+                    val falls = fresh.count { isFall(it) }
                     val feeds = fresh.count { it == "feed" }
                     val moods = fresh.count { it.startsWith("emotion:") }
                     if (rituals > 0) parts.add(Copy.awayRituals(rituals))

@@ -41,6 +41,14 @@ data class RuleUi(
 
 data class RuleStep(val action: String, val value: String)
 
+/**
+ * The core writes a fall into the life record as "fell" — one word, not a
+ * prefix. The diary counted the prefix "fall", which matched nothing, so the
+ * fall count was always zero, and a zero in the facts is a claim about the
+ * duck that is not true.
+ */
+fun isFall(event: String): Boolean = event == "fell" || event.startsWith("fall")
+
 /** The program the core is running, read from GET /rules. */
 fun fetchRules(): List<RuleUi>? = try {
     val summary = JSONObject(getJson("/rules")).optJSONObject("rules") ?: return null

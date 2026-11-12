@@ -345,7 +345,7 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
     }
     val caption = postcardCaption(
         rituals = events.count { it == "idle_ritual" },
-        falls = events.count { it.startsWith("fall") },
+        falls = events.count { isFall(it) },
         feeds = events.count { it == "feed" },
         pets = events.count { it == "pet" },
         moods = events.count { it.startsWith("emotion:") },

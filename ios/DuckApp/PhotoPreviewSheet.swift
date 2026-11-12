@@ -118,7 +118,7 @@ struct PhotoPreviewSheet: View {
             let metres = (json["life"] as? [String: Any])?["metres"] as? Double ?? 0
             caption = postcardCaption(
                 rituals: events.filter { $0 == "idle_ritual" }.count,
-                falls: events.filter { $0.hasPrefix("fall") }.count,
+                falls: events.filter(LifeEvent.isFall).count,
                 feeds: events.filter { $0 == "feed" }.count,
                 pets: events.filter { $0 == "pet" }.count,
                 moods: events.filter { $0.hasPrefix("emotion:") }.count,

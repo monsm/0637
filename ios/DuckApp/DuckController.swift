@@ -1386,7 +1386,7 @@ final class DuckController: ObservableObject {
             let pets = count("pet")
             let feeds = count("feed")
             let rituals = count("idle_ritual")
-            let falls = prefix("fall")
+            let falls = events.filter(LifeEvent.isFall).count
             let moods = prefix("emotion:")
             let gifts = prefix("gift:")
             if pets > 0 { lines.append(Copy.awayPets(pets)) }
@@ -1452,7 +1452,7 @@ final class DuckController: ObservableObject {
         guard !fresh.isEmpty else { return }
         var parts: [String] = []
         let rituals = fresh.filter { $0 == "idle_ritual" }.count
-        let falls = fresh.filter { $0.hasPrefix("fall") }.count
+        let falls = fresh.filter(LifeEvent.isFall).count
         let feeds = fresh.filter { $0 == "feed" }.count
         let pets = fresh.filter { $0 == "pet" }.count
         if rituals > 0 { parts.append(Copy.awayRituals(rituals)) }
