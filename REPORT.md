@@ -116,6 +116,7 @@
 | 0e | 整只鸭子是灰的 | `geom_rgba` 对全部 70 个可见 geom 都是默认灰 0.5——颜色在 `mat_rgba`，经 `geom_matid` 引用，只有渲染器解析 | shim 增加 `duck_mj_geom_colour`，按材质解析；16 种颜色到达渲染器 |
 | 0f | 面向镜头的一侧几乎全黑 | 固定世界光 `(-0.45,-0.65,-1)`，侧面无漫反射 | 改为跟随相机的头灯（与 MuJoCo 官方视图一致） |
 | 0g | 新 shim 函数链接报 `undefined symbol` | shim 的 C 链接来自头文件的 `extern "C"` 块，新函数未声明 → C++ 改名 | 在 `duck_mj_shim.h` 中声明 |
+| 0h | Android 正对镜头的鸭身只被环境光照亮（白壳发灰、地板没有主光） | Android 头灯向量传成 `eye - trunk`，shader 又做一次 `normalize(-uLight)`，主光因此永远背对镜头；iOS 传的是 `focus - eye`（相机→鸭子），方向正确。既有 bug，B3 舞台移植时被对抗审查抓出 | 改为 `trunk - eye`，与 iOS 同向。CI 判帧「亮中性壳」从门槛边缘升到 7908 px（门槛 600），暖石地板与日光染色才真正吃到主光（`5f097b4`） |
 | 1 | Android 闪退 | NDK 的 `libdl.a` 是"静态可执行文件"shim，把 `malloc/newlocale/__cxa_atexit` 静态拉进 .so，scudo 全局未初始化 → 除零 | 用 llvm-ar 只保留 dl 成员重建 `libdl.a`；CI 断言 bionic 符号不出现 |
 | 2 | Android 链接失败 | 缺 `__gxx_personality_v0`（C++ ABI）；API 21 stub 缺 `pthread_atfork`；API 28 无 ELF TLS | 补 `c++abi`、`--no-undefined`、`--platform 29`，minSdk 29 |
 | 3 | Android 崩溃 | MuJoCo C++ 异常穿越进 Rust → abort | shim 改为 C++17 + try/catch，错误走错误缓冲 |
@@ -579,7 +580,7 @@ iOS 真机 IPA 仍等签名凭据，Android arm64 真机仍没跑，真实双手
 | 开机姿态判定 | ✅ 上游 `posture.rs` 原样编译，其单元测试在核心里跑通；数字版 MuJoCo 永远从 HOME 启动，故没有「折叠开机」输入场景，判定作为 API 保留而不造假路径 |
 | 仍未移植 | 多鸭合唱 chorale（需多机无线电）、ToF 特雷门琴（需头部深度传感器）、pad 组合摇杆模式、`robot.rest` 的完整告别分支、渲染多光源/阴影贴图 —— 需硬件或超出手机范围 |
 | 第三轮 QA 的未关项 | 15 条里关了 8 条（核心门禁、礼物与夜、摔倒数、合唱形状、API 鉴权、规则导入的三条：空值判定三端统一、核心拒绝的导入不再落盘/不再报成功、Android 不再拿空表合并、规则恢复失败不再连坐 care/life）。**仍排着**：peer id 只有 32 位且 pid 被掩掉、合唱 id 只含 tick、日记没有「今天」（核心掉线会说「今天什么都没发生」）、模型输出零校验、Android 没接手机 IMU。逐条见 [docs/QA_ROUND3.md](docs/QA_ROUND3.md) |
-| 界面的账 | 设计审计（[docs/UI_AUDIT_2026-11-12.md](docs/UI_AUDIT_2026-11-12.md)）：Live 页面还露着引擎（状态串、原始技能名、tick 计数）、没有令牌层（9 个强调色/12 种字号/8 种圆角散在各处）、iOS 全部固定字号（171 处，Dynamic Type 完全无效）、手势没有无障碍等价物。方案在 [docs/UI_TOKENS.md](docs/UI_TOKENS.md) 与 [docs/STAGE_LOOK.md](docs/STAGE_LOOK.md) |
+| 界面的账 | 设计审计（[docs/UI_AUDIT_2026-11-12.md](docs/UI_AUDIT_2026-11-12.md)）指出 Live 页面还露着引擎（状态串、原始技能名、tick 计数）、没有令牌层（9 个强调色/12 种字号/8 种圆角散在各处）、iOS 全部固定字号（171 处，Dynamic Type 完全无效）、手势没有无障碍等价物。方案在 [docs/UI_TOKENS.md](docs/UI_TOKENS.md) 与 [docs/STAGE_LOOK.md](docs/STAGE_LOOK.md)。**2026-11-13 进展**：B1 止血（状态人话、技能名翻译、首屏零 tick/百分比、失败卡与重试、编舞对比度）与 B3 舞台（暖石地面、渐变墙、光晕、接触阴影、Instrument 冷棋盘）已双端验收签字；B4 可发现性（入口预算、两端动词统一、同物异名）待规格。见 [docs/UI_REVIEW_2026-11-13.md](docs/UI_REVIEW_2026-11-13.md) |
 
 ---
 
