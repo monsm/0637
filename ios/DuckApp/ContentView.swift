@@ -187,64 +187,7 @@ struct ContentView: View {
             // One modal sheet for every surface: instrument, Director photo,
             // blocks, neighbours and the user's model.
             .sheet(item: $modal) { sheet in
-                switch sheet {
-                case .instrument:
-                    InstrumentSheet(controller: controller)
-                        .presentationDetents(portrait ? [.medium, .large] : [.large])
-                        .presentationDragIndicator(.visible)
-                case .photo(let photo):
-                    PhotoPreviewSheet(
-                        photo: photo,
-                        shelf: controller.postcards
-                    )
-                case .rules:
-                    RulesSheet(controller: controller)
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.visible)
-                case .peers:
-                    PeersSheet(controller: controller)
-                        .presentationDetents(portrait ? [.medium, .large] : [.large])
-                        .presentationDragIndicator(.visible)
-                case .ai:
-                    AISheet(controller: controller)
-                        .presentationDetents(portrait ? [.medium, .large] : [.large])
-                        .presentationDragIndicator(.visible)
-                case .dance:
-                    DanceSheet(
-                        studio: controller.dance,
-                        execute: playDanceStep,
-                        tryStep: { kind, value in
-                            let label = kind == "sound"
-                                ? Copy.danceStepSound
-                                : SkillLabel.of(value)
-                            controller.dance.record(
-                                kind,
-                                value: value,
-                                label: label
-                            )
-                            playDanceStep(DanceStep(
-                                kind: kind,
-                                value: value,
-                                label: label
-                            ))
-                        }
-                    )
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                case .progress:
-                    ProgressSheet()
-                        .presentationDetents(portrait ? [.medium, .large] : [.large])
-                        .presentationDragIndicator(.visible)
-                case .more:
-                    MoreSheet(
-                        controller: controller,
-                        stickMode: $stickMode,
-                        languageTick: $languageTick,
-                        onDanceStep: playDanceStep
-                    )
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                }
+                modalSheet(sheet, portrait: portrait)
             }
             .onChange(of: showInstrument) { _, show in
                 if show { showInstrument = false; modal = .instrument }
@@ -695,6 +638,71 @@ struct ContentView: View {
                 timeHolding = false
                 timeHoldEndedAt = Date()
             }
+    }
+
+    /// One sheet at a time. The switch lives in its own function because the
+    /// body expression — every modifier on the scene — was more than the
+    /// type checker could solve once the drawer joined it.
+    @ViewBuilder
+    private func modalSheet(_ sheet: Modal, portrait: Bool) -> some View {
+        switch sheet {
+        case .instrument:
+            InstrumentSheet(controller: controller)
+                .presentationDetents(portrait ? [.medium, .large] : [.large])
+                .presentationDragIndicator(.visible)
+        case .photo(let photo):
+            PhotoPreviewSheet(
+                photo: photo,
+                shelf: controller.postcards
+            )
+        case .rules:
+            RulesSheet(controller: controller)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        case .peers:
+            PeersSheet(controller: controller)
+                .presentationDetents(portrait ? [.medium, .large] : [.large])
+                .presentationDragIndicator(.visible)
+        case .ai:
+            AISheet(controller: controller)
+                .presentationDetents(portrait ? [.medium, .large] : [.large])
+                .presentationDragIndicator(.visible)
+        case .dance:
+            DanceSheet(
+                studio: controller.dance,
+                execute: playDanceStep,
+                tryStep: { kind, value in
+                    let label = kind == "sound"
+                        ? Copy.danceStepSound
+                        : SkillLabel.of(value)
+                    controller.dance.record(
+                        kind,
+                        value: value,
+                        label: label
+                    )
+                    playDanceStep(DanceStep(
+                        kind: kind,
+                        value: value,
+                        label: label
+                    ))
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        case .progress:
+            ProgressSheet()
+                .presentationDetents(portrait ? [.medium, .large] : [.large])
+                .presentationDragIndicator(.visible)
+        case .more:
+            MoreSheet(
+                controller: controller,
+                stickMode: $stickMode,
+                languageTick: $languageTick,
+                onDanceStep: playDanceStep
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     /// The share of retained history, not of the whole run: the bar fills as
