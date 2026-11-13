@@ -29,9 +29,6 @@ struct ContentView: View {
     @AppStorage("first_launch_hint_shown") private var hintShown = false
     @State private var showHint = false
 
-    enum StickMode: String, CaseIterable {
-        case drive, head, body, path
-    }
     @State private var showInstrument = false
     /// The time button's long press: the quick freeze. The button's own
     /// action fires on the same lift, so the hold has to be able to say
