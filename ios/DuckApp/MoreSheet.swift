@@ -154,7 +154,7 @@ struct MoreSheet: View {
             .padding(.top, 14)
             .padding(.bottom, 28)
         }
-        .background(Color(red: 0.055, green: 0.075, blue: 0.10))
+        .background(Color.sheetSurface)
         .preferredColorScheme(.dark)
         .sheet(item: $destination) { destination in
             sheet(for: destination)
@@ -291,11 +291,11 @@ struct MoreSheet: View {
                 if check {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.cyan)
+                        .foregroundStyle(Color.actionAccent)
                 }
                 if dot {
                     Circle()
-                        .fill(Color.orange)
+                        .fill(Color.actionAccent)
                         .frame(width: 8, height: 8)
                 }
                 if let badge {
@@ -306,7 +306,7 @@ struct MoreSheet: View {
                 if showsChevron {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(.secondary)
                 }
             }
             .frame(minHeight: 48)
@@ -368,10 +368,10 @@ struct ModeSheet: View {
                         if stickMode == mode {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.cyan)
+                                .foregroundStyle(Color.actionAccent)
                         }
                     }
-                    .frame(minHeight: 44)
+                    .frame(minHeight: 48)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -380,7 +380,16 @@ struct ModeSheet: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(red: 0.055, green: 0.075, blue: 0.10))
+        .background(Color.sheetSurface)
         .preferredColorScheme(.dark)
     }
+}
+/// UI_TOKENS v1 literals until B2 grows `DuckTheme.swift`: a new component
+/// must not invent another surface or accent (design review 2026-11-13).
+private extension Color {
+    /// bg.surface #221F1D — the opaque sheet surface, warm like the room
+    /// (UI_TOKENS §4).
+    static let sheetSurface = Color(red: 0.133, green: 0.122, blue: 0.114)
+    /// accent.action #FF8A3D — selection, checks and attention dots.
+    static let actionAccent = Color(red: 1.0, green: 0.541, blue: 0.239)
 }
