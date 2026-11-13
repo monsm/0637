@@ -1146,7 +1146,6 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityIdentifier("duck-topbar")
     }
 
     private func topBar(showSurface: Bool = true, showProgress: Bool = false) -> some View {

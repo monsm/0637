@@ -36,7 +36,9 @@ final class DuckUITests: XCTestCase {
     }
 
     private func labelElement() -> XCUIElement {
-        app.staticTexts["duck-label"]
+        // Any element type: SwiftUI may expose a labelled Text as a static
+        // text or as a container element, and the test cares about the id.
+        app.descendants(matching: .any)["duck-label"].firstMatch
     }
 
     /// Poll the visible label until it is one of `wanted`, returning the last
@@ -384,7 +386,7 @@ final class DuckUITests: XCTestCase {
     func testFirstScreenSpeaksHuman() throws {
         XCTAssertTrue(
             labelElement().waitForExistence(timeout: 120),
-            "the status panel never appeared - the app did not get past loading"
+            "the status panel never appeared - the app did not get past loading\n\(app.debugDescription)"
         )
         let ready = waitForLabel(["walk", "stand"], timeout: 180)
         XCTAssertTrue(

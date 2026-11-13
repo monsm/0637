@@ -253,7 +253,6 @@ struct MoreSheet: View {
                 .padding(.bottom, 2)
             VStack(spacing: 2) { content() }
         }
-        .accessibilityIdentifier("more-group-\(id)")
     }
 
     /// One row: 48 pt tall, a 20 pt icon, a 15 pt title, an optional 12 pt
