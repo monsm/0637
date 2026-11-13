@@ -58,7 +58,32 @@ final class DuckUITests: XCTestCase {
         return last
     }
 
-    /// Open the skill ring and pick a skill by its visible name.
+    /// Open the More drawer: one tap from the stage (B4 §2).
+    private func openMore() {
+        let more = app.buttons["duck-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "the More button is missing")
+        more.tap()
+        XCTAssertTrue(
+            app.staticTexts["more-title"].waitForExistence(timeout: 10),
+            "the More drawer did not open"
+        )
+    }
+
+    /// Close the drawer again; a function sheet that opened on top of it
+    /// leaves the drawer underneath.
+    private func closeMore() {
+        let close = app.buttons["more-close"]
+        if close.waitForExistence(timeout: 5) { close.tap() }
+        // The drawer has to be gone before the next drawer opens, or the tap
+        // lands on a sheet that is still animating away.
+        let gone = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: app.staticTexts["more-title"]
+        )
+        _ = XCTWaiter.wait(for: [gone], timeout: 5)
+    }
+
+    /// Open a skill from the ring.
     private func pickSkill(_ name: String) throws {
         let skills = app.buttons["duck-skills"]
         XCTAssertTrue(skills.waitForExistence(timeout: 10), "the skills button is missing")
@@ -206,9 +231,11 @@ final class DuckUITests: XCTestCase {
         )
         // The block program: add "when clap, roll over" through the editor and
         // see the block it created. The engine itself is exercised by
-        // sim-drive's clap test; this proves the control is wired to it.
-        let rulesButton = app.buttons["duck-rules"]
-        XCTAssertTrue(rulesButton.waitForExistence(timeout: 5), "the Blocks button is missing")
+        // sim-drive's clap test; this proves the control is wired to it. It
+        // now lives in the More drawer (B4 §2), one tap from the stage.
+        openMore()
+        let rulesButton = app.buttons["more-blocks"]
+        XCTAssertTrue(rulesButton.waitForExistence(timeout: 10), "the drawer has no Blocks row")
         rulesButton.tap()
         XCTAssertTrue(
             app.staticTexts["rules-title"].waitForExistence(timeout: 10),
@@ -232,10 +259,12 @@ final class DuckUITests: XCTestCase {
             .completed,
             "the block editor did not close"
         )
+        closeMore()
         // The neighbours sheet: with no second phone in CI it must say so
         // rather than sit blank, and its close target must work.
-        let peersButton = app.buttons["duck-peers"]
-        XCTAssertTrue(peersButton.waitForExistence(timeout: 5), "the Neighbours button is missing")
+        openMore()
+        let peersButton = app.buttons["more-peers"]
+        XCTAssertTrue(peersButton.waitForExistence(timeout: 10), "the drawer has no Neighbours row")
         peersButton.tap()
         XCTAssertTrue(
             app.staticTexts["peers-title"].waitForExistence(timeout: 10),
@@ -246,6 +275,7 @@ final class DuckUITests: XCTestCase {
             "an empty LAN has no empty-state line"
         )
         app.buttons["peers-close"].tap()
+        closeMore()
         let after = waitForLabel(["walk", "stand"], timeout: 30)
         XCTAssertTrue(
             ["walk", "stand"].contains(after),
@@ -315,8 +345,8 @@ final class DuckUITests: XCTestCase {
         )
     }
 
-    /// The Path Painter: the mode opens from the shell menu, and with nothing
-    /// drawn Go must exist but wait for a route with two real steps on it.
+    /// The Path Painter: the mode opens from the More drawer, and with
+    /// nothing drawn Go must exist but wait for a route with two real steps.
     func testPathModeOpensWithGoWaiting() throws {
         XCTAssertTrue(
             labelElement().waitForExistence(timeout: 120),
@@ -328,12 +358,11 @@ final class DuckUITests: XCTestCase {
             "the 50 Hz loop never drove the duck: label=\(ready)"
         )
 
-        // The deck's own scribble chip: one tap into the stage-as-canvas.
-        // (The mode menu carries the same entry, but SwiftUI menu items
-        // report an empty frame to XCUITest and cannot be tapped here.)
-        let pathChip = app.buttons["duck-path"]
-        XCTAssertTrue(pathChip.waitForExistence(timeout: 10), "the deck has no Path chip")
-        pathChip.tap()
+        // One tap into the stage-as-canvas: the drawer's Path row (B4 §2).
+        openMore()
+        let pathRow = app.buttons["more-path"]
+        XCTAssertTrue(pathRow.waitForExistence(timeout: 10), "the drawer has no Path row")
+        pathRow.tap()
 
         let go = app.buttons["path-go"]
         XCTAssertTrue(go.waitForExistence(timeout: 10), "path mode has no Go chip")
@@ -374,11 +403,33 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(mood.waitForExistence(timeout: 20), "the mood capsule never appeared")
         XCTAssertFalse(mood.label.contains("%"), "the mood line still carries a percentage: \(mood.label)")
 
-        // The progress page has a portrait entry, not only the landscape bar.
-        XCTAssertTrue(
-            app.buttons["duck-progress"].waitForExistence(timeout: 5),
-            "portrait has no Daily/progress entry"
+        // The B4 budget: seven tappable controls on the first screen —
+        // four verbs, More, and the two time-rail buttons.
+        let tappable = app.buttons.allElementsBoundByIndex.filter { $0.exists && $0.isHittable }
+        XCTAssertLessThanOrEqual(
+            tappable.count, 7,
+            "the first screen has \(tappable.count) tappable controls"
         )
+
+        // The daily goals live in the More drawer now, one tap from the stage.
+        openMore()
+        XCTAssertTrue(
+            app.buttons["more-quests"].waitForExistence(timeout: 5),
+            "the drawer has no Daily quests row"
+        )
+        XCTAssertTrue(
+            app.buttons["more-diary"].exists,
+            "the drawer has no Diary row"
+        )
+        XCTAssertTrue(
+            app.buttons["more-postcards"].exists,
+            "the drawer has no Postcards row"
+        )
+        XCTAssertTrue(
+            app.buttons["more-dex"].exists,
+            "the drawer has no Mood dex row"
+        )
+        closeMore()
 
         // A wire skill name must never reach the stage. `kick_left` is the
         // case with an underscore the old bar printed verbatim.
@@ -412,6 +463,8 @@ final class DuckUITests: XCTestCase {
             "rotation to landscape did not happen (\(app.frame))"
         )
         // Every load-bearing control exists in the wide shell too.
+        // The wide shell still carries its own ⋯ menu this round (B4a is
+        // portrait only), so the landscape keeps that entry.
         for id in ["duck-label", "duck-menu", "surface-toggle", "duck-time", "duck-skills", "duck-quack", "duck-grab"] {
             let element = app.buttons[id].exists ? app.buttons[id] : app.staticTexts[id]
             XCTAssertTrue(element.waitForExistence(timeout: 5), "\(id) missing in landscape")

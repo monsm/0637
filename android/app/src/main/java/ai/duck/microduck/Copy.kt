@@ -139,6 +139,23 @@ val quack get() = pick("Quack", "叫一声")
 
     // Instrument sheet
     val thisDuck get() = pick("This duck", "这只鸭子")
+    // The one More drawer (B4): four groups, at most four rows each.
+    val more get() = pick("More", "更多")
+    val groupPlay get() = pick("Play", "玩")
+    val groupTogether get() = pick("Together", "一起")
+    val groupRecord get() = pick("Record", "记录")
+    val dailyQuests get() = pick("Daily quests", "每日任务")
+    val stickModes get() = pick("Controls", "操控方式")
+    val pathRowNote get() = pick("Draw a route, then walk it", "画一条路，让它走")
+    val blocksRowNote get() = pick("When this, then that", "当……就……")
+    val danceRowNote get() = pick("Record a move, then replay it", "录下来，再重演")
+    val peersRowNote get() = pick("Chorus · gifts · nearby", "合唱 · 互送礼物 · 附近")
+    val questsRowNote get() = pick("Three small goals a day", "每天三个小目标")
+    val dexRowNote get() = pick("Moods you have met", "见过多少种心情")
+    val languageRow get() = pick("Language", "语言")
+    val nightRowNote get() = pick("Let it sleep", "让鸭子睡下")
+    val morningRowNote get() = pick("Wake the duck", "叫醒鸭子")
+    val tiltLook get() = pick("Tilt to look", "倾斜看")
     val close get() = pick("Close", "关闭")
     val timeMachine get() = pick("Time machine", "时间机器")
     val freeze get() = pick("Freeze", "冻结")
@@ -347,7 +364,7 @@ val quack get() = pick("Quack", "叫一声")
     /// The mood arrived while the duck was busy: it was sent, it was not played.
     fun giftMissedEmotion(name: String) = pick("$name sent a cheer", "$name 送来一份心意")
     // The room's chorus: every duck performs the same moves together.
-    val chorus get() = pick("Chorus", "一起唱")
+    val chorus get() = pick("Chorus", "合唱")
     fun chorusLine(peers: Int) = pick(
         "Singing together with $peers duck(s)",
         "和 $peers 只鸭子一起唱",

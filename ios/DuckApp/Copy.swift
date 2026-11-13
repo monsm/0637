@@ -261,6 +261,24 @@ enum Copy {
         ), minutes)
     }
     static var menu: String { pick("Menu", "菜单") }
+    // The one "More" drawer (B4): four groups, at most four rows each.
+    static var more: String { pick("More", "更多") }
+    static var groupPlay: String { pick("Play", "玩") }
+    static var groupTogether: String { pick("Together", "一起") }
+    static var groupRecord: String { pick("Record", "记录") }
+    static var dailyQuests: String { pick("Daily quests", "每日任务") }
+    static var stickModes: String { pick("Controls", "操控方式") }
+    static var pathRowNote: String { pick("Draw a route, then walk it", "画一条路，让它走") }
+    static var blocksRowNote: String { pick("When this, then that", "当……就……") }
+    static var danceRowNote: String { pick("Record a move, then replay it", "录下来，再重演") }
+    /// The neighbours row carries its own actions in the subtitle; the
+    /// chorus and the gifts are actions inside that page, not pages.
+    static var peersRowNote: String { pick("Chorus · gifts · nearby", "合唱 · 互送礼物 · 附近") }
+    static var questsRowNote: String { pick("Three small goals a day", "每天三个小目标") }
+    static var dexRowNote: String { pick("Moods you have met", "见过多少种心情") }
+    static var languageRow: String { pick("Language", "语言") }
+    static var nightRowNote: String { pick("Let it sleep", "让鸭子睡下") }
+    static var morningRowNote: String { pick("Wake the duck", "叫醒鸭子") }
     static var cameraUnavailable: String { pick("NO CAMERA", "无相机") }
     static var feed: String { pick("Feed", "喂食") }
     /// 每日任务与成就墙（成长系统）的入口。
@@ -442,7 +460,7 @@ enum Copy {
     }
     // A chorus between neighbours: one duck starts it, the room joins the
     // same moods 1.5 s later.
-    static var chorus: String { pick("Chorus", "一起唱") }
+    static var chorus: String { pick("Chorus", "合唱") }
     static func chorusLine(_ peers: Int) -> String {
         String(format: pick("Singing together with %d duck(s)", "和 %d 只鸭子一起唱"), peers)
     }

@@ -33,6 +33,11 @@ struct ContentView: View {
         case drive, head, body, path
     }
     @State private var showInstrument = false
+    /// The time button's long press: the quick freeze. The button's own
+    /// action fires on the same lift, so the hold has to be able to say
+    /// "that was me".
+    @State private var timeHolding = false
+    @State private var timeHoldEndedAt = Date.distantPast
     /// The child's block program, edited over the live duck.
     @State private var showRules = false
     /// Other ducks on the Wi-Fi.
@@ -51,6 +56,7 @@ struct ContentView: View {
         case ai
         case dance
         case progress
+        case more
 
         var id: String {
             switch self {
@@ -61,6 +67,7 @@ struct ContentView: View {
             case .ai: return "ai"
             case .dance: return "dance"
             case .progress: return "progress"
+            case .more: return "more"
             }
         }
     }
@@ -228,6 +235,15 @@ struct ContentView: View {
                     ProgressSheet()
                         .presentationDetents(portrait ? [.medium, .large] : [.large])
                         .presentationDragIndicator(.visible)
+                case .more:
+                    MoreSheet(
+                        controller: controller,
+                        stickMode: $stickMode,
+                        languageTick: $languageTick,
+                        onDanceStep: playDanceStep
+                    )
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
                 }
             }
             .onChange(of: showInstrument) { _, show in
@@ -266,6 +282,14 @@ struct ContentView: View {
             if ready {
                 presentHint()
                 controller.restoreCompanionState()
+                // A launch argument opens the More drawer straight away: CI
+                // takes the acceptance screenshot of it without a hand on the
+                // phone (`-duck.openMore YES`). The argument domain stores
+                // strings, so the value is read as text.
+                if let open = UserDefaults.standard.string(forKey: "duck.openMore"),
+                   open.lowercased() == "yes" || open == "1" {
+                    modal = .more
+                }
             }
         }
         .onChange(of: controller.awaySummary) { _, summary in
@@ -531,7 +555,8 @@ struct ContentView: View {
 
     // MARK: - Portrait shell (Stage Deck)
 
-    /// 单手构图：状态在上，舞台在中，拇指下面是 48 pt 时间条和 76 pt 托盘。
+    /// 单手构图：状态在上（只读），舞台在中，拇指下面是 48 pt 时间条和
+    /// 82 pt 托盘（4 个动词 + 更多）。
     /// 横屏走 `chrome(in:)`，两边共用同一张失败卡片、同一行说人话的状态、
     /// 同一套语义字号。
     private func portraitChrome(in size: CGSize) -> some View {
@@ -540,7 +565,7 @@ struct ContentView: View {
         let failure = failureMessage
         let usable = controller.ready && failure == nil
         return VStack(spacing: 0) {
-            topBar(showSurface: false, showProgress: true)
+            titleBar()
             if let failure {
                 Spacer(minLength: 12)
                 failureCard(failure)
@@ -598,19 +623,18 @@ struct ContentView: View {
             .accessibilityIdentifier("mood-pill")
     }
 
+    /// The portrait time rail: two buttons, icon only (B4 §1). The time
+    /// button keeps the retained-history bar; a long press on it is the
+    /// quick freeze, so freeze and resume live in the time machine and one
+    /// hold away.
     private var timeRail: some View {
         HStack(spacing: 8) {
             Button {
-                showInstrument = true
+                openInstrument()
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.body)
-                    // 这个按钮通向时间机器，标签就该说它在做什么。墙钟会
-                    // 和状态栏的钟重复、还一直在变；时间读数住在仪表盘。
-                    Text(Copy.time)
-                        .font(.system(.caption, design: .rounded, weight: .medium))
-                        .foregroundStyle(.secondary)
+                    Image(systemName: Icons.time)
+                        .font(.system(size: 18, weight: .medium))
                     GeometryReader { proxy in
                         ZStack(alignment: .leading) {
                             Capsule()
@@ -625,67 +649,52 @@ struct ContentView: View {
                         .frame(maxHeight: .infinity, alignment: .center)
                     }
                     .frame(height: 18)
-                    Image(systemName: "chevron.up")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.tertiary)
                 }
                 .padding(.horizontal, 12)
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .simultaneousGesture(timeHoldGesture)
             .accessibilityLabel(Copy.timeMachine)
             .accessibilityIdentifier("duck-time")
 
-            Button {
-                controller.setPaused(!controller.paused)
-            } label: {
-                Image(systemName: controller.paused ? "play.fill" : "pause.fill")
-                    .font(.body)
-                    .frame(width: 48, height: 48)
-                    .background(
-                        controller.paused
-                            ? AnyShapeStyle(Color.orange.opacity(0.28))
-                            : AnyShapeStyle(.ultraThinMaterial),
-                        in: Circle()
-                    )
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(controller.paused ? Copy.resume : Copy.freeze)
-            .accessibilityIdentifier("rail-pause")
-
-            // Other ducks on this Wi-Fi: discovery is the core's, the list is
-            // one tap from the stage.
-            Button {
-                showPeers = true
-            } label: {
-                Image(systemName: "dot.radiowaves.left.and.right")
-                    .font(.body)
-                    .frame(width: 48, height: 48)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Copy.peers)
-            .accessibilityIdentifier("duck-peers")
-
-            Button {
+            secondaryButton(
+                "surface-toggle",
+                surface == .live ? Copy.director : Copy.live,
+                surface == .live ? Icons.director : Icons.live
+            ) {
                 toggleSurface()
-            } label: {
-                Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
-                    .font(.body.weight(.semibold))
-                    .frame(width: 48, height: 48)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .contentShape(Circle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(surface == .live ? Copy.director : Copy.live)
-            .accessibilityIdentifier("surface-toggle")
         }
         .frame(height: 48)
         .padding(.top, 6)
         .padding(.bottom, 8)
+    }
+
+    /// The time button opens the time machine — unless the press was a hold,
+    /// which is the quick freeze. The button's own action fires on the same
+    /// lift, so the two have to tell each other apart.
+    private func openInstrument() {
+        if timeHolding || Date().timeIntervalSince(timeHoldEndedAt) < 0.6 { return }
+        showInstrument = true
+    }
+
+    /// Long press the time button = freeze at once. `LongPressGesture.sequenced`
+    /// is the one primitive whose `onEnded` sees the real lift.
+    private var timeHoldGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.45)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                if case .second(true, _) = value, !timeHolding {
+                    timeHolding = true
+                    controller.setPaused(true)
+                }
+            }
+            .onEnded { _ in
+                timeHolding = false
+                timeHoldEndedAt = Date()
+            }
     }
 
     /// The share of retained history, not of the whole run: the bar fills as
@@ -698,81 +707,31 @@ struct ContentView: View {
         return width * CGFloat(fraction)
     }
 
+    /// The portrait thumb deck (B4 §1): four verbs and the More drawer.
+    /// Every button is the same primary shape — a 52 pt circle, an 18 pt
+    /// icon and an 11 pt label — so the deck and (later) both platforms
+    /// cannot drift apart.
     private var thumbDeck: some View {
-        HStack(spacing: 6) {
-            Spacer(minLength: 0)
-            deckButton("duck-feed", Copy.feed, "fork.knife") { controller.feed() }
-            deckButton("duck-skills", Copy.skills, "sparkles") { showRing = true }
-            // Path mode's own door: a child should not dig through the menu
-            // to draw a route. Tap enters the stage-as-canvas; tap again
-            // hands the stick back.
-            Button {
-                stickMode = stickMode == .path ? .drive : .path
-            } label: {
-                Image(systemName: "scribble")
-                    .font(.body)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        stickMode == .path
-                            ? AnyShapeStyle(Color.cyan.opacity(0.35))
-                            : AnyShapeStyle(.ultraThinMaterial),
-                        in: Circle()
-                    )
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Copy.pathMode)
-            .accessibilityIdentifier("duck-path")
-            Button {
-                quackTapped()
-            } label: {
-                Image(systemName: "waveform")
-                    .font(.title3)
-                    .frame(width: 50, height: 50)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .simultaneousGesture(wheeeGesture)
-            .accessibilityLabel(Copy.quack)
-            .accessibilityIdentifier("duck-quack")
-
-            Button {
+        HStack(spacing: 8) {
+            primaryButton("duck-feed", Copy.feed, Icons.feed) { controller.feed() }
+            primaryButton("duck-skills", Copy.skills, Icons.skills) { showRing = true }
+            primaryButton("duck-quack", Copy.quack, Icons.quack) { quackTapped() }
+                .simultaneousGesture(wheeeGesture)
+            primaryButton(
+                "duck-grab",
+                controller.carrying ? Copy.putDown : Copy.grab,
+                controller.carrying ? Icons.drop : Icons.grab,
+                selected: controller.carrying
+            ) {
                 if controller.carrying {
                     controller.release()
                 } else {
                     controller.grab()
                 }
-            } label: {
-                Image(systemName: controller.carrying ? "hand.raised.fill" : "hand.point.up.left.fill")
-                    .font(.title3)
-                    .frame(width: 56, height: 56)
-                    .background(
-                        controller.carrying
-                            ? AnyShapeStyle(Color.cyan.opacity(0.35))
-                            : AnyShapeStyle(.ultraThinMaterial),
-                        in: Circle()
-                    )
-                    .contentShape(Circle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(controller.carrying ? Copy.putDown : Copy.grab)
-            .accessibilityIdentifier("duck-grab")
-
-            Button {
-                showRules = true
-            } label: {
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.body)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Copy.blocks)
-            .accessibilityIdentifier("duck-rules")
+            primaryButton("duck-more", Copy.more, Icons.more) { modal = .more }
         }
-        .frame(height: 76)
+        .frame(height: 82)
         .padding(.horizontal, 10)
         .background(
             Color(red: 0.078, green: 0.102, blue: 0.133).opacity(0.94),
@@ -784,7 +743,42 @@ struct ContentView: View {
         )
     }
 
-    private func deckButton(
+    /// The one primary button (B4 §3): 52 pt circle, 18 pt icon, 11 pt label
+    /// underneath.
+    private func primaryButton(
+        _ id: String,
+        _ label: String,
+        _ icon: String,
+        selected: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(width: 52, height: 52)
+                    .background(
+                        selected
+                            ? AnyShapeStyle(Color.cyan.opacity(0.35))
+                            : AnyShapeStyle(.ultraThinMaterial),
+                        in: Circle()
+                    )
+                    .contentShape(Circle())
+                Text(label)
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityIdentifier(id)
+    }
+
+    /// A secondary button (B4 §3): 48 pt circle, icon only, and always an
+    /// accessibility label.
+    private func secondaryButton(
         _ id: String,
         _ label: String,
         _ icon: String,
@@ -792,8 +786,8 @@ struct ContentView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.title3)
-                .frame(width: 46, height: 46)
+                .font(.system(size: 18, weight: .medium))
+                .frame(width: 48, height: 48)
                 .background(.ultraThinMaterial, in: Circle())
                 .contentShape(Circle())
         }
@@ -1110,6 +1104,38 @@ struct ContentView: View {
         if failureMessage != nil { return Copy.wakeFailed }
         if controller.ready { return Copy.behaviourOf(raw: controller.label) }
         return Copy.waking
+    }
+
+    /// The portrait top area is read-only (B4 §1): the duck's name and what
+    /// it is doing, in words rather than numbers. Every menu that used to
+    /// hide in the right-hand corner moved into the More drawer.
+    private func titleBar() -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(Copy.name)
+                .font(.system(.headline, design: .rounded))
+            Text(statusLine)
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("duck-label")
+            if !controller.lastSkill.isEmpty {
+                Text(SkillLabel.of(controller.lastSkill))
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("duck-last-skill")
+            }
+            if controller.fallen {
+                Text(Copy.fell)
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.orange)
+            }
+            if controller.pickedUp && !controller.carrying {
+                Text(Copy.held)
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.cyan)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("duck-topbar")
     }
 
     private func topBar(showSurface: Bool = true, showProgress: Bool = false) -> some View {

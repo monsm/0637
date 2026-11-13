@@ -375,8 +375,9 @@ jobs:
             exit 1
           fi
           cp "$CARD" ui-b1-postcard.png
-          # The portrait Live acceptance screenshot, in the language a Chinese
-          # user sees, with the room's hour pinned so CI is reproducible.
+          # The portrait Live acceptance screenshot (B1), the B4 first screen
+          # and its More drawer, in the language a Chinese user sees, with the
+          # room's hour pinned so CI is reproducible.
           xcrun simctl terminate "$SIM_UDID" ai.duck.microduck > /dev/null 2>&1 || true
           xcrun simctl launch "$SIM_UDID" ai.duck.microduck \
             -duck.language 中文 -duck.daylightHour 12 > /dev/null 2>&1 || true
@@ -395,19 +396,32 @@ jobs:
             exit 1
           fi
           sleep 2
-          xcrun simctl io "$SIM_UDID" screenshot ui-b1-ios.png
-          # The acceptance screenshot is the portrait product. Fail loudly if
-          # the runner ended in landscape rather than publishing the wrong shot.
+          xcrun simctl io "$SIM_UDID" screenshot ui-b4-ios.png
+          cp ui-b4-ios.png ui-b1-ios.png
+          # The More drawer, opened by a launch argument so no hand is needed.
+          xcrun simctl terminate "$SIM_UDID" ai.duck.microduck > /dev/null 2>&1 || true
+          xcrun simctl launch "$SIM_UDID" ai.duck.microduck \
+            -duck.language 中文 -duck.daylightHour 12 -duck.openMore YES > /dev/null 2>&1 || true
+          STATE=""
+          for _ in $(seq 1 120); do
+            STATE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state || true)
+            if [ -n "$STATE" ] && ! printf '%s' "$STATE" | grep -q '"label":"idle"'; then break; fi
+            sleep 2
+          done
+          sleep 3
+          xcrun simctl io "$SIM_UDID" screenshot ui-b4-ios-more.png
+          # The acceptance screenshots are portrait, or they are not the product.
           python3 - <<'PY'
           import struct
-          with open('ui-b1-ios.png', 'rb') as handle:
-              header = handle.read(24)
-          if header[:8] != b'\x89PNG\r\n\x1a\n':
-              raise SystemExit("::error::the acceptance screenshot is not a PNG")
-          width, height = struct.unpack('>II', header[16:24])
-          if height <= width:
-              raise SystemExit(f"::error::the acceptance screenshot is not portrait: {width}x{height}")
-          print(f"portrait screenshot: {width}x{height}")
+          for path in ('ui-b4-ios.png', 'ui-b4-ios-more.png'):
+              with open(path, 'rb') as handle:
+                  header = handle.read(24)
+              if header[:8] != b'\x89PNG\r\n\x1a\n':
+                  raise SystemExit(f"::error::{path} is not a PNG")
+              width, height = struct.unpack('>II', header[16:24])
+              if height <= width:
+                  raise SystemExit(f"::error::{path} is not portrait: {width}x{height}")
+              print(f"{path}: {width}x{height}")
           PY
           xcrun simctl shutdown "$SIM_UDID" || true
 
@@ -579,6 +593,8 @@ jobs:
           # artifacts: commit them to dist/ on this branch. [skip ci] and the
           # workflow's path filter keep the commit from re-running CI.
           mkdir -p dist
+          cp ui-b4-ios.png dist/ui-b4-ios.png
+          cp ui-b4-ios-more.png dist/ui-b4-ios-more.png
           cp ui-b1-ios.png dist/ui-b1-ios.png
           cp ui-b1-postcard.png dist/ui-b1-postcard.png
           git config user.email "actions@github.com"
@@ -591,8 +607,8 @@ jobs:
             if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
               git reset --mixed FETCH_HEAD
             fi
-            git add -f dist/ui-b1-ios.png dist/ui-b1-postcard.png
-            git commit -m "ui-b1: iOS portrait Live screenshot and postcard [skip ci]" || true
+            git add -f dist/ui-b4-ios.png dist/ui-b4-ios-more.png dist/ui-b1-ios.png dist/ui-b1-postcard.png
+            git commit -m "ui-b1/ui-b4: iOS portrait Live screen, More drawer and postcard [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2
           done
@@ -628,6 +644,8 @@ jobs:
           path: |
             sim-screenshot.png
             ui-b1-ios.png
+            ui-b4-ios.png
+            ui-b4-ios-more.png
             ui-b1-postcard.png
             sim-syslog.log
             sim-syslog-all.log

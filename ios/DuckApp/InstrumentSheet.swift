@@ -553,9 +553,27 @@ struct InstrumentSheet: View {
             }
             row(Copy.battery, controller.faceBattery)
             flashlightRow
+            tiltRow
         }
         .padding(14)
         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// Tilt-to-look is a drive mode, not a separate feature: it belongs with
+    /// the face's controls in "This duck" (design decision 2026-11-13). It is
+    /// iOS only — the phone's IMU is the head; Android does not ship it.
+    private var tiltRow: some View {
+        HStack {
+            Text(Copy.tiltLook)
+                .font(.system(size: 12, design: .rounded))
+                .foregroundStyle(.secondary)
+            Spacer()
+            Toggle("", isOn: $controller.tiltLook)
+                .labelsHidden()
+                .tint(Color(red: 0.498, green: 0.698, blue: 0.851))
+                .accessibilityLabel(Copy.tiltLook)
+                .accessibilityIdentifier("sheet-tilt-look")
+        }
     }
 
     /// "▮▮▯▯" for two lit LEDs of four. The core's `bars` is 0…4; an
