@@ -399,6 +399,8 @@ val quack get() = pick("Quack", "叫一声")
     val face get() = pick("Face", "脸")
     val flashlight get() = pick("Flash", "手电")
     val flashlightRow get() = pick("Flashlight", "手电筒")
+    val flashlightOn get() = pick("on", "开")
+    val flashlightOff get() = pick("off", "关")
 
     /** The status LED's verdict, in the shell's language. */
     fun faceStatus(status: String): String = when (status) {

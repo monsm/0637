@@ -632,8 +632,11 @@ struct ContentView: View {
                 }
             }
             .onEnded { _ in
+                // Only a real hold arms the "that was me" window. A plain
+                // tap ends the gesture too, and stamping it there would
+                // swallow the tap that opens the time machine.
+                if timeHolding { timeHoldEndedAt = Date() }
                 timeHolding = false
-                timeHoldEndedAt = Date()
             }
     }
 
@@ -1107,6 +1110,9 @@ struct ContentView: View {
     /// 承诺，起不来时是一句诚实的结论。原因由舞台下方的卡片来说。
     private var statusLine: String {
         if failureMessage != nil { return Copy.wakeFailed }
+        // A frozen duck says so. The top bar must not keep reporting the
+        // core's own label while the clock is stopped.
+        if controller.paused { return Copy.freeze }
         if controller.ready { return Copy.behaviourOf(raw: controller.label) }
         return Copy.waking
     }

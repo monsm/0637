@@ -408,6 +408,14 @@ jobs:
             if [ -n "$STATE" ] && ! printf '%s' "$STATE" | grep -q '"label":"idle"'; then break; fi
             sleep 2
           done
+          if [ -z "$STATE" ]; then
+            echo "::error::the app did not come back for the drawer screenshot"
+            exit 1
+          fi
+          if printf '%s' "$STATE" | grep -q '"label":"idle"'; then
+            echo "::error::the core never ticked before the drawer screenshot"
+            exit 1
+          fi
           sleep 3
           xcrun simctl io "$SIM_UDID" screenshot ui-b4-ios-more.png
           # The acceptance screenshots are portrait, or they are not the product.

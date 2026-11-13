@@ -26,15 +26,27 @@ struct MoreSheet: View {
     let onDanceStep: (DanceStep) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showRules = false
-    @State private var showDance = false
-    @State private var showPeers = false
-    @State private var showQuests = false
-    @State private var showDiary = false
-    @State private var showPostcards = false
-    @State private var showDex = false
-    @State private var showAI = false
-    @State private var showModes = false
+    /// Where a drawer row leads. One sheet, one destination: a view with
+    /// several `.sheet` modifiers is unreliable, and this codebase says so
+    /// about itself in ContentView.
+    private enum Destination: Identifiable {
+        case rules, dance, peers, quests, diary, postcards, dex, ai, modes
+
+        var id: String {
+            switch self {
+            case .rules: return "rules"
+            case .dance: return "dance"
+            case .peers: return "peers"
+            case .quests: return "quests"
+            case .diary: return "diary"
+            case .postcards: return "postcards"
+            case .dex: return "dex"
+            case .ai: return "ai"
+            case .modes: return "modes"
+            }
+        }
+    }
+    @State private var destination: Destination?
 
     var body: some View {
         let _ = languageTick
@@ -54,17 +66,17 @@ struct MoreSheet: View {
                         dismiss()
                     }
                     row(Icons.blocks, Copy.blocks, note: Copy.blocksRowNote, id: "more-blocks") {
-                        showRules = true
+                        destination = .rules
                     }
                     row(Icons.dance, Copy.dance, note: Copy.danceRowNote, id: "more-dance") {
-                        showDance = true
+                        destination = .dance
                     }
                     row(
                         Icons.controls, Copy.stickModes,
                         note: Copy.stick(stickMode.rawValue),
                         id: "more-controls"
                     ) {
-                        showModes = true
+                        destination = .modes
                     }
                 }
                 group(Copy.groupTogether, id: "together") {
@@ -74,7 +86,7 @@ struct MoreSheet: View {
                         badge: "\(controller.peers.count)/3",
                         id: "more-peers"
                     ) {
-                        showPeers = true
+                        destination = .peers
                     }
                 }
                 group(Copy.groupRecord, id: "record") {
@@ -84,20 +96,20 @@ struct MoreSheet: View {
                         badge: questsLeft,
                         id: "more-quests"
                     ) {
-                        showQuests = true
+                        destination = .quests
                     }
                     row(Icons.diary, Copy.diary, id: "more-diary") {
-                        showDiary = true
+                        destination = .diary
                     }
                     row(
                         Icons.postcards, Copy.postcardShelf,
                         badge: "\(controller.postcards.cards.count)",
                         id: "more-postcards"
                     ) {
-                        showPostcards = true
+                        destination = .postcards
                     }
                     row(Icons.dex, Copy.dex, note: Copy.dexRowNote, id: "more-dex") {
-                        showDex = true
+                        destination = .dex
                     }
                 }
                 group(Copy.thisDuck, id: "duck") {
@@ -107,7 +119,7 @@ struct MoreSheet: View {
                         dot: !aiConfigured,
                         id: "more-ai"
                     ) {
-                        showAI = true
+                        destination = .ai
                     }
                     row(
                         controller.nightActive ? Icons.morning : Icons.night,
@@ -144,12 +156,21 @@ struct MoreSheet: View {
         }
         .background(Color(red: 0.055, green: 0.075, blue: 0.10))
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showRules) {
+        .sheet(item: $destination) { destination in
+            sheet(for: destination)
+        }
+    }
+
+    /// The screen behind one drawer row. It lives in its own function so the
+    /// drawer's body stays small enough for the type checker.
+    @ViewBuilder
+    private func sheet(for destination: Destination) -> some View {
+        switch destination {
+        case .rules:
             RulesSheet(controller: controller)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showDance) {
+        case .dance:
             DanceSheet(
                 studio: controller.dance,
                 execute: { step in onDanceStep(step) },
@@ -163,38 +184,31 @@ struct MoreSheet: View {
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showPeers) {
+        case .peers:
             PeersSheet(controller: controller)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showQuests) {
+        case .quests:
             ProgressSheet()
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showDiary) {
+        case .diary:
             DiarySheet(controller: controller)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showPostcards) {
+        case .postcards:
             PostcardShelfView(shelf: controller.postcards)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showDex) {
+        case .dex:
             DexSheet(controller: controller)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showAI) {
+        case .ai:
             AISheet(controller: controller)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showModes) {
+        case .modes:
             ModeSheet(controller: controller, stickMode: $stickMode)
                 .presentationDetents([.height(320)])
                 .presentationDragIndicator(.visible)
