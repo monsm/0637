@@ -448,6 +448,42 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// A composed postcard in Chinese, for B4 §6.5. It sorts last (Z) so the
+    /// newest card in the app container is this one; CI publishes it as the
+    /// Chinese sample.
+    func testZChinesePostcard() throws {
+        app.terminate()
+        app.launchArguments = ["-duck.language", "中文"]
+        app.launch()
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the app did not get past loading"
+        )
+        let director = app.buttons["surface-toggle"]
+        XCTAssertTrue(director.waitForExistence(timeout: 10), "no Director switch")
+        director.tap()
+        usleep(1_500_000)
+        let shutter = app.buttons["duck-photo"]
+        XCTAssertTrue(shutter.waitForExistence(timeout: 10), "no Director shutter")
+        shutter.tap()
+        XCTAssertTrue(
+            app.staticTexts["postcard-caption"].waitForExistence(timeout: 15),
+            "the Chinese postcard has no caption"
+        )
+        let keep = app.buttons["photo-keep"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), "no keep button")
+        keep.tap()
+        let kept = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "已收藏"),
+            object: keep
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [kept], timeout: 10),
+            .completed,
+            "the Chinese postcard was not kept"
+        )
+    }
+
     /// The same duck, the wide composition: rotation must swap shells without
     /// losing the core, the controls or the skill path.
     func testLandscapeRoundTrip() throws {

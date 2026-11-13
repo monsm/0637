@@ -12,6 +12,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
@@ -48,6 +49,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -67,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -133,6 +136,12 @@ fun Shell(
     var showPostcards by remember { mutableStateOf(false) }
     var showDex by remember { mutableStateOf(false) }
     var showDiary by remember { mutableStateOf(false) }
+    // The More drawer and its daily-goals sheet (B4a, portrait).
+    var showMore by remember { mutableStateOf(false) }
+    var showQuests by remember { mutableStateOf(false) }
+    // The drawer's night row follows /state.night, so it can offer
+    // good night or good morning honestly.
+    var nightActive by remember { mutableStateOf(false) }
     var dex by remember { mutableStateOf(emptyList<DexEntryUi>()) }
     val dance = remember(context) { DanceStudio(context) }
     var danceShow by remember { mutableStateOf(0) }
@@ -263,7 +272,7 @@ fun Shell(
     LaunchedEffect(hintDismiss) {
         if (hintDismiss) {
             hintPrefs.edit().putBoolean("hintShown", true).apply()
-            delay(4000)
+            delay(6000)
             hintDismiss = false
         }
     }
@@ -292,6 +301,8 @@ fun Shell(
             if (careNow != null) careUi = careNow
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
+            val nightNow = stateText?.let(::parseNight)
+            if (nightNow != null) nightActive = nightNow.active
             val event = stateText?.let(::parseSoundEvent)
             if (event != null && event.kind.isNotEmpty() && event.tick != lastSoundTick) {
                 lastSoundTick = event.tick
@@ -457,32 +468,11 @@ fun Shell(
                         .windowInsetsPadding(WindowInsets.safeDrawing),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    TopBar(
+                    PortraitTitleBar(
                         core = duck,
                         carrying = carrying,
                         lastSkill = lastSkill,
                         behaviourRaw = behaviourRaw,
-                        menuOpen = menuOpen,
-                        onMenuOpen = { menuOpen = it },
-                        onStick = { stick = it },
-                        onSurface = onSurface,
-                        onFlashlight = toggleFlashlight,
-                        onRules = { showRules = true },
-                        onDance = { showDance = true },
-                        onPeers = { showPeers = true },
-                        onAI = { showAI = true },
-                        onLanguage = {
-                            Copy.language = if (Copy.language == Copy.Language.English) {
-                                Copy.Language.Chinese
-                            } else {
-                                Copy.Language.English
-                            }
-                            languageTick += 1
-                            // A transient event line was written in the old
-                            // language; drop it rather than leaving a stale
-                            // sentence on the stage.
-                            soundLine = null
-                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -529,7 +519,7 @@ fun Shell(
                     // the rail: no magic bottom offset to drift onto a button.
                     AnimatedVisibility(visible = hintDismiss) {
                         Text(
-                            Copy.dragHint,
+                            Copy.firstLaunchHint,
                             color = Color.White.copy(alpha = 0.7f),
                             fontSize = 12.sp,
                             modifier = Modifier.padding(bottom = 6.dp),
@@ -576,10 +566,9 @@ fun Shell(
                         surface = surface,
                         onSurface = onSurface,
                         onOpenSheet = { showSheet = true },
-                        onRules = { showRules = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = 8.dp),
                     )
                     ThumbDeck(
                         core = duck,
@@ -592,9 +581,10 @@ fun Shell(
                         },
                         onWheee = onWheee,
                         onSkills = { showRing = true },
+                        onMore = { showMore = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 8.dp, vertical = 8.dp),
                     )
                 }
             }
@@ -821,7 +811,7 @@ fun Shell(
                 .padding(bottom = 92.dp),
         ) {
             Text(
-                Copy.dragHint,
+                Copy.firstLaunchHint,
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 12.sp,
             )
@@ -935,6 +925,59 @@ fun Shell(
 
     if (showPostcards) {
         PostcardsSheet(onClose = { showPostcards = false })
+    }
+
+    if (showQuests) {
+        QuestsSheet(quests, onClose = { showQuests = false })
+    }
+
+    // The More drawer: every row is one tap from Live. Rows that open a
+    // sheet close the drawer first (one sheet at a time, like the shell).
+    if (showMore) {
+        MoreSheet(
+            board = quests,
+            peers = peers,
+            aiConfig = aiConfig,
+            nightActive = nightActive,
+            flashlightOn = flashlightState > 0,
+            stick = stick,
+            onPath = {
+                stick = "path"
+                core?.setHead(0.0, 0.0, 0.0, 0.0)
+                core?.releaseBody()
+                showMore = false
+            },
+            onMode = { mode ->
+                stick = mode
+                core?.setHead(0.0, 0.0, 0.0, 0.0)
+                core?.releaseBody()
+            },
+            onRules = { showMore = false; showRules = true },
+            onDance = { showMore = false; showDance = true },
+            onPeers = { showMore = false; showPeers = true },
+            onQuests = { showMore = false; showQuests = true },
+            onDiary = { showMore = false; showDiary = true },
+            onPostcards = { showMore = false; showPostcards = true },
+            onDex = { showMore = false; showDex = true },
+            onAI = { showMore = false; showAI = true },
+            onNight = {
+                postDuckCommand(
+                    "/night",
+                    org.json.JSONObject().put("on", !nightActive).toString(),
+                )
+            },
+            onFlashlight = toggleFlashlight,
+            onLanguage = {
+                Copy.language = if (Copy.language == Copy.Language.English) {
+                    Copy.Language.Chinese
+                } else {
+                    Copy.Language.English
+                }
+                languageTick += 1
+                soundLine = null
+            },
+            onClose = { showMore = false },
+        )
     }
 
     if (showDance && core != null) {
@@ -1313,7 +1356,7 @@ private fun RulesSheet(onClose: () -> Unit) {
         saveRules(context, next) { accepted ->
             if (!accepted) {
                 rules = previous
-                Toast.makeText(context, Copy.rulesRefused, Toast.LENGTH_LONG).show()
+                Toast.makeText(context, Copy.rulesRefusedText, Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -1680,9 +1723,54 @@ private fun TopBar(
 }
 
 /**
- * The 48 dp time rail: the time machine button (tick + retention bar), the
- * rail's own freeze/resume, and the camera/Director toggle that moved down
- * from the portrait top bar.
+ * The portrait title bar (B4 §1): read-only. Name, what the duck is doing,
+ * and the ring's last verdict; every menu moved into the More drawer.
+ */
+@Composable
+private fun PortraitTitleBar(
+    core: DuckCore?,
+    carrying: Boolean,
+    lastSkill: String,
+    behaviourRaw: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            Modifier
+                .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                .padding(horizontal = 12.dp, vertical = 7.dp),
+        ) {
+            Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(
+                when {
+                    core == null -> Copy.waking
+                    carrying -> Copy.held
+                    core.paused() -> Copy.freeze
+                    behaviourRaw.isEmpty() -> Copy.live
+                    else -> Copy.behaviourOf(behaviourRaw)
+                },
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 11.sp,
+                modifier = Modifier.testTag("duck-label"),
+            )
+            if (lastSkill.isNotEmpty()) {
+                Text(
+                    skillLabel(lastSkill),
+                    color = Color.White.copy(alpha = 0.55f),
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.testTag("duck-last-skill"),
+                )
+            }
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+/**
+ * The portrait time rail (B4 §1): two buttons, icon only. Time opens the
+ * time machine and a long press freezes at once; Director is the second.
  */
 @Composable
 private fun PortraitTimeRail(
@@ -1690,17 +1778,14 @@ private fun PortraitTimeRail(
     surface: Surface,
     onSurface: (Surface) -> Unit,
     onOpenSheet: () -> Unit,
-    onRules: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var tick by remember { mutableStateOf(core.tickIndex()) }
     var oldest by remember { mutableStateOf(core.oldestTick()) }
-    var paused by remember { mutableStateOf(core.paused()) }
     LaunchedEffect(core) {
         while (true) {
             tick = core.tickIndex()
             oldest = core.oldestTick()
-            paused = core.paused()
             delay(200)
         }
     }
@@ -1721,55 +1806,51 @@ private fun PortraitTimeRail(
                 .weight(1f)
                 .fillMaxHeight()
                 .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
-                .pointerInput(Unit) { detectTapGestures { onOpenSheet() } }
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClickLabel = Copy.timeMachine,
+                    onLongClickLabel = Copy.freeze,
+                    role = Role.Button,
+                    onClick = onOpenSheet,
+                    onLongClick = { core.setPaused(true) },
+                )
                 .testTag("duck-time")
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(
-                // The rail opens the time machine: its label says what the
-                // button is for. The tick is a reading, and readings live in
-                // the instrument.
-                Copy.time,
-                color = Color.White.copy(alpha = 0.85f),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                softWrap = false,
+            Icon(
+                Icons.time,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.size(18.dp),
             )
+            // The bar is about 60% of the row: it reads as a progress, not
+            // as a divider between the time and Director buttons.
             Box(
-                Modifier
-                    .weight(1f)
-                    .height(3.dp)
-                    .background(Color.White.copy(alpha = 0.08f), CircleShape),
+                Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart,
             ) {
                 Box(
                     Modifier
-                        .fillMaxWidth(fraction.toFloat())
-                        .fillMaxHeight()
-                        // accent.data #7FB2D9, solid: the retained-history
-                        // fill must read against the track (P1-10).
-                        .background(Color(0xFF7FB2D9), CircleShape),
-                )
+                        .fillMaxWidth(0.6f)
+                        .height(3.dp)
+                        .background(Color.White.copy(alpha = 0.08f), CircleShape),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth(fraction.toFloat())
+                            .fillMaxHeight()
+                            // accent.data #7FB2D9, solid: the retained-history
+                            // fill must read against the track (P1-10).
+                            .background(Color(0xFF7FB2D9), CircleShape),
+                    )
+                }
             }
         }
-        RoundChip(
-            Copy.blocksShort,
-            size = 48.dp,
-            testTag = "duck-rules",
-        ) { onRules() }
-        RoundChip(
-            if (paused) Copy.resume else Copy.freeze,
-            size = 48.dp,
-            selected = paused,
-            selectedColor = Color(0xFFFFA726).copy(alpha = 0.28f),
-            testTag = "rail-pause",
-        ) {
-            paused = !paused
-            core.setPaused(paused)
-        }
-        RoundChip(
+        IconChip(
+            Icons.director,
             if (surface == Surface.Live) Copy.director else Copy.live,
             size = 48.dp,
             testTag = "surface-toggle",
@@ -1780,9 +1861,8 @@ private fun PortraitTimeRail(
 }
 
 /**
- * The right-weighted thumb deck: Feed, Skills, Quack and Grab. Grab is the
- * largest target and turns cyan with "Drop" while the duck is carried, the
- * same affordance the wide layout gives the corner chip.
+ * The portrait thumb deck (B4 §1): four verbs and the More drawer, all one
+ * primary shape — a 52 dp circle, an 18 dp icon and an 11 sp label.
  */
 @Composable
 private fun ThumbDeck(
@@ -1793,37 +1873,155 @@ private fun ThumbDeck(
     onFeed: (() -> Unit)?,
     onWheee: ((Boolean) -> Unit)?,
     onSkills: () -> Unit,
+    onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier
-            .height(76.dp)
+            .height(90.dp)
             .background(Color(0xFF141A22).copy(alpha = 0.94f), RoundedCornerShape(28.dp))
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Spacer(Modifier.weight(1f))
-        RoundChip(Copy.feed, size = 52.dp, testTag = "duck-feed") { onFeed?.invoke() }
-        RoundChip(Copy.skills, size = 52.dp, testTag = "duck-skills") { onSkills() }
-        WheeeChip(
+        PrimaryVerb(Copy.feed, Icons.feed, "duck-feed", onTap = { onFeed?.invoke() })
+        PrimaryVerb(Copy.skills, Icons.skills, "duck-skills", onTap = { onSkills() })
+        PrimaryVerb(
             Copy.quack,
-            size = 56.dp,
-            testTag = "duck-quack",
+            Icons.quack,
+            "duck-quack",
             onTap = { quack?.invoke() },
-            onHold = { onWheee?.invoke(it) },
+            onHold = onWheee,
         )
-        RoundChip(
+        PrimaryVerb(
             if (carrying) Copy.putDown else Copy.grab,
-            size = 64.dp,
+            if (carrying) Icons.drop else Icons.grab,
+            "duck-grab",
             selected = carrying,
-            selectedColor = Color.Cyan.copy(alpha = 0.35f),
-            testTag = "duck-grab",
-        ) {
-            val next = !carrying
-            onCarrying(next)
-            core.carry(0.0, 0.0, 0.0, next)
+            onTap = {
+                val next = !carrying
+                onCarrying(next)
+                core.carry(0.0, 0.0, 0.0, next)
+            },
+        )
+        PrimaryVerb(Copy.more, Icons.more, "duck-more", onTap = { onMore() })
+    }
+}
+
+/**
+ * The one primary button (B4 §3): 52 dp circle, 18 dp icon, 11 sp label
+ * underneath. Optional hold = the wheee ride on the quack button.
+ */
+@Composable
+private fun PrimaryVerb(
+    label: String,
+    icon: ImageVector,
+    tag: String,
+    selected: Boolean = false,
+    onTap: () -> Unit,
+    onHold: ((Boolean) -> Unit)? = null,
+) {
+    // The quack's hold is the official wheee ride: it starts on the long
+    // press and has to end on the real lift, so it uses the same gesture as
+    // the old WheeeChip. Plain verbs are ordinary clicks.
+    val hold = onHold
+    val gesture = if (hold != null) {
+        Modifier.pointerInput(Unit) {
+            var riding = false
+            detectTapGestures(
+                onTap = { onTap() },
+                onLongPress = {
+                    riding = true
+                    hold(true)
+                },
+                onPress = {
+                    try {
+                        tryAwaitRelease()
+                    } finally {
+                        if (riding) {
+                            riding = false
+                            hold(false)
+                        }
+                    }
+                },
+            )
         }
+    } else {
+        Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClickLabel = label,
+            role = Role.Button,
+            onClick = onTap,
+        )
+    }
+    Column(
+        Modifier
+            .width(52.dp)
+            .then(gesture)
+            .testTag(tag),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Box(
+            Modifier
+                .size(52.dp)
+                .background(
+                    if (selected) ActionAccent.copy(alpha = 0.35f)
+                    else Color.White.copy(alpha = 0.10f),
+                    CircleShape,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.9f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Text(
+            label,
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** A 48 dp secondary button: icon only, always with an accessibility label. */
+@Composable
+private fun IconChip(
+    icon: ImageVector,
+    label: String,
+    size: androidx.compose.ui.unit.Dp = 48.dp,
+    testTag: String? = null,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(size.coerceAtLeast(48.dp))
+            .background(Color.White.copy(alpha = 0.10f), CircleShape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClickLabel = label,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = Color.White.copy(alpha = 0.9f),
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -2450,7 +2648,7 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
  * text, percent and a checkmark carry the meaning so it never relies on hue.
  */
 @Composable
-private fun QuestCard(board: QuestBoardUi) {
+internal fun QuestCard(board: QuestBoardUi) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -2809,15 +3007,15 @@ private fun InstrumentSheet(
             if (showDetails && status.size >= 14) {
                 Text(
                     buildString {
-                        append(Copy.bringup(status[0].toInt()))
+                        append(Copy.bringupText(status[0].toInt()))
                         append(" · ")
-                        append(if (status[9] > 0.5) "IMU warm" else "IMU warming")
+                        append(if (status[9] > 0.5) Copy.imu else Copy.imuWarming)
                         // [0 bringup, 1 fallen, 2 gain, 3..5 trunk, 6..8 gravity,
                         //  9 imu_ready, 10 picked_up, 11 p_held, 12 mouth, 13 volts,
                         //  14 has_mouth, 15 fps, 16 ticks/s]
-                        append(" · beak ${"%.2f".format(status[12])}")
-                        if (status[10] > 0.5) append(" · in a hand")
-                        if (status[13] > 0.0) append(" · pack ${"%.2f".format(status[13])} V")
+                        append(" · ${Copy.mouth} ${"%.2f".format(status[12])}")
+                        if (status[10] > 0.5) append(" · ${Copy.held}")
+                        if (status[13] > 0.0) append(" · ${Copy.battery} ${"%.2f".format(status[13])} V")
                         if ((status.getOrNull(15) ?: 0.0) > 0.0) append(
                             " · ${"%.0f".format(status[15])} fps · ${"%.1f".format(status[16])} Hz"
                         )
@@ -2876,9 +3074,9 @@ private fun InstrumentSheet(
                     Text(
                         when (speechFeed.state) {
                             SpeechState.Off -> speechFeed.lastHeard ?: "—"
-                            SpeechState.Listening -> speechFeed.lastHeard ?: Copy.listening
+                            SpeechState.Listening -> speechFeed.lastHeard ?: Copy.speechListening
                             SpeechState.Denied -> Copy.denied
-                            SpeechState.Unavailable -> Copy.unavailable
+                            SpeechState.Unavailable -> Copy.speechUnavailable
                         },
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = 11.sp,
@@ -2887,7 +3085,7 @@ private fun InstrumentSheet(
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     SurfaceChip(
-                        if (speechFeed.state == SpeechState.Listening) "ON" else "OFF",
+                        Copy.voiceEar,
                         speechFeed.state == SpeechState.Listening,
                         testTag = "sheet-voice-toggle",
                     ) {
@@ -3002,7 +3200,7 @@ private fun InstrumentSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(Copy.flashlightRow, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Text(Copy.flashlight, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         face.color?.let { Copy.faceColor(it) }
@@ -3046,7 +3244,7 @@ private fun InstrumentSheet(
                 }
             }
             Text(
-                "speed ${speed}× · branches $branches · AI API :8765 · MCP /mcp",
+                "speed ${speed}× · ${Copy.branches} $branches · AI API :8765 · MCP /mcp",
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 11.sp,
             )
@@ -3362,7 +3560,7 @@ private fun fetchBehaviorSummary(): String {
         }
         val gain = Regex(""""idle"\s*:\s*\{[^}]*\}""").find(text)?.value
             ?.let { Regex(""""takeover"\s*:\s*([0-9.]+)"""").find(it)?.groupValues?.get(1)?.toDoubleOrNull() }
-        if (gain != null && gain > 0.1) return "looking around ${(gain * 100).toInt()}%"
+        if (gain != null && gain > 0.1) return Copy.lookingAround((gain * 100).toInt())
         "—"
     } catch (_: Throwable) {
         "—"

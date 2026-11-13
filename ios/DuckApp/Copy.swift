@@ -122,12 +122,40 @@ enum Copy {
     // The face: the virtual status LED, the four-light battery gauge and the
     // flashlight, as /state.leds publishes them. The wire names (Starting,
     // Two, white…) stay the protocol's; only these labels translate.
-    static var face: String { pick("Face", "面部") }
+    static var face: String { pick("Face", "脸") }
     static var ledStatus: String { pick("status", "状态灯") }
     static var gauge: String { pick("gauge", "电量灯") }
     static var flashlight: String { pick("flashlight", "手电筒") }
     static var flashlightOn: String { pick("on", "开") }
     static var flashlightOff: String { pick("off", "关") }
+    /// The Director shutter's short name, mirrored by Android's photoShort.
+    static var photoShort: String { pick("Photo", "拍照") }
+    /// The core has not finished starting, so there is nothing to merge onto.
+    static var rulesNotReady: String {
+        pick(
+            "The duck has not finished starting; try again in a moment",
+            "鸭子还没启动完，等一下再试"
+        )
+    }
+    /// The IMU warming-up state, beside the warm reading.
+    static var imuWarming: String { pick("IMU warming", "IMU 预热中") }
+    /// The idle look-around, said in words with the core's own percentage.
+    static func lookingAround(_ percent: Int) -> String {
+        String(format: pick("looking around %d%%", "四处张望 %d%%"), percent)
+    }
+    /// The flashlight's colour, in the shell's language.
+    static func faceColor(_ raw: String) -> String {
+        switch raw {
+        case "white": return pick("white", "白")
+        case "red": return pick("red", "红")
+        case "green": return pick("green", "绿")
+        case "blue": return pick("blue", "蓝")
+        case "yellow": return pick("yellow", "黄")
+        case "cyan": return pick("cyan", "青")
+        case "magenta": return pick("magenta", "品红")
+        default: return raw
+        }
+    }
     /// The status LED's verdict. An unknown wire name passes through, the
     /// way a user-manifest skill's name does.
     static func faceStatus(_ raw: String) -> String {
@@ -301,12 +329,11 @@ enum Copy {
     }
     static var tiltLook: String { pick("Tilt to look", "倾斜看") }
     static var tiltLookOn: String { pick("Tilt to look: on", "倾斜看：开") }
-    static var trickBook: String { pick("Trick book", "技巧图鉴") }
+    static var trickBook: String { pick("Tricks", "把戏") }
     // The vet book, and the file it exports.
     static var lifeRecord: String { pick("Life record", "终身记录") }
     // Dance Studio: record actions and replay them.
     static var dance: String { pick("Dance Studio", "编舞铺") }
-    static var danceShort: String { pick("Dance", "编舞") }
     static var danceHint: String {
         pick("Press Record, then do anything: a skill, a quack, a treat. Press Play and the duck repeats it.",
              "按录制，然后做动作：技能、叫声、喂食。按播放，鸭子照着重演。")
@@ -331,7 +358,6 @@ enum Copy {
     }
     static var pathDone: String { pick("Walked the whole path", "走完全程啦") }
     // Morning postcard.
-    static var postcard: String { pick("Morning postcard", "早安明信片") }
     static var postcardKeep: String { pick("Keep", "收藏") }
     static var postcardQuiet: String { pick("A quiet night.", "安静的一夜。") }
     static var postcardShelf: String { pick("Postcards", "明信片") }
@@ -342,7 +368,7 @@ enum Copy {
     }
     // Mood dex.
     static var dex: String { pick("Mood dex", "情绪图鉴") }
-    static var dexMoves: String { pick("Moves", "动作") }
+    static var dexMoves: String { pick("Moves", "招式") }
     static var dexMoods: String { pick("Moods", "情绪") }
     static var dexNever: String { pick("not yet", "还没见过") }
     static var dexFirst: String { pick("first", "初次") }
@@ -445,8 +471,8 @@ enum Copy {
         pick("\(name) answered!", "\(name) 回应了！")
     }
     // Gifts between neighbours: a treat on the floor, or a cheer.
-    static var giftTreat: String { pick("Treat", "喂一颗") }
-    static var giftEmotion: String { pick("Cheer", "逗逗它") }
+    static var giftTreat: String { pick("Treat a neighbour", "给邻居一颗") }
+    static var giftEmotion: String { pick("Cheer a neighbour", "逗邻居笑") }
     static func giftReceivedTreat(_ name: String) -> String {
         pick("\(name) sent a treat", "\(name) 送来一颗零食")
     }
@@ -505,7 +531,6 @@ enum Copy {
     }
     static var reload: String { pick("Reload AI", "重载 AI") }
     static var api: String { "AI API :8765 · MCP /mcp" }
-    static var languageLabel: String { pick("Language", "语言") }
 
     static var bringupText: (Int) -> String = { code in
         switch code {

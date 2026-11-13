@@ -592,7 +592,7 @@ struct InstrumentSheet: View {
                 .foregroundStyle(.secondary)
             Spacer()
             if let color = controller.flashlightColor {
-                Text("\(color) · \(Copy.flashlightOn)")
+                Text("\(Copy.faceColor(color)) · \(Copy.flashlightOn)")
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.white)
             } else {

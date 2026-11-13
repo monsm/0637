@@ -141,6 +141,12 @@ jobs:
       - uses: actions/checkout@v4
         id: checkout
 
+      - name: Copy dictionaries agree
+        id: copykeys
+        # B4 §6.4: the two shells must name the same things, even though the
+        # values differ by language.
+        run: python3 scripts/check-copy-keys.py .
+
       - name: Pre-boot simulator in the background
         id: preboot
         run: |
@@ -375,6 +381,7 @@ jobs:
             exit 1
           fi
           cp "$CARD" ui-b1-postcard.png
+          cp "$CARD" ui-b4-postcard-zh.png
           # The portrait Live acceptance screenshot (B1), the B4 first screen
           # and its More drawer, in the language a Chinese user sees, with the
           # room's hour pinned so CI is reproducible.
@@ -605,6 +612,7 @@ jobs:
           cp ui-b4-ios-more.png dist/ui-b4-ios-more.png
           cp ui-b1-ios.png dist/ui-b1-ios.png
           cp ui-b1-postcard.png dist/ui-b1-postcard.png
+          cp ui-b4-postcard-zh.png dist/ui-b4-postcard-zh.png
           git config user.email "actions@github.com"
           git config user.name "ui-bot"
           pushed=0
@@ -615,7 +623,7 @@ jobs:
             if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
               git reset --mixed FETCH_HEAD
             fi
-            git add -f dist/ui-b4-ios.png dist/ui-b4-ios-more.png dist/ui-b1-ios.png dist/ui-b1-postcard.png
+            git add -f dist/ui-b4-ios.png dist/ui-b4-ios-more.png \n              dist/ui-b1-ios.png dist/ui-b1-postcard.png dist/ui-b4-postcard-zh.png
             git commit -m "ui-b1/ui-b4: iOS portrait Live screen, More drawer and postcard [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2
@@ -655,6 +663,7 @@ jobs:
             ui-b4-ios.png
             ui-b4-ios-more.png
             ui-b1-postcard.png
+            ui-b4-postcard-zh.png
             sim-syslog.log
             sim-syslog-all.log
             sim-console.log

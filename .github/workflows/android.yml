@@ -30,6 +30,12 @@ jobs:
       - uses: actions/checkout@v4
         id: checkout
 
+      - name: Copy dictionaries agree
+        id: copykeys
+        # B4 §6.4: the two shells must name the same things, even though the
+        # values differ by language.
+        run: python3 scripts/check-copy-keys.py .
+
       - uses: actions/setup-java@v4
         id: java
         with:
@@ -290,6 +296,8 @@ jobs:
           mkdir -p dist
           cp ui-b1-android.png dist/ui-b1-android.png
           cp ui-b1-android-zh.png dist/ui-b1-android-zh.png
+          cp ui-b4-android.png dist/ui-b4-android.png
+          cp ui-b4-android-more.png dist/ui-b4-android-more.png
           git config user.email "actions@github.com"
           git config user.name "ui-bot"
           pushed=0
@@ -300,7 +308,7 @@ jobs:
             if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
               git reset --mixed FETCH_HEAD
             fi
-            git add -f dist/ui-b1-android.png dist/ui-b1-android-zh.png
+            git add -f dist/ui-b1-android.png dist/ui-b1-android-zh.png \n              dist/ui-b4-android.png dist/ui-b4-android-more.png
             git commit -m "ui-b1: Android portrait Live screenshot [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2
@@ -404,6 +412,8 @@ jobs:
             android-screen-2.png
             ui-b1-android.png
             ui-b1-android-zh.png
+            ui-b4-android.png
+            ui-b4-android-more.png
             unstripped/
 
       - uses: actions/upload-artifact@v4

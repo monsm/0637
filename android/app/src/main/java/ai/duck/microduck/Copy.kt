@@ -67,7 +67,7 @@ object Copy {
     val pickUp get() = pick("pick", "抓取")
     val grab get() = pick("Hold", "拎起")
     val putDown get() = pick("Drop", "放下")
-    val held get() = pick("in a hand · drag to carry", "在手里 · 拖动搬运")
+    val held get() = pick("in a hand", "在手里")
     val feed get() = pick("Feed", "喂食")
 val awayTitle get() = pick("While you were away", "你不在时")
 fun awayRituals(n: Int) = pick("played by itself ×$n", "自己演了 $n 出")
@@ -132,7 +132,7 @@ val quack get() = pick("Quack", "叫一声")
     }
     val retry get() = pick("Try again", "重试")
     // First-launch hint: shown once above the bottom bar, then never again.
-    val dragHint get() = pick(
+    val firstLaunchHint get() = pick(
         "Drag to walk · long-press for skills · tap the duck to pet",
         "拖动走路 · 长按出技能 · 点鸭子摸摸",
     )
@@ -156,6 +156,61 @@ val quack get() = pick("Quack", "叫一声")
     val nightRowNote get() = pick("Let it sleep", "让鸭子睡下")
     val morningRowNote get() = pick("Wake the duck", "叫醒鸭子")
     val tiltLook get() = pick("Tilt to look", "倾斜看")
+    // Keys the iOS dictionary already had: the instrument, the face and the
+    // phone's own sensors. Values copied verbatim so the two sides agree.
+    val battery get() = pick("pack", "电池")
+    val branches get() = pick("branches", "分叉数")
+    val bringup get() = pick("bring-up", "启动阶段")
+    val camera get() = pick("camera", "相机")
+    val cameraUnavailable get() = pick("NO CAMERA", "无相机")
+    val danceSaved get() = pick("Saved on this phone", "已存在这台手机")
+    val danceStepPet get() = pick("Pet", "摸摸")
+    val depth get() = pick("depth", "深度")
+    val fallen get() = pick("fallen", "已摔倒")
+    val gain get() = pick("gain", "增益")
+    val gauge get() = pick("gauge", "电量灯")
+    val gravityZ get() = pick("gravity z", "重力 z")
+    val heard get() = pick("heard", "听到")
+    val imu get() = pick("IMU warm", "IMU 预热")
+    val imuWarming get() = pick("IMU warming", "IMU 预热中")
+    val ledStatus get() = pick("status", "状态灯")
+    val menu get() = pick("Menu", "菜单")
+    val mouth get() = pick("beak", "嘴")
+    val no get() = pick("no", "否")
+    val progress get() = pick("Daily", "每日")
+    val provenance get() = pick("Provenance", "出处")
+    val reload get() = pick("Reload AI", "重载 AI")
+    val sensorNote get() = pick(
+        "None of these is part of the duck's 61-D observation. The IMU is a shove, the rest is the room.",
+        "这些都不在鸭子的 61 维观测里。IMU 是推力，其余是房间。",
+    )
+    val speechOff get() = pick("off", "未开启")
+    val speechOnDeviceMissing get() = pick("no local model", "无本地模型")
+    val state get() = pick("State", "状态")
+    val tiltLookOn get() = pick("Tilt to look: on", "倾斜看：开")
+    val trunkZ get() = pick("trunk z", "躯干高度")
+    val voiceNote get() = pick(
+        "Chinese speech is recognised on this phone and handed to the duck as text. The audio never leaves the phone.",
+        "中文语音在本机识别成文字再交给鸭子，音频不会离开手机。",
+    )
+    val wakeFailed get() = pick("did not wake up", "没能醒来")
+    val whatPhoneSenses get() = pick("What the phone senses", "手机感知到什么")
+    val yes get() = pick("yes", "是")
+
+    /** The battery gauge's own words, the same five the iOS face shows. */
+    fun faceGauge(raw: String): String = when (raw) {
+        "Unknown" -> pick("unknown", "未知")
+        "Critical" -> pick("critical", "耗尽")
+        "Low" -> pick("low", "偏低")
+        "One" -> pick("one light", "一格")
+        "Two" -> pick("two lights", "两格")
+        "Three" -> pick("three lights", "三格")
+        else -> raw
+    }
+
+    /** The idle look-around, said in words with the percentage the core publishes. */
+    fun lookingAround(percent: Int): String = pick("looking around $percent%", "四处张望 $percent%")
+
     val close get() = pick("Close", "关闭")
     val timeMachine get() = pick("Time machine", "时间机器")
     val freeze get() = pick("Freeze", "冻结")
@@ -167,9 +222,10 @@ val quack get() = pick("Quack", "叫一声")
     val microphone get() = pick("microphone", "麦克风")
     val denied get() = pick("denied", "未授权")
     // Spoken commands: the platform recognizer as a second, opt-in channel.
-    val voiceCommands get() = pick("Voice commands", "听懂中文")
-    val listening get() = pick("listening…", "聆听中…")
-    val unavailable get() = pick("unavailable", "不可用")
+    val voiceCommands get() = pick("Voice commands", "语音指令")
+    val voiceEar get() = pick("Understand Chinese", "听懂中文")
+    val speechListening get() = pick("listening", "聆听中")
+    val speechUnavailable get() = pick("unavailable", "不可用")
     val behavior get() = pick("behaviour", "此刻")
 
     /**
@@ -240,7 +296,7 @@ val quack get() = pick("Quack", "叫一声")
         "Good morning! Quiet for $minutes min",
         "早安！昨晚安静了 $minutes 分钟",
     )
-    val trickBook get() = pick("Trick book", "技巧图鉴")
+    val trickBook get() = pick("Tricks", "把戏")
     /** The label for the API token: what a tool on another machine has to
      *  send, so the duck's own history cannot be rewritten from the network. */
     val apiToken get() = pick("API token (for other machines)", "API 令牌（给别的机器）")
@@ -263,17 +319,15 @@ val quack get() = pick("Quack", "叫一声")
     val danceTry get() = pick("Try these while recording:", "录制时点这些：")
     val danceStepSound get() = pick("Quack", "叫一声")
     // Morning postcard.
-    val postcard get() = pick("Morning postcard", "早安明信片")
-    val postcardKeep get() = pick("Keep", "收藏")
-    val postcardShare get() = pick("Share", "分享")
-    val postcardQuiet get() = pick("A quiet night.", "安静的一夜。")
+        val postcardKeep get() = pick("Keep", "收藏")
+        val postcardQuiet get() = pick("A quiet night.", "安静的一夜。")
     val postcardShelf get() = pick("Postcards", "明信片")
     val postcardSaved get() = pick("Kept to the shelf", "已收藏")
     val postcardNone get() = pick("No postcards yet", "还没有明信片")
     fun postcardMetres(m: Double) = pick("walked ${"%.1f".format(m)} m", "走了 ${"%.1f".format(m)} 米")
     // Mood dex.
     val dex get() = pick("Mood dex", "情绪图鉴")
-    val dexMoves get() = pick("Moves", "动作")
+    val dexMoves get() = pick("Moves", "招式")
     val dexMoods get() = pick("Moods", "情绪")
     val dexNever get() = pick("not yet", "还没见过")
     val dexFirst get() = pick("first", "初次")
@@ -299,8 +353,7 @@ val quack get() = pick("Quack", "叫一声")
     }
     // The block rules a child programs.
     val blocks get() = pick("Blocks", "积木规则")
-    val blocksShort get() = pick("Blocks", "积木")
-    val ruleWhen get() = pick("When", "当")
+        val ruleWhen get() = pick("When", "当")
     val ruleThen get() = pick("then", "就")
     val addRule get() = pick("Add", "添加")
     val ruleChain get() = pick("then also", "然后再")
@@ -320,7 +373,7 @@ val quack get() = pick("Quack", "叫一声")
         "导入了 $count 条积木",
     )
     /** The core refused the program: the editor puts the old one back. */
-    val rulesRefused get() = pick(
+    val rulesRefusedText get() = pick(
         "The duck would not take that program, so nothing changed",
         "鸭子没有接受这份程序，所以什么都没变",
     )
@@ -357,8 +410,8 @@ val quack get() = pick("Quack", "叫一声")
     fun peerReplied(name: String) = pick("$name answered!", "$name 回应了！")
     // Gifts between neighbours: a treat for the tummy, a cheer for the mood,
     // and the one-line pill the receiver shows.
-    val giftTreat get() = pick("Treat", "喂一颗")
-    val giftEmotion get() = pick("Cheer", "逗逗它")
+    val giftTreat get() = pick("Treat a neighbour", "给邻居一颗")
+    val giftEmotion get() = pick("Cheer a neighbour", "逗邻居笑")
     fun giftReceivedTreat(name: String) = pick("$name sent a treat", "$name 送来一颗零食")
     fun giftReceivedEmotion(name: String) = pick("$name cheered you up", "$name 逗你笑了")
     /// The mood arrived while the duck was busy: it was sent, it was not played.
@@ -397,9 +450,8 @@ val quack get() = pick("Quack", "叫一声")
     // The face: the status LED, the four-light battery gauge and the
     // flashlight, all published on /state.leds.
     val face get() = pick("Face", "脸")
-    val flashlight get() = pick("Flash", "手电")
-    val flashlightRow get() = pick("Flashlight", "手电筒")
-    val flashlightOn get() = pick("on", "开")
+    val flashlight get() = pick("Flashlight", "手电筒")
+        val flashlightOn get() = pick("on", "开")
     val flashlightOff get() = pick("off", "关")
 
     /** The status LED's verdict, in the shell's language. */
@@ -423,7 +475,7 @@ val quack get() = pick("Quack", "叫一声")
         else -> color
     }
 
-    fun bringup(code: Int): String = when (code) {
+    fun bringupText(code: Int): String = when (code) {
         0 -> pick("Limp", "软瘫")
         1 -> pick("Homing", "归位中")
         2 -> pick("Ready", "就绪")

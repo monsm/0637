@@ -1739,7 +1739,7 @@ final class DuckController: ObservableObject {
                         self.behaviorSummary = String(format: "%@ %.1f/%.1fs", SkillLabel.of(name), elapsed, duration)
                     } else if let idle = json["idle"] as? [String: Any],
                               let takeover = idle["takeover"] as? Double, takeover > 0.1 {
-                        self.behaviorSummary = String(format: "looking around %.0f%%", takeover * 100)
+                        self.behaviorSummary = Copy.lookingAround(Int((takeover * 100).rounded()))
                     } else {
                         self.behaviorSummary = "—"
                     }

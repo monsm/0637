@@ -972,16 +972,29 @@ if height <= width:
 print(f"portrait screenshot: {width}x{height}")
 PY
 
-# Switch the shell to Chinese through its own menu: the product's true face.
-tap_text "⋯" > /dev/null 2>&1 || true
+# Switch the shell to Chinese through the More drawer (B4 removed the top-bar
+# menu): More -> Language. The row shows the language it is IN, so only tap
+# it when the drawer is still English.
+tap_text "More" > /dev/null 2>&1 || tap_text "更多" > /dev/null 2>&1 || true
 sleep 1
-# The menu shows the language it is IN. "EN" switches to Chinese; if it says
-# "中文" the shell is already Chinese, and tapping the anchor again dismisses
-# the menu without changing the language.
-if ! tap_text "EN" > /dev/null 2>&1; then
-  tap_text "⋯" > /dev/null 2>&1 || true
+rm -f language-ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > language-ui.xml 2>/dev/null || true
+if python3 - <<'PY'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('language-ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = [node.get('text') or '' for node in root.iter('node')]
+raise SystemExit(0 if 'Language' in texts else 1)
+PY
+then
+  tap_text "Language" > /dev/null 2>&1 || true
 fi
-sleep 2
+sleep 1
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
 
 # A fresh dump or a clear failure: a swallowed dump that falls back to a
 # previous run's ui.xml would assert on stale text and "pass" by accident.
@@ -1032,6 +1045,15 @@ stale = [t for t in texts if t in (
 )]
 if stale:
     raise SystemExit(f"::error::English controls survived the switch: {stale[:8]}")
+
+# B4 §6.1: the first screen must count seven tappable controls at most.
+clickable = sum(
+    1 for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck' and node.get('clickable') == 'true'
+)
+if clickable > 7:
+    raise SystemExit(f"::error::the first screen has {clickable} clickable controls, want <= 7")
+print(f"first screen: {clickable} clickable controls")
 print("first screen: no raw tokens, ticks, percentages or engine names; fully Chinese")
 PY
 
@@ -1052,9 +1074,65 @@ if height <= width:
     raise SystemExit(f"::error::the Chinese screenshot is not portrait: {width}x{height}")
 print(f"Chinese portrait screenshot: {width}x{height}")
 PY
+cp ui-b1-android-zh.png ui-b4-android.png
+
+# The B4 drawer, opened from the thumb deck's More button, in Chinese.
+tap_text "更多" > /dev/null 2>&1 || {
+  echo "::error::the thumb deck has no More button"
+  exit 1
+}
+sleep 2
+rm -f ui.xml
+if ! adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
+  echo "::error::uiautomator could not dump the More drawer"
+  exit 1
+fi
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+[ -s ui.xml ] || { echo "::error::the More drawer UI dump is empty"; exit 1; }
+python3 - <<'PY' || exit 1
+import xml.etree.ElementTree as ET
+
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the drawer dump: {exc}")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+needed = (
+    '玩', '一起', '记录', '这只鸭子',
+    '画路走', '积木规则', '编舞铺', '操控方式',
+    '邻居', '每日任务', '鸭子日记', '明信片', '情绪图鉴',
+    'AI 伙伴', '晚安', '手电筒', '语言',
+)
+missing = [word for word in needed if word not in texts]
+if missing:
+    raise SystemExit(f"::error::the drawer is missing {missing}: {texts[:24]}")
+print("drawer: four groups, all rows, Chinese")
+PY
+adb exec-out screencap -p > ui-b4-android-more.png || true
+python3 - <<'PY' || exit 1
+import struct
+try:
+    with open('ui-b4-android-more.png', 'rb') as handle:
+        header = handle.read(24)
+except Exception as exc:
+    raise SystemExit(f"::error::no drawer screenshot: {exc}")
+if header[:8] != b'\x89PNG\r\n\x1a\n':
+    raise SystemExit("::error::the drawer screenshot is not a PNG")
+width, height = struct.unpack('>II', header[16:24])
+if height <= width:
+    raise SystemExit(f"::error::the drawer screenshot is not portrait: {width}x{height}")
+print(f"drawer screenshot: {width}x{height}")
+PY
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
 
 # A real wire skill with an underscore: its verdict in the top bar must read
-# human too. This runs after the screenshot so the idle frame stays clean.
+# human too. This runs after the screenshots so the idle frame stays clean.
 tap_text "技能" > /dev/null 2>&1 || tap_text "Skills" > /dev/null 2>&1 || true
 sleep 1
 tap_text "左踢" > /dev/null 2>&1 || tap_text "kick left" > /dev/null 2>&1 || true

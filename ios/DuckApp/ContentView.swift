@@ -576,15 +576,18 @@ struct ContentView: View {
                     Image(systemName: Icons.time)
                         .font(.system(size: 18, weight: .medium))
                     GeometryReader { proxy in
+                        // 历史条只占约 60% 宽，右侧留白：它读起来是"进度"，
+                        // 不是一条把时间钮和取景钮分开的分割线。
+                        let barWidth = max(1, proxy.size.width * 0.6)
                         ZStack(alignment: .leading) {
                             Capsule()
                                 .fill(Color.white.opacity(0.08))
-                                .frame(height: 3)
+                                .frame(width: barWidth, height: 3)
                             Capsule()
                                 // accent.data #7FB2D9，实色：保留历史的
                                 // 进度条必须读得出来（原 60% 系统蓝 2.11:1）。
                                 .fill(Color(red: 0.498, green: 0.698, blue: 0.851))
-                                .frame(width: railProgress(width: proxy.size.width), height: 3)
+                                .frame(width: barWidth * railFraction, height: 3)
                         }
                         .frame(maxHeight: .infinity, alignment: .center)
                     }
@@ -707,12 +710,15 @@ struct ContentView: View {
 
     /// The share of retained history, not of the whole run: the bar fills as
     /// checkpoints age out of the ring buffer.
-    private func railProgress(width: CGFloat) -> CGFloat {
+    private var railFraction: CGFloat {
         let newest = Double(controller.simTick)
         guard newest > 0 else { return 0 }
         let oldest = Double(min(controller.oldestTick, controller.simTick))
-        let fraction = max(0, min(1, (newest - oldest) / newest))
-        return width * CGFloat(fraction)
+        return CGFloat(max(0, min(1, (newest - oldest) / newest)))
+    }
+
+    private func railProgress(width: CGFloat) -> CGFloat {
+        width * railFraction
     }
 
     /// The portrait thumb deck (B4 §1): four verbs and the More drawer.
