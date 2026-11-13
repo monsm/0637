@@ -1268,7 +1268,10 @@ struct ContentView: View {
             .accessibilityIdentifier("duck-menu")
         }
         .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
+        // No full-width material panel: it painted a light band across the
+        // top ~16% of the stage and broke the room's vertical gradient
+        // (review 2026-11-13, 打回 1). The title is white on the dark room;
+        // the flame/menu buttons carry their own material circles.
     }
 
     private var bottomBar: some View {

@@ -952,9 +952,27 @@ if [ -z "${SCREEN_STATE:-}" ]; then
   echo "::error::the core did not come back for the first-screen check"
   exit 1
 fi
-# Let the first frame settle, then switch the shell to Chinese through its
-# own menu: the acceptance screen is the one a Chinese user sees.
+# Let the first frame settle. This first shot is the canonical Live screen in
+# the build's current language (the emulator is en-US); the Chinese-state
+# shot is taken after the switch below.
 sleep 3
+adb exec-out screencap -p > ui-b1-android.png || true
+python3 - <<'PY' || exit 1
+import struct
+try:
+    with open('ui-b1-android.png', 'rb') as handle:
+        header = handle.read(24)
+except Exception as exc:
+    raise SystemExit(f"::error::no first-screen screenshot: {exc}")
+if header[:8] != b'\x89PNG\r\n\x1a\n':
+    raise SystemExit("::error::the first-screen screenshot is not a PNG")
+width, height = struct.unpack('>II', header[16:24])
+if height <= width:
+    raise SystemExit(f"::error::the acceptance screenshot is not portrait: {width}x{height}")
+print(f"portrait screenshot: {width}x{height}")
+PY
+
+# Switch the shell to Chinese through its own menu: the product's true face.
 tap_text "⋯" > /dev/null 2>&1 || true
 sleep 1
 # The menu shows the language it is IN. "EN" switches to Chinese; if it says
@@ -1006,24 +1024,33 @@ if problems:
 joined = ' '.join(texts)
 if not any(word in joined for word in ('技能', '时间', '心情不错', '有点饿了', '待着', '散步中', '站着')):
     raise SystemExit(f"::error::the shell did not switch to Chinese: {texts[:20]}")
-print("first screen: no raw tokens, ticks, percentages or engine names")
+# The old language must be gone from every control, not just the labels that
+# happened to recompose. This is what caught the thumb deck staying English.
+stale = [t for t in texts if t in (
+    'Feed', 'Skills', 'Quack', 'Hold', 'Drop', 'Time', 'Freeze', 'Resume',
+    'Blocks', 'Director', 'Live', 'in a hand', 'it fell',
+)]
+if stale:
+    raise SystemExit(f"::error::English controls survived the switch: {stale[:8]}")
+print("first screen: no raw tokens, ticks, percentages or engine names; fully Chinese")
 PY
 
-# The idle Live screen itself, portrait, no skill line on it.
-adb exec-out screencap -p > ui-b1-android.png || true
+# The idle Live screen itself, portrait, no skill line on it: the Chinese state
+# a real user sees.
+adb exec-out screencap -p > ui-b1-android-zh.png || true
 python3 - <<'PY' || exit 1
 import struct
 try:
-    with open('ui-b1-android.png', 'rb') as handle:
+    with open('ui-b1-android-zh.png', 'rb') as handle:
         header = handle.read(24)
 except Exception as exc:
-    raise SystemExit(f"::error::no first-screen screenshot: {exc}")
+    raise SystemExit(f"::error::no Chinese first-screen screenshot: {exc}")
 if header[:8] != b'\x89PNG\r\n\x1a\n':
-    raise SystemExit("::error::the first-screen screenshot is not a PNG")
+    raise SystemExit("::error::the Chinese screenshot is not a PNG")
 width, height = struct.unpack('>II', header[16:24])
 if height <= width:
-    raise SystemExit(f"::error::the acceptance screenshot is not portrait: {width}x{height}")
-print(f"portrait screenshot: {width}x{height}")
+    raise SystemExit(f"::error::the Chinese screenshot is not portrait: {width}x{height}")
+print(f"Chinese portrait screenshot: {width}x{height}")
 PY
 
 # A real wire skill with an underscore: its verdict in the top bar must read

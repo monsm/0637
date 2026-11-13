@@ -651,7 +651,11 @@ class DuckRenderer(
                     float t = vNdc.y * 0.5 + 0.5;
                     vec3 horizon = vec3(0.102, 0.090, 0.078);  // #1A1714
                     vec3 zenith = vec3(0.047, 0.055, 0.071);   // #0C0E12
-                    vec3 bg = mix(horizon, zenith, smoothstep(0.62, 1.15, t));
+                    // The gradient starts at the floor's far edge (the same
+                    // screen row on both aspects), so the fogged floor and
+                    // the wall meet in the same horizon colour: one
+                    // continuous room from the status bar down.
+                    vec3 bg = mix(horizon, zenith, smoothstep(0.78, 1.12, t));
                     float dx = (vNdc.x - uHalo.x) * uHalo.w;
                     float dy = vNdc.y - uHalo.y;
                     float glow = exp(-(dx * dx + dy * dy)
@@ -717,7 +721,10 @@ class DuckRenderer(
                     float radial = length(vWorld.xy - uShadow.xy);
                     float shadow = smoothstep(0.02, 0.55, radial);
                     color *= mix(1.0 - uShadow.z, 1.0, shadow);
-                    float fog = smoothstep(1.5, 4.0, vWorld.y) * 0.35;
+                    // The floor's far edge fades fully into the wall colour;
+                    // the backdrop above it starts at that same colour, so
+                    // the 8 m plane leaves no hard horizon line.
+                    float fog = smoothstep(0.9, 4.0, vWorld.y);
                     color = mix(color, vec3(0.102, 0.090, 0.078) * uDaylight.rgb, fog);
                 }
 

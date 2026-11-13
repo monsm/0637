@@ -625,7 +625,11 @@ final class Renderer: NSObject, MTKViewDelegate {
         // 3 = 全屏背景板。light.w 继续当"这是地板"的标志用，棋盘与否由
         // stage.x 再分一次（STAGE_LOOK §7.1）。
         var uniforms = Uniforms(
-            mvp: viewProjection * model,
+            // The backdrop's vertices are already NDC: its MVP is the model
+            // (identity), not the camera. Multiplying NDC by viewProjection
+            // treated them as world metres near the duck, which shrank the
+            // triangle and left the top of the screen on the clear colour.
+            mvp: look == 3 ? model : viewProjection * model,
             model: model,
             color: color,
             // The shader negates this and dots it with the normal, so the

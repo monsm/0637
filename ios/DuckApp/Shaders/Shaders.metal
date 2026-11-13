@@ -14,6 +14,10 @@ struct VertexOut {
     float4 position [[position]];
     float3 normal;
     float3 world;
+    // Clip-space NDC. The backdrop is drawn with the identity MVP and w=1,
+    // so this is exactly the screen NDC and interpolates linearly across the
+    // triangle; the fragment's [[position]] is in pixels, not NDC.
+    float2 ndc;
 };
 
 struct Uniforms {
@@ -73,6 +77,7 @@ vertex VertexOut duck_vertex(
     VertexIn input = vertices[vertexID];
     VertexOut out;
     out.position = uniforms.mvp * float4(input.px, input.py, input.pz, 1.0);
+    out.ndc = out.position.xy / out.position.w;
     out.normal = normalize((uniforms.model * float4(input.nx, input.ny, input.nz, 0.0)).xyz);
     out.world = (uniforms.model * float4(input.px, input.py, input.pz, 1.0)).xyz;
     return out;
@@ -83,14 +88,15 @@ fragment float4 duck_fragment(
     constant Uniforms& uniforms [[buffer(0)]]
 ) {
     // 全屏背景板：不走 PBR，直接给出竖向渐变墙加鸭身后的暖光晕
-    // （STAGE_LOOK §2.2）。渐变取 NDC 的 y 而不是世界高度——不管横竖屏、
-    // 相机怎么动，地平线以上永远有一层从暖褐到冷蓝黑的墙。
+    // （STAGE_LOOK §2.2）。NDC 来自顶点（单位 MVP），从地板远边一直连续
+    // 铺到屏幕顶；渐变在地板远边那一行正好是地平线色，和雾化后的地板
+    // 接得上，没有一条硬边。
     if (uniforms.stage.y > 0.5) {
-        float2 ndc = in.position.xy / in.position.w;
+        float2 ndc = in.ndc;
         float t = ndc.y * 0.5 + 0.5;
         float3 horizon = float3(0.102, 0.090, 0.078);  // #1A1714 暖褐
         float3 zenith = float3(0.047, 0.055, 0.071);   // #0C0E12 冷蓝黑
-        float3 bg = mix(horizon, zenith, smoothstep(0.62, 1.15, t));
+        float3 bg = mix(horizon, zenith, smoothstep(0.78, 1.12, t));
         // 鸭身后的径向暖光 #FFD9A8 @ 8%：x 先乘宽高比，光晕才是圆的。
         float dx = (ndc.x - uniforms.halo.x) * uniforms.halo.w;
         float dy = ndc.y - uniforms.halo.y;
@@ -169,8 +175,9 @@ fragment float4 duck_fragment(
         float radial = length(in.world.xy - uniforms.shadow.xy);
         float shadow = smoothstep(0.02, 0.55, radial);
         color *= mix(1.0 - uniforms.shadow.z, 1.0, shadow);
-        // 地平线处的极淡雾化：地板远端融进墙面，8 m 平面不再露出硬边。
-        float fog = smoothstep(1.5, 4.0, in.world.y) * 0.35;
+        // 地平线处的雾化：地板远边完全融进墙色，8 m 平面不再露出硬边。
+        // 背景板在地板远边那一行也是同一个地平线色，所以接缝不可见。
+        float fog = smoothstep(0.9, 4.0, in.world.y);
         color = mix(color,
             float3(0.102, 0.090, 0.078) * uniforms.daylight.rgb, fog);
     }

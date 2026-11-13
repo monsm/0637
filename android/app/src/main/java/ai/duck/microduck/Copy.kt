@@ -1,6 +1,9 @@
 package ai.duck.microduck
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -20,7 +23,11 @@ object Copy {
         Chinese("中文"),
     }
 
-    private var cached: Language? = null
+    // Compose snapshot state, not a plain global: a composable that reads a
+    // Copy getter must recompose when the chip flips the language. The old
+    // `languageTick` only invalidated Shell, and Compose skipped children
+    // whose parameters had not changed — the thumb deck stayed English.
+    private var cached by mutableStateOf<Language?>(null)
 
     fun load(context: Context) {
         val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -289,6 +289,7 @@ jobs:
           # the workflow's path filter keep the commit from re-running CI.
           mkdir -p dist
           cp ui-b1-android.png dist/ui-b1-android.png
+          cp ui-b1-android-zh.png dist/ui-b1-android-zh.png
           git config user.email "actions@github.com"
           git config user.name "ui-bot"
           pushed=0
@@ -299,7 +300,7 @@ jobs:
             if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
               git reset --mixed FETCH_HEAD
             fi
-            git add -f dist/ui-b1-android.png
+            git add -f dist/ui-b1-android.png dist/ui-b1-android-zh.png
             git commit -m "ui-b1: Android portrait Live screenshot [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2
@@ -402,6 +403,7 @@ jobs:
             android-screen.png
             android-screen-2.png
             ui-b1-android.png
+            ui-b1-android-zh.png
             unstripped/
 
       - uses: actions/upload-artifact@v4

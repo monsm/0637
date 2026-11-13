@@ -77,30 +77,43 @@ enum PostcardCompose {
             )
             dateText.draw(at: dateOrigin, withAttributes: dateAttrs)
 
-            // 5. 左侧字幕：右边界避开日期与品牌标，垂直居中，超长时尾部省略
+            // 5. 左侧字幕：右边界避开日期与品牌标，垂直居中。字幕带允许
+            // 两行——一行装不下的真实计数不该被省略号吃掉（2026-11-13
+            // 验收打回 2）。只有两行仍放不下的极端字幕才退回尾部省略。
             guard !caption.isEmpty else { return }
             let captionRight = min(dateOrigin.x, markOrigin.x) - 14 * unit
             let captionWidth = max(1, captionRight - paddingX)
             let paragraph = NSMutableParagraphStyle()
-            paragraph.lineBreakMode = .byTruncatingTail
+            paragraph.lineBreakMode = .byWordWrapping
             let captionAttrs: [NSAttributedString.Key: Any] = [
                 .font: captionFont,
                 .foregroundColor: UIColor.white,
                 .paragraphStyle: paragraph,
             ]
             let captionText = caption as NSString
-            let options: NSStringDrawingOptions = [
-                .usesLineFragmentOrigin,
-                .usesFontLeading,
-                .truncatesLastVisibleLine,
-            ]
-            let bounds = captionText.boundingRect(
-                with: CGSize(width: captionWidth, height: textHeight),
+            var options: NSStringDrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+            var measured = captionText.boundingRect(
+                with: CGSize(width: captionWidth, height: .greatestFiniteMagnitude),
                 options: options,
                 attributes: captionAttrs,
                 context: nil
             )
-            let drawHeight = min(bounds.height.rounded(.up), textHeight)
+            if measured.height > textHeight {
+                // More than the band can hold even at two lines: truncate the
+                // last visible line rather than drawing past the band.
+                paragraph.lineBreakMode = .byTruncatingTail
+                options.insert(.truncatesLastVisibleLine)
+                measured = captionText.boundingRect(
+                    with: CGSize(width: captionWidth, height: textHeight),
+                    options: options,
+                    attributes: captionAttrs,
+                    context: nil
+                )
+            }
+            let drawHeight = min(
+                max(measured.height.rounded(.up), captionFont.lineHeight),
+                textHeight
+            )
             let drawRect = CGRect(
                 x: paddingX,
                 y: textMidY - drawHeight / 2,
