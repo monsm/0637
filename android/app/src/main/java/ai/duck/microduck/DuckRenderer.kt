@@ -65,9 +65,6 @@ class DuckRenderer(
     /// The body model this renderer was built for; a mode switch changes it.
     private var builtGeneration = -1L
     private val yaw = Math.PI.toFloat()
-    // The compass lives in DuckInput; the camera leans on the offset so the
-    // room turns under the person instead of the duck moving.
-    private val compassYaw get() = input.compassYawRad
     private val pitch = 0.32f
     private val distance = 0.85f
 
@@ -178,8 +175,8 @@ class DuckRenderer(
         // 0.85 base distance, scaled the way the iOS renderer does.
         val cameraDistance = if (aspect < 1f) distance * 1.15f else distance
         val eye = floatArrayOf(
-            trunk[0] + cameraDistance * cosPitch * sin((yaw + compassYaw).toDouble()).toFloat(),
-            trunk[1] + cameraDistance * cosPitch * cos((yaw + compassYaw).toDouble()).toFloat(),
+            trunk[0] + cameraDistance * cosPitch * sin(yaw.toDouble()).toFloat(),
+            trunk[1] + cameraDistance * cosPitch * cos(yaw.toDouble()).toFloat(),
             trunk[2] + cameraDistance * sin(pitch.toDouble()).toFloat(),
         )
         Matrix.perspectiveM(projection, 0, 45f, aspect, 0.01f, 100f)

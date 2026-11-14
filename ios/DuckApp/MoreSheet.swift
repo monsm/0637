@@ -141,15 +141,6 @@ struct MoreSheet: View {
                         controller.toggleFlashlight()
                     }
                     row(
-                        "location.north", Copy.compass,
-                        note: Copy.compassNote,
-                        check: controller.compassOn,
-                        showsChevron: false,
-                        id: "more-compass"
-                    ) {
-                        controller.compassOn.toggle()
-                    }
-                    row(
                         "lightbulb", Copy.roomLamp,
                         note: Copy.roomLampNote,
                         badge: String(format: "%.0f%%", controller.ambientScale * 100),

@@ -3411,28 +3411,6 @@ private fun InstrumentSheet(
                     }
                 }
             }
-            // The compass: the home keeps one real-world bearing when the
-            // device has a rotation vector. Off by default - a rotating
-            // room can confuse a driving child - and honest when absent.
-            var compassOn by remember { mutableStateOf(
-                context.getSharedPreferences("duck", Context.MODE_PRIVATE)
-                    .getBoolean("duck_compass_on", false)
-            ) }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(Copy.compass, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                ButtonChip(
-                    if (compassOn) Copy.flashlightOff else Copy.flashlightOn,
-                    "compass-toggle",
-                ) {
-                    compassOn = !compassOn
-                    context.getSharedPreferences("duck", Context.MODE_PRIVATE)
-                        .edit().putBoolean("duck_compass_on", compassOn).apply()
-                }
-            }
             // The parent's daily allowance: one chip cycles off -> 15 -> 30
             // -> 60 minutes. The number shown is the core's own accounting.
             Row(

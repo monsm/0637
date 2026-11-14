@@ -82,33 +82,6 @@ class MainActivity : ComponentActivity() {
         // follows the room, clamped to the readable band. No sensor leaves
         // the sheet's manual stops in charge — the number is never invented.
         val sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
-        // The compass, when the device has a rotation vector: the azimuth's
-        // delta from the bearing at switch-on becomes the room's yaw offset.
-        // No sensor, no row - the number is never invented.
-        sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR)?.let { rotation ->
-            val compassPrefs = getSharedPreferences("duck", Context.MODE_PRIVATE)
-            var compassBearing = Float.NaN
-            sensorManager.registerListener(
-                { event ->
-                    if (compassPrefs.getBoolean("duck_compass_on", false) &&
-                        event.sensor.type == android.hardware.Sensor.TYPE_ROTATION_VECTOR
-                    ) {
-                        val rotationMatrix = FloatArray(9)
-                        android.hardware.SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                        val orientation = FloatArray(3)
-                        android.hardware.SensorManager.getOrientation(rotationMatrix, orientation)
-                        val azimuth = orientation[0]
-                        if (compassBearing.isNaN()) compassBearing = azimuth
-                        input.compassYawRad = -(azimuth - compassBearing)
-                    } else if (!compassPrefs.getBoolean("duck_compass_on", false)) {
-                        compassBearing = Float.NaN
-                        input.compassYawRad = 0f
-                    }
-                },
-                rotation,
-                android.hardware.SensorManager.SENSOR_DELAY_NORMAL,
-            )
-        }
         sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_LIGHT)?.let { light ->
             sensorManager.registerListener(
                 { event ->

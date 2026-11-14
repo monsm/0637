@@ -472,15 +472,6 @@ enum Copy {
         [pick("Pet it", "摸摸它"), pick("Feed it", "喂食"),
          pick("Quack", "叫一声"), pick("Sit down", "坐下")][index]
     }
-    // The compass: the home keeps one real-world bearing. Off by default;
-    // a device without attitude hides the row instead of pretending.
-    static var compass: String { pick("Home faces north", "家永远朝北") }
-    static var compassNote: String {
-        pick(
-            "Turn around - the room turns with you. Honest, not 1:1.",
-            "转个身，房间跟着你转。诚实标注：非 1:1。"
-        )
-    }
     static var roomLamp: String { pick("Room lamp", "房间灯") }
     static var roomLampNote: String {
         pick(

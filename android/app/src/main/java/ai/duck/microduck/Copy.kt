@@ -489,7 +489,6 @@ val quack get() = pick("Quack", "叫一声")
         2 -> pick("Quack", "叫一声")
         else -> pick("Sit down", "坐下")
     }
-    val compass get() = pick("Home faces north", "家永远朝北")
     val roomLamp get() = pick("Room lamp", "房间灯")
     val parentTime get() = pick("Parent time", "家长时间")
     val parentOff get() = pick("off", "不限")

@@ -484,8 +484,8 @@ final class Renderer: NSObject, MTKViewDelegate {
         // frame without shrinking it vertically (fovY is unchanged).
         let eyeDistance = aspect < 1 ? distance * 1.15 : distance
         let eye = focus + SIMD3<Float>(
-            eyeDistance * cos(pitch) * sin(yaw + controller.compassYaw),
-            eyeDistance * cos(pitch) * cos(yaw + controller.compassYaw),
+            eyeDistance * cos(pitch) * sin(yaw),
+            eyeDistance * cos(pitch) * cos(yaw),
             eyeDistance * sin(pitch)
         )
         let viewMatrix = lookAt(eye: eye, center: focus, up: SIMD3<Float>(0, 0, 1))
