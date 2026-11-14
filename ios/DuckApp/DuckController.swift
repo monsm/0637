@@ -44,19 +44,24 @@ final class DuckController: ObservableObject {
         var value: String
         /// Optional ordered follow-ups: a chain, for a longer little program.
         var then: [DuckRuleStep] = []
+        /// A timer rule's period in whole simulated seconds. Separate from
+        /// the action's word: the period is the WHEN.
+        var periodS: Int?
 
-        enum CodingKeys: String, CodingKey { case trigger, action, value, then }
+        enum CodingKeys: String, CodingKey { case trigger, action, value, then, periodS = "period_s" }
 
         init(
             trigger: String,
             action: String,
             value: String,
-            then: [DuckRuleStep] = []
+            then: [DuckRuleStep] = [],
+            periodS: Int? = nil
         ) {
             self.trigger = trigger
             self.action = action
             self.value = value
             self.then = then
+            self.periodS = periodS
         }
 
         // Programs saved before chains existed have no `then` key; they must
@@ -1443,6 +1448,33 @@ final class DuckController: ObservableObject {
     }
     /// The vet book's per-day rows, newest last — the parent's view.
     @Published var vetbookDays: [String] = []
+    /// The duck 8x8 head grid as a tiny heat text: the official resampler
+    /// output from whatever depth the phone published. Empty means nothing
+    /// was published - the row says so rather than drawing a room.
+    @Published var tofStrip = "-"
+
+    func refreshTofStrip() {
+        guard let url = URL(string: "http://127.0.0.1:8765/sensors") else { return }
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let self, let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let grid = json["tof_grid"] as? [Double], grid.count == 64
+            else { return }
+            let rows = (0..<8).map { row in
+                (0..<8).map { col -> String in
+                    let value = grid[row * 8 + col]
+                    switch value {
+                    case ..<0.001: return "."
+                    case ..<1.0: return "#"
+                    case ..<2.0: return "="
+                    case ..<3.0: return "-"
+                    default: return "_"
+                    }
+                }.joined()
+            }
+            DispatchQueue.main.async { self.tofStrip = rows.joined(separator: " / ") }
+        }.resume()
+    }
     /// Rewind-play: while on, the tick rewinds 200 ticks every 150 ms -
     /// the same /seek the rail rewind button uses, continuously.
     @Published var rewinding = false

@@ -500,6 +500,10 @@ enum Copy {
         )
     }
     static var abLoaded: String { pick("Loaded on branch B", "已载入分支 B") }
+    static func photoFamily(_ names: [String]) -> String {
+        String(format: pick("In the room: %@", "同框：%@"), names.joined(separator: ", "))
+    }
+    static var tof: String { pick("Head ToF", "头部 ToF") }
     static var padSender: String { pick("Be the pad", "当手柄") }
     static var padTarget: String { pick("Driving", "驾驶中") }
     static var pushCompareDone: String {
@@ -554,6 +558,7 @@ enum Copy {
         case "clap": return pick("clap", "拍手")
         case "whistle": return pick("whistle", "吹口哨")
         case "pet": return pick("pet me", "摸摸我")
+        case "timer": return pick("the timer", "定时")
         default: return trigger
         }
     }

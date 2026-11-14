@@ -32,6 +32,11 @@ pub struct Rule {
     /// old one-action rule.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub then: Vec<Action>,
+    /// A timer rule's period in whole simulated seconds. Separate from
+    /// `value` (which stays the action's word): the period is the WHEN, the
+    /// value is the WHAT, and one field cannot be both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub period_s: Option<u32>,
 }
 
 /// One block after the first: same action/value pair as a classic rule.
@@ -62,10 +67,10 @@ pub struct Rules {
 }
 
 impl Rules {
-    /// A timer rule's period in SIMULATED SECONDS, parsed from its value.
-    /// The value is the duck's own clock (20 ms ticks), never a wall clock.
-    pub fn timer_period_s(value: &str) -> Option<u32> {
-        value.trim().parse::<u32>().ok().filter(|period| *period >= 5 && *period <= 3600)
+    /// A timer rule's period check: whole simulated seconds, 5..=3600.
+    /// The duck's own clock (20 ms ticks), never a wall clock.
+    pub fn timer_period_s(period: Option<u32>) -> Option<u32> {
+        period.filter(|seconds| (5..=3600).contains(seconds))
     }
 
     /// Replace the set from the wire. Invalid blocks are refused by name
@@ -103,13 +108,15 @@ impl Rules {
             if name.trim().is_empty() {
                 return Err(format!("rule {index}: empty value"));
             }
-            // A timer rule's value is SECONDS of the duck's own clock: a
-            // junk number is refused here, at the door, not discovered by a
-            // tick that never fires.
-            if trigger == "timer" && Self::timer_period_s(name).is_none() {
-                return Err(format!(
-                    "rule {index}: a timer needs whole seconds between 5 and 3600"
-                ));
+            // A timer rule needs its period: junk is refused here, at the
+            // door, not discovered by a tick that never fires.
+            if trigger == "timer" {
+                let period = item.get("period_s").and_then(Value::as_u64).unwrap_or(0) as u32;
+                if Self::timer_period_s(Some(period)).is_none() {
+                    return Err(format!(
+                        "rule {index}: a timer needs period_s between 5 and 3600"
+                    ));
+                }
             }
             let mut then = Vec::new();
             if let Some(list) = item.get("then") {
@@ -150,6 +157,11 @@ impl Rules {
                 action: action.to_owned(),
                 value: name.trim().to_owned(),
                 then,
+                period_s: if trigger == "timer" {
+                    item.get("period_s").and_then(Value::as_u64).map(|v| v as u32)
+                } else {
+                    None
+                },
             });
         }
         self.rules = rules;
