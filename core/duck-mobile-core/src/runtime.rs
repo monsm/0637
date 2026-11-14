@@ -13,6 +13,8 @@
 //! has more phases (pose, still, max); this is the subset the mobile shell needs first and
 //! is marked where it differs.
 
+#[cfg(feature = "mujoco")]
+use crate::mujoco::MujocoIo;
 use std::time::{Duration, Instant};
 
 use duck_control::fall::{FallPredictor, FallPredictorConfig};
@@ -781,6 +783,16 @@ pub struct DuckRuntime<T: RobotIo> {
     volts: Option<f64>,
     slow_ticks: u32,
     dt: Duration,
+}
+
+#[cfg(feature = "mujoco")]
+impl DuckRuntime<MujocoIo> {
+    /// The AR floor (SENSORS_PLAN S2): only the MuJoCo body can move its
+    /// ground, so the typed impl is where the intent lands. Refused on a
+    /// body without a plane geom.
+    pub fn set_floor_height(&mut self, z: f64) -> Result<bool, RuntimeError> {
+        Ok(self.safety.io_mut().set_floor_z(z).is_some())
+    }
 }
 
 impl<T: RobotIo> DuckRuntime<T> {
@@ -1760,7 +1772,19 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
         let mut executed = false;
         for rule in &rules {
-            let mut steps = Vec::with_capacity(rule.then.len() + 1);
+            if self.fire_rule(rule, trigger) {
+                executed = true;
+            }
+        }
+        executed
+    }
+
+    /// One rule, by name: the shared body of every firing path. The timer
+    /// checker hands in the exact rule it found due; the sound and pet paths
+    /// hand in whatever matched their trigger word.
+    fn fire_rule(&mut self, rule: &crate::rules::Rule, trigger: &str) -> bool {
+        let mut executed = false;
+        let mut steps = Vec::with_capacity(rule.then.len() + 1);
             steps.push(crate::rules::Action {
                 action: rule.action.clone(),
                 value: rule.value.clone(),
@@ -1778,7 +1802,6 @@ impl<T: RobotIo> DuckRuntime<T> {
                     });
                 }
             }
-        }
         // If nothing could run (busy, unknown value), let the duck's default
         // reaction have the moment rather than suppressing it silently.
         executed
@@ -2361,6 +2384,30 @@ impl<T: RobotIo> DuckRuntime<T> {
         // asleep; the check never wakes anybody.
         if self.care.budget_s.is_some() && self.care.budget_spent(self.book().life.powered_s) {
             self.care.enter_night(self.clock.tick);
+        // Timer rules fire on the duck's own clock: every whole simulated
+        // period, a rule whose trigger is "timer" gets its moment. A paused
+        // duck never reaches this code, so frozen time fires nothing.
+        let due: Vec<usize> = self
+            .rules
+            .rules
+            .iter()
+            .enumerate()
+            .filter(|(index, rule)| {
+                rule.trigger == "timer"
+                    && crate::rules::Rules::timer_period_s(&rule.value).is_some_and(|period| {
+                        let period_ticks = u64::from(period) * 50;
+                        self.clock.tick
+                            .saturating_sub(*self.rules.timer_last.get(index).unwrap_or(&0))
+                            >= period_ticks
+                    })
+            })
+            .map(|(index, _)| index)
+            .collect();
+        for index in due {
+            let rule = self.rules.rules[index].clone();
+            self.rules.timer_last.insert(index, self.clock.tick);
+            self.fire_rule(&rule, "timer");
+        }
         }
         let now = TickTime::of(&self.clock);
         let sensors: Sensors = self.safety.read()?;

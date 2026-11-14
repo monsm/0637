@@ -405,6 +405,38 @@ struct ContentView: View {
                 }
                 MetalView(controller: controller)
                     .ignoresSafeArea()
+                // The observation HUD: a few REAL numbers over the stage -
+                // the same tick and mode the status line publishes, drawn
+                // where the person is looking instead of behind a sheet.
+                if controller.hudOn {
+                    VStack(alignment: .leading) {
+                        Text("tick \(controller.simTick) · \(controller.label)")
+                            .font(.system(size: 11, design: .monospaced))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+                            .accessibilityIdentifier("hud-overlay")
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                    .padding(.horizontal, 16)
+                    .allowsHitTesting(false)
+                }
+                // The second player: the right edge belongs to them - three
+                // verbs at arm's length while player one keeps the joystick.
+                if controller.p2On {
+                    VStack(spacing: 10) {
+                        bigP2(0, icon: "hand.raised.fill") { controller.pet() }
+                        bigP2(2, icon: Icons.quack) {
+                            if let core = controller.core {
+                                controller.voice.play(core: core, tag: "chirp")
+                            }
+                        }
+                        bigP2(3, icon: "figure.wave") { controller.sit() }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .padding(.trailing, 10)
+                }
             }
             .onAppear { controller.setDirector(surface == .director) }
             .onChange(of: surface) { _, newValue in
@@ -1864,5 +1896,24 @@ struct DirectorOverlay: View {
                 .padding(.trailing, 16)
             }
         }
+    }
+}
+
+/// One second-player verb: the same calls the big-button page makes,
+/// sized for the right edge of a portrait stage.
+fileprivate extension ContentView {
+    func bigP2(_ index: Int, icon: String, action: @escaping () -> Void) -> some View {
+        Button {
+            action()
+        } label: {
+            Image(systemName: icon)
+                .font(.system(size: 22))
+                .frame(width: 56, height: 56)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Copy.bigButtonAction(index))
+        .accessibilityIdentifier("p2-action-\(index)")
     }
 }

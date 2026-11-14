@@ -84,42 +84,45 @@ class MainActivity : ComponentActivity() {
         val sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
         // The compass, when the device has a rotation vector: the azimuth's
         // delta from the bearing at switch-on becomes the room's yaw offset.
-        // No sensor, no row - the number is never invented.
+        // No sensor, no row - the number is never invented. The listeners are
+        // explicit SensorEventListener objects: registerListener's overloads
+        // make a bare lambda's SAM conversion ambiguous.
+        val compassPrefs = getSharedPreferences("duck", Context.MODE_PRIVATE)
+        val compassListener = object : android.hardware.SensorEventListener {
+            private var bearing = Float.NaN
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                if (event.sensor.type != android.hardware.Sensor.TYPE_ROTATION_VECTOR) return
+                if (!compassPrefs.getBoolean("duck_compass_on", false)) {
+                    bearing = Float.NaN
+                    input.compassYawRad = 0f
+                    return
+                }
+                val matrix = FloatArray(9)
+                android.hardware.SensorManager.getRotationMatrixFromVector(matrix, event.values)
+                val orientation = FloatArray(3)
+                android.hardware.SensorManager.getOrientation(matrix, orientation)
+                val azimuth = orientation[0]
+                if (bearing.isNaN()) bearing = azimuth
+                input.compassYawRad = -(azimuth - bearing)
+            }
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+        }
         sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR)?.let { rotation ->
-            val compassPrefs = getSharedPreferences("duck", Context.MODE_PRIVATE)
-            var compassBearing = Float.NaN
-            sensorManager.registerListener(
-                { event ->
-                    if (compassPrefs.getBoolean("duck_compass_on", false) &&
-                        event.sensor.type == android.hardware.Sensor.TYPE_ROTATION_VECTOR
-                    ) {
-                        val rotationMatrix = FloatArray(9)
-                        android.hardware.SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                        val orientation = FloatArray(3)
-                        android.hardware.SensorManager.getOrientation(rotationMatrix, orientation)
-                        val azimuth = orientation[0]
-                        if (compassBearing.isNaN()) compassBearing = azimuth
-                        input.compassYawRad = -(azimuth - compassBearing)
-                    } else if (!compassPrefs.getBoolean("duck_compass_on", false)) {
-                        compassBearing = Float.NaN
-                        input.compassYawRad = 0f
-                    }
-                },
-                rotation,
-                android.hardware.SensorManager.SENSOR_DELAY_NORMAL,
-            )
+            sensorManager.registerListener(compassListener, rotation, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        // The room's lamp, when the device has a real lux sensor: the scale
+        // follows the room, clamped to the readable band. No sensor leaves
+        // the sheet's manual stops in charge; the number is never invented.
+        val luxListener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                if (event.sensor.type != android.hardware.Sensor.TYPE_LIGHT) return
+                input.ambientLux = event.values[0]
+                input.ambientScale = (event.values[0] / 200f).coerceIn(0.55f, 1.15f)
+            }
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
         }
         sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_LIGHT)?.let { light ->
-            sensorManager.registerListener(
-                { event ->
-                    if (event.sensor.type == android.hardware.Sensor.TYPE_LIGHT) {
-                        input.ambientLux = event.values[0]
-                        input.ambientScale = (event.values[0] / 200f).coerceIn(0.55f, 1.15f)
-                    }
-                },
-                light,
-                android.hardware.SensorManager.SENSOR_DELAY_NORMAL,
-            )
+            sensorManager.registerListener(luxListener, light, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
         }
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {

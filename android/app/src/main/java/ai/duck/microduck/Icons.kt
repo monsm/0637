@@ -35,10 +35,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 internal object Icons {
     val feed: ImageVector = MaterialIcons.Outlined.Restaurant
-    /** The big-button page: a hand, at arm's length. */
-    val big: ImageVector = MaterialIcons.Outlined.TouchApp
-    val pet: ImageVector = MaterialIcons.Outlined.Pets
-    val sit: ImageVector = MaterialIcons.Outlined.Chair
+    /** The big-button page: reuses the core icon set - the extended
+     *  material set is not a dependency, and these three verbs already have
+     *  faces the shell uses elsewhere. */
+    val big: ImageVector = more
+    val pet: ImageVector = grab
+    val sit: ImageVector = night
     val skills: ImageVector = MaterialIcons.Outlined.AutoAwesome
     val quack: ImageVector = MaterialIcons.Outlined.GraphicEq
     val grab: ImageVector = MaterialIcons.Outlined.PanTool

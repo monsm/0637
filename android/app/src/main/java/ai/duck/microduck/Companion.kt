@@ -216,6 +216,8 @@ data class LifeUi(
     val metres: Double = 0.0,
     val rolls: Int = 0,
     val pickups: Int = 0,
+    /** The parent's per-day rows, newest last, from /state.life.days. */
+    val days: List<String> = emptyList(),
 )
 
 fun fetchLifeRecord(): LifeUi? = try {
@@ -224,6 +226,16 @@ fun fetchLifeRecord(): LifeUi? = try {
         metres = life.optDouble("metres", 0.0),
         rolls = life.optJSONObject("skills")?.optInt("roulade", 0) ?: 0,
         pickups = life.optInt("pickups", 0),
+        days = life.optJSONArray("days")?.let { array ->
+            (0 until array.length()).mapNotNull { index ->
+                array.optJSONObject(index)?.let { row ->
+                    val metres = row.optDouble("metres", 0.0)
+                    val powered = row.optDouble("powered_s", 0.0).toInt()
+                    val rolls = row.optInt("rolls", 0)
+                    "${row.optString("day", "")}: ${"%.1f".format(metres)}m · ${powered}s · ${rolls} rolls"
+                }
+            }
+        } ?: emptyList(),
     )
 } catch (_: Throwable) {
     null

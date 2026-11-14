@@ -1410,6 +1410,56 @@ final class DuckController: ObservableObject {
         }
     }
 
+    // MARK: - The time machine's thirds
+
+    /// Push & compare: checkpoint, fork, then shove branch B. The rewind
+    /// machine already keeps both branches; the shell only hands out the
+    /// shove and tells the person where to look.
+    func pushCompare() {
+        postJSON("/checkpoint", [:])
+        postJSON("/fork", [:])
+        postJSON("/push", ["vx": 0.6, "vy": 0.0, "vz": 0.0])
+    }
+
+    /// Policy A/B: fork, then load a policy DIRECTORY on the new branch and
+    /// switch to it. The reload route's own refusal is the honest answer for
+    /// a folder the manifest cannot read.
+    func loadPolicyOnBranchB(directory: String) {
+        postJSON("/fork", [:])
+        postJSON("/branch/select", ["branch": 2])
+        postJSON("/reload", ["directory": directory])
+    }
+
+    /// The observation HUD's toggles, persisted like the mic.
+    @Published var hudOn = UserDefaults.standard.bool(forKey: "duck_hud_on") {
+        didSet {
+            if hudOn != oldValue { UserDefaults.standard.set(hudOn, forKey: "duck_hud_on") }
+        }
+    }
+    @Published var p2On = UserDefaults.standard.bool(forKey: "duck_p2_on") {
+        didSet {
+            if p2On != oldValue { UserDefaults.standard.set(p2On, forKey: "duck_p2_on") }
+        }
+    }
+    /// The vet book's per-day rows, newest last — the parent's view.
+    @Published var vetbookDays: [String] = []
+    /// Rewind-play: while on, the tick rewinds 200 ticks every 150 ms -
+    /// the same /seek the rail rewind button uses, continuously.
+    @Published var rewinding = false
+    private var rewindTimer: Timer?
+
+    func toggleRewindPlay() {
+        rewinding.toggle()
+        if rewinding {
+            rewindTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+                self?.postJSON("/seek", ["ticks": 200])
+            }
+        } else {
+            rewindTimer?.invalidate()
+            rewindTimer = nil
+        }
+    }
+
     /// The parent's daily allowance. Zero clears it; the core snapshots
     /// its own powered time and puts the duck to bed when the day is spent.
     func setParent(minutes: Int) {
@@ -2092,6 +2142,19 @@ final class DuckController: ObservableObject {
                         self.lastEvents = life["events"] as? [String] ?? self.lastEvents
                         self.updateDex(skills: skills, emotions: emotions)
                         self.vetbookMetres = life["metres"] as? Double ?? 0
+                        // The parent's per-day rows, newest last.
+                        if let days = life["days"] as? [[String: Any]] {
+                            self.vetbookDays = days.prefix(30).map { row in
+                                let day = row["day"] as? String ?? ""
+                                let metres = row["metres"] as? Double ?? 0
+                                let powered = row["powered_s"] as? Double ?? 0
+                                let rolls = row["rolls"] as? Int ?? 0
+                                return String(
+                                    format: "%@: %.1fm · %ds · %d rolls",
+                                    day, metres, Int(powered), rolls
+                                )
+                            }
+                        }
                         self.vetbookRolls = skills["roulade"] as? Int ?? 0
                         self.vetbookPickups = life["pickups"] as? Int ?? 0
                         // 成长系统：散步按增量记账，停走一条 poll 后结一次。

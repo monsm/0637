@@ -205,6 +205,28 @@ pub struct MujocoIo {
 unsafe impl Send for MujocoIo {}
 
 impl MujocoIo {
+    /// The AR mode's floor hook (SENSORS_PLAN S2): write the plane geom's
+    /// z directly in mjModel and re-run the solver's forward pass. The
+    /// duck's senses do not change - the WORLD does, which is what makes
+    /// this the honest AR move rather than a possession trick.
+    /// Returns the geom it moved, for the route to report.
+    pub fn set_floor_z(&mut self, z: f64) -> Option<usize> {
+        let count = self.geom_count();
+        for geom in 0..count {
+            if unsafe { duck_mj_geom_type(self.handle, geom as i32) } == 0 {
+                // A plane geom is the room's ground. Move it, then let the
+                // physics re-derive everything that stands on it.
+                let pos = unsafe {
+                    slice::from_raw_parts_mut(duck_mj_geom_pos(self.handle), count * 3)
+                };
+                pos[geom * 3 + 2] = z;
+                unsafe { duck_mj_forward(self.handle) };
+                return Some(geom);
+            }
+        }
+        None
+    }
+
     /// Load with the BAM M6 torque path (the real servo model).
     pub fn load(xml_path: impl AsRef<Path>) -> std::result::Result<Self, String> {
         Self::load_with_mode(xml_path, true)

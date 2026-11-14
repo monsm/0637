@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// What a child can listen for.
-pub const TRIGGERS: [&str; 3] = ["clap", "whistle", "pet"];
+pub const TRIGGERS: [&str; 4] = ["clap", "whistle", "pet", "timer"];
 
 /// What a block can make the duck do.
 pub const ACTIONS: [&str; 4] = ["skill", "emotion", "sound", "light"];
@@ -55,9 +55,19 @@ pub struct Fired {
 pub struct Rules {
     pub rules: Vec<Rule>,
     pub last: Option<Fired>,
+    /// Per-timer-rule tick of its last firing, keyed by rule index. The
+    /// tick resets this when the program changes, so a new timer is due
+    /// immediately rather than inheriting an old clock.
+    pub timer_last: std::collections::HashMap<usize, u64>,
 }
 
 impl Rules {
+    /// A timer rule's period in SIMULATED SECONDS, parsed from its value.
+    /// The value is the duck's own clock (20 ms ticks), never a wall clock.
+    pub fn timer_period_s(value: &str) -> Option<u32> {
+        value.trim().parse::<u32>().ok().filter(|period| *period >= 5 && *period <= 3600)
+    }
+
     /// Replace the set from the wire. Invalid blocks are refused by name
     /// rather than silently dropped: a child's program that did not load must
     /// not look like one that did.
@@ -70,6 +80,7 @@ impl Rules {
             return Err("at most 8 rules".to_owned());
         }
         let mut rules = Vec::with_capacity(array.len());
+        self.timer_last.clear();
         for (index, item) in array.iter().enumerate() {
             let trigger = item
                 .get("trigger")
@@ -91,6 +102,14 @@ impl Rules {
                 .ok_or_else(|| format!("rule {index}: missing value"))?;
             if name.trim().is_empty() {
                 return Err(format!("rule {index}: empty value"));
+            }
+            // A timer rule's value is SECONDS of the duck's own clock: a
+            // junk number is refused here, at the door, not discovered by a
+            // tick that never fires.
+            if trigger == "timer" && Self::timer_period_s(name).is_none() {
+                return Err(format!(
+                    "rule {index}: a timer needs whole seconds between 5 and 3600"
+                ));
             }
             let mut then = Vec::new();
             if let Some(list) = item.get("then") {
