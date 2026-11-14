@@ -2,9 +2,9 @@
    Compiling duck-ipc-proto v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-ipc-proto)
    Compiling kinematics v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/kinematics)
    Compiling duck-mobile-core v0.1.0 (/Users/runner/work/0637/0637/core/duck-mobile-core)
-   Compiling odometry v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/odometry)
    Compiling robotd-params v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/robotd-params)
    Compiling duck-control v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-control)
+   Compiling odometry v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/odometry)
 warning: unused import: `crate::control::Tuning`
   --> duck-mobile-core/src/ffi.rs:19:5
    |
@@ -13,19 +13,78 @@ warning: unused import: `crate::control::Tuning`
    |
    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-warning: unused variable: `name`
-   --> duck-mobile-core/src/ffi.rs:792:23
-    |
-792 |         Intent::Skill(name) if core.runtime.shutting_down() => {
-    |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
-    |
-    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+error[E0277]: the `?` operator can only be used in a closure that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> duck-mobile-core/src/pad.rs:51:81
+   |
+51 |     let u32le = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().ok()?);
+   |                 -----------                                                     ^ cannot use the `?` operator in a closure that returns `u32`
+   |                 |
+   |                 this function should return `Result` or `Option` to accept `?`
 
-warning: unused variable: `dir`
-    --> duck-mobile-core/src/ffi.rs:1151:24
+error[E0277]: the `?` operator can only be used in a closure that returns `Result` or `Option` (or another type that implements `FromResidual`)
+  --> duck-mobile-core/src/pad.rs:52:81
+   |
+52 |     let i16le = |at: usize| i16::from_le_bytes(bytes[at..at + 2].try_into().ok()?);
+   |                 -----------                                                     ^ cannot use the `?` operator in a closure that returns `i16`
+   |                 |
+   |                 this function should return `Result` or `Option` to accept `?`
+
+error[E0308]: mismatched types
+    --> duck-mobile-core/src/ffi.rs:1088:17
      |
-1151 |         Intent::Reload(dir) if core.runtime.shutting_down() => {
-     |                        ^^^ help: if this is intentional, prefix it with an underscore: `_dir`
+1087 |             match sent {
+     |                   ---- this expression has type `std::option::Option<Result<usize, std::string::String>>`
+1088 |                 Ok(Ok(roles)) => {
+     |                 ^^^^^^^^^^^^^ expected `Option<Result<usize, String>>`, found `Result<_, _>`
+     |
+     = note: expected enum `std::option::Option<Result<usize, std::string::String>>`
+                found enum `Result<_, _>`
+help: try wrapping the pattern in `Some`
+     |
+1088 |                 Some(Ok(Ok(roles))) => {
+     |                 +++++             +
+
+error[E0308]: mismatched types
+    --> duck-mobile-core/src/ffi.rs:1096:17
+     |
+1087 |             match sent {
+     |                   ---- this expression has type `std::option::Option<Result<usize, std::string::String>>`
+...
+1096 |                 Ok(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
+     |                 ^^^^^^^^^^^^^^ expected `Option<Result<usize, String>>`, found `Result<_, _>`
+     |
+     = note: expected enum `std::option::Option<Result<usize, std::string::String>>`
+                found enum `Result<_, _>`
+help: try wrapping the pattern in `Some`
+     |
+1096 |                 Some(Ok(Err(error))) => refuse(core, format!("ensemble refused: {error}")),
+     |                 +++++              +
+
+error[E0308]: mismatched types
+    --> duck-mobile-core/src/ffi.rs:1097:17
+     |
+1087 |             match sent {
+     |                   ---- this expression has type `std::option::Option<Result<usize, std::string::String>>`
+...
+1097 |                 Err(_) => refuse(core, "the LAN peer port is not available".to_owned()),
+     |                 ^^^^^^ expected `Option<Result<usize, String>>`, found `Result<_, _>`
+     |
+     = note: expected enum `std::option::Option<Result<usize, std::string::String>>`
+                found enum `Result<_, _>`
+help: try wrapping the pattern in `Some`
+     |
+1097 |                 Some(Err(_)) => refuse(core, "the LAN peer port is not available".to_owned()),
+     |                 +++++      +
+
+warning: variable does not need to be mutable
+   --> duck-mobile-core/src/lan.rs:203:13
+    |
+203 |         let mut inner = self.inner.lock().map_err(|_| "the peer table is busy".to_owned())?;
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
 
 warning: variable does not need to be mutable
    --> duck-mobile-core/src/mujoco.rs:532:13
@@ -34,38 +93,40 @@ warning: variable does not need to be mutable
     |             ----^^^^
     |             |
     |             help: remove this `mut`
-    |
-    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
 
-warning: type `DuckMj` is more private than the item `MujocoIo::handle`
-   --> duck-mobile-core/src/mujoco.rs:565:5
-    |
-565 |     pub fn handle(&self) -> *mut DuckMj {
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `MujocoIo::handle` is reachable at visibility `pub`
-    |
-note: but type `DuckMj` is only usable at visibility `pub(self)`
-   --> duck-mobile-core/src/mujoco.rs:23:1
-    |
- 23 | struct DuckMj {
-    | ^^^^^^^^^^^^^
-    = note: `#[warn(private_interfaces)]` on by default
-
-warning: field `provenance` is never read
-  --> duck-mobile-core/src/ffi.rs:59:5
-   |
-48 | pub struct DuckCore {
-   |            -------- field in this struct
+error[E0004]: non-exhaustive patterns: `&PeerEvent::Ensemble { .. }` not covered
+    --> duck-mobile-core/src/runtime.rs:1832:56
+     |
+1832 |         let (kind, from, name, sound, emotion) = match event {
+     |                                                        ^^^^^ pattern `&PeerEvent::Ensemble { .. }` not covered
+     |
+note: `PeerEvent` defined here
+    --> duck-mobile-core/src/lan.rs:61:10
+     |
+  61 | pub enum PeerEvent {
+     |          ^^^^^^^^^
 ...
-59 |     provenance: crate::provenance::Provenance,
-   |     ^^^^^^^^^^
-   |
-   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+  89 |     Ensemble {
+     |     -------- not covered
+     = note: the matched value is of type `&PeerEvent`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+     |
+1844 ~             crate::lan::PeerEvent::Chorus { .. } => return,
+1845 ~             &PeerEvent::Ensemble { .. } => todo!(),
+     |
 
-warning: function `duck_mj_timestep` is never used
-  --> duck-mobile-core/src/mujoco.rs:43:8
-   |
-43 |     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
-   |        ^^^^^^^^^^^^^^^^
+warning: value assigned to `beat_count` is never read
+    --> duck-mobile-core/src/runtime.rs:2921:30
+     |
+2921 |         let mut beat_count = 0usize;
+     |                              ^^^^^^ this value is reassigned later and never used
+2922 |         if let Some(task) = self.chorus.as_mut() {
+2923 |             beat_count = task.moves.len().max(task.sounds.len());
+     |             ---------------------------------------------------- `beat_count` is overwritten here before the previous value is read
+     |
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
 
-warning: `duck-mobile-core` (lib) generated 7 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 4 suggestions)
-    Finished `release` profile [optimized] target(s) in 48.03s
+Some errors have detailed explanations: E0004, E0277, E0308.
+For more information about an error, try `rustc --explain E0004`.
+warning: `duck-mobile-core` (lib) generated 4 warnings
+error: could not compile `duck-mobile-core` (lib) due to 6 previous errors; 4 warnings emitted
