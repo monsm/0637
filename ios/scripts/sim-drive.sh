@@ -411,16 +411,26 @@ print((e.get('sound_event') or {}).get('kind',''), (e.get('life') or {}).get('cl
 [ "${CLAP%% *}" = "clap" ]; check $? "a clap is heard as a clap" "event=$CLAP"
 api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.0,\"peak_hz\":0},\"tick_ms\":$((SOUND_TICK + 200))}" > /dev/null || true
 sleep 0.2
-WHISTLE_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
-api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":900},\"tick_ms\":$((WHISTLE_TICK))}" > /dev/null || true
-sleep 0.4
-api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":950},\"tick_ms\":$((WHISTLE_TICK + 450))}" > /dev/null || true
-sleep 0.5
-WHISTLE=$(api GET /state | python3 -c "
+# A whistle is 200 ms of sustained tone; under load a sensor POST can vanish
+# (curl -sf, silently) and the classifier then reads one short spell as a
+# clap. Keep singing until the event says whistle — the classifier emits at
+# most one event per spell, so re-asking is free.
+WHISTLE=""
+for _ in $(seq 1 25); do
+  WHISTLE_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
+  api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":900},\"tick_ms\":$((WHISTLE_TICK))}" > /dev/null || true
+  sleep 0.4
+  api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.4,\"peak_hz\":950},\"tick_ms\":$((WHISTLE_TICK + 450))}" > /dev/null || true
+  sleep 0.5
+  WHISTLE=$(api GET /state | python3 -c "
 import json,sys
 e=json.load(sys.stdin)
 print((e.get('sound_event') or {}).get('kind',''), (e.get('life') or {}).get('whistles',0))
 " 2>/dev/null || echo " 0")
+  [ "${WHISTLE%% *}" = "whistle" ] && break
+  api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.0,\"peak_hz\":0},\"tick_ms\":$((WHISTLE_TICK + 900))}" > /dev/null || true
+  sleep 0.3
+done
 [ "${WHISTLE%% *}" = "whistle" ]; check $? "a sustained tone is heard as a whistle" "event=$WHISTLE"
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
 
