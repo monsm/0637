@@ -1,0 +1,17 @@
+run=43545181949
+sha=c8c012b92ed453285eac535a01e5bac97f84ac7a
+checkout=success
+upstream=success
+toolchain=success
+ort=success
+mujoco=success
+stage=success
+rustcore=success
+xcodegen=success
+xcodebuild=success
+simsmoke=failure
+uitest=skipped
+mujocodev=success
+rustdevice=success
+xcodebuilddev=success
+ipa=success
