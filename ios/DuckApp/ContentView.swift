@@ -156,6 +156,11 @@ struct ContentView: View {
                     } onClose: {
                         showRing = false
                     }
+                    // Above the chrome: the portrait deck and the landscape
+                    // bar carry zIndex(2), and the bottom-anchored picker sat
+                    // beneath them — its lower half was covered and taps
+                    // landed on the deck instead of the skill.
+                    .zIndex(5)
                 }
                 // 核要几秒钟才起得来；在那之前控件看着是活的，其实每一下
                 // 都是空操作。用一只鸭子说这件事，不用转圈：里面有个东西

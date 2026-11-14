@@ -232,7 +232,8 @@ class SpeechFeed(private val context: Context) {
                 RecognizerIntent.EXTRA_LANGUAGE_MODEL,
                 RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
             )
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, LANGUAGE)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Copy.language.tag)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, Copy.language.tag)
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
@@ -335,7 +336,6 @@ class SpeechFeed(private val context: Context) {
     }
 
     private companion object {
-        const val LANGUAGE = "zh-CN"
         const val BASE_RESTART_MS = 800L
         const val MAX_RESTART_MS = 4000L
         const val MAX_FAILURES = 6

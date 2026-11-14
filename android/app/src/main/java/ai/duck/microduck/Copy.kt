@@ -19,8 +19,17 @@ object Copy {
     private const val KEY = "language"
 
     enum class Language(val label: String) {
-        English("EN"),
-        Chinese("中文"),
+        English("EN") {
+            override val tag get() = "en-US"
+        },
+        Chinese("中文") {
+            override val tag get() = "zh-CN"
+        };
+
+        /// The BCP-47 tag the speech recogniser listens in. The core's verb
+        /// table accepts both languages, but a zh-CN recogniser transcribes
+        /// English as Chinese noise, so the ear must match the screen.
+        abstract val tag: String
     }
 
     // Compose snapshot state, not a plain global: a composable that reads a
