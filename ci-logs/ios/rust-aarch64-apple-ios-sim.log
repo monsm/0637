@@ -2,9 +2,9 @@
    Compiling duck-ipc-proto v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-ipc-proto)
    Compiling kinematics v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/kinematics)
    Compiling duck-mobile-core v0.1.0 (/Users/runner/work/0637/0637/core/duck-mobile-core)
-   Compiling robotd-params v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/robotd-params)
-   Compiling duck-control v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-control)
    Compiling odometry v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/odometry)
+   Compiling duck-control v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-control)
+   Compiling robotd-params v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/robotd-params)
 warning: unused import: `crate::control::Tuning`
   --> duck-mobile-core/src/ffi.rs:19:5
    |
@@ -13,68 +13,17 @@ warning: unused import: `crate::control::Tuning`
    |
    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-error[E0277]: the `?` operator can only be used in a closure that returns `Result` or `Option` (or another type that implements `FromResidual`)
-  --> duck-mobile-core/src/pad.rs:51:81
-   |
-51 |     let u32le = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().ok()?);
-   |                 -----------                                                     ^ cannot use the `?` operator in a closure that returns `u32`
-   |                 |
-   |                 this function should return `Result` or `Option` to accept `?`
+error[E0433]: cannot find type `Value` in this scope
+    --> duck-mobile-core/src/ffi.rs:1123:45
+     |
+1123 |             if value.get("format").and_then(Value::as_str) != Some("microduck-backup/1") {
+     |                                             ^^^^^ use of undeclared type `Value`
 
-error[E0277]: the `?` operator can only be used in a closure that returns `Result` or `Option` (or another type that implements `FromResidual`)
-  --> duck-mobile-core/src/pad.rs:52:81
-   |
-52 |     let i16le = |at: usize| i16::from_le_bytes(bytes[at..at + 2].try_into().ok()?);
-   |                 -----------                                                     ^ cannot use the `?` operator in a closure that returns `i16`
-   |                 |
-   |                 this function should return `Result` or `Option` to accept `?`
-
-error[E0308]: mismatched types
-    --> duck-mobile-core/src/ffi.rs:1088:17
+error[E0433]: cannot find type `Value` in this scope
+    --> duck-mobile-core/src/ffi.rs:1136:49
      |
-1087 |             match sent {
-     |                   ---- this expression has type `std::option::Option<Result<usize, std::string::String>>`
-1088 |                 Ok(Ok(roles)) => {
-     |                 ^^^^^^^^^^^^^ expected `Option<Result<usize, String>>`, found `Result<_, _>`
-     |
-     = note: expected enum `std::option::Option<Result<usize, std::string::String>>`
-                found enum `Result<_, _>`
-help: try wrapping the pattern in `Some`
-     |
-1088 |                 Some(Ok(Ok(roles))) => {
-     |                 +++++             +
-
-error[E0308]: mismatched types
-    --> duck-mobile-core/src/ffi.rs:1096:17
-     |
-1087 |             match sent {
-     |                   ---- this expression has type `std::option::Option<Result<usize, std::string::String>>`
-...
-1096 |                 Ok(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
-     |                 ^^^^^^^^^^^^^^ expected `Option<Result<usize, String>>`, found `Result<_, _>`
-     |
-     = note: expected enum `std::option::Option<Result<usize, std::string::String>>`
-                found enum `Result<_, _>`
-help: try wrapping the pattern in `Some`
-     |
-1096 |                 Some(Ok(Err(error))) => refuse(core, format!("ensemble refused: {error}")),
-     |                 +++++              +
-
-error[E0308]: mismatched types
-    --> duck-mobile-core/src/ffi.rs:1097:17
-     |
-1087 |             match sent {
-     |                   ---- this expression has type `std::option::Option<Result<usize, std::string::String>>`
-...
-1097 |                 Err(_) => refuse(core, "the LAN peer port is not available".to_owned()),
-     |                 ^^^^^^ expected `Option<Result<usize, String>>`, found `Result<_, _>`
-     |
-     = note: expected enum `std::option::Option<Result<usize, std::string::String>>`
-                found enum `Result<_, _>`
-help: try wrapping the pattern in `Some`
-     |
-1097 |                 Some(Err(_)) => refuse(core, "the LAN peer port is not available".to_owned()),
-     |                 +++++      +
+1136 |             let day = value.get("day").and_then(Value::as_str).unwrap_or("").to_owned();
+     |                                                 ^^^^^ use of undeclared type `Value`
 
 warning: variable does not need to be mutable
    --> duck-mobile-core/src/lan.rs:203:13
@@ -94,39 +43,6 @@ warning: variable does not need to be mutable
     |             |
     |             help: remove this `mut`
 
-error[E0004]: non-exhaustive patterns: `&PeerEvent::Ensemble { .. }` not covered
-    --> duck-mobile-core/src/runtime.rs:1832:56
-     |
-1832 |         let (kind, from, name, sound, emotion) = match event {
-     |                                                        ^^^^^ pattern `&PeerEvent::Ensemble { .. }` not covered
-     |
-note: `PeerEvent` defined here
-    --> duck-mobile-core/src/lan.rs:61:10
-     |
-  61 | pub enum PeerEvent {
-     |          ^^^^^^^^^
-...
-  89 |     Ensemble {
-     |     -------- not covered
-     = note: the matched value is of type `&PeerEvent`
-help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
-     |
-1844 ~             crate::lan::PeerEvent::Chorus { .. } => return,
-1845 ~             &PeerEvent::Ensemble { .. } => todo!(),
-     |
-
-warning: value assigned to `beat_count` is never read
-    --> duck-mobile-core/src/runtime.rs:2921:30
-     |
-2921 |         let mut beat_count = 0usize;
-     |                              ^^^^^^ this value is reassigned later and never used
-2922 |         if let Some(task) = self.chorus.as_mut() {
-2923 |             beat_count = task.moves.len().max(task.sounds.len());
-     |             ---------------------------------------------------- `beat_count` is overwritten here before the previous value is read
-     |
-     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
-
-Some errors have detailed explanations: E0004, E0277, E0308.
-For more information about an error, try `rustc --explain E0004`.
-warning: `duck-mobile-core` (lib) generated 4 warnings
-error: could not compile `duck-mobile-core` (lib) due to 6 previous errors; 4 warnings emitted
+For more information about this error, try `rustc --explain E0433`.
+warning: `duck-mobile-core` (lib) generated 3 warnings
+error: could not compile `duck-mobile-core` (lib) due to 2 previous errors; 3 warnings emitted
