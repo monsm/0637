@@ -48,8 +48,10 @@ pub fn parse(bytes: &[u8]) -> Option<Frame> {
     if bytes.len() < PACKET || &bytes[0..4] != b"DKPD" || bytes[4] != 1 {
         return None;
     }
-    let u32le = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().ok()?);
-    let i16le = |at: usize| i16::from_le_bytes(bytes[at..at + 2].try_into().ok()?);
+    // parse() already checked bytes.len() >= PACKET, so every slice below
+    // has exactly the width of its integer: unwrap cannot fail here.
+    let u32le = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap());
+    let i16le = |at: usize| i16::from_le_bytes(bytes[at..at + 2].try_into().unwrap());
     let axis = |at: usize| f64::from(i16le(at)) / 32767.0;
     Some(Frame {
         seq: u32le(6),
@@ -62,7 +64,7 @@ pub fn parse(bytes: &[u8]) -> Option<Frame> {
             lt: axis(22),
             rt: axis(24),
         },
-        buttons: u16::from_le_bytes(bytes[26..28].try_into().ok()?),
+        buttons: u16::from_le_bytes(bytes[26..28].try_into().unwrap()),
     })
 }
 
