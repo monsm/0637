@@ -875,7 +875,10 @@ try:
 except Exception:
     raise SystemExit(1)
 for node in root.iter('node'):
-    if node.get('text') == want:
+    # Icon-only controls (Director, the shutter) carry their name in
+    # content-desc; matching only text misses them.
+    label = node.get('text') or node.get('content-desc') or ''
+    if label == want:
         bounds = node.get('bounds', '')
         parts = bounds.replace('][', ',').strip('[]').split(',')
         if len(parts) == 4:

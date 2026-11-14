@@ -623,7 +623,8 @@ jobs:
             if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
               git reset --mixed FETCH_HEAD
             fi
-            git add -f dist/ui-b4-ios.png dist/ui-b4-ios-more.png \n              dist/ui-b1-ios.png dist/ui-b1-postcard.png dist/ui-b4-postcard-zh.png
+            git add -f dist/ui-b4-ios.png dist/ui-b4-ios-more.png \
+              dist/ui-b1-ios.png dist/ui-b1-postcard.png dist/ui-b4-postcard-zh.png
             git commit -m "ui-b1/ui-b4: iOS portrait Live screen, More drawer and postcard [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2
