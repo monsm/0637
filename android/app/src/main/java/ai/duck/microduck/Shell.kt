@@ -139,6 +139,7 @@ fun Shell(
     var showDiary by remember { mutableStateOf(false) }
     // The More drawer and its daily-goals sheet (B4a, portrait).
     var showMore by remember { mutableStateOf(false) }
+    var showBig by remember { mutableStateOf(false) }
     var showQuests by remember { mutableStateOf(false) }
     // The drawer's night row follows /state.night, so it can offer
     // good night or good morning honestly.
@@ -995,6 +996,7 @@ fun Shell(
             onPeers = { showMore = false; showPeers = true },
             onQuests = { showMore = false; showQuests = true },
             onDiary = { showMore = false; showDiary = true },
+            onBig = { showMore = false; showBig = true },
             onPostcards = { showMore = false; showPostcards = true },
             onDex = { showMore = false; showDex = true },
             onAI = { showMore = false; showAI = true },
@@ -1046,6 +1048,16 @@ fun Shell(
                 )
             },
             onClose = { showDance = false },
+        )
+    }
+
+    if (showBig && core != null) {
+        BigButtonsSheet(
+            onPet = { postDuckCommand("/pet") },
+            onFeed = { onFeed?.invoke() },
+            onQuack = { quack?.invoke() },
+            onSit = { core.sit() },
+            onClose = { showBig = false },
         )
     }
 

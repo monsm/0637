@@ -35,6 +35,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
  */
 internal object Icons {
     val feed: ImageVector = MaterialIcons.Outlined.Restaurant
+    /** The big-button page: a hand, at arm's length. */
+    val big: ImageVector = MaterialIcons.Outlined.TouchApp
+    val pet: ImageVector = MaterialIcons.Outlined.Pets
+    val sit: ImageVector = MaterialIcons.Outlined.Chair
     val skills: ImageVector = MaterialIcons.Outlined.AutoAwesome
     val quack: ImageVector = MaterialIcons.Outlined.GraphicEq
     val grab: ImageVector = MaterialIcons.Outlined.PanTool

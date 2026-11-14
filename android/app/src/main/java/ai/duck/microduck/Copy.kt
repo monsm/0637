@@ -481,6 +481,14 @@ val quack get() = pick("Quack", "叫一声")
         "Set the pair code first; the official DKPD pad then drives this duck.",
         "先设配对码，官方 DKPD 手柄才能开这只鸭。",
     )
+    val bigButtons get() = pick("Big buttons", "大按钮")
+    val bigButtonsNote get() = pick("Four big taps, large type", "四个大按钮，大字")
+    fun bigButtonAction(index: Int) = when (index) {
+        0 -> pick("Pet it", "摸摸它")
+        1 -> pick("Feed it", "喂食")
+        2 -> pick("Quack", "叫一声")
+        else -> pick("Sit down", "坐下")
+    }
     val roomLamp get() = pick("Room lamp", "房间灯")
     val parentTime get() = pick("Parent time", "家长时间")
     val parentOff get() = pick("off", "不限")
