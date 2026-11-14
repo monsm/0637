@@ -200,6 +200,8 @@ final class DuckController: ObservableObject {
         let name: String
         let replied: Bool
         let paired: Bool
+        /// "ip:port" as the LAN announced it - the pad sender dials its ip.
+        let addr: String
     }
     @Published var peers: [PeerInfo] = []
     /// The official UDP pad's gate, read back from /state.pad — the core is
@@ -1475,6 +1477,20 @@ final class DuckController: ObservableObject {
             DispatchQueue.main.async { self.tofStrip = rows.joined(separator: " / ") }
         }.resume()
     }
+    /// This phone as the official DKPD pad (the sender half). Only ever
+    /// dials a PAIRED neighbour; the stick it sends is the shell's own.
+    let padSender = PadSender()
+    @Published var padTargetName = ""
+
+    func togglePad(peer: PeerInfo) {
+        if padSender.active {
+            padSender.stop()
+            padTargetName = ""
+        } else if padSender.start(addr: peer.addr) {
+            padTargetName = peer.name
+        }
+    }
+
     /// Rewind-play: while on, the tick rewinds 200 ticks every 150 ms -
     /// the same /seek the rail rewind button uses, continuously.
     @Published var rewinding = false
@@ -2109,7 +2125,8 @@ final class DuckController: ObservableObject {
                                 id: id,
                                 name: name,
                                 replied: item["replied"] as? Bool ?? false,
-                                paired: item["paired"] as? Bool ?? false
+                                paired: item["paired"] as? Bool ?? false,
+                                addr: item["addr"] as? String ?? ""
                             )
                         }
                     }
@@ -2572,6 +2589,10 @@ final class DuckController: ObservableObject {
         // The beak follows the voice. robotd's chorus opens the mouth servo
         // through a 90 ms time constant; the shell uses the same one, so a
         // quack opens the jaw instead of snapping it open and shut.
+        // The pad sender's stick is this shell's own joystick, read every
+        // tick; a receiver-owned deadzone means raw values travel.
+        padSender.stickX = joystick.x
+        padSender.stickY = joystick.y
         let mouthTarget = (voice.isSpeaking || speaker.isSpeaking) ? 1.0 : 0.0
         visualMouth += (mouthTarget - visualMouth) * (1 - exp(-0.02 / 0.09))
         // The palm's beat: one tick checks whether the next beat of the
