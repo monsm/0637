@@ -357,6 +357,12 @@ class DuckInput {
     @Volatile var ambientScale: Float = 1.0f
     /** The last lux reading, or -1 when the device has no light sensor. */
     @Volatile var ambientLux: Float = -1.0f
+    /**
+     * The compass: a yaw offset in radians for the camera, derived from the
+     * rotation vector when the person turns the compass on. Zero when off;
+     * the duck's senses never see it.
+     */
+    @Volatile var compassYawRad: Float = 0.0f
     // Performance counters, reset once a second. The loop counts achieved
     // simulation ticks, the renderer counts frames on its own thread: an
     // atomic getAndSet is needed or a frame drawn between the read and the

@@ -250,6 +250,23 @@ final class DuckController: ObservableObject {
     @Published var heartBpm: Double = 0
     /// The parent's daily allowance in minutes, nil when unlimited — the
     /// core's own accounting of `powered_s`, read back on every poll.
+    /// The compass: the duck's home keeps one real-world bearing, so the
+    /// room turns UNDER the camera when the person turns. Off by default
+    /// (a rotating room can confuse a driving child); unavailable when the
+    /// device has no attitude - the simulator has none, and the row hides.
+    @Published var compassOn = false {
+        didSet {
+            if compassOn != oldValue {
+                UserDefaults.standard.set(compassOn, forKey: "duck_compass_on")
+                if !compassOn { compassYaw = 0 }
+            }
+        }
+    }
+    /// The heading delta from the bearing the compass started with, in
+    /// radians, already negated for the camera: turning right turns the
+    /// room left. Written on the main thread by the motion handler.
+    @Published var compassYaw: Float = 0
+    private var compassBearing: Double?
     /// The room's lamp: a render-layer multiplier on the daylight exposure
     /// (0.55 dark … 1.15 bright). iOS has no ambient-light API, so this is
     /// the person's own hand on the lamp — the honest label says so, and
@@ -512,6 +529,7 @@ final class DuckController: ObservableObject {
         // The same client intent a robot-side chorus writes goes out for the
         // open AND the close — a natural finish must not leave /state holding
         // a beak the duck is not keeping open.
+        compassOn = UserDefaults.standard.bool(forKey: "duck_compass_on")
         speaker.onChange = { [weak self] speaking in
             guard let self else { return }
             self.ttsSpeaking = speaking
@@ -783,8 +801,30 @@ final class DuckController: ObservableObject {
     private func startMotion() {
         guard motion.isDeviceMotionAvailable else { return }
         motion.deviceMotionUpdateInterval = 0.02
-        motion.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+        // The arbitrary-Z reference frame makes `heading` valid (a stable
+        // yaw against the first frame's bearing), which the plain update
+        // does not carry.
+        motion.startDeviceMotionUpdates(
+            using: .xArbitraryZVertical,
+            to: .main,
+        ) { [weak self] motion, _ in
             guard let self, let motion else { return }
+            // The compass: a real bearing, not a guess. The delta from the
+            // bearing at switch-on rotates the room under the camera; the
+            // shortest-way-around keeps the motion continuous across the
+            // 0/360 seam.
+            if self.compassOn {
+                let heading = motion.heading
+                if heading >= 0 {
+                    if self.compassBearing == nil { self.compassBearing = heading }
+                    if let bearing = self.compassBearing {
+                        var delta = (heading - bearing) * Double.pi / 180.0
+                        while delta > Double.pi { delta -= 2 * Double.pi }
+                        while delta < -Double.pi { delta += 2 * Double.pi }
+                        self.compassYaw = Float(-delta)
+                    }
+                }
+            }
             // Tilt-to-look: with the switch on and the joystick idle, the
             // phone's attitude steers the head, as the real pad's IMU does.
             // Landscape: rolling the phone pans (yaw), pitching it tilts
