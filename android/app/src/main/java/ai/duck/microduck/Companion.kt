@@ -263,6 +263,52 @@ fun shareVetbook(context: Context) {
     }.start()
 }
 
+/**
+ * The move-out document: GET the core's versioned backup, write it to the
+ * cache and hand it to the chooser. The duck wrote the file; the app owns
+ * only the bytes' ride to wherever the person points.
+ */
+fun exportBackup(context: Context) {
+    Thread {
+        try {
+            val document = getJson("/backup")
+            if (document.isBlank()) return@Thread
+            val dir = java.io.File(context.cacheDir, "exports").apply { mkdirs() }
+            val file = java.io.File(dir, "MicroDuck-backup.json")
+            file.writeText(document)
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file,
+            )
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "MicroDuck backup")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = android.content.Intent.createChooser(send, Copy.backupExport)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(chooser)
+        } catch (_: Throwable) {
+        }
+    }.start()
+}
+
+/**
+ * Read the person's backup file from the SAF picker and POST it back. The
+ * route refuses a document without its version at the door; this helper
+ * only carries bytes and reports what the duck said.
+ */
+fun restoreBackup(context: Context, uri: android.net.Uri): Boolean = try {
+    val text = context.contentResolver.openInputStream(uri)?.use { input ->
+        input.readBytes().toString(Charsets.UTF_8)
+    } ?: return false
+    postJson("/backup/restore", org.json.JSONObject(text).toString())
+} catch (_: Throwable) {
+    false
+}
+
 fun fetchCare(): CareUi? = fetchRawState()?.let(::parseCare)
 
 /** The core's own state-machine word, from the top-level `label`. */

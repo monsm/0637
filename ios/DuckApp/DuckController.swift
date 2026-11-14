@@ -1362,6 +1362,54 @@ final class DuckController: ObservableObject {
         postJSON("/ensemble", ["moves": moves, "sounds": sounds])
     }
 
+    /// The move-out document: the core packs care, quests and rules into
+    /// one versioned file. The person carries it; the core never sees a
+    /// server, and the file is as honest as the intents it came from.
+    func fetchBackup(done: @escaping (String?) -> Void) {
+        guard let url = URL(string: "http://127.0.0.1:8765/backup") else {
+            done(nil)
+            return
+        }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            done(data.flatMap { String(data: $0, encoding: .utf8) })
+        }.resume()
+    }
+
+    /// A backup read back from a file: the core's restore door answers
+    /// per-part, and the shell relays the verdict.
+    func postRestore(_ text: String, done: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "http://127.0.0.1:8765/backup/restore") else {
+            done(false)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 5.0
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data(text.utf8)
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            let ok = (response as? HTTPURLResponse)?.statusCode == 200
+                && (data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] })
+                    .map { $0["ok"] as? Bool == true } == true
+            DispatchQueue.main.async { done(ok) }
+        }.resume()
+    }
+
+    /// The system share sheet over one file URL, presented on the main
+    /// thread from wherever the backup export finished.
+    func shareFile(url: URL) {
+        DispatchQueue.main.async {
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene }).first,
+                let root = scene.keyWindow?.rootViewController
+            else { return }
+            var top = root
+            while let presented = top.presentedViewController { top = presented }
+            let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            top.present(sheet, animated: true)
+        }
+    }
+
     /// The parent's daily allowance. Zero clears it; the core snapshots
     /// its own powered time and puts the duck to bed when the day is spent.
     func setParent(minutes: Int) {

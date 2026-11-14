@@ -145,6 +145,12 @@ pub enum Intent {
     PadSwitch(bool),
     /// The parent's daily play allowance, in minutes; zero clears it.
     ParentBudget(u32),
+    /// The whole duck's portable state: care, quests and rules, packed for
+    /// a file the person carries to another phone.
+    Backup,
+    /// A backup read back from that file. Every part goes through the same
+    /// intent it came from - the format field is the only thing new here.
+    RestoreBackup(serde_json::Value),
     /// The shell's calendar day, plus the quest board it saved. Quests are
     /// the person's day, not simulated time; a rewind must not rewrite them.
     QuestDay(String, serde_json::Value),
@@ -1045,6 +1051,25 @@ fn handle(
             Duration::from_secs(15),
         ).to_string()),
         ("POST", "/power") => Ok(queue.request(Intent::PowerOn).to_string()),
+        // The backup document is an idempotent read, so both verbs answer
+        // it: the shells GET it, and the boundary probes POST it through
+        // the same pipeline every other route is verified with.
+        ("GET", "/backup") => Ok(queue.request(Intent::Backup).to_string()),
+        ("POST", "/backup") => Ok(queue.request(Intent::Backup).to_string()),
+        ("POST", "/backup/restore") => {
+            // The format check lives HERE, before anything is queued: a
+            // document without the version, or with somebody else's, is
+            // refused at the door and the duck never sees a field of it.
+            match value.get("format").and_then(Value::as_str) {
+                Some("microduck-backup/1") => Ok(queue
+                    .request(Intent::RestoreBackup(value.clone()))
+                    .to_string()),
+                _ => Ok(json!({
+                    "ok": false,
+                    "error": "that file is not a microduck-backup/1",
+                }).to_string()),
+            }
+        }
         ("POST", "/parent") => Ok(queue
             .request(Intent::ParentBudget(value["minutes"].as_u64().unwrap_or(0).min(600) as u32))
             .to_string()),

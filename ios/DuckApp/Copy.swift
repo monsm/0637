@@ -474,6 +474,22 @@ enum Copy {
     }
     // The compass: the home keeps one real-world bearing. Off by default;
     // a device without attitude hides the row instead of pretending.
+    // The move-out page: one file carries care, quests and rules. The
+    // postcards are the phone's own files and are said not to travel.
+    static var backup: String { pick("Back up & move", "备份·搬家") }
+    static var backupRowNote: String { pick("Carry this duck to another phone", "把这只鸭带到另一台手机") }
+    static var backupNote: String {
+        pick(
+            "Care, quests and rules travel in one file; postcards stay here.",
+            "养成、挑战与积木装进一个文件带走；明信片留在本机。"
+        )
+    }
+    static var backupExport: String { pick("Export backup", "导出备份") }
+    static var backupImport: String { pick("Import a backup", "导入备份") }
+    static var backupWorking: String { pick("Working…", "进行中…") }
+    static var backupReady: String { pick("Backup written — share it", "备份已生成——分享它") }
+    static var backupDone: String { pick("Restored", "已恢复") }
+    static var backupFailed: String { pick("The duck refused that file", "鸭子没有收下那个文件") }
     static var compass: String { pick("Home faces north", "家永远朝北") }
     static var compassNote: String {
         pick(

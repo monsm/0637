@@ -30,7 +30,7 @@ struct MoreSheet: View {
     /// several `.sheet` modifiers is unreliable, and this codebase says so
     /// about itself in ContentView.
     private enum Destination: Identifiable {
-        case rules, dance, peers, quests, diary, postcards, dex, ai, modes, big
+        case rules, dance, peers, quests, diary, postcards, dex, ai, modes, big, backup
 
         var id: String {
             switch self {
@@ -44,6 +44,7 @@ struct MoreSheet: View {
             case .ai: return "ai"
             case .modes: return "modes"
             case .big: return "big"
+            case .backup: return "backup"
             }
         }
     }
@@ -139,6 +140,13 @@ struct MoreSheet: View {
                         id: "more-flashlight"
                     ) {
                         controller.toggleFlashlight()
+                    }
+                    row(
+                        "externaldrive", Copy.backup,
+                        note: Copy.backupRowNote,
+                        id: "more-backup"
+                    ) {
+                        destination = .backup
                     }
                     row(
                         "location.north", Copy.compass,
@@ -268,6 +276,10 @@ struct MoreSheet: View {
         case .big:
             BigButtonsSheet(controller: controller)
                 .presentationDetents([.height(400)])
+                .presentationDragIndicator(.visible)
+        case .backup:
+            BackupSheet(controller: controller)
+                .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }
     }

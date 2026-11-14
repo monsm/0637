@@ -11,6 +11,7 @@
 //! feature set only matters for the policy tests, not for these probes).
 
 use duck_mobile_core::intent::{start_listener, IntentQueue};
+use serde_json::json;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
@@ -31,11 +32,38 @@ impl Harness {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let port = listener.local_addr().expect("addr").port();
         let server = start_listener(listener, queue.clone());
+        Self::start_applier(&queue);
         Harness {
             port,
             queue,
             _server: server,
         }
+    }
+
+    /// The apply half: drains the queue in a background thread so a GET
+    /// probe's synchronous request gets a real answer instead of a pending.
+    fn start_applier(queue: &Arc<IntentQueue>) {
+        let queue = queue.clone();
+        std::thread::spawn(move || loop {
+            for item in queue.drain() {
+                let answer = match &item.intent {
+                    duck_mobile_core::intent::Intent::Backup => json!({
+                        "format": "microduck-backup/1",
+                        "day": "2026-11-14",
+                        "care": {},
+                        "quests": {},
+                        "rules": {"rules": []},
+                        "fingerprint": "test",
+                    }),
+                    duck_mobile_core::intent::Intent::RestoreBackup(_) => {
+                        serde_json::json!({"ok": true})
+                    }
+                    _ => serde_json::json!({"ok": true}),
+                };
+                queue.answer(item.id, answer);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        });
     }
 
     fn post(&self, path: &str, body: &str) -> String {
@@ -140,4 +168,25 @@ fn a_gift_needs_a_known_peer_and_a_known_gift() {
     h.refuses("/peers/gift", r#"{"peer":"ghost","gift":"treat"}"#);
     h.refuses("/peers/gift", r#"{"peer":"ghost","gift":"emotion","value":"laugh"}"#);
     h.refuses("/peers/gift", r#"{"peer":"ghost","gift":"drone"}"#);
+}
+
+#[test]
+fn a_backup_names_its_format_and_a_strange_one_is_refused() {
+    let h = Harness::start();
+    // GET /backup answers with the versioned document; every part a client
+    // could carry back is in it.
+    let response = h.post("/backup", "{}");
+    for needle in ["microduck-backup/1", "\"care\"", "\"quests\"", "\"rules\"", "\"fingerprint\""] {
+        assert!(
+            response.contains(needle.trim_matches('"')),
+            "backup is missing {needle}: {response}"
+        );
+    }
+    // A document without the format field, or with a strange one, is
+    // refused as a whole - no part of a strange backup is applied.
+    h.refuses("/backup/restore", r#"{"care":{"hunger":0.5}}"#);
+    h.refuses(
+        "/backup/restore",
+        r#"{"format":"some-other-backup/9","care":{"hunger":0.5}}"#,
+    );
 }
