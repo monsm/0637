@@ -795,9 +795,9 @@ import json,sys
 print('awake' if not (json.load(sys.stdin).get('care') or {}).get('asleep') else 'asleep')
 " 2>/dev/null || echo "asleep")
 [ "$WOKEN" = "awake" ]; check $? "a stroke wakes it" "$WOKEN"
-# The wake coo can be superseded on a later tick by an idle ritual's own
-# event, so poll for the coo the instant it publishes instead of reading
-# the latest sound after a fixed nap.
+# A waking duck keeps its coo for a full idle period: the core resets the
+# ritual clock on the wake, so poll the next few ticks (the pet lands
+# asynchronously) and read the sound that was published, not a later event.
 WOKE_SOUND=""
 for _ in $(seq 1 20); do
   WOKE_SOUND=$(api GET /state | field last_sound)
