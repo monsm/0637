@@ -2394,7 +2394,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             .enumerate()
             .filter(|(index, rule)| {
                 rule.trigger == "timer"
-                    && crate::rules::Rules::timer_period_s(&rule.value).is_some_and(|period| {
+                    && crate::rules::Rules::timer_period_s(rule.period_s).is_some_and(|period| {
                         let period_ticks = u64::from(period) * 50;
                         self.clock.tick
                             .saturating_sub(*self.rules.timer_last.get(index).unwrap_or(&0))

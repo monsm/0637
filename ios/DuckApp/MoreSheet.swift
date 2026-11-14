@@ -198,6 +198,12 @@ struct MoreSheet: View {
                         controller.compassOn.toggle()
                     }
                     row(
+                    row(
+                        "square.grid.3x3", Copy.tof,
+                        note: controller.tofStrip,
+                        showsChevron: false,
+                        id: "more-tof"
+                    ) { controller.refreshTofStrip() }
                         "lightbulb", Copy.roomLamp,
                         note: Copy.roomLampNote,
                         badge: String(format: "%.0f%%", controller.ambientScale * 100),

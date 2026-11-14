@@ -126,6 +126,9 @@ fun Shell(
 ) {
     val context = LocalContext.current
     var showRing by remember { mutableStateOf(false) }
+    // The phone as the official DKPD pad: 30 Hz at a PAIRED neighbour only.
+    val padSender = remember { PadSender(input) }
+    var padTargetName by remember { mutableStateOf("") }
     var showSheet by remember { mutableStateOf(false) }
     var showRules by remember { mutableStateOf(false) }
     var showPeers by remember { mutableStateOf(false) }
@@ -1103,6 +1106,15 @@ fun Shell(
             peers = peers,
             onStart = { startPeers(context, android.os.Build.MODEL) },
             onGreet = { id -> greetPeer(context, id) },
+            onPad = { peer ->
+                if (padSender.active) {
+                    padSender.stop()
+                    padTargetName = ""
+                } else if (padSender.start(peer.addr)) {
+                    padTargetName = peer.name
+                }
+            },
+            onPadTarget = padTargetName,
             onPair = { code, id ->
                 Thread {
                     postDuckCommand(
@@ -1114,7 +1126,7 @@ fun Shell(
                     )
                 }.start()
             },
-            onPad = { on -> postDuckCommand("/pad", """{"on":$on}""") },
+            onNetPad = { on -> postDuckCommand("/pad", """{"on":$on}""") },
             onClose = { showPeers = false },
         )
     }
@@ -1288,7 +1300,9 @@ private fun PeersSheet(
     onStart: () -> Unit,
     onGreet: (String?) -> Unit,
     onPair: (String, String?) -> Unit,
-    onPad: (Boolean) -> Unit,
+    onPad: (PeerUi) -> Unit,
+    onPadTarget: String,
+    onNetPad: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1375,7 +1389,7 @@ private fun PeersSheet(
             "peers-netpad",
         ) {
             netPadOn = !netPadOn
-            onPad(netPadOn)
+            onNetPad(netPadOn)
         }
     }
     Text(
@@ -1443,6 +1457,14 @@ private fun PeersSheet(
                             }
                             ButtonChip(Copy.giftEmotion, "gift-emotion-${peer.id}") {
                                 sendGift(peer.id, "emotion", "excited")
+                            }
+                            // This phone as the official pad, aimed at THIS
+                            // paired neighbour. One tap dials, one stops.
+                            if (peer.paired && peer.addr.isNotEmpty()) {
+                                ButtonChip(
+                                    if (onPadTarget == peer.name) Copy.padTarget else Copy.padSender,
+                                    "pad-send-${peer.id}",
+                                ) { onPad(peer) }
                             }
                         }
                     }
@@ -1521,7 +1543,8 @@ private fun RulesSheet(onClose: () -> Unit) {
             }
         }
     }
-    val triggers = listOf("clap", "whistle", "pet")
+    val triggers = listOf("clap", "whistle", "pet", "timer")
+    var timerPeriod by remember { mutableStateOf(60) }
     val kinds = listOf("skill", "emotion", "sound")
     val values = when (action) {
         "skill" -> listOf("roulade", "kick_left", "kick_right", "sit", "ground_pick")
@@ -1644,6 +1667,21 @@ private fun RulesSheet(onClose: () -> Unit) {
                     ) { trigger = option }
                 }
             }
+            if (trigger == "timer") {
+                // The WHEN, in the duck's own clock: four honest beats.
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(30, 60, 120, 300).forEach { seconds ->
+                        RuleChip(
+                            "${seconds}s",
+                            "rule-timer-$seconds",
+                            timerPeriod == seconds,
+                        ) { timerPeriod = seconds }
+                    }
+                }
+            }
             Text(Copy.ruleThen, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
@@ -1714,7 +1752,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                     "rule-add",
                 ) {
                     if (rules.size < 8) {
-                        applyRules(rules + RuleUi(trigger, action, value, chain))
+                        applyRules(rules + RuleUi(trigger, action, value, chain, periodS = if (trigger == "timer") timerPeriod else null))
                         chain = emptyList()
                     }
                 }
@@ -3083,6 +3121,7 @@ private fun InstrumentSheet(
     // back. It lives here, in the sheet's own loop, so it costs nothing while
     // the sheet is closed.
     var micSummary by remember { mutableStateOf("—") }
+    var tofStrip by remember { mutableStateOf("—") }
     // The duck's own behaviour: an emotion timeline, or the idle look-around.
     // A static duck reads as switched off, so the sheet says what it is doing.
     var behaviorSummary by remember { mutableStateOf("—") }
@@ -3154,6 +3193,7 @@ private fun InstrumentSheet(
     LaunchedEffect(core) {
         while (true) {
             micSummary = fetchMicSummary()
+            tofStrip = fetchTofStrip()
             behaviorSummary = fetchBehaviorSummary()
             face = fetchFace()
             trickBook = fetchTrickBook()
@@ -3441,6 +3481,21 @@ private fun InstrumentSheet(
                         testTag = "heart-toggle",
                     ) { heartOn = !heartOn }
                 }
+            }
+            // What the duck's head would see: the official 8x8 grid the
+            // phone's depth was resampled into, as a heat strip.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(Copy.tof, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Text(
+                    tofStrip,
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                )
             }
             // The room's lamp: real lux when the device has a sensor (the
             // scale follows the room), or five manual stops. The duck cannot
@@ -3962,6 +4017,46 @@ private fun fetchBehaviorSummary(): String {
  * them the way the iOS shell does. Any failure (server not up yet, no reading)
  * returns "—" rather than throwing, so the sheet's poll loop never breaks.
  */
+/**
+ * The duck's 8x8 head grid as a tiny heat strip: each cell a block whose
+ * height follows the official resampler's distance (4 m far, 0 m close).
+ * Empty when nothing published depth - the row says so instead of drawing
+ * an invented room.
+ */
+private fun fetchTofStrip(): String {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/sensors")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 1500
+        connection.readTimeout = 1500
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        val array = Regex("\"tof_grid\"\\s*:\\s*\\[([^\\]]*)\\]").find(text)
+            ?.groupValues?.get(1)?.split(',')?.mapNotNull { it.trim().toDoubleOrNull() }
+            ?: return "—"
+        if (array.size != 64) return "—"
+        val rows = (0 until 8).map { row ->
+            (0 until 8).joinToString("") { col ->
+                val value = array[row * 8 + col]
+                // Closer is taller. Four blocks of resolution is all a
+                // text strip can honestly show.
+                when {
+                    value <= 0.0 -> "·"
+                    value < 1.0 -> "█"
+                    value < 2.0 -> "▆"
+                    value < 3.0 -> "▃"
+                    else -> "▁"
+                }
+            }
+        }
+        rows.joinToString("
+")
+    } catch (_: Throwable) {
+        "—"
+    }
+}
+
 private fun fetchMicSummary(): String {
     return try {
         val connection = java.net.URL("http://127.0.0.1:8765/sensors")

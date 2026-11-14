@@ -408,6 +408,7 @@ val quack get() = pick("Quack", "叫一声")
         "clap" -> pick("clap", "拍手")
         "whistle" -> pick("whistle", "吹口哨")
         "pet" -> pick("pet me", "摸摸我")
+        "timer" -> pick("the timer", "定时")
         else -> trigger
     }
     fun ruleKind(action: String): String = when (action) {
@@ -494,6 +495,11 @@ val quack get() = pick("Quack", "叫一声")
     val pushCompareDone get() = pick("B got the push - switch branches", "B 路挨了推——切分支看差异")
     val hud get() = pick("Observation HUD", "观测摘录")
     val twoPlayer get() = pick("Second player", "双人接机")
+    fun photoFamily(names: List<String>) = pick(
+        "In the room: ${names.joinToString(", ")}",
+        "同框：${names.joinToString(", ")}",
+    )
+    val tof get() = pick("Head ToF", "头部 ToF")
     val padSender get() = pick("Be the pad", "当手柄")
     val padTarget get() = pick("Driving", "驾驶中")
     val abTry get() = pick("Policy A/B", "策略 AB 试穿")

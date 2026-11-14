@@ -7,6 +7,8 @@ struct RulesSheet: View {
     @ObservedObject var controller: DuckController
     @Environment(\.dismiss) private var dismiss
     @State private var trigger = "clap"
+    /// The timer's period, in whole simulated seconds.
+    @State private var timerPeriod = 60
     @State private var action = "skill"
     @State private var value = "roulade"
     /// Ordered follow-ups staged before Add. Empty means a classic one-action
@@ -15,7 +17,7 @@ struct RulesSheet: View {
     /// The last import's verdict, shown under the share row.
     @State private var importNote = ""
 
-    private let triggers = ["clap", "whistle", "pet"]
+    private let triggers = ["clap", "whistle", "pet", "timer"]
     private let kinds = ["skill", "emotion", "sound"]
 
     var body: some View {
@@ -135,6 +137,29 @@ struct RulesSheet: View {
                     Text(Copy.ruleWhen)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                     chipRow(triggers, selected: trigger, kind: "trigger") { trigger = $0 }
+            if trigger == "timer" {
+                // The WHEN, in the duck's own clock: four honest beats.
+                HStack(spacing: 6) {
+                    ForEach([30, 60, 120, 300], id: \.self) { seconds in
+                        Button {
+                            timerPeriod = seconds
+                        } label: {
+                            Text("\(seconds)s")
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 32)
+                                .background(
+                                    timerPeriod == seconds
+                                        ? Color.white.opacity(0.28)
+                                        : Color.white.opacity(0.08),
+                                    in: Capsule()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("rule-timer-\(seconds)")
+                    }
+                }
+            }
 
                     Text(Copy.ruleThen)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -197,7 +222,8 @@ struct RulesSheet: View {
                             trigger: trigger,
                             action: action,
                             value: value,
-                            then: chainDraft.map { DuckController.DuckRuleStep(action: $0.0, value: $0.1) }
+                            then: chainDraft.map { DuckController.DuckRuleStep(action: $0.0, value: $0.1) },
+                            periodS: trigger == "timer" ? timerPeriod : nil
                         ))
                         controller.saveRules(next)
                         chainDraft = []

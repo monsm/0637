@@ -7,6 +7,9 @@ import SwiftUI
 /// Keep asks the shelf to store the same composed card beside the untouched
 /// frame. The raw PNG is a cache file; dismissing deletes it unless kept.
 struct PhotoPreviewSheet: View {
+    /// The peers that were in the room, for the family credit. Optional so
+    /// previews composed without a live duck still build.
+    var controller: DuckController?
     let photo: DuckController.CapturedPhoto
     @ObservedObject var shelf: PostcardShelf
     @Environment(\.dismiss) private var dismiss
@@ -48,6 +51,17 @@ struct PhotoPreviewSheet: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .lineLimit(2)
                     .accessibilityIdentifier("postcard-caption")
+            }
+            // The family credit: the ducks that were REALLY in the room when
+            // the shutter fell, by their published names. No neighbour, no
+            // line - the photo stays a solo portrait rather than inventing
+            // company.
+            if let controller, !controller.peers.filter(\.paired).isEmpty {
+                Text(Copy.photoFamily(controller.peers.filter(\.paired).map(\.name)))
+                    .font(.system(size: 11, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .lineLimit(1)
+                    .accessibilityIdentifier("photo-family")
             }
             HStack(spacing: 12) {
                 Button {

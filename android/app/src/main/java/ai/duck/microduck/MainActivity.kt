@@ -395,6 +395,14 @@ private fun DuckScreen(
 
 @Composable
 private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
+    // The family credit: the PAIRED ducks in the room right now, by their
+    // published names. No neighbour, no line.
+    var family by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        family = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            fetchPeers()?.peers?.filter { it.paired }?.map { it.name } ?: emptyList()
+        }
+    }
     val context = LocalContext.current
     var saved by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
@@ -427,6 +435,13 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (family.isNotEmpty()) {
+                Text(
+                    Copy.photoFamily(family),
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                )
+            }
             Text(
                 Copy.photoTitle,
                 color = Color.White,

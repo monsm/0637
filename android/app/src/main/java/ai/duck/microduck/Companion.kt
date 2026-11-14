@@ -41,6 +41,8 @@ data class RuleUi(
     val action: String,
     val value: String,
     val then: List<RuleStep> = emptyList(),
+    /** A timer rule's period in whole simulated seconds (5..3600). */
+    val periodS: Int? = null,
 )
 
 data class RuleStep(val action: String, val value: String)
@@ -113,7 +115,7 @@ fun saveRules(context: Context, rules: List<RuleUi>, onResult: (Boolean) -> Unit
     }.start()
 }
 
-internal val RULE_TRIGGERS = setOf("clap", "whistle", "pet")
+internal val RULE_TRIGGERS = setOf("clap", "whistle", "pet", "timer")
 internal val RULE_ACTIONS = setOf("skill", "emotion", "sound")
 internal const val RULE_MAX_STEPS = 4
 internal const val RULE_MAX_RULES = 8
@@ -124,6 +126,9 @@ internal fun ruleJson(rule: RuleUi): JSONObject {
         .put("trigger", rule.trigger)
         .put("action", rule.action)
         .put("value", rule.value)
+    if (rule.trigger == "timer" && rule.periodS != null) {
+        item.put("period_s", rule.periodS)
+    }
     if (rule.then.isNotEmpty()) {
         val chain = org.json.JSONArray()
         rule.then.forEach { step ->
@@ -396,6 +401,8 @@ data class PeerUi(
     val name: String,
     val replied: Boolean,
     val paired: Boolean = false,
+    /** "ip:port" as the LAN announced it — the pad sender dials its ip. */
+    val addr: String = "",
 )
 
 data class PeersUi(
@@ -417,6 +424,7 @@ fun parsePeers(text: String): PeersUi? = try {
                 name = item.optString("name", ""),
                 replied = item.optBoolean("replied", false),
                 paired = item.optBoolean("paired", false),
+                addr = item.optString("addr", ""),
             )
         },
     )
