@@ -500,6 +500,11 @@ enum Copy {
         )
     }
     static var abLoaded: String { pick("Loaded on branch B", "已载入分支 B") }
+    static var padSender: String { pick("Be the pad", "当手柄") }
+    static var padTarget: String { pick("Driving", "驾驶中") }
+    static var pushCompareDone: String {
+        pick("B got the push - switch branches", "B 路挨了推——切分支看差异")
+    }
     static var hud: String { pick("Observation HUD", "观测摘录") }
     static var twoPlayer: String { pick("Second player", "双人接机") }
     static var compass: String { pick("Home faces north", "家永远朝北") }
