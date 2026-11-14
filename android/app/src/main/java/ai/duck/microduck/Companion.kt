@@ -330,6 +330,7 @@ data class PeerUi(
     val id: String,
     val name: String,
     val replied: Boolean,
+    val paired: Boolean = false,
 )
 
 data class PeersUi(
@@ -350,6 +351,7 @@ fun parsePeers(text: String): PeersUi? = try {
                 id = item.optString("id", ""),
                 name = item.optString("name", ""),
                 replied = item.optBoolean("replied", false),
+                paired = item.optBoolean("paired", false),
             )
         },
     )

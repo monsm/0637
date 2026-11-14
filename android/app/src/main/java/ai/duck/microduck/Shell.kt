@@ -1066,6 +1066,18 @@ fun Shell(
             peers = peers,
             onStart = { startPeers(context, android.os.Build.MODEL) },
             onGreet = { id -> greetPeer(context, id) },
+            onPair = { code, id ->
+                Thread {
+                    postDuckCommand(
+                        "/peers/pair",
+                        org.json.JSONObject()
+                            .put("code", code)
+                            .apply { if (id != null) put("id", id) }
+                            .toString(),
+                    )
+                }.start()
+            },
+            onPad = { on -> postDuckCommand("/pad", """{"on":$on}""") },
             onClose = { showPeers = false },
         )
     }
@@ -1238,6 +1250,8 @@ private fun PeersSheet(
     peers: PeersUi,
     onStart: () -> Unit,
     onGreet: (String?) -> Unit,
+    onPair: (String, String?) -> Unit,
+    onPad: (Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -1302,7 +1316,38 @@ private fun PeersSheet(
                 }
                 CloseChip("peers-close", onClose)
             }
-            if (peers.peers.isEmpty()) {
+            var netPadOn by remember { mutableStateOf(false) }
+    var pairCode by remember { mutableStateOf("") }
+    OutlinedTextField(
+        value = pairCode,
+        onValueChange = { text -> pairCode = text.filter { it.isDigit() }.take(6) },
+        label = { Text(Copy.pairCode) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth().testTag("peers-pair-code"),
+    )
+    Text(
+        Copy.pairNote,
+        color = Color.White.copy(alpha = 0.6f),
+        fontSize = 10.sp,
+    )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(Copy.netPad, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+        Spacer(Modifier.size(8.dp))
+        ButtonChip(
+            if (netPadOn) Copy.flashlightOff else Copy.flashlightOn,
+            "peers-netpad",
+        ) {
+            netPadOn = !netPadOn
+            onPad(netPadOn)
+        }
+    }
+    Text(
+        Copy.netPadNote,
+        color = Color.White.copy(alpha = 0.6f),
+        fontSize = 10.sp,
+    )
+
+    if (peers.peers.isEmpty()) {
                 Text(
                     Copy.peersEmpty,
                     color = Color.White.copy(alpha = 0.6f),
@@ -1345,6 +1390,11 @@ private fun PeersSheet(
                                     fontSize = 10.sp,
                                 )
                             }
+                            if (!peer.paired) {
+                                ButtonChip(Copy.pairCode, "peer-pair-$index") {
+                                    if (pairCode.length == 6) onPair(pairCode, peer.id)
+                                }
+                            }
                             ButtonChip(Copy.peerSayHi, "peer-greet-$index") { onGreet(peer.id) }
                         }
                         // Gifts in the greeting's own chip language: a treat
@@ -1361,6 +1411,9 @@ private fun PeersSheet(
                     }
                 }
                 ButtonChip(Copy.peerSayAll, "peer-greet-all") { onGreet(null) }
+                if (pairCode.length == 6) {
+                    ButtonChip(Copy.pairCode, "peers-pair-code-set") { onPair(pairCode, null) }
+                }
                 // A chorus needs someone to sing with: a lone duck sees the
                 // disabled affordance rather than losing the idea of it.
                 // PathChip is the shared chip face that carries `enabled`.

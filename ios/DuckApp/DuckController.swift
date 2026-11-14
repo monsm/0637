@@ -194,8 +194,12 @@ final class DuckController: ObservableObject {
         let id: String
         let name: String
         let replied: Bool
+        let paired: Bool
     }
     @Published var peers: [PeerInfo] = []
+    /// The official UDP pad's gate, read back from /state.pad — the core is
+    /// the authority, not the switch the finger just flipped.
+    @Published var netPadOn = false
     @Published var peerName = ""
     @Published var peerNotice: String?
     private var lastPeerTick = -1
@@ -1302,6 +1306,22 @@ final class DuckController: ObservableObject {
     }
 
     /// Say hello to one duck, or to every duck on the Wi-Fi.
+    /// The official UDP pad: OFF by default, gated in the core by the pair
+    /// code. A standard DKPD sender (duckctl udp-pad, a script) then drives
+    /// this duck through the same twist the joystick uses.
+    func setNetPad(on: Bool) {
+        postJSON("/pad", ["on": on])
+    }
+
+    /// Both people type the same six digits; only paired neighbours may
+    /// send gifts or start a chorus. The code itself never leaves the LAN
+    /// outside the pair handshake, and no control verb rides with it.
+    func pairPeer(code: String, id: String?) {
+        var payload: [String: Any] = ["code": code]
+        if let id { payload["id"] = id }
+        postJSON("/peers/pair", payload)
+    }
+
     func greetPeer(_ id: String?) {
         let payload: [String: Any] = id.map { ["id": $0] } ?? [:]
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
@@ -1896,9 +1916,13 @@ final class DuckController: ObservableObject {
                             return PeerInfo(
                                 id: id,
                                 name: name,
-                                replied: item["replied"] as? Bool ?? false
+                                replied: item["replied"] as? Bool ?? false,
+                                paired: item["paired"] as? Bool ?? false
                             )
                         }
+                    }
+                    if let pad = json["pad"] as? [String: Any] {
+                        self.netPadOn = pad["on"] as? Bool ?? false
                     }
                     if let event = json["peer_event"] as? [String: Any],
                        let kind = event["kind"] as? String,

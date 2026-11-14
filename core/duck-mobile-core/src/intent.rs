@@ -123,6 +123,9 @@ pub enum Intent {
     Posture(bool),
     /// Say hello to another duck on the LAN (None = every duck).
     GreetPeer(Option<String>),
+    /// The person's six-digit pairing code, and the peer to offer it to.
+    /// Setting the code alone never pairs anyone; the answer does.
+    PairPeer(String, Option<String>),
     /// A treat or an official emotion for one known peer, unicast to the
     /// address its announce/greet came from.
     SendGift {
@@ -135,6 +138,8 @@ pub enum Intent {
     /// Open the LAN socket and announce as `name`. On-demand because iOS
     /// asks for local-network permission the first time one is opened.
     StartLan(String),
+    /// Enable or disable the official UDP pad. Gated by a pair code in ffi.rs.
+    PadSwitch(bool),
     /// The shell's calendar day, plus the quest board it saved. Quests are
     /// the person's day, not simulated time; a rewind must not rewrite them.
     QuestDay(String, serde_json::Value),
@@ -1035,6 +1040,9 @@ fn handle(
             Duration::from_secs(15),
         ).to_string()),
         ("POST", "/power") => Ok(queue.request(Intent::PowerOn).to_string()),
+        ("POST", "/pad") => Ok(queue
+            .request(Intent::PadSwitch(value["on"].as_bool().unwrap_or(false)))
+            .to_string()),
         ("POST", "/mode") => match value["mode"].as_str() {
             // The switch rebuilds MuJoCo and the policy set: seconds, not the
             // 300 ms a one-shot gets.
@@ -1124,6 +1132,15 @@ fn handle(
             ));
             Ok(json!({ "ok": true, "queued": true }).to_string())
         }
+        ("POST", "/peers/pair") => match value["code"].as_str() {
+            Some(code) => Ok(queue
+                .request(Intent::PairPeer(
+                    code.to_owned(),
+                    value["id"].as_str().filter(|id| !id.is_empty()).map(str::to_owned),
+                ))
+                .to_string()),
+            None => Err("missing code"),
+        },
         ("POST", "/peers/greet") => Ok(queue
             .request(Intent::GreetPeer(
                 value["id"].as_str().filter(|id| !id.is_empty()).map(str::to_owned),
