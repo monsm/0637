@@ -219,8 +219,15 @@ for name in $EMOTIONS; do
 done
 
 # An action route answers with the tick's verdict. A skill that does not exist
-# is refused in words, not accepted and dropped.
-REFUSED=$(api POST /skill '{"name":"fly"}' || true)
+# is refused in words, not accepted and dropped. At session start the core may
+# still be loading and the 300 ms intent deadline can expire before the first
+# tick; a "pending" answer means the app has not ticked yet, not that the skill
+# was accepted, so ask again until the tick answers.
+for _ in $(seq 1 40); do
+  REFUSED=$(api POST /skill '{"name":"fly"}' || true)
+  printf '%s' "$REFUSED" | grep -q '"pending":true' || break
+  sleep 0.25
+done
 echo "$REFUSED" | tee "$OUT/skill-refused.json" > /dev/null
 printf '%s' "$REFUSED" | grep -q '"ok":false'
 check $? "an unknown skill is refused, not accepted" "$(printf '%s' "$REFUSED" | head -c 120)"
@@ -553,25 +560,34 @@ python3 - <<'PY' > /tmp/duck-peer-ack.txt &
 import json, socket, time
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("127.0.0.1", 8799))
-# Long enough to cover the whole retry loop below: the script keeps asking
-# for up to twelve seconds, and a listener that leaves after six makes every
-# later ask a no-op — which is exactly how this check flakes on a loaded
-# runner.
-sock.settimeout(20.0)
+# Long enough to cover the whole retry loop below. A datagram that is not the
+# greet (an answer to the announce, a duplicate) must not end the listener —
+# only the greet does — and a loaded runner can forget a neighbour, so keep
+# announcing while we wait.
+deadline = time.time() + 55.0
 announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
-sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
-time.sleep(0.2)
-try:
-    data, addr = sock.recvfrom(2048)
-    message = json.loads(data)
+next_announce = 0.0
+result = "timeout"
+while time.time() < deadline:
+    now = time.time()
+    if now >= next_announce:
+        sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+        next_announce = now + 5.0
+    sock.settimeout(max(0.1, min(1.0, deadline - now)))
+    try:
+        data, addr = sock.recvfrom(2048)
+    except Exception:
+        continue
+    try:
+        message = json.loads(data)
+    except Exception:
+        continue
     if message.get("type") == "greet":
         hello = {"v": 1, "type": "hello", "from": "peerci01", "name": "Sunny", "to": "all"}
         sock.sendto(json.dumps(hello).encode(), addr)
-        print("greet")
-    else:
-        print(message.get("type", ""))
-except Exception:
-    print("timeout")
+        result = "greet"
+        break
+print(result)
 PY
 PEER_PID=$!
 sleep 0.5
@@ -579,7 +595,7 @@ sleep 0.5
 # runner must not end the story. The POST and the wait are idempotent: ask
 # again until the ack lands or the window closes.
 PEER_ACK=""
-for _ in $(seq 1 8); do
+for _ in $(seq 1 30); do
   api POST /peers/greet '{"id":"peerci01"}' > /dev/null || true
   for _ in $(seq 1 15); do
     PEER_ACK=$(cat /tmp/duck-peer-ack.txt 2>/dev/null || echo "")
@@ -1251,6 +1267,42 @@ SOUND=$(api POST /sound '{"tag":"chirp"}' || true)
 echo "$SOUND" | tee "$OUT/sound.json" > /dev/null
 printf '%s' "$SOUND" | grep -q '"ok":true'
 check $? "the duck can be asked to chirp" "$(printf '%s' "$SOUND" | head -c 100)"
+# The core's answer is only the queue. The app has to render the PCM and hand
+# it to AVAudioEngine; count the platform's own "scheduled" lines, because a
+# chirp may already have played earlier in this session (the clap rule).
+CHIRPS_BEFORE=$(grep -c 'duck: voice scheduled tag=chirp' "$OUT/app-stdout.log" 2>/dev/null || true)
+[ -n "$CHIRPS_BEFORE" ] || CHIRPS_BEFORE=0
+CHIRPS_AFTER=$CHIRPS_BEFORE
+# The core's queue holds one one-shot: a later idle emotion replaces a queued
+# chirp before the shell can play it — that is the "one voice" rule, and why
+# the core lets the trigger be spammed. Keep asking; the claim under test is
+# that a requested chirp reaches the engine, not that it wins every race
+# against an idle ritual.
+#
+# The window is 40 s, not 20: on a loaded runner the first chirp that gets
+# through can land just past a 20 s loop, and the log line itself arrives a
+# beat after the engine schedules it. A red here is then a real "no chirp in
+# 40 s", and the failure prints what the engine did schedule so it can be
+# told apart from a mute duck without re-running the job.
+for _ in $(seq 1 200); do
+  api POST /sound '{"tag":"chirp"}' > /dev/null || true
+  CHIRPS_AFTER=$(grep -c 'duck: voice scheduled tag=chirp' "$OUT/app-stdout.log" 2>/dev/null || true)
+  [ -n "$CHIRPS_AFTER" ] || CHIRPS_AFTER=0
+  [ "$CHIRPS_AFTER" -gt "$CHIRPS_BEFORE" ] && break
+  sleep 0.2
+done
+if [ "$CHIRPS_AFTER" -gt "$CHIRPS_BEFORE" ]; then
+  check 0 "the chirp reaches the audio engine" "scheduled chirps $CHIRPS_BEFORE -> $CHIRPS_AFTER"
+else
+  grep 'duck: voice scheduled' "$OUT/app-stdout.log" 2>/dev/null | tail -6 || true
+  check 1 "the chirp reaches the audio engine" "scheduled chirps $CHIRPS_BEFORE -> $CHIRPS_AFTER"
+fi
+# The session that carries it must be a playable category: `.ambient` dies
+# with the Ring/Silent switch. (The receiver-routing half of the regression is
+# asserted by the UI test: the simulator always keeps the speaker.)
+AUDIO_SESSION=$(grep 'duck: audio session' "$OUT/app-stdout.log" 2>/dev/null | tail -1)
+printf '%s' "$AUDIO_SESSION" | grep -q 'category=AVAudioSessionCategoryPlayback'
+check $? "the audio session is playable (playback, not ambient)" "$AUDIO_SESSION"
 BOGUS=$(api POST /sound '{"tag":"bark"}' || true)
 printf '%s' "$BOGUS" | grep -q '"ok":false'
 check $? "an unknown sound is refused" "$(printf '%s' "$BOGUS" | head -c 100)"
@@ -1463,9 +1515,24 @@ check $? "step advances exactly the ticks asked for" "$TICK_PAUSED -> $TICK_STEP
 
 api POST /time '{"speed":0.5}' > /dev/null
 api POST /time '{"paused":false}' > /dev/null
+# The intent deadline is 300 ms; on a loaded runner that POST can time out and
+# the setting is lost (the same flake the refusal check retries). Confirm the
+# clock took both settings before timing it.
+SPEED_NOW=""; PAUSED_NOW=""
+for _ in $(seq 1 30); do
+  SPEED_NOW=$(api GET /state | field speed)
+  PAUSED_NOW=$(api GET /state | field paused)
+  [ "$SPEED_NOW" = "0.5000" ] && [ "$PAUSED_NOW" = "false" ] && break
+  api POST /time '{"speed":0.5}' > /dev/null || true
+  api POST /time '{"paused":false}' > /dev/null || true
+  sleep 0.2
+done
+[ "$SPEED_NOW" = "0.5000" ] && [ "$PAUSED_NOW" = "false" ]
+check $? "the clock takes the half-speed setting" "speed=$SPEED_NOW paused=$PAUSED_NOW"
+TICK_SLOW_START=$(api GET /state | field tick)
 sleep 2
 TICK_SLOW=$(api GET /state | field tick)
-ELAPSED=$((TICK_SLOW - TICK_STEPPED))
+ELAPSED=$((TICK_SLOW - TICK_SLOW_START))
 # 2 s at 0.5x is about 50 ticks. A loaded simulator can finish a frame
 # late; a green run measured 34 and a loaded one 26. What the check must
 # catch is full speed (100) or a stopped clock (0), not CI jitter. The
