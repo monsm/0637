@@ -263,7 +263,7 @@ final class AIBrain {
         let why = json["why"] as? String ?? ""
         guard let action = json["action"] as? String else {
             guard !say.isEmpty else { return nil }
-            return AIDecision(action: "talk", say: say, why: why)
+            return AIDecision(action: "talk", why: why, say: say)
         }
         switch action {
         case "skill", "sound":
@@ -296,7 +296,7 @@ final class AIBrain {
             )
         case "talk":
             guard !say.isEmpty else { return nil }
-            return AIDecision(action: action, say: say, why: why)
+            return AIDecision(action: action, why: why, say: say)
         default:
             return nil
         }
