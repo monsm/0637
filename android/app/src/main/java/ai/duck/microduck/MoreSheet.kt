@@ -71,6 +71,7 @@ internal fun MoreSheet(
     onPeers: () -> Unit,
     onQuests: () -> Unit,
     onDiary: () -> Unit,
+    onBig: () -> Unit,
     onPostcards: () -> Unit,
     onDex: () -> Unit,
     onAI: () -> Unit,
@@ -147,6 +148,9 @@ internal fun MoreSheet(
                     badge = if (board.quests.isEmpty()) null else "$unfinished",
                     tag = "more-quests",
                 ) { onQuests() }
+                MoreRow(Icons.big, Copy.bigButtons, note = Copy.bigButtonsNote, tag = "more-big") {
+                    onBig()
+                }
                 MoreRow(Icons.diary, Copy.diary, tag = "more-diary") { onDiary() }
                 MoreRow(
                     Icons.postcards, Copy.postcardShelf,

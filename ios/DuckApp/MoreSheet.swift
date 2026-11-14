@@ -30,7 +30,7 @@ struct MoreSheet: View {
     /// several `.sheet` modifiers is unreliable, and this codebase says so
     /// about itself in ContentView.
     private enum Destination: Identifiable {
-        case rules, dance, peers, quests, diary, postcards, dex, ai, modes
+        case rules, dance, peers, quests, diary, postcards, dex, ai, modes, big
 
         var id: String {
             switch self {
@@ -43,6 +43,7 @@ struct MoreSheet: View {
             case .dex: return "dex"
             case .ai: return "ai"
             case .modes: return "modes"
+            case .big: return "big"
             }
         }
     }
@@ -167,6 +168,13 @@ struct MoreSheet: View {
                         controller.setParent(minutes: next)
                     }
                     row(
+                        "hand.tap", Copy.bigButtons,
+                        note: Copy.bigButtonsNote,
+                        id: "more-big"
+                    ) {
+                        destination = .big
+                    }
+                    row(
                         Icons.heart, Copy.heart,
                         note: controller.heartOn ? String(format: "%.0f bpm", controller.heartBpm) : Copy.heartRowNote,
                         check: controller.heartOn,
@@ -247,6 +255,10 @@ struct MoreSheet: View {
         case .modes:
             ModeSheet(controller: controller, stickMode: $stickMode)
                 .presentationDetents([.height(320)])
+                .presentationDragIndicator(.visible)
+        case .big:
+            BigButtonsSheet(controller: controller)
+                .presentationDetents([.height(400)])
                 .presentationDragIndicator(.visible)
         }
     }

@@ -463,6 +463,15 @@ enum Copy {
     // The room's lamp: a render-layer multiplier. iOS has no ambient-light
     // sensor API, so this is the person's hand — the label says so and never
     // claims the duck can see.
+    // The big-button page: four verbs a grandparent can hit without
+    // hunting. The words are the shell's own; the buttons are 72 pt tall
+    // and VoiceOver reads the whole sentence.
+    static var bigButtons: String { pick("Big buttons", "大按钮") }
+    static var bigButtonsNote: String { pick("Four big taps, large type", "四个大按钮，大字") }
+    static func bigButtonAction(_ index: Int) -> String {
+        [pick("Pet it", "摸摸它"), pick("Feed it", "喂食"),
+         pick("Quack", "叫一声"), pick("Sit down", "坐下")][index]
+    }
     static var roomLamp: String { pick("Room lamp", "房间灯") }
     static var roomLampNote: String {
         pick(
