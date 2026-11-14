@@ -234,7 +234,7 @@ final class Voice {
         })
 
         observers.append(center.addObserver(
-            forName: AVAudioEngine.configurationChangeNotification,
+            forName: .AVAudioEngineConfigurationChange,
             object: engine,
             queue: .main
         ) { [weak self] _ in
