@@ -1677,11 +1677,39 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     /// The care numbers plus the idle span, for persistence and /state.
+    /// The parent's daily allowance, in minutes; zero clears it. The base
+    /// snapshots the duck's own powered time NOW, so the day already spent
+    /// is not double-counted against the new allowance.
+    pub fn set_parent_budget(&mut self, minutes: u32) {
+        self.care.budget_s = if minutes == 0 { None } else { Some(minutes * 60) };
+        self.care.budget_base_s = self.book().life.powered_s;
+    }
+
+    /// The calendar day rolled over: the allowance restarts from the
+    /// powered time the duck has now. The caller (the tick) decides when a
+    /// day begins — the shell posts the day it lives by.
+    pub fn reset_parent_day(&mut self) {
+        self.care.budget_base_s = self.book().life.powered_s;
+    }
+
     pub fn care_summary(&self) -> serde_json::Value {
         let mut value = self.care.summary();
         let idle = self.clock.tick.saturating_sub(self.care.last_touch) as f64 * 0.02;
         if let Some(object) = value.as_object_mut() {
             object.insert("idle_s".to_owned(), serde_json::json!(idle));
+            // The parent's day, as the duck keeps it: allowance in minutes,
+            // and how much of the duck's own powered time it has used.
+            let used = (self.book().life.powered_s - self.care.budget_base_s).max(0.0);
+            object.insert(
+                "parent".to_owned(),
+                serde_json::json!({
+                    "minutes": self.care.budget_s.map(|s| s / 60),
+                    "used_s": (used * 10.0).round() / 10.0,
+                    "left_s": self.care.budget_s.map_or(0.0, |budget| {
+                        (f64::from(budget) - used).max(0.0)
+                    }),
+                }),
+            );
         }
         value
     }
@@ -2326,6 +2354,13 @@ impl<T: RobotIo> DuckRuntime<T> {
             // way a morning gets its own note and the same wake gets a coo.
             self.care.woken_by_touch = false;
             self.book.note("woken_by_touch".to_owned());
+        }
+        // The parent's allowance: when the day's powered time is spent, the
+        // duck goes to bed — the same real sleep the switch puts it in, and
+        // only a hand (or the morning) wakes it. A sleeping duck stays
+        // asleep; the check never wakes anybody.
+        if self.care.budget_s.is_some() && self.care.budget_spent(self.book().life.powered_s) {
+            self.care.enter_night(self.clock.tick);
         }
         let now = TickTime::of(&self.clock);
         let sensors: Sensors = self.safety.read()?;

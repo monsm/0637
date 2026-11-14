@@ -82,6 +82,8 @@ pub struct DuckCore {
     lan: Option<crate::lan::Lan>,
     /// The official UDP pad receiver: off until enabled with a pair code.
     pad: Option<crate::pad::Pad>,
+    /// The calendar day the parent's allowance was last reset on.
+    parent_day: String,
     /// The last button bitmap seen, so a press fires once rather than
     /// repeating on every one of the 50 Hz ticks.
     pad_buttons: u16,
@@ -294,6 +296,7 @@ pub unsafe extern "C" fn duck_core_new(
             lan: None,
             pad: None,
             pad_buttons: 0,
+            parent_day: String::new(),
             quests: crate::quests::QuestBoard::default(),
             notice: None,
             rendered_sound: None,
@@ -1104,6 +1107,11 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             None => refuse(core, "the LAN peer port is not available".to_owned()),
         },
+        Intent::ParentBudget(minutes) => {
+            on_active(core, |runtime| runtime.set_parent_budget(minutes));
+            let summary = active_runtime(core).care_summary();
+            json!({ "ok": true, "minutes": minutes, "parent": summary.get("parent") })
+        }
         Intent::PadSwitch(on) => {
             if on {
                 // The official UDP pad is unauthenticated by design. A
@@ -1673,6 +1681,13 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     // A quest completing is a real event; the duck answers with one of its
     // own official emotions rather than a fake notification.
     let quest_day = core.intents.day();
+    // A new calendar day restarts the parent's allowance: the budget's base
+    // re-snapshots the duck's own powered time, so yesterday's play does not
+    // eat today's minutes.
+    if quest_day.len() == 10 && quest_day != core.parent_day {
+        core.parent_day = quest_day.clone();
+        on_active(core, |runtime| runtime.reset_parent_day());
+    }
     if quest_day.len() == 10 {
         // Measure the duck the client is driving: a selected branch's own
         // counters, not the original the branch forked from.

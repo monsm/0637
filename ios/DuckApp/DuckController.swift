@@ -248,6 +248,15 @@ final class DuckController: ObservableObject {
     /// The core's own heart reading (care.heart_bpm): the same numbers the
     /// three capsules above show, as one bpm for the palm.
     @Published var heartBpm: Double = 0
+    /// The parent's daily allowance in minutes, nil when unlimited — the
+    /// core's own accounting of `powered_s`, read back on every poll.
+    /// The room's lamp: a render-layer multiplier on the daylight exposure
+    /// (0.55 dark … 1.15 bright). iOS has no ambient-light API, so this is
+    /// the person's own hand on the lamp — the honest label says so, and
+    /// nothing here reaches the duck's observation.
+    @Published var ambientScale: Double = 1.0
+    @Published var parentMinutes: Int?
+    @Published var parentLeftS: Double = 0
     private var companionRestored = false
     private var companionRestoreStarted = false
     private var lastCompanionSave = Date.distantPast
@@ -1313,6 +1322,12 @@ final class DuckController: ObservableObject {
         postJSON("/ensemble", ["moves": moves, "sounds": sounds])
     }
 
+    /// The parent's daily allowance. Zero clears it; the core snapshots
+    /// its own powered time and puts the duck to bed when the day is spent.
+    func setParent(minutes: Int) {
+        postJSON("/parent", ["minutes": minutes])
+    }
+
     /// The official UDP pad: OFF by default, gated in the core by the pair
     /// code. A standard DKPD sender (duckctl udp-pad, a script) then drives
     /// this duck through the same twist the joystick uses.
@@ -1976,6 +1991,11 @@ final class DuckController: ObservableObject {
                         self.careAsleep = care["asleep"] as? Bool ?? false
                         // The palm reads the same numbers the capsules do.
                         self.heartBpm = care["heart_bpm"] as? Double ?? 0
+                        // The parent's day, as the core keeps it.
+                        if let parent = care["parent"] as? [String: Any] {
+                            self.parentMinutes = parent["minutes"] as? Int
+                            self.parentLeftS = parent["left_s"] as? Double ?? 0
+                        }
                         self.saveCompanionState(care: care, life: json["life"] as? [String: Any])
                     }
                     if let life = json["life"] as? [String: Any] {

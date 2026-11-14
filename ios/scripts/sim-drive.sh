@@ -869,6 +869,47 @@ import json,sys
 print('awake' if not (json.load(sys.stdin).get('care') or {}).get('asleep') else 'asleep')
 " 2>/dev/null || echo "asleep")
 [ "$WOKEN" = "awake" ]; check $? "a stroke wakes it" "$WOKEN"
+# The parent's allowance, on the same 200x care clock: one budget minute is
+# 60 simulated seconds = under a real second at 200x. The duck goes to the
+# SAME real sleep, and zero minutes clears it.
+PARENT_SET=$(api POST /parent '{"minutes":1}' || true)
+printf '%s' "$PARENT_SET" | grep -q '"ok":true'
+check $? "the parent posts a one-minute allowance" "$(printf '%s' "$PARENT_SET" | head -c 100)"
+BUDGET_SLEEP=""
+for _ in $(seq 1 40); do
+  BUDGET_SLEEP=$(api GET /care | python3 -c "
+import json,sys
+print('yes' if (json.load(sys.stdin).get('care') or {}).get('asleep') else 'no')
+" 2>/dev/null || echo "no")
+  [ "$BUDGET_SLEEP" = "yes" ] && break
+  sleep 0.2
+done
+[ "$BUDGET_SLEEP" = "yes" ]; check $? "a spent allowance puts the duck to bed" "asleep=$BUDGET_SLEEP"
+# Clearing the allowance does NOT wake the duck — only a hand does. The
+# pet above is that hand; after it the number goes back to unlimited.
+PARENT_CLEAR=$(api POST /parent '{"minutes":0}' || true)
+printf '%s' "$PARENT_CLEAR" | grep -q '"ok":true'
+check $? "zero minutes clears the allowance" "$(printf '%s' "$PARENT_CLEAR" | head -c 100)"
+CLEARED=""
+for _ in $(seq 1 20); do
+  CLEARED=$(api GET /care | python3 -c "
+import json,sys
+parent=(json.load(sys.stdin).get('care') or {}).get('parent') or {}
+print('cleared' if parent.get('minutes') is None else 'still-set')
+" 2>/dev/null || echo "?")
+  [ "$CLEARED" = "cleared" ] && break
+  sleep 0.2
+done
+[ "$CLEARED" = "cleared" ]; check $? "/care.parent.minutes goes back to null" "$CLEARED"
+# The duck is still asleep under its budget; the hand wakes it for the
+# sections below.
+api POST /pet '{}' > /dev/null || true
+sleep 0.4
+BUDGET_AWAKE=$(api GET /care | python3 -c "
+import json,sys
+print('awake' if not (json.load(sys.stdin).get('care') or {}).get('asleep') else 'asleep')
+" 2>/dev/null || echo "asleep")
+[ "$BUDGET_AWAKE" = "awake" ]; check $? "a stroke wakes it after the budget" "$BUDGET_AWAKE"
 # A waking duck keeps its coo for a full idle period: the core resets the
 # ritual clock on the wake, so poll the next few ticks (the pet lands
 # asynchronously) and read the sound that was published, not a later event.

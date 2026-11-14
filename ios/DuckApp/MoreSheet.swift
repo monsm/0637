@@ -140,6 +140,33 @@ struct MoreSheet: View {
                         controller.toggleFlashlight()
                     }
                     row(
+                        "lightbulb", Copy.roomLamp,
+                        note: Copy.roomLampNote,
+                        badge: String(format: "%.0f%%", controller.ambientScale * 100),
+                        showsChevron: false,
+                        id: "more-lamp"
+                    ) {
+                        // Five honest stops across the readable range.
+                        let stops: [Double] = [0.55, 0.7, 0.85, 1.0, 1.15]
+                        let index = stops.firstIndex(of: controller.ambientScale) ?? 3
+                        controller.ambientScale = stops[(index + 1) % stops.count]
+                    }
+                    row(
+                        "hourglass", Copy.parentTime,
+                        note: controller.parentMinutes.map { minutes in
+                            String(format: Copy.parentLeft, minutes, Int(controller.parentLeftS / 60.0))
+                        } ?? Copy.parentOff,
+                        showsChevron: false,
+                        id: "more-parent"
+                    ) {
+                        // Off -> 15 -> 30 -> 60 -> off: one tap, one honest
+                        // choice, no second-layer menu.
+                        let next = (controller.parentMinutes ?? 0) == 0 ? 15
+                            : (controller.parentMinutes == 15 ? 30
+                            : (controller.parentMinutes == 30 ? 60 : 0))
+                        controller.setParent(minutes: next)
+                    }
+                    row(
                         Icons.heart, Copy.heart,
                         note: controller.heartOn ? String(format: "%.0f bpm", controller.heartBpm) : Copy.heartRowNote,
                         check: controller.heartOn,

@@ -210,10 +210,13 @@ class DuckRenderer(
         // and every duck part. The halo is the trunk projected into NDC: the
         // warm glow sits behind the duck wherever the camera puts it. The
         // instrument is a lab, not a room: its light is neutral at any hour.
+        // The room's lamp: the shell's scale on the exposure, clamped so the
+        // room can dim but never go black. The duck's senses never see it.
+        val lamp = input.ambientScale.coerceIn(0.55f, 1.15f)
         val daylight = if (instrument) {
             floatArrayOf(1f, 1f, 1f, 1f)
         } else {
-            floatArrayOf(day.tint[0], day.tint[1], day.tint[2], day.exposure)
+            floatArrayOf(day.tint[0], day.tint[1], day.tint[2], day.exposure * lamp)
         }
         val shadow = floatArrayOf(trunk[0], trunk[1], 0.62f, 0f)
         val clip = FloatArray(4)

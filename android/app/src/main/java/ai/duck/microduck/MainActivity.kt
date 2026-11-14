@@ -1,5 +1,6 @@
 package ai.duck.microduck
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.opengl.GLSurfaceView
 import android.os.Bundle
@@ -77,6 +78,22 @@ class MainActivity : ComponentActivity() {
             if (hour.isFinite() && hour in 0f..24f) Daylight.hourOverride = hour
         }
         input = DuckInput()
+        // The room's lamp, when the device has a real lux sensor: the scale
+        // follows the room, clamped to the readable band. No sensor leaves
+        // the sheet's manual stops in charge — the number is never invented.
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+        sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_LIGHT)?.let { light ->
+            sensorManager.registerListener(
+                { event ->
+                    if (event.sensor.type == android.hardware.Sensor.TYPE_LIGHT) {
+                        input.ambientLux = event.values[0]
+                        input.ambientScale = (event.values[0] / 200f).coerceIn(0.55f, 1.15f)
+                    }
+                },
+                light,
+                android.hardware.SensorManager.SENSOR_DELAY_NORMAL,
+            )
+        }
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 DuckScreen(
