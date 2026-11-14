@@ -59,10 +59,11 @@ class SpeechFeed(private val context: Context) {
 
     /** The last final transcript posted, or null before the first one. */
     var lastHeard by mutableStateOf<String?>(null)
+        private set
+
     /// Set by the shell: a fresh final transcript, so the AI loop can answer
     /// speech now instead of on its next periodic tick. Main thread.
     var onUtterance: ((String) -> Unit)? = null
-        private set
 
     private val handler = Handler(Looper.getMainLooper())
     private val poster = Executors.newSingleThreadExecutor { runnable ->
