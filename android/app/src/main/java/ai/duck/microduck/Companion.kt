@@ -18,6 +18,8 @@ data class CareUi(
     val mood: Double = 0.35,
     val bond: Double = 0.1,
     val asleep: Boolean = false,
+    /** The core's own heart reading (beats per minute), 0 before first read. */
+    val heartBpm: Double = 0.0,
 ) {
     /** Fullness fills the bar left-to-right: full means fed. */
     val fullness: Float get() = (1.0 - hunger).toFloat().coerceIn(0f, 1f)
@@ -273,6 +275,7 @@ fun parseCare(text: String): CareUi? = try {
         mood = care.optDouble("mood", 0.35),
         bond = care.optDouble("bond", 0.1),
         asleep = care.optBoolean("asleep", false),
+        heartBpm = care.optDouble("heart_bpm", 0.0),
     )
 } catch (_: Throwable) {
     null

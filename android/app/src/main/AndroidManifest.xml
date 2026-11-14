@@ -12,6 +12,9 @@
     <!-- The microphone is the ROOM, never the duck's senses. Asked only when the
          user enables the mic row in the instrument sheet, never at launch. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- The palm's heartbeat: the care numbers as a haptic rhythm, rendered
+         only while the drawer row is on. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Spoken commands: SpeechRecognizer resolves the device's recognition
          service through package visibility. Without this <queries> entry the

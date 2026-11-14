@@ -792,6 +792,16 @@ sys.exit(0 if c.get('hunger',1) < 0.15 and c.get('bond',0) > 0.1 and 'mood' in c
 " 2>/dev/null
 check $? "a treat fills the tummy and a stroke warms the bond" ""
 
+# The palm's heartbeat: a pure reading of the care numbers, published in the
+# same summary. It must be a plausible bpm and never stored by restore.
+printf '%s' "$CARE" | python3 -c "
+import json,sys
+c=json.load(sys.stdin).get('care') or {}
+bpm=c.get('heart_bpm')
+sys.exit(0 if isinstance(bpm,(int,float)) and 40<=bpm<=120 else 1)
+" 2>/dev/null
+check $? "care publishes the palm's heart reading" ""
+
 CARE_TICK=$(api GET /state | python3 -c "
 import json,sys
 print(json.load(sys.stdin).get('tick',0))

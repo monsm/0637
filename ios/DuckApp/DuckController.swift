@@ -241,6 +241,9 @@ final class DuckController: ObservableObject {
     @Published var careMood: Double = 0
     @Published var careBond: Double = 0
     @Published var careAsleep = false
+    /// The core's own heart reading (care.heart_bpm): the same numbers the
+    /// three capsules above show, as one bpm for the palm.
+    @Published var heartBpm: Double = 0
     private var companionRestored = false
     private var companionRestoreStarted = false
     private var lastCompanionSave = Date.distantPast
@@ -348,6 +351,19 @@ final class DuckController: ObservableObject {
     /// honestly labelled. It renders through Voice's session without owning
     /// it; the tick's mouth target follows it like a quack.
     private let speaker = Speaker()
+    /// The palm's heartbeat: the core's care numbers as a haptic rhythm.
+    /// Reading, not event — nothing here writes back to the duck.
+    let heart = Heart()
+    /// The drawer row's switch. Persisted like the mic toggle; off means the
+    /// duck's heart is silent in the palm, not that the duck has none.
+    @Published var heartOn = UserDefaults.standard.bool(forKey: "duck_heart_on") {
+        didSet {
+            if heartOn != oldValue {
+                UserDefaults.standard.set(heartOn, forKey: "duck_heart_on")
+                heart.setEnabled(heartOn)
+            }
+        }
+    }
     /// Observed by the diary's button so the icon flips the moment speech
     /// starts and ends. Written only on the main thread.
     @Published private(set) var ttsSpeaking = false
@@ -1927,6 +1943,8 @@ final class DuckController: ObservableObject {
                         self.careMood = care["mood"] as? Double ?? 0
                         self.careBond = care["bond"] as? Double ?? 0
                         self.careAsleep = care["asleep"] as? Bool ?? false
+                        // The palm reads the same numbers the capsules do.
+                        self.heartBpm = care["heart_bpm"] as? Double ?? 0
                         self.saveCompanionState(care: care, life: json["life"] as? [String: Any])
                     }
                     if let life = json["life"] as? [String: Any] {
@@ -2119,6 +2137,13 @@ final class DuckController: ObservableObject {
         } else {
             DispatchQueue.main.async(execute: toggle)
         }
+    }
+
+    /// A dance step's light: "off" or one of the seven official colours,
+    /// through the same client intent any rule uses. The lamp is the duck's
+    /// own LED; a choreography may light it between two quacks.
+    func setFlashlight(color: String) {
+        postJSON("/flashlight", ["toggle": false, "on": color != "off", "color": color])
     }
 
     /// `robotctl wheee` on a phone: holding starts the ride's segments,
@@ -2315,6 +2340,9 @@ final class DuckController: ObservableObject {
         // quack opens the jaw instead of snapping it open and shut.
         let mouthTarget = (voice.isSpeaking || speaker.isSpeaking) ? 1.0 : 0.0
         visualMouth += (mouthTarget - visualMouth) * (1 - exp(-0.02 / 0.09))
+        // The palm's beat: one tick checks whether the next beat of the
+        // polled bpm is due. A disabled heart is one branch and no engine.
+        heart.tick(pollBpm: heartBpm)
         if Voice.diagnosticsEnabled {
             // Five times a second is enough for the UI test's polling and
             // cheap enough for the control loop; the string is only built

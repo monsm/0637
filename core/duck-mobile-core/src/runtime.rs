@@ -1736,6 +1736,21 @@ impl<T: RobotIo> DuckRuntime<T> {
                     false
                 }
             }
+            // The flashlight as a step: the same virtual LED the drawer row
+            // and robot.flashlight toggle, named "off" or one of the seven
+            // official colours. It is the duck's own lamp — robotd owns it —
+            // so a choreography or a rule may light it between moves.
+            "light" => {
+                if value == "off" {
+                    self.set_flashlight(false, false, "white");
+                    true
+                } else if crate::leds::COLORS.contains(&value) {
+                    self.set_flashlight(false, true, value);
+                    true
+                } else {
+                    false
+                }
+            }
             _ => false,
         }
     }

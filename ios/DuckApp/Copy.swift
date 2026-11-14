@@ -445,6 +445,15 @@ enum Copy {
             "系统声音替它说——不是鸭子自己的合成嗓。"
         )
     }
+    // The palm's heartbeat: the duck's care numbers as a haptic rhythm.
+    // A reading of the real state, not a new fact; off until asked for.
+    static var heart: String { pick("Heartbeat", "手心心跳") }
+    static var heartRowNote: String {
+        pick(
+            "Feel its heart in your palm — a reading of its mood.",
+            "在手心感受它的心——由心情推出来的读数。"
+        )
+    }
     static var rulesEmpty: String {
         pick("No rules yet. Build one: when I clap, roll over.",
              "还没有规则。拼一个：拍手，就翻滚。")

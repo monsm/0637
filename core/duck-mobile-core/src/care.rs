@@ -187,12 +187,30 @@ impl Care {
         self.mood < -0.35
     }
 
+    /// The heart rate a hand would feel through the shell, in beats per
+    /// minute. A pure function of this Care — every input is a number the
+    /// loop already keeps, and nothing here mutates anything: it is a
+    /// reading, not an event. A sleeping duck's heart slows like a resting
+    /// animal's; a happy bonded one is quick; hunger races it a little.
+    pub fn heart_bpm(&self) -> f64 {
+        if self.asleep {
+            return 46.0;
+        }
+        let mood_beats = self.mood * 12.0;
+        let hunger_beats = self.hunger * 14.0;
+        let bond_beats = self.bond * -8.0;
+        (72.0 + mood_beats + hunger_beats + bond_beats).clamp(42.0, 118.0)
+    }
+
     pub fn summary(&self) -> serde_json::Value {
         serde_json::json!({
             "hunger": self.hunger,
             "mood": self.mood,
             "bond": self.bond,
             "asleep": self.asleep,
+            // The hand's reading, not a new fact: derived here so every
+            // client feels the same heart without re-deriving it.
+            "heart_bpm": (self.heart_bpm() * 10.0).round() / 10.0,
             "last_touch": self.last_touch,
             // The night travels with the three numbers: the shells save this
             // object wholesale and hand it back, and the quiet span is always
@@ -251,6 +269,29 @@ impl Care {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_heart_is_a_pure_reading_of_the_care_numbers() {
+        let care = Care::default();
+        let rest = care.heart_bpm();
+        assert!((55.0..90.0).contains(&rest), "rest {rest}");
+        let mut happy = care;
+        happy.mood = 1.0; happy.bond = 1.0; happy.hunger = 0.0;
+        let mut sad = care;
+        sad.mood = -1.0; sad.bond = 0.0; sad.hunger = 1.0;
+        assert!(happy.heart_bpm() > sad.heart_bpm());
+        let mut sleeper = happy;
+        sleeper.asleep = true;
+        assert_eq!(sleeper.heart_bpm(), 46.0);
+        let summary = sleeper.summary();
+        assert_eq!(
+            summary.get("heart_bpm").and_then(serde_json::Value::as_f64),
+            Some(46.0)
+        );
+        let mut restored = Care::default();
+        restored.restore(&summary);
+        assert!(restored.heart_bpm() > 0.0);
+    }
 
     #[test]
     fn feeding_lowers_hunger_and_petting_lifts_the_mood() {

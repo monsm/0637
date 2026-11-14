@@ -46,6 +46,7 @@ fun DanceSheet(
     onSkill: (String) -> Unit,
     onSound: (String) -> Unit,
     onFeed: () -> Unit,
+    onLight: (String) -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -81,6 +82,7 @@ fun DanceSheet(
                 "skill" -> onSkill(step.value)
                 "sound" -> onSound(step.value)
                 "feed" -> onFeed()
+                "light" -> onLight(step.value)
             }
             delay(800)
         }
@@ -198,6 +200,14 @@ fun DanceSheet(
                 ButtonChip(Copy.danceStepSound, "dance-try-chirp") {
                     onSound("chirp")
                     refresh()
+                }
+                // The duck's own lamp as a choreography step: one official
+                // colour and its honest off.
+                listOf("yellow", "off").forEach { color ->
+                    ButtonChip(color, "dance-try-light-$color") {
+                        onLight(color)
+                        refresh()
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

@@ -145,6 +145,17 @@ fun Shell(
     var nightActive by remember { mutableStateOf(false) }
     var dex by remember { mutableStateOf(emptyList<DexEntryUi>()) }
     val dance = remember(context) { DanceStudio(context) }
+    // The palm's heartbeat: the core's care numbers as a vibration rhythm.
+    // A reading of the real state, never a fact; silent until the row says on.
+    val heart = remember(context) { Heart(context) }
+    var heartOn by remember { mutableStateOf(
+        context.getSharedPreferences("duck", Context.MODE_PRIVATE).getBoolean("duck_heart_on", false)
+    ) }
+    LaunchedEffect(heartOn) {
+        heart.setEnabled(heartOn)
+        context.getSharedPreferences("duck", Context.MODE_PRIVATE)
+            .edit().putBoolean("duck_heart_on", heartOn).apply()
+    }
     var danceShow by remember { mutableStateOf(0) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
     var aiStatus by remember { mutableStateOf("") }
@@ -326,7 +337,12 @@ fun Shell(
             // snapshot it persists.
             val stateText = withContext(Dispatchers.IO) { fetchRawState() }
             val careNow = stateText?.let(::parseCare)
-            if (careNow != null) careUi = careNow
+            if (careNow != null) {
+                careUi = careNow
+                // The palm reads the same numbers the pill does; one tick
+                // checks whether the next beat is due.
+                heart.tick(careNow.heartBpm, System.currentTimeMillis())
+            }
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
             val nightNow = stateText?.let(::parseNight)
@@ -3249,6 +3265,29 @@ private fun InstrumentSheet(
                     )
                     Spacer(Modifier.size(8.dp))
                     ButtonChip(Copy.flashlight) { onFlashlight() }
+                }
+            }
+            // The palm's heartbeat: one tap flips it; the bpm is the core's
+            // own reading, and a device with no vibrator shows the number
+            // without pretending to pulse.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.heart, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (heartOn && heart.bpm > 0) "%.0f bpm".format(heart.bpm) else Copy.heartRowNote,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    ButtonChip(
+                        if (heartOn) Copy.flashlightOff else Copy.flashlightOn,
+                        testTag = "heart-toggle",
+                    ) { heartOn = !heartOn }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

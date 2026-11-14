@@ -16,7 +16,7 @@ use serde_json::Value;
 pub const TRIGGERS: [&str; 3] = ["clap", "whistle", "pet"];
 
 /// What a block can make the duck do.
-pub const ACTIONS: [&str; 3] = ["skill", "emotion", "sound"];
+pub const ACTIONS: [&str; 4] = ["skill", "emotion", "sound", "light"];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Rule {
@@ -158,6 +158,26 @@ impl Rules {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_light_step_keeps_the_official_flashlight_vocabulary() {
+        let mut rules = Rules::default();
+        rules.set(&serde_json::json!({
+            "rules": [{
+                "trigger": "clap",
+                "action": "light",
+                "value": "yellow",
+                "then": [
+                    { "action": "sound", "value": "chirp" },
+                    { "action": "light", "value": "off" }
+                ]
+            }]
+        })).expect("a light step with an official colour must load");
+        // The word is validated by the runtime against COLORS, not here:
+        // an invented colour is still a legal wire shape and must be refused
+        // where the lamp lives, with no state changed.
+        assert!(ACTIONS.contains(&"light"));
+    }
 
     #[test]
     fn a_well_formed_rule_set_loads_and_matches() {
