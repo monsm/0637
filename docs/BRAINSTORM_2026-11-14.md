@@ -177,6 +177,13 @@ ARKit/ARCore 检测的桌面/地板高度写进 MuJoCo 地面平面，鸭子真�
 | 二 | #17 邻居配对码、#11 网控手柄 DKPD | ✅ 双端 + 核心 + 单测 + 两端 CI 断言 | `1bd24d6` |
 | 三 | #7 家庭舞团编队、#5 角色编舞、#6 多鸭合奏编曲 | ✅ 一条 `ensemble` wire 动词承载三条，双端按钮 + 核心 + 单测 | `a33476c` |
 | 修复 | 首轮 CI 指名 6 个编译错（pad 闭包 `?`、ensemble 的 Option<Result> 模式、peer_event 穷举、beat_count 警告） | ✅ 已修并重推 | `9309c0b` |
+| 修复2 | CI 指名作用域 bug（InstrumentSheet 的 heart 局部变量）与 greet 竞态（pair 抢了 hello 的回复） | ✅ 双端 CI 全绿（apk/unittest/emulator/alignment + simsmoke/uitest） | `565b27c` |
+| 修复3 | CI 指名 8 个 lan/pad 测试失败：stale-seq 守卫恒假 + 配对门槛后的测试时钟撞窗口默认值 | ✅ 本地以 CI 同命令验证（cargo test --locked --workspace -- --include-ignored，ORT 1.24.2：153+8 全绿） | `41e13c5` |
+| 四a | #14 家长时长（核心预算+跨日重置+到点真安睡，双端行 + CI 断言）、#18 房间灯（渲染层曝光倍率；Android 真 lux 传感器，iOS 诚实手动档） | ✅ 已实现 | `fed3375` |
+| 四b | #26 长辈大字模式（四动词 72pt 页，双端） | ✅ 已实现 | `5f87fe3` |
+| 四c | #19 朝向罗盘（两端相机偏航偏移，真传感，无传感器诚实隐藏） | ✅ 已实现 | `e9164dd` |
+| blocked | #21 自愈爬起 | ⛔ 官方未发布 standup.onnx 权重，等上游——不自己训，不编造 | — |
+| 余 | #4/#20/#9（AR/深度）、#8、#11 发送端、#15、#22/#23/#27/#13、#10/#12/#16、#24/#25 | ⏳ 排序在后 | — |
 | 四–七 | #4/#20/#9、#8/#14/#15、#13/#22/#23/#27/#10/#12/#16/#18/#19/#24/#25/#26/#21 | ⏳ 待 CI 验证前三批后开工 | — |
 
 > 验证口径：本机 Windows 无 Rust 工具链 / Xcode / Android SDK，所有编译与运行验证以 GitHub Actions 三条工作流为准（core 单测、iOS 模拟器 15 步、Android 冒烟）。台账不得在 CI 全绿前把条目标成「完成」——未验证就是未验证。
