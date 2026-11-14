@@ -753,6 +753,8 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             | Intent::DropBranch(_)
             | Intent::SelectBranch(_)
             | Intent::QuestDay(_, _)
+            | Intent::Backup
+            | Intent::RestoreBackup(_)
     );
     let selected = core.selected;
     if global || selected == 0 || selected > core.branches.len() {
@@ -1099,6 +1101,55 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 Some(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
                 None => refuse(core, "the LAN peer port is not available".to_owned()),
             }
+        }
+        Intent::Backup => {
+            // The whole duck's portable state, one versioned document. Every
+            // part comes from the same intent it restores through, so a
+            // backup can never carry a field the restore would not accept.
+            let values = json!({
+                "care": active_runtime(core).care_summary(),
+                "life": active_runtime(core).book().summary(),
+            });
+            json!({
+                "format": "microduck-backup/1",
+                "fingerprint": core.fingerprint.to_string_lossy(),
+                "day": core.intents.day(),
+                "care": active_runtime(core).care_summary(),
+                "quests": core.quests.summary(&values),
+                "rules": active_runtime(core).rules_summary(),
+            })
+        }
+        Intent::RestoreBackup(value) => {
+            if value.get("format").and_then(Value::as_str) != Some("microduck-backup/1") {
+                return refuse(core, "unknown backup format".to_owned());
+            }
+            // Three parts, three of the duck's own doors: the care restore
+            // clamps what it is given, the quest board re-measures against
+            // the duck as it is now, and the rules vocabulary refuses a
+            // program with a word the duck does not know. Nothing here
+            // accepts a sentence, a number without a source, or a new kind
+            // of fact.
+            let care = apply_intent_active(
+                core,
+                Intent::RestoreCare(value.get("care").cloned().unwrap_or(json!({}))),
+            );
+            let day = value.get("day").and_then(Value::as_str).unwrap_or("").to_owned();
+            let quests = if day.len() == 10 {
+                apply_intent_active(
+                    core,
+                    Intent::QuestDay(
+                        day,
+                        value.get("quests").cloned().unwrap_or(json!({})),
+                    ),
+                )
+            } else {
+                json!({ "ok": false, "error": "the backup carries no calendar day" })
+            };
+            let rules = apply_intent_active(
+                core,
+                Intent::SetRules(value.get("rules").cloned().unwrap_or(json!({}))),
+            );
+            json!({ "ok": true, "care": care, "quests": quests, "rules": rules })
         }
         Intent::PeerName(name) => match &core.lan {
             Some(lan) => {

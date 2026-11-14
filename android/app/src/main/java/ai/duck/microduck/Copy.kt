@@ -489,6 +489,18 @@ val quack get() = pick("Quack", "叫一声")
         2 -> pick("Quack", "叫一声")
         else -> pick("Sit down", "坐下")
     }
+    val backup get() = pick("Back up & move", "备份·搬家")
+    val backupRowNote get() = pick("Carry this duck to another phone", "把这只鸭带到另一台手机")
+    val backupNote get() = pick(
+        "Care, quests and rules travel in one file; postcards stay here.",
+        "养成、挑战与积木装进一个文件带走；明信片留在本机。",
+    )
+    val backupExport get() = pick("Export backup", "导出备份")
+    val backupImport get() = pick("Import a backup", "导入备份")
+    val backupWorking get() = pick("Working…", "进行中…")
+    val backupReady get() = pick("Backup written - share it", "备份已生成——分享它")
+    val backupDone get() = pick("Restored", "已恢复")
+    val backupFailed get() = pick("The duck refused that file", "鸭子没有收下那个文件")
     val compass get() = pick("Home faces north", "家永远朝北")
     val roomLampNote get() = pick(
         "Manual or lux-driven; the duck cannot see it.",

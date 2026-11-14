@@ -3061,6 +3061,19 @@ private fun InstrumentSheet(
     // row says whether the duck is down for the night and how quietly.
     var night by remember { mutableStateOf(NightUi()) }
     // The vet book's three headline numbers, from the same /state.life.
+    // The move-out flow: the SAF picker's verdict lands as a status line.
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+    val backupPicker = rememberLauncherForActivityResult(
+        androidx.activity.compose.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            backupStatus = Copy.backupWorking
+            Thread {
+                val ok = restoreBackup(context, uri)
+                scope.launch { backupStatus = if (ok) Copy.backupDone else Copy.backupFailed }
+            }.start()
+        }
+    }
     var lifeRecord by remember { mutableStateOf(LifeUi()) }
     // What the duck logged while the app was away; remembered across closes
     // by hoisting it to the activity's state via a remembered ref.
@@ -3431,6 +3444,32 @@ private fun InstrumentSheet(
                     compassOn = !compassOn
                     context.getSharedPreferences("duck", Context.MODE_PRIVATE)
                         .edit().putBoolean("duck_compass_on", compassOn).apply()
+                }
+            }
+            // Back up & move: export the core's document, or import one the
+            // person carried here. The route refuses anything without its
+            // version at the door, and the sheet says what the duck said.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.backup, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        backupStatus ?: Copy.backupNote,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 10.sp,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    ButtonChip(Copy.backupExport, "backup-export") {
+                        backupStatus = Copy.backupWorking
+                        exportBackup(context)
+                    }
+                    Spacer(Modifier.size(8.dp))
+                    ButtonChip(Copy.backupImport, "backup-import") { backupPicker = true }
                 }
             }
             // The parent's daily allowance: one chip cycles off -> 15 -> 30
