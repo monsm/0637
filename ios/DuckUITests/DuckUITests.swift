@@ -574,6 +574,47 @@ final class DuckUITests: XCTestCase {
         try assertQuackReachesTheEngine()
     }
 
+    /// The diary's speak channel: the system voice reading the real facts
+    /// aloud, honestly labelled as the phone speaking FOR the duck (not the
+    /// duck's own synth). A fresh install has no facts yet, so the button may
+    /// not exist — the note always does, and a tap that happens must leave
+    /// the sheet alive. The synthesizer itself is device-side; CI only proves
+    /// the wiring.
+    func testDiarySpeakChannelIsHonest() throws {
+        openMore()
+        let diaryRow = app.buttons["more-diary"]
+        XCTAssertTrue(diaryRow.exists, "the drawer has no Diary row")
+        diaryRow.tap()
+        XCTAssertTrue(
+            app.staticTexts["diary-title"].waitForExistence(timeout: 10),
+            "the diary sheet did not open"
+        )
+        XCTAssertTrue(
+            app.staticTexts["diary-speak-note"].waitForExistence(timeout: 10),
+            "the diary never says the system voice speaks for the duck"
+        )
+        let speak = app.buttons["diary-speak"]
+        if speak.exists {
+            // A device with no voices finishes instantly, so whether the
+            // button flipped is device-side and racy — the wiring assertion
+            // is that a tap leaves the sheet alive and the note still honest.
+            speak.tap()
+            usleep(1_000_000)
+            XCTAssertTrue(
+                app.staticTexts["diary-title"].exists,
+                "speaking took the diary sheet down"
+            )
+            XCTAssertTrue(
+                app.staticTexts["diary-speak-note"].exists,
+                "speaking took the honest label away"
+            )
+        }
+        let close = app.buttons["diary-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "the diary has no close button")
+        close.tap()
+        closeMore()
+    }
+
     /// Relaunch with the voice diagnostics open and the given argument-domain
     /// overrides. The overrides keep a persisted mic toggle from an earlier
     /// test out of this one.

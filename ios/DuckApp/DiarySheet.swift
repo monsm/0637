@@ -15,6 +15,24 @@ struct DiarySheet: View {
                     .accessibilityIdentifier("diary-title")
                 Spacer()
                 if !shareText.isEmpty {
+                    // The system voice reading the day aloud. The duck's own
+                    // synth stays the 1:1 channel; this button toggles the
+                    // honest stand-in, labelled as such below.
+                    Button {
+                        if controller.ttsSpeaking {
+                            controller.stopSpeaking()
+                        } else {
+                            controller.speakDiary(shareText)
+                        }
+                    } label: {
+                        Image(systemName: controller.ttsSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 16))
+                            .frame(width: 48, height: 48)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(controller.ttsSpeaking ? Copy.stopSpeaking : Copy.speak)
+                    .accessibilityIdentifier("diary-speak")
                     ShareLink(item: shareText) {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 16))
@@ -84,6 +102,11 @@ struct DiarySheet: View {
                             .font(.system(size: 12, design: .rounded))
                             .foregroundStyle(.secondary)
                     }
+
+                    Text(Copy.speakNote)
+                        .font(.system(size: 11, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("diary-speak-note")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -91,6 +114,11 @@ struct DiarySheet: View {
         .padding(20)
         .preferredColorScheme(.dark)
         .onAppear { controller.loadDiary() }
+        .onDisappear {
+            // The synthesizer outlives the sheet; a duck that keeps reading
+            // the room after the page is gone would be a wrong mouth too.
+            controller.stopSpeaking()
+        }
     }
 
     private var shareText: String {

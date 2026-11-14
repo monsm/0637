@@ -15,6 +15,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +46,25 @@ fun DiarySheet(onClose: () -> Unit) {
     var modelText by remember { mutableStateOf("") }
     var modelError by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(true) }
+    // The system voice reading the day aloud — the honest stand-in, not the
+    // duck's own formant synth. While it speaks the callback drives the same
+    // client intent a robot-side chorus writes (POST /mouth), so the beak
+    // opens on the duck itself and /state shows it to any client watching.
+    // The core keeps the honest overrides: asleep shuts the beak regardless.
+    var ttsSpeaking by remember { mutableStateOf(false) }
+    val speaker = remember {
+        Speaker(context) { speaking ->
+            ttsSpeaking = speaking
+            postDuckCommand("/mouth", if (speaking) """{"open":1.0}""" else """{"open":0.0}""")
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            // The engine outlives the sheet; a duck that keeps reading the
+            // room after the page is gone would be a wrong mouth too.
+            speaker.shutdown()
+        }
+    }
     LaunchedEffect(Unit) {
         val facts = withContext(Dispatchers.IO) {
             val events = fetchLifeEvents()
@@ -121,6 +141,23 @@ fun DiarySheet(onClose: () -> Unit) {
                 )
                 val shareText = if (modelText.isNotEmpty()) modelText else lines.joinToString("\n")
                 if (shareText.isNotEmpty()) {
+                    ButtonChip(
+                        if (ttsSpeaking) Copy.stopSpeaking else Copy.speak,
+                        "diary-speak",
+                    ) {
+                        if (ttsSpeaking) {
+                            speaker.stop()
+                        } else {
+                            // Copy.language is Compose state: read it here, on
+                            // the main thread, and hand the locale down.
+                            val locale = if (Copy.language == Copy.Language.Chinese) {
+                                java.util.Locale.SIMPLIFIED_CHINESE
+                            } else {
+                                java.util.Locale.US
+                            }
+                            speaker.speak(shareText, locale)
+                        }
+                    }
                     ButtonChip(Copy.share, "diary-share") {
                         val send = Intent(Intent.ACTION_SEND)
                             .setType("text/plain")
@@ -175,6 +212,11 @@ fun DiarySheet(onClose: () -> Unit) {
                     fontSize = 12.sp,
                 )
             }
+            Text(
+                Copy.speakNote,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 11.sp,
+            )
         }
     }
 }

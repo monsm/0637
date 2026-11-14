@@ -434,6 +434,17 @@ enum Copy {
     static func diaryGifts(_ n: Int) -> String {
         String(format: pick("%d gift(s) from neighbours", "收到邻居 %d 份礼物"), n)
     }
+    // The speak button on the diary: the system voice reading the real facts
+    // (or the model's paragraph) aloud. Honest about the stand-in: this is
+    // the phone speaking FOR the duck, not the duck's own formant voice.
+    static var speak: String { pick("Let it speak", "让它说") }
+    static var stopSpeaking: String { pick("Stop", "停下") }
+    static var speakNote: String {
+        pick(
+            "The system voice speaks for it — not the duck's own synth.",
+            "系统声音替它说——不是鸭子自己的合成嗓。"
+        )
+    }
     static var rulesEmpty: String {
         pick("No rules yet. Build one: when I clap, roll over.",
              "还没有规则。拼一个：拍手，就翻滚。")

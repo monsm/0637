@@ -96,6 +96,15 @@ fun awayMoods(n: Int) = pick("$n moods", "$n 种心情")
         "在 AI 伙伴里配置接口，就能听鸭子用自己的话讲这一天。",
     )
     fun diaryGifts(n: Int) = pick("$n gift(s) from neighbours", "收到邻居 $n 份礼物")
+    // The speak button on the diary: the system voice reading the real facts
+    // (or the model's paragraph) aloud. Honest about the stand-in: this is
+    // the phone speaking FOR the duck, not the duck's own formant voice.
+    val speak get() = pick("Let it speak", "让它说")
+    val stopSpeaking get() = pick("Stop", "停下")
+    val speakNote get() = pick(
+        "The system voice speaks for it — not the duck's own synth.",
+        "系统声音替它说——不是鸭子自己的合成嗓。",
+    )
 val quack get() = pick("Quack", "叫一声")
     val drive get() = pick("drive", "驱动")
     fun stick(mode: String): String = when (mode) {

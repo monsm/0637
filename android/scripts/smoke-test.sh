@@ -1251,6 +1251,74 @@ PY
 adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
 sleep 1
 
+# The diary's speak channel: the system voice reading the real facts aloud,
+# honestly labelled as the phone speaking FOR the duck (not the duck's own
+# synth). A fresh install has no facts yet, so the button may not exist; the
+# note always does, and a tap that happens must leave the sheet alive. The
+# shell is Chinese here: the language switch ran before the drawer check.
+tap_text "更多" > /dev/null 2>&1 || {
+  echo "::error::the thumb deck lost the More button"
+  exit 1
+}
+DIARY_TAP=0
+for _ in $(seq 1 15); do
+  if tap_text "鸭子日记" > /dev/null 2>&1; then DIARY_TAP=1; break; fi
+  # The diary row sits below the fold on the 320x640 screen.
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
+[ "$DIARY_TAP" = "1" ] || { echo "::error::the drawer never showed the diary row"; exit 1; }
+NOTE_OK=0
+for _ in $(seq 1 20); do
+  sleep 0.3
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  [ -s ui.xml ] || continue
+  if python3 - <<'PY'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = [(node.get('text') or '') + (node.get('content-desc') or '') for node in root.iter('node')]
+raise SystemExit(0 if any('系统声音替它说' in text for text in texts) else 1)
+PY
+  then
+    NOTE_OK=1
+    break
+  fi
+  # The honest note is the sheet's last row: swipe it into view.
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
+[ "$NOTE_OK" = "1" ] || {
+  echo "::error::the diary never says the system voice speaks for the duck"
+  grep -o 'text="[^"]*"' ui.xml 2>/dev/null | sort -u | head -40 || true
+  exit 1
+}
+# A tap that happens must leave the sheet alive; whether speech actually
+# sounds is device-side (the emulator may carry no voices), not a CI claim.
+tap_text "让它说" > /dev/null 2>&1 && sleep 2 || true
+rm -f ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+if [ -s ui.xml ] && python3 - <<'PY'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = [(node.get('text') or '') + (node.get('content-desc') or '') for node in root.iter('node')]
+raise SystemExit(0 if any('系统声音替它说' in text for text in texts) else 1)
+PY
+then
+  echo "diary speak: honest note on screen, sheet alive after the tap"
+else
+  echo "::error::the diary sheet did not survive its speak tap"
+  exit 1
+fi
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+
 # A real wire skill with an underscore: its verdict in the top bar must read
 # human too. This runs after the screenshots so the idle frame stays clean.
 tap_text "技能" > /dev/null 2>&1 || tap_text "Skills" > /dev/null 2>&1 || true

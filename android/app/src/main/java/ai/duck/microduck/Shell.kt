@@ -153,6 +153,17 @@ fun Shell(
     var aiThinking by remember { mutableStateOf(false) }
     var lastAIThink by remember { mutableStateOf(0L) }
     val aiScope = rememberCoroutineScope()
+    // The system voice for the duck's answers (`say`): the same
+    // possession-mode channel the diary reads with, rendering through the
+    // duck's own playback session. The beak follows through /mouth.
+    val speaker = remember(context) {
+        Speaker(context) { speaking ->
+            postDuckCommand(
+                "/mouth",
+                JSONObject().put("open", if (speaking) 1.0 else 0.0).toString(),
+            )
+        }
+    }
     // The one-line pill above the rail: care by default, a room sound, a
     // block or the model's decision for a moment.
     var soundLine by remember { mutableStateOf<String?>(null) }
@@ -176,6 +187,22 @@ fun Shell(
                 val decision = result.first
                 val error = result.second
                 if (decision != null) {
+                    // The duck's answer first: `say` is spoken in the shell's
+                    // language, the body follows the action. The speaker is
+                    // the same possession-mode channel the diary reads with;
+                    // it renders through the duck's own playback session.
+                    if (decision.say.isNotEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            speaker.speak(
+                                decision.say,
+                                if (Copy.language == Copy.Language.Chinese) {
+                                    java.util.Locale.SIMPLIFIED_CHINESE
+                                } else {
+                                    java.util.Locale.US
+                                },
+                            )
+                        }
+                    }
                     aiDecision = executeAIDecision(decision)
                     soundLine = aiDecision
                     aiStatus = if (config.enabled) Copy.aiOn else Copy.aiOff

@@ -31,6 +31,9 @@ struct AIConfig: Codable, Equatable {
 }
 
 /// One validated decision: only the duck's own verbs, never free-form code.
+/// `say` is the one first-person sentence the duck speaks aloud; a reply
+/// with only `say` (no action) is a valid turn — the duck talks without
+/// moving, exactly as a companion does.
 struct AIDecision {
     var action: String
     var value: String = ""
@@ -41,6 +44,7 @@ struct AIDecision {
     var y: Double = 0
     var z: Double = 0.15
     var why: String = ""
+    var say: String = ""
 }
 
 /// Calls the configured model and parses its one-line JSON answer.
@@ -51,11 +55,17 @@ final class AIBrain {
         let extra = persona.trimmingCharacters(in: .whitespacesAndNewlines)
         return """
         You are the brain of MicroDuck, a small two-legged robot duck living in \
-        a phone. You decide one action at a time from the duck's real state.
+        a phone. The person talks to you; answer them and decide one action at \
+        a time from the duck's real state.
         Available skills: \(skills.joined(separator: ", ")).
         Reply with ONE JSON object and nothing else:
         {"action":"skill|sound|sit|stand|stop|look|move","value":"...",\
-        "vx":0,"vz":0,"seconds":1,"x":1,"y":0,"z":0.15,"why":"short reason"}
+        "vx":0,"vz":0,"seconds":1,"x":1,"y":0,"z":0.15,\
+        "say":"one short first-person sentence","why":"short reason"}
+        - "say" is what the duck SAYS aloud, in the person's language, in the \
+        duck's own voice: warm, small-vocabulary, never longer than one \
+        sentence. Always fill "say"; a reply with only "say" (no action) is \
+        fine — the duck talks without moving.
         - skill/sound use value (a skill name above, or chirp/coo/greet/inquire/peck).
         - move uses vx (m/s, -0.6..0.6), vz (rad/s, -1..1) and seconds (0.2..2).
         - look aims the head at x/y/z in the duck's own frame (metres).
@@ -238,16 +248,22 @@ final class AIBrain {
 
     /// The model is asked for bare JSON; models still like fences and prose.
     /// Take the first object and validate every field against the duck's verbs.
+    /// A reply with no action but a `say` sentence is a valid talking turn.
     static func parse(_ text: String) -> AIDecision? {
         guard let start = text.firstIndex(of: "{"),
               let end = text.lastIndex(of: "}"),
               start <= end,
               let data = String(text[start...end]).data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let action = json["action"] as? String
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
         let num = { (key: String, fallback: Double) -> Double in
             (json[key] as? NSNumber)?.doubleValue ?? fallback
+        }
+        let say = (json["say"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let why = json["why"] as? String ?? ""
+        guard let action = json["action"] as? String else {
+            guard !say.isEmpty else { return nil }
+            return AIDecision(action: "talk", say: say, why: why)
         }
         switch action {
         case "skill", "sound":
@@ -255,17 +271,19 @@ final class AIBrain {
             return AIDecision(
                 action: action,
                 value: value,
-                why: json["why"] as? String ?? ""
+                why: why,
+                say: say
             )
         case "sit", "stand", "stop":
-            return AIDecision(action: action, why: json["why"] as? String ?? "")
+            return AIDecision(action: action, why: why, say: say)
         case "look":
             return AIDecision(
                 action: action,
                 x: num("x", 1).clamped(-2, 2),
                 y: num("y", 0).clamped(-2, 2),
                 z: num("z", 0.15).clamped(0, 1.5),
-                why: json["why"] as? String ?? ""
+                why: why,
+                say: say
             )
         case "move":
             return AIDecision(
@@ -273,8 +291,12 @@ final class AIBrain {
                 vx: num("vx", 0).clamped(-0.6, 0.6),
                 vz: num("vz", 0).clamped(-1, 1),
                 seconds: num("seconds", 1).clamped(0.2, 2),
-                why: json["why"] as? String ?? ""
+                why: why,
+                say: say
             )
+        case "talk":
+            guard !say.isEmpty else { return nil }
+            return AIDecision(action: action, say: say, why: why)
         default:
             return nil
         }
