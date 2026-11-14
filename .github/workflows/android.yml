@@ -308,7 +308,8 @@ jobs:
             if git fetch --depth 1 origin "$GITHUB_REF_NAME"; then
               git reset --mixed FETCH_HEAD
             fi
-            git add -f dist/ui-b1-android.png dist/ui-b1-android-zh.png \n              dist/ui-b4-android.png dist/ui-b4-android-more.png
+            git add -f dist/ui-b1-android.png dist/ui-b1-android-zh.png \
+              dist/ui-b4-android.png dist/ui-b4-android-more.png
             git commit -m "ui-b1: Android portrait Live screenshot [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2
