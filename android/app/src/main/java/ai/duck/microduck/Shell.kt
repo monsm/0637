@@ -10,6 +10,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -336,7 +337,6 @@ fun Shell(
             // The night: a chosen sleep, ended by the morning verb or by a
             // real hand. Its end is the active->inactive edge, and the pill
             // uses the quiet the last active publish carried.
-            val nightNow = stateText?.let(::parseNight)
             if (nightNow != null) {
                 if (lastNightActive && !nightNow.active && lastNightQuiet > 0.0) {
                     soundLine = Copy.goodMorningLine((lastNightQuiet / 60.0).roundToInt())
@@ -1772,6 +1772,7 @@ private fun PortraitTitleBar(
  * The portrait time rail (B4 §1): two buttons, icon only. Time opens the
  * time machine and a long press freezes at once; Director is the second.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun PortraitTimeRail(
     core: DuckCore,
