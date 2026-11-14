@@ -434,6 +434,24 @@ if ! echo "$PEERS" | grep -q '"peers"'; then
 fi
 adb emu redir add udp:8766:8766 > /dev/null 2>&1 || true
 
+# Pairing: both sides hold the same six digits before a gift may touch the
+# duck. The handshake has its own script so the greeting check below still
+# reads the hello reply and not our pair answer.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"code":"424242"}' http://127.0.0.1:8765/peers/pair | grep -q '"ok":true' || {
+  echo "::error::the six-digit pairing code was refused"
+  exit 1
+}
+python3 - <<'HERE'
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8799))
+announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+pair = {"v": 1, "type": "pair", "from": "peerci01", "name": "Sunny", "code": "424242"}
+sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.1)
+sock.sendto(json.dumps(pair).encode(), ("127.0.0.1", 8766))
+HERE
+
 # Discovery and a greeting, the same protocol two phones use. The duck must
 # discover Sunny, answer the greet with a hello, and keep the peer.
 PEER_REPLY=$(python3 - <<'PY'
@@ -485,6 +503,14 @@ if [ -z "$APP_PEER_ID" ]; then
   exit 1
 fi
 
+# The official UDP pad is gated by the pair code: it opens here and closes
+# immediately so no listener is left behind for the rest of the smoke.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"on":true}' http://127.0.0.1:8765/pad | grep -q '"ok":true' || {
+  echo "::error::the UDP pad did not open after pairing"
+  exit 1
+}
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"on":false}' http://127.0.0.1:8765/pad > /dev/null || true
+
 # A gift through the real receiver path: the official laugh timeline runs
 # and the vet book keeps the gift. The announce keeps the peer inside its
 # 8 s TTL while the packet lands.
@@ -495,6 +521,10 @@ announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
 gift = {"v": 1, "type": "gift", "from": "peerci01", "name": "Sunny",
         "to": sys.argv[1], "gift": "emotion", "value": "laugh"}
 sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.15)
+sock.sendto(json.dumps({"v": 1, "type": "pair", "from": "peerci01",
+                        "name": "Sunny", "code": "424242"}).encode(),
+            ("127.0.0.1", 8766))
 time.sleep(0.15)
 sock.sendto(json.dumps(gift).encode(), ("127.0.0.1", 8766))
 PY

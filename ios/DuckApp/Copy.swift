@@ -445,6 +445,32 @@ enum Copy {
             "系统声音替它说——不是鸭子自己的合成嗓。"
         )
     }
+    // The palm's heartbeat: the duck's care numbers as a haptic rhythm.
+    // A reading of the real state, not a new fact; off until asked for.
+    static var heart: String { pick("Heartbeat", "手心心跳") }
+    static var formation: String { pick("Dance together", "家庭舞团") }
+    static var roleDance: String { pick("Role dance", "角色编舞") }
+    static var voiceChoir: String { pick("Voice choir", "多鸭合奏") }
+    static var netPad: String { pick("UDP pad (port 4210)", "网控手柄 (4210)") }
+    static var netPadNote: String {
+        pick(
+            "Set the pair code first; the official DKPD pad then drives this duck.",
+            "先设配对码，官方 DKPD 手柄才能开这只鸭。"
+        )
+    }
+    static var pairCode: String { pick("Pair code", "配对码") }
+    static var pairNote: String {
+        pick(
+            "Both phones type the same six digits before gifts or songs.",
+            "两台手机输入同一个 6 位数字，才能互送礼物或一起唱。"
+        )
+    }
+    static var heartRowNote: String {
+        pick(
+            "Feel its heart in your palm — a reading of its mood.",
+            "在手心感受它的心——由心情推出来的读数。"
+        )
+    }
     static var rulesEmpty: String {
         pick("No rules yet. Build one: when I clap, roll over.",
              "还没有规则。拼一个：拍手，就翻滚。")

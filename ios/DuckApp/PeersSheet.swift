@@ -6,6 +6,9 @@ import SwiftUI
 struct PeersSheet: View {
     @ObservedObject var controller: DuckController
     @Environment(\.dismiss) private var dismiss
+    /// The six digits BOTH people typed. Local UI state only: the core
+    /// holds its own copy and refuses anything but six ASCII digits.
+    @State private var pairCode = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -34,6 +37,18 @@ struct PeersSheet: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Copy.close)
                 .accessibilityIdentifier("peers-close")
+            }
+
+            // Pairing: a stranger on the Wi-Fi is visible but cannot send
+            // gifts or start a chorus until both sides typed this code.
+            VStack(alignment: .leading, spacing: 6) {
+                TextField(Copy.pairCode, text: $pairCode)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityIdentifier("peers-pair-code")
+                Text(Copy.pairNote)
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundStyle(.secondary)
             }
 
             if controller.peers.isEmpty {
@@ -67,6 +82,13 @@ struct PeersSheet: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
+                            chip(
+                                peer.paired ? Copy.peerRepliedLabel : Copy.pairCode,
+                                id: "peer-pair-\(index)",
+                                enabled: pairCode.count == 6 && !peer.paired
+                            ) {
+                                controller.pairPeer(code: pairCode, id: peer.id)
+                            }
                             chip(Copy.peerSayHi, id: "peer-greet-\(index)") {
                                 controller.greetPeer(peer.id)
                             }
@@ -100,12 +122,40 @@ struct PeersSheet: View {
                 .accessibilityIdentifier("peer-greet-all")
             }
 
+            HStack(spacing: 8) {
+                chip(Copy.formation, id: "ensemble-formation", enabled: !controller.peers.isEmpty) {
+                    controller.startEnsemble(moves: ["laugh", "yes_fast", "excited", "curious"])
+                }
+                chip(Copy.roleDance, id: "ensemble-roles", enabled: !controller.peers.isEmpty) {
+                    controller.startEnsemble(moves: ["laugh", "yes_fast", "excited", "curious", "sad", "inquire"])
+                }
+                chip(Copy.voiceChoir, id: "ensemble-choir", enabled: !controller.peers.isEmpty) {
+                    controller.startEnsemble(
+                        moves: ["laugh", "curious"],
+                        sounds: ["chirp", "coo", "greet", "inquire"]
+                    )
+                }
+            }
+
             // One song for the whole room: this duck leads and every known
             // neighbour joins. A lone duck has nobody to sing with, so the
             // chip stays visible but disabled rather than disappearing.
             chip(Copy.chorus, id: "chorus-start", enabled: !controller.peers.isEmpty) {
                 controller.startChorus()
             }
+
+            // The official UDP pad, OFF until the pair code gates it.
+            Toggle(isOn: Binding(
+                get: { controller.netPadOn },
+                set: { controller.setNetPad(on: $0) }
+            )) {
+                Text(Copy.netPad)
+                    .font(.system(size: 12, design: .rounded))
+            }
+            .accessibilityIdentifier("peers-netpad")
+            Text(Copy.netPadNote)
+                .font(.system(size: 10, design: .rounded))
+                .foregroundStyle(.secondary)
 
             Text(Copy.voiceNote)
                 .font(.system(size: 10, design: .rounded))

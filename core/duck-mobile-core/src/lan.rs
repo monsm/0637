@@ -12,9 +12,11 @@
 //! moves on the same beat.
 //!
 //! The protocol is deliberately tiny and cannot command anything: the only
-//! verbs are announce, greet, hello, gift and chorus. A greeting, a gift or a
-//! chorus reaches the duck as one of its own reactions, never as a control
-//! input or an observation.
+//! verbs are announce, greet, hello, pair, gift and chorus. A greeting, a
+//! gift or a chorus reaches the duck as one of its own reactions, never as
+//! a control input or an observation. A gift or a chorus only counts from a
+//! PAIRED duck: both people typed the same six-digit code, so a stranger
+//! broadcasting on the Wi-Fi is visible but cannot touch the duck.
 
 use serde_json::{json, Value};
 use std::net::{SocketAddr, UdpSocket};
@@ -80,6 +82,19 @@ pub enum PeerEvent {
         id: String,
         moves: Vec<String>,
     },
+    /// A room-wide ensemble: the lead authored a short score of official
+    /// moves (and optional voice tags), addressed by role. Every duck plays
+    /// ITS OWN part through its own runtime — the packet carries no pose,
+    /// no joint command and no control verb.
+    Ensemble {
+        from: String,
+        name: String,
+        id: String,
+        role: usize,
+        roles: usize,
+        moves: Vec<String>,
+        sounds: Vec<String>,
+    },
 }
 
 struct Peer {
@@ -99,6 +114,12 @@ struct Peer {
     last_sent_gift_ms: u128,
     /// The last chorus we accepted from this duck: one per ten seconds.
     last_chorus_ms: u128,
+    /// The last ensemble we joined from this duck: one per ten seconds too.
+    last_ensemble_ms: u128,
+    /// Both people typed the same six-digit code for this duck. Gifts and
+    /// choruses are refused until it is true; a peer can still be seen and
+    /// greeted, which is what "visible but not trusted" means.
+    paired: bool,
 }
 
 struct Inner {
@@ -110,6 +131,9 @@ struct Inner {
     /// name that is not on the list is refused at the wire, so a junk packet
     /// spends neither the window nor a place in the event queue.
     emotions: Vec<String>,
+    /// The six digits this person typed; None until the pairing row is used.
+    /// Both sides must have set the same code for a pair to complete.
+    pair_code: Option<String>,
 }
 
 /// The shared half: the listener thread and the shell both use it.
@@ -136,6 +160,7 @@ impl Lan {
             // Empty until duck_core_load_emotions publishes the official
             // list; an emotion gift before then is simply refused.
             emotions: Vec::new(),
+            pair_code: None,
         }));
         let socket = Arc::new(socket);
         let listener_socket = socket.clone();
@@ -145,6 +170,54 @@ impl Lan {
             .spawn(move || listen(listener_socket, listener_inner))
             .ok()?;
         Some(Lan { inner, socket })
+    }
+
+    /// Both people typed the same six digits. Setting a code does NOT pair
+    /// anybody: the peer still has to send the same code in a `pair` packet,
+    /// and this duck answers with its own. Invalid or empty codes clear it.
+    pub fn set_pair_code(&self, code: &str) -> bool {
+        let code = code.trim();
+        let held = if valid_code(code) { Some(code.to_owned()) } else { None };
+        let ok = held.is_some() || code.is_empty();
+        if let Ok(mut inner) = self.inner.lock() {
+            inner.pair_code = held.clone();
+            if !ok || code.is_empty() {
+                for peer in inner.peers.iter_mut() {
+                    peer.paired = false;
+                }
+            }
+        }
+        ok
+    }
+
+    /// Whether this person has set a six-digit pairing code. The UDP pad
+    /// uses it as its gate: no code, no unauthenticated control channel.
+    pub fn pair_code_set(&self) -> bool {
+        self.inner.lock().is_ok_and(|inner| inner.pair_code.is_some())
+    }
+
+    /// Ask one visible duck to pair. Unicast, like a gift; the answer marks
+    /// both sides. An unknown peer or a duck we have no code for is refused
+    /// before anything leaves the socket.
+    pub fn pair(&self, target: &str) -> Result<(), String> {
+        let mut inner = self.inner.lock().map_err(|_| "the peer table is busy".to_owned())?;
+        let Some(code) = inner.pair_code.clone() else {
+            return Err("set a six-digit pairing code first".to_owned());
+        };
+        let Some(peer) = inner.peers.iter().find(|peer| peer.id == target) else {
+            return Err("no such peer".to_owned());
+        };
+        let message = json!({
+            "v": VERSION,
+            "type": "pair",
+            "from": inner.id,
+            "name": inner.name,
+            "code": code,
+        });
+        self.socket
+            .send_to(message.to_string().as_bytes(), peer.addr)
+            .map(|_| ())
+            .map_err(|error| error.to_string())
     }
 
     pub fn set_name(&self, name: &str) {
@@ -286,6 +359,41 @@ impl Lan {
             .is_some_and(|peer| now.saturating_sub(peer.last_sent_gift_ms) >= GIFT_EVERY_MS)
     }
 
+    /// Lead a room-wide ensemble: one broadcast packet per role, so every
+    /// duck plays its own part. The shell passes one `score` of official
+    /// names; the core assigns roles by the order of the paired peers.
+    pub fn ensemble(&self, id: &str, moves: &[String], sounds: &[String]) -> Result<usize, String> {
+        let inner = self.inner.lock().map_err(|_| "the peer table is busy".to_owned())?;
+        let now = now_ms();
+        let roles: Vec<&Peer> = inner
+            .peers
+            .iter()
+            .filter(|peer| peer.paired && now.saturating_sub(peer.last_seen_ms) <= PEER_TTL_MS)
+            .collect();
+        if roles.is_empty() {
+            return Err("no paired neighbours".to_owned());
+        }
+        let count = roles.len();
+        for (role, peer) in roles.iter().enumerate() {
+            let message = json!({
+                "v": VERSION,
+                "type": "ensemble",
+                "from": inner.id,
+                "name": inner.name,
+                "to": "all",
+                "id": id,
+                "role": role,
+                "roles": count,
+                "moves": moves,
+                "sounds": sounds,
+            });
+            self.socket
+                .send_to(message.to_string().as_bytes(), peer.addr)
+                .map_err(|error| error.to_string())?;
+        }
+        Ok(count)
+    }
+
     /// The room size right now: peers inside the TTL. The chorus publishes
     /// this as its honest "singing with N ducks".
     pub fn peer_count(&self) -> u32 {
@@ -320,11 +428,18 @@ impl Lan {
                     "name": peer.name,
                     "addr": peer.addr.to_string(),
                     "replied": peer.replied,
+                    "paired": peer.paired,
                     "last_seen_ms": peer.last_seen_ms as u64,
                 })
             })
             .collect();
-        json!({ "id": inner.id, "name": inner.name, "port": PORT, "peers": peers })
+        json!({
+            "id": inner.id,
+            "name": inner.name,
+            "port": PORT,
+            "pair_code_set": inner.pair_code.is_some(),
+            "peers": peers,
+        })
     }
 
     pub fn take_events(&self) -> Vec<PeerEvent> {
@@ -396,7 +511,7 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
     let kind = message.get("type").and_then(Value::as_str)?;
     // Only the five real verbs may touch the peer table: any other type is
     // noise, and noise must not create peers or evict the ducks we know.
-    if !matches!(kind, "announce" | "greet" | "hello" | "gift" | "chorus") {
+    if !matches!(kind, "announce" | "greet" | "hello" | "pair" | "gift" | "chorus" | "ensemble") {
         return None;
     }
     let from = message
@@ -472,6 +587,52 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             }
             None
         }
+        "pair" => {
+            // A pair is a handshake, not a discovery: the peer must already
+            // be visible (announce did that) and BOTH sides must hold the
+            // same six digits. A forged code from one side can never make
+            // this duck paired — the code is compared with our own.
+            let offered = message
+                .get("code")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let Some(ours) = inner.pair_code.as_deref() else {
+                return None;
+            };
+            if !valid_code(offered) || offered != ours {
+                return None;
+            }
+            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            if to.is_empty() || to == inner.id {
+                // A request with no "to" (or addressed to us) is the first
+                // half: mark them paired and answer with our own code so the
+                // sender can mark us too. A packet WITH a "to" is already
+                // the answer — mark, but never answer an answer.
+                let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) else {
+                    return None;
+                };
+                peer.paired = true;
+                peer.last_seen_ms = now;
+                if to.is_empty() {
+                    Some(
+                        json!({
+                            "v": VERSION,
+                            "type": "pair",
+                            "from": inner.id,
+                            "name": inner.name,
+                            "to": from,
+                            "code": ours,
+                        })
+                        .to_string(),
+                    )
+                } else {
+                    None
+                }
+            } else {
+                // Addressed to somebody else: noise.
+                None
+            }
+        }
         "gift" => {
             // A gift is not a discovery: only a duck already in the table may
             // send one, so announce/greet remain the only verbs that create
@@ -501,6 +662,11 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) else {
                 return None;
             };
+            // A visible stranger is not a trusted neighbour: gifts only
+            // after both sides typed the same pairing code.
+            if !peer.paired {
+                return None;
+            }
             // One gift per peer per three seconds; extra packets inside the
             // window are dropped silently, exactly like a greet flood.
             if now.saturating_sub(peer.last_gift_ms) < GIFT_EVERY_MS {
@@ -556,6 +722,9 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) else {
                 return None;
             };
+            if !peer.paired {
+                return None;
+            }
             // One chorus per duck per ten seconds: a bouncing packet must not
             // become a bouncing song.
             if now.saturating_sub(peer.last_chorus_ms) < CHORUS_EVERY_MS {
@@ -568,6 +737,64 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
                 name,
                 id,
                 moves,
+            });
+            if inner.events.len() > 32 {
+                inner.events.remove(0);
+            }
+            None
+        }
+        "ensemble" => {
+            // Same trust rule as a chorus: only a PAIRED duck may lead a
+            // room-wide performance, and every move/sound must name an
+            // official mood or the duck's own sound tag.
+            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            if to != "all" && to != inner.id {
+                return None;
+            }
+            let id = message.get("id").and_then(Value::as_str).unwrap_or_default().to_owned();
+            if id.is_empty() {
+                return None;
+            }
+            let role = message.get("role").and_then(Value::as_u64).unwrap_or(0) as usize;
+            let roles = message.get("roles").and_then(Value::as_u64).unwrap_or(1) as usize;
+            if roles == 0 || roles > 8 || role >= roles {
+                return None;
+            }
+            let moves: Vec<String> = message
+                .get("moves")
+                .and_then(Value::as_array)
+                .map(|rows| rows.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .unwrap_or_default();
+            let sounds: Vec<String> = message
+                .get("sounds")
+                .and_then(Value::as_array)
+                .map(|rows| rows.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .unwrap_or_default();
+            // A whole dance is up to 8 beats, unlike the chorus's 1..=3.
+            if moves.is_empty() && sounds.is_empty()
+                || moves.len() > 8
+                || sounds.len() > 8
+                || !moves.iter().all(|m| inner.emotions.iter().any(|n| n == m))
+                || !sounds.iter().all(|s| crate::voice::TAGS.contains(&s.as_str()))
+            {
+                return None;
+            }
+            let Some(peer) = inner.peers.iter_mut().find(|peer| peer.id == from) else {
+                return None;
+            };
+            if !peer.paired || now.saturating_sub(peer.last_ensemble_ms) < CHORUS_EVERY_MS {
+                return None;
+            }
+            peer.last_ensemble_ms = now;
+            peer.last_seen_ms = now;
+            inner.events.push(PeerEvent::Ensemble {
+                from: from.to_owned(),
+                name,
+                id,
+                role,
+                roles,
+                moves,
+                sounds,
             });
             if inner.events.len() > 32 {
                 inner.events.remove(0);
@@ -607,7 +834,15 @@ fn upsert(inner: &mut Inner, id: &str, name: &str, source: SocketAddr, now: u128
         last_gift_ms: 0,
         last_sent_gift_ms: 0,
         last_chorus_ms: 0,
+        last_ensemble_ms: 0,
+        paired: false,
     });
+}
+
+/// Exactly six ASCII digits, nothing else: a code is a human pairing word,
+/// not a secret, and no control characters ride in.
+fn valid_code(code: &str) -> bool {
+    code.len() == 6 && code.bytes().all(|b| b.is_ascii_digit())
 }
 
 fn clean_name(name: &str) -> String {
@@ -648,7 +883,109 @@ mod tests {
             peers: Vec::new(),
             events: Vec::new(),
             emotions: vec!["laugh".to_owned(), "excited".to_owned()],
+            pair_code: None,
         }
+    }
+
+    /// A visible neighbour, announced but NOT paired.
+    fn with_peer(duck: &mut Inner) {
+        ingest(
+            duck,
+            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
+            source(8767),
+            1000,
+        );
+    }
+
+    #[test]
+    fn an_ensemble_needs_a_paired_peer_and_official_names() {
+        let mut duck = inner();
+        with_peer(&mut duck);
+        let packet = json!({
+            "v": 1, "type": "ensemble", "from": "peer01", "name": "Sunny",
+            "to": "all", "id": "dance1", "role": 0, "roles": 2,
+            "moves": ["laugh"], "sounds": ["chirp"],
+        });
+        ingest(&mut duck, &packet, source(8767), 1200);
+        assert!(duck.events.is_empty(), "an unpaired duck led a dance");
+        duck.peers[0].paired = true;
+        ingest(&mut duck, &packet, source(8767), 1200);
+        assert!(matches!(duck.events.last(), Some(PeerEvent::Ensemble { role: 0, .. })));
+    }
+
+    #[test]
+    fn a_visible_stranger_cannot_gift_or_start_a_chorus() {
+        let mut duck = inner();
+        with_peer(&mut duck);
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny",
+                     "to": "self0001", "gift": "treat", "value": "" }),
+            source(8767),
+            1200,
+        );
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny",
+                     "to": "all", "id": "song1", "moves": ["laugh"] }),
+            source(8767),
+            1300,
+        );
+        assert!(duck.events.is_empty(), "an unpaired duck touched ours");
+        assert!(!duck.peers[0].paired);
+    }
+
+    #[test]
+    fn a_wrong_pair_code_changes_nothing() {
+        let mut duck = inner();
+        with_peer(&mut duck);
+        duck.pair_code = Some("123456".to_owned());
+        let reply = ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "pair", "from": "peer01", "name": "Sunny", "code": "654321" }),
+            source(8767),
+            1100,
+        );
+        assert!(reply.is_none());
+        assert!(!duck.peers[0].paired);
+        assert!(!valid_code("12345") && !valid_code("1234567") && !valid_code("12x456"));
+    }
+
+    #[test]
+    fn the_same_code_on_both_sides_pairs_and_answers() {
+        let mut duck = inner();
+        with_peer(&mut duck);
+        duck.pair_code = Some("123456".to_owned());
+        let reply = ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "pair", "from": "peer01", "name": "Sunny", "code": "123456" }),
+            source(8767),
+            1100,
+        );
+        let reply: Value = serde_json::from_str(&reply.expect("a pair request is answered")).unwrap();
+        assert_eq!(reply["type"], "pair");
+        assert_eq!(reply["to"], "peer01");
+        assert_eq!(reply["code"], "123456");
+        assert!(duck.peers[0].paired);
+        // The answer (with a "to") marks the sender's side but never answers
+        // an answer — otherwise two ducks would bounce forever.
+        let back = ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "pair", "from": "peer01", "name": "Sunny",
+                     "to": "self0001", "code": "123456" }),
+            source(8767),
+            1200,
+        );
+        assert!(back.is_none());
+        // Paired now: a real gift lands, once per three seconds.
+        ingest(
+            &mut duck,
+            &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny",
+                     "to": "self0001", "gift": "treat", "value": "" }),
+            source(8767),
+            1300,
+        );
+        assert!(matches!(duck.events.last(), Some(PeerEvent::Gift { .. })));
     }
 
     fn source(port: u16) -> SocketAddr {
@@ -1008,6 +1345,8 @@ mod tests {
             last_gift_ms: 0,
             last_sent_gift_ms: 0,
             last_chorus_ms: 0,
+            last_ensemble_ms: 0,
+            paired: true,
         };
         let lan = Lan {
             inner: Arc::new(Mutex::new(Inner {
@@ -1016,6 +1355,7 @@ mod tests {
                 peers: vec![peer],
                 events: Vec::new(),
                 emotions: vec!["laugh".to_owned()],
+                pair_code: None,
             })),
             socket: Arc::new(socket),
         };

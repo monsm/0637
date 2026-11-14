@@ -281,6 +281,11 @@ struct ChorusTask {
     next_move: usize,
     /// The honest room size at the moment the chorus started.
     peers: u32,
+    /// Sound tags interleaved with the moves: one beat may be a voice instead
+    /// of a mood. Empty for the classic chorus.
+    sounds: Vec<String>,
+    /// The vet book note this performance writes when it finishes.
+    note: &'static str,
 }
 
 impl ChorusTask {
@@ -291,6 +296,7 @@ impl ChorusTask {
             "moves": self.moves,
             "started_tick": self.start_tick as u32,
             "peers": self.peers,
+            "sounds": self.sounds,
         })
     }
 }
@@ -1511,6 +1517,53 @@ impl<T: RobotIo> DuckRuntime<T> {
             start_tick: self.clock.tick.saturating_add(CHORUS_START_TICKS),
             next_move: 0,
             peers,
+            sounds: Vec::new(),
+            note: "chorus",
+        });
+    }
+
+    /// Start a room-wide ensemble. The score is a sequence of official mood
+    /// names and sound tags; `role`/`roles` split it into parts so each duck
+    /// plays ITS OWN beat (a role dance, a formation, or a voice choir).
+    /// Every beat is still performed by this duck's own runtime — the wire
+    /// never carries a pose or a control verb.
+    #[allow(clippy::too_many_arguments)]
+    pub fn start_ensemble(
+        &mut self,
+        role: &'static str,
+        role_index: usize,
+        roles: usize,
+        moves: Vec<String>,
+        sounds: Vec<String>,
+        peers: u32,
+        id: Option<String>,
+    ) {
+        if id.as_deref().is_some_and(|id| self.last_chorus_id.as_deref() == Some(id)) {
+            return;
+        }
+        self.last_chorus_id = id;
+        // Each role takes the beat whose index matches it; with more beats
+        // than roles the part grows, with fewer it is an honest rest.
+        let parts: Vec<String> = moves
+            .iter()
+            .enumerate()
+            .filter(|(beat, _)| roles == 0 || beat % roles.max(1) == role_index)
+            .map(|(_, name)| name.clone())
+            .collect();
+        let voices: Vec<String> = sounds
+            .iter()
+            .enumerate()
+            .filter(|(beat, _)| roles == 0 || beat % roles.max(1) == role_index)
+            .map(|(_, tag)| tag.clone())
+            .collect();
+        self.chorus = Some(ChorusTask {
+            role,
+            moves: parts,
+            start_tick: self.clock.tick.saturating_add(CHORUS_START_TICKS),
+            next_move: 0,
+            peers,
+            sounds: voices,
+            note: "ensemble",
         });
     }
 
@@ -1731,6 +1784,21 @@ impl<T: RobotIo> DuckRuntime<T> {
             "sound" => {
                 if crate::voice::TAGS.contains(&value) {
                     self.queue_sound(value);
+                    true
+                } else {
+                    false
+                }
+            }
+            // The flashlight as a step: the same virtual LED the drawer row
+            // and robot.flashlight toggle, named "off" or one of the seven
+            // official colours. It is the duck's own lamp — robotd owns it —
+            // so a choreography or a rule may light it between moves.
+            "light" => {
+                if value == "off" {
+                    self.set_flashlight(false, false, "white");
+                    true
+                } else if crate::leds::COLORS.contains(&value) {
+                    self.set_flashlight(false, true, value);
                     true
                 } else {
                     false
@@ -2849,15 +2917,29 @@ impl<T: RobotIo> DuckRuntime<T> {
         // by a busy skill is skipped — the song degrades, it does not stall —
         // and the last move closes the chorus with its honest note.
         let mut due_moves: Vec<String> = Vec::new();
+        let mut due_sounds: Vec<String> = Vec::new();
+        let mut beat_count = 0usize;
         if let Some(task) = self.chorus.as_mut() {
-            while task.next_move < task.moves.len()
+            beat_count = task.moves.len().max(task.sounds.len());
+            while task.next_move < beat_count
                 && self.clock.tick
                     >= task
                         .start_tick
                         .saturating_add(task.next_move as u64 * CHORUS_MOVE_TICKS)
             {
-                due_moves.push(task.moves[task.next_move].clone());
+                if let Some(name) = task.moves.get(task.next_move) {
+                    due_moves.push(name.clone());
+                }
+                if let Some(tag) = task.sounds.get(task.next_move) {
+                    due_sounds.push(tag.clone());
+                }
                 task.next_move += 1;
+            }
+        }
+        for tag in due_sounds {
+            // A voice is the duck's OWN formant synth, never a system TTS.
+            if crate::voice::TAGS.contains(&tag.as_str()) {
+                self.queue_sound(&tag);
             }
         }
         for move_name in due_moves {
@@ -2865,16 +2947,19 @@ impl<T: RobotIo> DuckRuntime<T> {
             // it must not end a night or reset a neglect timer.
             let _ = self.celebrate_emotion(&move_name);
         }
-        if self.chorus.as_ref().is_some_and(|task| {
-            !task.moves.is_empty()
-                && task.next_move >= task.moves.len()
+        let finished = self.chorus.as_ref().is_some_and(|task| {
+            let beats = task.moves.len().max(task.sounds.len());
+            beats > 0
+                && task.next_move >= beats
                 && self.clock.tick
                     >= task
                         .start_tick
-                        .saturating_add((task.moves.len() as u64 - 1) * CHORUS_MOVE_TICKS)
-        }) {
+                        .saturating_add((beats as u64 - 1) * CHORUS_MOVE_TICKS)
+        });
+        if finished {
+            let note = self.chorus.as_ref().map_or("chorus", |task| task.note);
             self.chorus = None;
-            self.book.note("chorus".to_owned());
+            self.book.note(note.to_owned());
         }
         self.room_loud = false;
         self.last_loud = loud;

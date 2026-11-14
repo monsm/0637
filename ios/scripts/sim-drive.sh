@@ -518,6 +518,11 @@ api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_
 # we say hi back. This is the same protocol two phones use.
 echo "--- neighbours ---"
 LAN=$(api POST /peers/start '{"name":"CI Duck"}' || true)
+# The neighbour channel is paired: both sides hold the same six digits
+# before a gift or a chorus is allowed to touch our duck.
+PAIR=$(api POST /peers/pair '{"code":"424242"}' || true)
+printf '%s' "$PAIR" | grep -q '"ok":true'
+check $? "the six-digit pairing code is set" "$(printf '%s' "$PAIR" | head -c 120)"
 printf '%s' "$LAN" | grep -q '"ok":true'
 check $? "the duck opens its LAN socket" "$(printf '%s' "$LAN" | head -c 140)"
 # Starting discovery is queued; wait until /peers publishes our name before
@@ -532,8 +537,11 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("127.0.0.1", 8799))
 sock.settimeout(3.0)
 announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+pair = {"v": 1, "type": "pair", "from": "peerci01", "name": "Sunny", "code": "424242"}
 greet = {"v": 1, "type": "greet", "from": "peerci01", "name": "Sunny", "to": "all"}
 sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.05)
+sock.sendto(json.dumps(pair).encode(), ("127.0.0.1", 8766))
 time.sleep(0.15)
 sock.sendto(json.dumps(greet).encode(), ("127.0.0.1", 8766))
 try:
@@ -576,12 +584,15 @@ sock.bind(("127.0.0.1", 8799))
 # announcing while we wait.
 deadline = time.time() + 55.0
 announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+pair = {"v": 1, "type": "pair", "from": "peerci01", "name": "Sunny", "code": "424242"}
 next_announce = 0.0
 result = "timeout"
 while time.time() < deadline:
     now = time.time()
     if now >= next_announce:
         sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.05)
+sock.sendto(json.dumps(pair).encode(), ("127.0.0.1", 8766))
         next_announce = now + 5.0
     sock.settimeout(max(0.1, min(1.0, deadline - now)))
     try:
@@ -633,6 +644,11 @@ done
 [ "$FIRED" = "True replied" ]; check $? "the other duck's answer is recorded" "state=$FIRED"
 rm -f /tmp/duck-peer-ack.txt
 
+PAD=$(api POST /pad '{"on":true}' || true)
+printf '%s' "$PAD" | grep -q '"ok":true'
+check $? "the official UDP pad opens after a pair code" "$(printf '%s' "$PAD" | head -c 120)"
+api POST /pad '{"on":false}' > /dev/null || true
+
 # A chorus led by the neighbour: the packet names one official mood, this
 # duck joins the same song, plays it out and keeps the vet book note. The
 # announce travels on the socket that sends the chorus, the way the gift
@@ -643,9 +659,12 @@ import json, socket, time
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("127.0.0.1", 8799))
 announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
+pair = {"v": 1, "type": "pair", "from": "peerci01", "name": "Sunny", "code": "424242"}
 chorus = {"v": 1, "type": "chorus", "from": "peerci01", "name": "Sunny",
           "to": "all", "id": "ci-chorus-join", "moves": ["laugh"]}
 sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
+time.sleep(0.05)
+sock.sendto(json.dumps(pair).encode(), ("127.0.0.1", 8766))
 time.sleep(0.15)
 sock.sendto(json.dumps(chorus).encode(), ("127.0.0.1", 8766))
 PY
@@ -700,6 +719,15 @@ done
 check $? "the joined chorus finishes and the vet book notes it" "state=$CHORUS_DONE note=$CHORUS_NOTE"
 # This duck leads: an unknown mood is refused before anything is queued or
 # broadcast; a real one queues and /state says who leads.
+# The room-wide ensemble: an invented mood is refused at the route, and a
+# plain all-moves score is refused when nobody is paired to dance with.
+ENS_BAD=$(api POST /ensemble '{"moves":["not_a_mood"],"sounds":[]}' || true)
+printf '%s' "$ENS_BAD" | grep -q '"ok":false'
+check $? "an ensemble rejects an invented mood" "$(printf '%s' "$ENS_BAD" | head -c 120)"
+ENS_EMPTY=$(api POST /ensemble '{"moves":[],"sounds":[]}' || true)
+printf '%s' "$ENS_EMPTY" | grep -q '"ok":false'
+check $? "an ensemble needs a real beat" "$(printf '%s' "$ENS_EMPTY" | head -c 120)"
+
 CHORUS_BAD=$(api POST /chorus '{"moves":["not_a_mood"]}' || true)
 printf '%s' "$CHORUS_BAD" | grep -q '"ok":false'
 check $? "an unknown chorus move is refused" "$(printf '%s' "$CHORUS_BAD" | head -c 120)"
@@ -791,6 +819,16 @@ c=json.load(sys.stdin).get('care') or {}
 sys.exit(0 if c.get('hunger',1) < 0.15 and c.get('bond',0) > 0.1 and 'mood' in c else 1)
 " 2>/dev/null
 check $? "a treat fills the tummy and a stroke warms the bond" ""
+
+# The palm's heartbeat: a pure reading of the care numbers, published in the
+# same summary. It must be a plausible bpm and never stored by restore.
+printf '%s' "$CARE" | python3 -c "
+import json,sys
+c=json.load(sys.stdin).get('care') or {}
+bpm=c.get('heart_bpm')
+sys.exit(0 if isinstance(bpm,(int,float)) and 40<=bpm<=120 else 1)
+" 2>/dev/null
+check $? "care publishes the palm's heart reading" ""
 
 CARE_TICK=$(api GET /state | python3 -c "
 import json,sys

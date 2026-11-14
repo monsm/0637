@@ -1,205 +1,105 @@
-       Using cargo-ndk v4.1.2
-    Detected NDK v27.3.13750724 (/usr/local/lib/android/sdk/ndk/27.3.13750724) [ANDROID_NDK_HOME]
-   Exporting CARGO_NDK_OUTPUT_PATH="/home/runner/work/0637/0637/android/app/src/main/jniLibs"
-     Setting Android SDK platform level to 29
-    Building targets (x86_64)
     Building x86_64 (x86_64-linux-android)
-       Fresh unicode-ident v1.0.27
-       Fresh proc-macro2 v1.0.107
-       Fresh autocfg v1.5.1
-       Fresh quote v1.0.47
-       Fresh serde_core v1.0.229
-       Fresh memchr v2.8.3
-       Fresh syn v2.0.119
-       Fresh syn v3.0.9
-       Fresh cfg-if v1.0.5
-       Fresh typenum v1.20.1
-       Fresh zmij v1.0.23
-       Fresh hybrid-array v0.4.15
-       Fresh thiserror-impl v2.0.21
-       Fresh serde_derive v1.0.229
-       Fresh num-traits v0.2.19
-       Fresh itoa v1.0.18
-       Fresh thiserror v2.0.21
-       Fresh serde v1.0.229
-       Fresh serde_json v1.0.154
-       Fresh libc v0.2.191
-       Fresh semver v1.0.28
-       Fresh rawpointer v0.2.1
-       Fresh once_cell v1.21.4
-       Fresh winnow v1.0.5
-       Fresh toml_parser v1.1.5+spec-1.1.0
-       Fresh tracing-core v0.1.36
-       Fresh matrixmultiply v0.3.11
-       Dirty duck-ipc-proto v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/duck-ipc-proto): the file `/home/runner/work/0637/0637/upstream/microduck/duck-ipc-proto/src/lib.rs` has changed (1794646188.268716249s, 42h 46m 11s after last build at 1794492217.626189391s)
+   Compiling serde_core v1.0.229
+   Compiling memchr v2.8.3
+   Compiling num-traits v0.2.19
+   Compiling cfg-if v1.0.5
+   Compiling typenum v1.20.1
+   Compiling hybrid-array v0.4.15
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.154
+   Compiling thiserror v2.0.21
+   Compiling libc v0.2.191
+   Compiling serde v1.0.229
+   Compiling matrixmultiply v0.3.11
+   Compiling rawpointer v0.2.1
+   Compiling once_cell v1.21.4
+   Compiling itoa v1.0.18
+   Compiling winnow v1.0.5
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling tracing-core v0.1.36
+   Compiling toml_parser v1.1.5+spec-1.1.0
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling semver v1.0.28
+   Compiling ort-sys v2.0.0-rc.11
+   Compiling num-integer v0.1.47
+   Compiling num-complex v0.4.6
+   Compiling winnow v0.7.15
+   Compiling const-oid v0.10.2
+   Compiling toml_writer v1.2.0+spec-1.1.0
+   Compiling pin-project-lite v0.2.17
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.3
+   Compiling jni-sys v0.3.1
+   Compiling tracing v0.1.44
+   Compiling indexmap v2.14.2
+   Compiling thiserror v1.0.69
+   Compiling digest v0.11.3
+   Compiling ndarray v0.17.2
+   Compiling jni-sys v0.4.1
    Compiling duck-ipc-proto v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/duck-ipc-proto)
-       Fresh num-integer v0.1.47
-       Fresh num-complex v0.4.6
-       Fresh crypto-common v0.2.2
-       Fresh block-buffer v0.12.1
-       Fresh jni-sys-macros v0.4.1
-       Fresh tracing-attributes v0.1.31
-       Fresh toml_datetime v0.7.5+spec-1.1.0
-       Fresh roxmltree v0.21.2
-       Fresh winnow v0.7.15
-       Fresh find-msvc-tools v0.1.15
-       Fresh hashbrown v0.17.1
-       Fresh shlex v2.0.1
-       Fresh equivalent v1.0.3
-       Fresh const-oid v0.10.2
-       Fresh pin-project-lite v0.2.17
-       Fresh toml_writer v1.2.0+spec-1.1.0
-       Fresh tracing v0.1.44
-       Fresh cc v1.11.1
-       Fresh digest v0.11.3
-       Fresh indexmap v2.14.2
-       Dirty kinematics v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/kinematics): the file `/home/runner/work/0637/0637/upstream/microduck/kinematics/src/head.rs` has changed (1794646188.155409506s, 42h 46m 11s after last build at 1794492217.622189414s)
+   Compiling serde_spanned v1.1.3
+   Compiling roxmltree v0.21.2
+   Compiling libloading v0.9.0
+   Compiling bytes v1.12.1
+   Compiling smallvec v1.16.5
+   Compiling cpufeatures v0.3.1
+   Compiling sha2 v0.11.1
+   Compiling combine v4.6.9
    Compiling kinematics v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/kinematics)
-       Fresh jni-sys v0.4.1
-       Fresh ndarray v0.17.2
-       Fresh ort-sys v2.0.0-rc.11
-       Fresh libloading v0.9.0
-       Fresh thiserror-impl v1.0.69
-       Fresh serde_spanned v1.1.3
-       Fresh bytes v1.12.1
-       Fresh smallvec v1.16.5
-       Fresh cpufeatures v0.3.1
-       Fresh combine v4.6.9
-       Fresh sha2 v0.11.1
-       Fresh ort v2.0.0-rc.11
-       Fresh thiserror v1.0.69
-       Fresh toml v0.9.12+spec-1.1.0
-       Fresh jni-sys v0.3.1
-       Fresh toml_edit v0.23.10+spec-1.0.0
-       Fresh libloading v0.8.9
-     Running `/home/runner/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name kinematics --edition=2024 /home/runner/work/0637/0637/upstream/microduck/kinematics/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=7a9778ac83f21a07 -C extra-filename=-4eaebfa2f66f7615 --out-dir /home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps --target x86_64-linux-android -C linker=/home/runner/.cargo/bin/cargo-ndk -C strip=debuginfo -L dependency=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps -L dependency=/home/runner/work/0637/0637/core/target/release/deps --extern roxmltree=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libroxmltree-433ceb8f46388835.rmeta --extern thiserror=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libthiserror-ff1d87cf946346f2.rmeta -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-arm64-v8a.map -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-x86_64.map`
-       Fresh log v0.4.35
-       Fresh cesu8 v1.1.0
-       Fresh jni v0.21.1
-   Compiling duck-mobile-core v0.1.0 (/home/runner/work/0637/0637/core/duck-mobile-core)
-     Running `/home/runner/work/0637/0637/core/target/release/build/duck-mobile-core-665b6f66ab84b066/build-script-build`
-     Running `/home/runner/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name duck_ipc_proto --edition=2024 /home/runner/work/0637/0637/upstream/microduck/duck-ipc-proto/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("test-support"))' -C metadata=26b14a5c9f114f59 -C extra-filename=-81eaa763b092ad74 --out-dir /home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps --target x86_64-linux-android -C linker=/home/runner/.cargo/bin/cargo-ndk -C strip=debuginfo -L dependency=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps -L dependency=/home/runner/work/0637/0637/core/target/release/deps --extern libc=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/liblibc-d61d75994e7f6a3d.rmeta --extern semver=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libsemver-fd852bea90d52bcc.rmeta --extern serde=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde-9aa5ee0649ec5a61.rmeta --extern serde_json=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde_json-fffeb97883b26399.rmeta -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-arm64-v8a.map -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-x86_64.map`
-       Dirty duck-control v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/duck-control): the dependency `duck-ipc-proto` was rebuilt
+   Compiling ort v2.0.0-rc.11
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling toml_edit v0.23.10+spec-1.0.0
+   Compiling libloading v0.8.9
+   Compiling cesu8 v1.1.0
+   Compiling log v0.4.35
+   Compiling jni v0.21.1
    Compiling duck-control v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/duck-control)
-       Dirty odometry v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/odometry): the dependency `duck-ipc-proto` was rebuilt
-   Compiling odometry v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/odometry)
-       Dirty robotd-params v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/robotd-params): the dependency `duck-ipc-proto` was rebuilt
+   Compiling duck-mobile-core v0.1.0 (/home/runner/work/0637/0637/core/duck-mobile-core)
    Compiling robotd-params v0.18.9 (/home/runner/work/0637/0637/upstream/microduck/robotd-params)
-     Running `/home/runner/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name odometry --edition=2024 /home/runner/work/0637/0637/upstream/microduck/odometry/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=8aff006db24237c3 -C extra-filename=-45c2687635031f2c --out-dir /home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps --target x86_64-linux-android -C linker=/home/runner/.cargo/bin/cargo-ndk -C strip=debuginfo -L dependency=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps -L dependency=/home/runner/work/0637/0637/core/target/release/deps --extern duck_ipc_proto=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libduck_ipc_proto-81eaa763b092ad74.rmeta --extern kinematics=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libkinematics-4eaebfa2f66f7615.rmeta -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-arm64-v8a.map -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-x86_64.map`
-     Running `/home/runner/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name duck_control --edition=2024 /home/runner/work/0637/0637/upstream/microduck/duck-control/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --cfg 'feature="onnx-dynamic"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("default", "hardware", "onnx-dynamic", "onnx-static"))' -C metadata=67c6f79be209cf25 -C extra-filename=-63a3091e95941168 --out-dir /home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps --target x86_64-linux-android -C linker=/home/runner/.cargo/bin/cargo-ndk -C strip=debuginfo -L dependency=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps -L dependency=/home/runner/work/0637/0637/core/target/release/deps --extern duck_ipc_proto=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libduck_ipc_proto-81eaa763b092ad74.rmeta --extern libloading=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/liblibloading-57e0d1c63a4d875a.rmeta --extern ort=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libort-c718fdef4851bf80.rmeta --extern serde=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde-9aa5ee0649ec5a61.rmeta --extern serde_json=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde_json-fffeb97883b26399.rmeta --extern sha2=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libsha2-c1bfc75f4d8f8ec3.rmeta --extern thiserror=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libthiserror-ff1d87cf946346f2.rmeta --extern tracing=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libtracing-bf8d5241a9d58b6d.rmeta -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-arm64-v8a.map -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-x86_64.map`
-     Running `/home/runner/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name robotd_params --edition=2024 /home/runner/work/0637/0637/upstream/microduck/robotd-params/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=315c987f59244ff4 -C extra-filename=-fae8f4b9259d531c --out-dir /home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps --target x86_64-linux-android -C linker=/home/runner/.cargo/bin/cargo-ndk -C strip=debuginfo -L dependency=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps -L dependency=/home/runner/work/0637/0637/core/target/release/deps --extern duck_ipc_proto=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libduck_ipc_proto-81eaa763b092ad74.rmeta --extern kinematics=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libkinematics-4eaebfa2f66f7615.rmeta --extern semver=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libsemver-fd852bea90d52bcc.rmeta --extern serde=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde-9aa5ee0649ec5a61.rmeta --extern serde_json=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde_json-fffeb97883b26399.rmeta --extern thiserror=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libthiserror-ff1d87cf946346f2.rmeta --extern toml=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libtoml-e4f2eb407c9df8bf.rmeta --extern toml_edit=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libtoml_edit-cd1dd72f871e470b.rmeta --extern tracing=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libtracing-bf8d5241a9d58b6d.rmeta -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-arm64-v8a.map -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-x86_64.map`
-     Running `/home/runner/.rustup/toolchains/1.99.1-x86_64-unknown-linux-gnu/bin/rustc --crate-name duck_mobile_core --edition=2024 duck-mobile-core/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type staticlib --crate-type cdylib --crate-type rlib --emit=dep-info,link -C opt-level=3 -C embed-bitcode=no --cfg 'feature="mujoco"' --cfg 'feature="onnx-dynamic"' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values("default", "mujoco", "onnx-dynamic", "onnx-static"))' -C metadata=612eb4d64f79ab7d --out-dir /home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps --target x86_64-linux-android -C linker=/home/runner/.cargo/bin/cargo-ndk -C strip=debuginfo -L dependency=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps -L dependency=/home/runner/work/0637/0637/core/target/release/deps --extern duck_control=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libduck_control-63a3091e95941168.rlib --extern duck_ipc_proto=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libduck_ipc_proto-81eaa763b092ad74.rlib --extern jni=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libjni-e9d538f7bc858ab2.rlib --extern kinematics=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libkinematics-4eaebfa2f66f7615.rlib --extern odometry=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libodometry-45c2687635031f2c.rlib --extern robotd_params=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/librobotd_params-fae8f4b9259d531c.rlib --extern serde=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde-9aa5ee0649ec5a61.rlib --extern serde_json=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libserde_json-fffeb97883b26399.rlib --extern sha2=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libsha2-c1bfc75f4d8f8ec3.rlib --extern tracing=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/deps/libtracing-bf8d5241a9d58b6d.rlib -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-arm64-v8a.map -C link-arg=-Wl,-Map=/home/runner/work/0637/0637/android/third_party/link-x86_64.map -L native=/home/runner/work/0637/0637/core/target/x86_64-linux-android/release/build/duck-mobile-core-d3104b241ee6a1e4/out -L native=/home/runner/work/0637/0637/android/third_party/mujoco/x86_64/lib -L native=/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/29 -L native=/home/runner/work/0637/0637/core/target/android-libdl-stub/x86_64 -L native=/usr/local/lib/android/sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android -l static=duck_mj_shim -l c++_shared -l static=lodepng -l static=miniz -l static=tinyxml2 -l static=qhullstatic_r -l static=ccd -l static=c++abi -l static=c++_static -C link-arg=-Wl,--whole-archive -C link-arg=-Wl,/home/runner/work/0637/0637/android/third_party/mujoco/x86_64/lib/libmujoco.a -C link-arg=-Wl,--no-whole-archive -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,--no-undefined`
 warning: unused import: `crate::control::Tuning`
-  --> duck-mobile-core/src/ffi.rs:19:5
+  --> duck-mobile-core/src/ffi.rs:18:5
    |
-19 | use crate::control::Tuning;
+18 | use crate::control::Tuning;
    |     ^^^^^^^^^^^^^^^^^^^^^^
    |
    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-warning: unused variable: `name`
-   --> duck-mobile-core/src/ffi.rs:792:23
-    |
-792 |         Intent::Skill(name) if core.runtime.shutting_down() => {
-    |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
-    |
-    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
-
-warning: unused variable: `dir`
-    --> duck-mobile-core/src/ffi.rs:1151:24
-     |
-1151 |         Intent::Reload(dir) if core.runtime.shutting_down() => {
-     |                        ^^^ help: if this is intentional, prefix it with an underscore: `_dir`
-
 warning: variable does not need to be mutable
-   --> duck-mobile-core/src/mujoco.rs:532:13
+   --> duck-mobile-core/src/jni.rs:365:5
     |
-532 |         let mut copy = Self {
-    |             ----^^^^
-    |             |
-    |             help: remove this `mut`
+365 |     mut env: JNIEnv,
+    |     ----^^^
+    |     |
+    |     help: remove this `mut`
     |
     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
 
 warning: variable does not need to be mutable
-   --> duck-mobile-core/src/jni.rs:290:5
+   --> duck-mobile-core/src/jni.rs:382:5
     |
-290 |     mut env: JNIEnv,
+382 |     mut env: JNIEnv,
     |     ----^^^
     |     |
     |     help: remove this `mut`
 
-warning: variable does not need to be mutable
-   --> duck-mobile-core/src/jni.rs:305:5
+warning: field `actuator_wire` is never read
+   --> duck-mobile-core/src/mujoco.rs:144:5
     |
-305 |     mut env: JNIEnv,
-    |     ----^^^
-    |     |
-    |     help: remove this `mut`
-
-warning: variable does not need to be mutable
-   --> duck-mobile-core/src/jni.rs:346:5
-    |
-346 |     mut env: JNIEnv,
-    |     ----^^^
-    |     |
-    |     help: remove this `mut`
-
-warning: variable does not need to be mutable
-   --> duck-mobile-core/src/jni.rs:678:5
-    |
-678 |     mut env: JNIEnv,
-    |     ----^^^
-    |     |
-    |     help: remove this `mut`
-
-warning: variable does not need to be mutable
-   --> duck-mobile-core/src/jni.rs:695:5
-    |
-695 |     mut env: JNIEnv,
-    |     ----^^^
-    |     |
-    |     help: remove this `mut`
-
-warning: variable does not need to be mutable
-   --> duck-mobile-core/src/jni.rs:715:5
-    |
-715 |     mut env: JNIEnv,
-    |     ----^^^
-    |     |
-    |     help: remove this `mut`
-
-warning: type `DuckMj` is more private than the item `MujocoIo::handle`
-   --> duck-mobile-core/src/mujoco.rs:565:5
-    |
-565 |     pub fn handle(&self) -> *mut DuckMj {
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `MujocoIo::handle` is reachable at visibility `pub`
-    |
-note: but type `DuckMj` is only usable at visibility `pub(self)`
-   --> duck-mobile-core/src/mujoco.rs:23:1
-    |
- 23 | struct DuckMj {
-    | ^^^^^^^^^^^^^
-    = note: `#[warn(private_interfaces)]` on by default
-
-warning: field `provenance` is never read
-  --> duck-mobile-core/src/ffi.rs:59:5
-   |
-48 | pub struct DuckCore {
-   |            -------- field in this struct
+131 | pub struct MujocoIo {
+    |            -------- field in this struct
 ...
-59 |     provenance: crate::provenance::Provenance,
-   |     ^^^^^^^^^^
-   |
-   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+144 |     actuator_wire: Vec<Option<usize>>,
+    |     ^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
 
 warning: function `duck_mj_timestep` is never used
-  --> duck-mobile-core/src/mujoco.rs:43:8
+  --> duck-mobile-core/src/mujoco.rs:37:8
    |
-43 |     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
+37 |     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
    |        ^^^^^^^^^^^^^^^^
 
-warning: `duck-mobile-core` (lib) generated 13 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 10 suggestions)
-    Finished `release` profile [optimized] target(s) in 49.53s
-     Copying /home/runner/work/0637/0637/core/target/x86_64-linux-android/release/libduck_mobile_core.so -> /home/runner/work/0637/0637/android/app/src/main/jniLibs/x86_64/libduck_mobile_core.so
-    Finished targets (x86_64) in 49.54s
+warning: `duck-mobile-core` (lib) generated 5 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 3 suggestions)
+    Finished `release` profile [optimized] target(s) in 55.59s
+     Copying libraries to /home/runner/work/0637/0637/android/app/src/main/jniLibs

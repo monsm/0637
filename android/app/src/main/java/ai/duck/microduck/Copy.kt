@@ -471,6 +471,23 @@ val quack get() = pick("Quack", "叫一声")
     val flashlight get() = pick("Flashlight", "手电筒")
         val flashlightOn get() = pick("on", "开")
     val flashlightOff get() = pick("off", "关")
+    // The palm's heartbeat: the duck's care numbers as a haptic rhythm.
+    // A reading of the real state, not a new fact; off until asked for.
+    val formation get() = pick("Dance together", "家庭舞团")
+    val roleDance get() = pick("Role dance", "角色编舞")
+    val voiceChoir get() = pick("Voice choir", "多鸭合奏")
+    val netPad get() = pick("UDP pad (4210)", "网控手柄 (4210)")
+    val netPadNote get() = pick(
+        "Set the pair code first; the official DKPD pad then drives this duck.",
+        "先设配对码，官方 DKPD 手柄才能开这只鸭。",
+    )
+    val pairCode get() = pick("Pair code", "配对码")
+    val pairNote get() = pick(
+        "Both phones type the same six digits before gifts or songs.",
+        "两台手机输入同一个 6 位数字，才能互送礼物或一起唱。",
+    )
+    val heart get() = pick("Heartbeat", "手心心跳")
+    val heartRowNote get() = pick("feel its heart — a reading of its mood", "感受它的心——由心情推出来的读数")
 
     /** The status LED's verdict, in the shell's language. */
     fun faceStatus(status: String): String = when (status) {

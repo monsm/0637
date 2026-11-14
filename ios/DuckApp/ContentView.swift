@@ -871,6 +871,7 @@ struct ContentView: View {
         case "pet": controller.pet()
         case "feed": controller.feed()
         case "sit": controller.sit()
+        case "light": controller.setFlashlight(color: step.value)
         default: break
         }
     }

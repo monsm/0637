@@ -140,6 +140,15 @@ struct MoreSheet: View {
                         controller.toggleFlashlight()
                     }
                     row(
+                        Icons.heart, Copy.heart,
+                        note: controller.heartOn ? String(format: "%.0f bpm", controller.heartBpm) : Copy.heartRowNote,
+                        check: controller.heartOn,
+                        showsChevron: false,
+                        id: "more-heart"
+                    ) {
+                        controller.heartOn.toggle()
+                    }
+                    row(
                         "globe", Copy.languageRow,
                         note: Copy.language.rawValue,
                         showsChevron: false,

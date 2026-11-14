@@ -26,6 +26,7 @@ enum Icons {
     static let night = "moon.stars.fill"
     static let morning = "sun.max.fill"
     static let flashlight = "flashlight.on.fill"
+    static let heart = "heart.fill"
     static let preferences = "slider.horizontal.3"
     static let time = "clock.arrow.circlepath"
     static let director = "viewfinder"

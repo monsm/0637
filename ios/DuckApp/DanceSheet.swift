@@ -13,6 +13,8 @@ struct DanceSheet: View {
         QuickStep(kind: "skill", value: "laugh"),
         QuickStep(kind: "skill", value: "yes"),
         QuickStep(kind: "sound", value: "chirp"),
+        QuickStep(kind: "light", value: "yellow"),
+        QuickStep(kind: "light", value: "off"),
     ]
     @ObservedObject var studio: DanceStudio
     let execute: (DanceStep) -> Void
@@ -51,7 +53,7 @@ struct DanceSheet: View {
                 ) {
                     ForEach(Array(studio.steps.enumerated()), id: \.element.id) { index, step in
                         VStack(spacing: 3) {
-                            Image(systemName: step.kind == "skill" ? "figure.walk" : "waveform")
+                            Image(systemName: step.kind == "light" ? "lightbulb.fill" : (step.kind == "skill" ? "figure.walk" : "waveform"))
                                 .font(.system(size: 16))
                             Text(step.label.isEmpty ? step.value : step.label)
                                 .font(.system(size: 10, design: .rounded))

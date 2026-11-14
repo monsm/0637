@@ -194,8 +194,12 @@ final class DuckController: ObservableObject {
         let id: String
         let name: String
         let replied: Bool
+        let paired: Bool
     }
     @Published var peers: [PeerInfo] = []
+    /// The official UDP pad's gate, read back from /state.pad — the core is
+    /// the authority, not the switch the finger just flipped.
+    @Published var netPadOn = false
     @Published var peerName = ""
     @Published var peerNotice: String?
     private var lastPeerTick = -1
@@ -241,6 +245,9 @@ final class DuckController: ObservableObject {
     @Published var careMood: Double = 0
     @Published var careBond: Double = 0
     @Published var careAsleep = false
+    /// The core's own heart reading (care.heart_bpm): the same numbers the
+    /// three capsules above show, as one bpm for the palm.
+    @Published var heartBpm: Double = 0
     private var companionRestored = false
     private var companionRestoreStarted = false
     private var lastCompanionSave = Date.distantPast
@@ -348,6 +355,19 @@ final class DuckController: ObservableObject {
     /// honestly labelled. It renders through Voice's session without owning
     /// it; the tick's mouth target follows it like a quack.
     private let speaker = Speaker()
+    /// The palm's heartbeat: the core's care numbers as a haptic rhythm.
+    /// Reading, not event — nothing here writes back to the duck.
+    let heart = Heart()
+    /// The drawer row's switch. Persisted like the mic toggle; off means the
+    /// duck's heart is silent in the palm, not that the duck has none.
+    @Published var heartOn = UserDefaults.standard.bool(forKey: "duck_heart_on") {
+        didSet {
+            if heartOn != oldValue {
+                UserDefaults.standard.set(heartOn, forKey: "duck_heart_on")
+                heart.setEnabled(heartOn)
+            }
+        }
+    }
     /// Observed by the diary's button so the icon flips the moment speech
     /// starts and ends. Written only on the main thread.
     @Published private(set) var ttsSpeaking = false
@@ -1286,6 +1306,29 @@ final class DuckController: ObservableObject {
     }
 
     /// Say hello to one duck, or to every duck on the Wi-Fi.
+    /// A room-wide score — a formation, a role dance or a voice choir.
+    /// The wire carries only official mood/sound names; every duck plays
+    /// its own part through its own 50 Hz runtime.
+    func startEnsemble(moves: [String], sounds: [String] = []) {
+        postJSON("/ensemble", ["moves": moves, "sounds": sounds])
+    }
+
+    /// The official UDP pad: OFF by default, gated in the core by the pair
+    /// code. A standard DKPD sender (duckctl udp-pad, a script) then drives
+    /// this duck through the same twist the joystick uses.
+    func setNetPad(on: Bool) {
+        postJSON("/pad", ["on": on])
+    }
+
+    /// Both people type the same six digits; only paired neighbours may
+    /// send gifts or start a chorus. The code itself never leaves the LAN
+    /// outside the pair handshake, and no control verb rides with it.
+    func pairPeer(code: String, id: String?) {
+        var payload: [String: Any] = ["code": code]
+        if let id { payload["id"] = id }
+        postJSON("/peers/pair", payload)
+    }
+
     func greetPeer(_ id: String?) {
         let payload: [String: Any] = id.map { ["id": $0] } ?? [:]
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
@@ -1880,9 +1923,13 @@ final class DuckController: ObservableObject {
                             return PeerInfo(
                                 id: id,
                                 name: name,
-                                replied: item["replied"] as? Bool ?? false
+                                replied: item["replied"] as? Bool ?? false,
+                                paired: item["paired"] as? Bool ?? false
                             )
                         }
+                    }
+                    if let pad = json["pad"] as? [String: Any] {
+                        self.netPadOn = pad["on"] as? Bool ?? false
                     }
                     if let event = json["peer_event"] as? [String: Any],
                        let kind = event["kind"] as? String,
@@ -1927,6 +1974,8 @@ final class DuckController: ObservableObject {
                         self.careMood = care["mood"] as? Double ?? 0
                         self.careBond = care["bond"] as? Double ?? 0
                         self.careAsleep = care["asleep"] as? Bool ?? false
+                        // The palm reads the same numbers the capsules do.
+                        self.heartBpm = care["heart_bpm"] as? Double ?? 0
                         self.saveCompanionState(care: care, life: json["life"] as? [String: Any])
                     }
                     if let life = json["life"] as? [String: Any] {
@@ -2119,6 +2168,13 @@ final class DuckController: ObservableObject {
         } else {
             DispatchQueue.main.async(execute: toggle)
         }
+    }
+
+    /// A dance step's light: "off" or one of the seven official colours,
+    /// through the same client intent any rule uses. The lamp is the duck's
+    /// own LED; a choreography may light it between two quacks.
+    func setFlashlight(color: String) {
+        postJSON("/flashlight", ["toggle": false, "on": color != "off", "color": color])
     }
 
     /// `robotctl wheee` on a phone: holding starts the ride's segments,
@@ -2315,6 +2371,9 @@ final class DuckController: ObservableObject {
         // quack opens the jaw instead of snapping it open and shut.
         let mouthTarget = (voice.isSpeaking || speaker.isSpeaking) ? 1.0 : 0.0
         visualMouth += (mouthTarget - visualMouth) * (1 - exp(-0.02 / 0.09))
+        // The palm's beat: one tick checks whether the next beat of the
+        // polled bpm is due. A disabled heart is one branch and no engine.
+        heart.tick(pollBpm: heartBpm)
         if Voice.diagnosticsEnabled {
             // Five times a second is enough for the UI test's polling and
             // cheap enough for the control loop; the string is only built

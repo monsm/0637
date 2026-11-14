@@ -80,6 +80,11 @@ pub struct DuckCore {
     sound_sequence: u64,
     /// The LAN social layer: other ducks, announces and greetings.
     lan: Option<crate::lan::Lan>,
+    /// The official UDP pad receiver: off until enabled with a pair code.
+    pad: Option<crate::pad::Pad>,
+    /// The last button bitmap seen, so a press fires once rather than
+    /// repeating on every one of the 50 Hz ticks.
+    pad_buttons: u16,
     /// Daily quests. Kept on DuckCore, not the simulated runtime: a rewind
     /// must not rewind the person's day.
     quests: crate::quests::QuestBoard,
@@ -287,6 +292,8 @@ pub unsafe extern "C" fn duck_core_new(
             // LAN, and that question belongs to the moment the user opens
             // Neighbours, not to every launch.
             lan: None,
+            pad: None,
+            pad_buttons: 0,
             quests: crate::quests::QuestBoard::default(),
             notice: None,
             rendered_sound: None,
@@ -1002,6 +1009,19 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             None => refuse(core, "the LAN peer port is not available".to_owned()),
         },
+        Intent::PairPeer(code, target) => match &core.lan {
+            Some(lan) => {
+                if !lan.set_pair_code(&code) {
+                    return refuse(core, "the pairing code must be six digits".to_owned());
+                }
+                let offered = target.as_deref().map(|id| lan.pair(id));
+                match offered {
+                    Some(Err(error)) => refuse(core, format!("pair refused: {error}")),
+                    _ => json!({ "ok": true, "code_set": true, "offered": target }),
+                }
+            }
+            None => refuse(core, "the LAN peer port is not available".to_owned()),
+        },
         Intent::SendGift { id, gift, value } => {
             // The route checked the published list; the runtime is the
             // authority on which official emotions this build loaded (a mode
@@ -1050,6 +1070,33 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 None => refuse(core, "the LAN peer port is not available".to_owned()),
             }
         }
+        Intent::Ensemble(moves, sounds) => {
+            if active_runtime(core).chorus_active() {
+                return refuse(core, "a performance is already playing".to_owned());
+            }
+            if !moves.iter().all(|name| {
+                active_runtime(core).emotion_names().iter().any(|loaded| loaded == name)
+            }) || !sounds.iter().all(|tag| crate::voice::TAGS.contains(&tag.as_str())) {
+                return refuse(core, "no such mood or sound".to_owned());
+            }
+            let id = format!("ensemble-{}", active_runtime(core).clock().tick);
+            let sent = core
+                .lan
+                .as_ref()
+                .map(|lan| lan.ensemble(&id, &moves, &sounds));
+            match sent {
+                Ok(Ok(roles)) => {
+                    let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
+                    // The lead plays too: its own part is the first role.
+                    on_active(core, |runtime| {
+                        runtime.start_ensemble("lead", 0, roles + 1, moves.clone(), sounds.clone(), peers, Some(id.clone()));
+                    });
+                    json!({ "ok": true, "roles": roles + 1, "moves": moves, "sounds": sounds })
+                }
+                Ok(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
+                Err(_) => refuse(core, "the LAN peer port is not available".to_owned()),
+            }
+        }
         Intent::PeerName(name) => match &core.lan {
             Some(lan) => {
                 lan.set_name(&name);
@@ -1057,6 +1104,37 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             None => refuse(core, "the LAN peer port is not available".to_owned()),
         },
+        Intent::PadSwitch(on) => {
+            if on {
+                // The official UDP pad is unauthenticated by design. A
+                // family app only opens it AFTER the person set the same
+                // six-digit pairing code the neighbours use; a stranger
+                // on the Wi-Fi then has no control channel at all.
+                let paired = core
+                    .lan
+                    .as_ref()
+                    .is_some_and(|lan| lan.pair_code_set());
+                if !paired {
+                    return refuse(core, "set a six-digit pairing code first".to_owned());
+                }
+                if core.pad.is_none() {
+                    core.pad = crate::pad::Pad::start();
+                }
+                match &core.pad {
+                    Some(pad) => {
+                        pad.set_enabled(true);
+                        json!({ "ok": true, "port": crate::pad::PORT, "on": true })
+                    }
+                    None => refuse(core, "UDP 4210 is not available".to_owned()),
+                }
+            } else {
+                if let Some(pad) = &core.pad {
+                    pad.set_enabled(false);
+                }
+                core.pad_buttons = 0;
+                json!({ "ok": true, "on": false })
+            }
+        }
         Intent::StartLan(name) => {
             if core.lan.is_none() {
                 core.lan = crate::lan::Lan::start(&name);
@@ -1549,6 +1627,10 @@ fn publish_state(core: &DuckCore) {
             "fps": core.performance.0,
             "ticks_per_second": core.performance.1,
         },
+        "pad": {
+            "on": core.pad.as_ref().is_some_and(crate::pad::Pad::is_enabled),
+            "port": crate::pad::PORT,
+        },
         "notice": core
             .notice
             .as_ref()
@@ -1633,6 +1715,14 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
             crate::lan::PeerEvent::Chorus { id, moves, .. } => {
                 choruses.push((id, moves))
             }
+            crate::lan::PeerEvent::Ensemble { id, role, roles, moves, sounds, .. } => {
+                if !active_runtime(core).chorus_active() {
+                    let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
+                    on_active(core, |runtime| {
+                        runtime.start_ensemble("join", role, roles, moves, sounds, peers, Some(id));
+                    });
+                }
+            }
             event => on_active(core, |runtime| runtime.peer_event(&event)),
         }
     }
@@ -1656,6 +1746,45 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         // The client that sent a one-shot is waiting on this; a stream may not
         // be waiting at all, and the queue keeps the answer bounded.
         core.intents.answer(queued.id, result);
+    }
+    // The official UDP pad: a CLIENT, not a sense. The same twist the shell's
+    // joystick writes; silence is a release (pad.rs checks the 300 ms stale
+    // window). Buttons fire once on their rising edge. Nothing here reaches
+    // the 61-D observation or the safety layer.
+    let pad_frame = core.pad.as_ref().and_then(crate::pad::Pad::latest);
+    if let Some(frame) = pad_frame {
+        on_active(core, |runtime| {
+            // robotd's pad: ly forward is +vx, lx is -yaw. The 0.1 deadzone
+            // belongs to the pad (upstream pad-map), not the policy — a
+            // resting stick is exactly zero.
+            fn deadzone(value: f64) -> f64 {
+                if value.abs() < 0.1 { 0.0 } else { value }
+            }
+            runtime.set_twist([
+                deadzone(frame.axes.ly) * 0.4,
+                0.0,
+                -deadzone(frame.axes.lx) * 1.0,
+            ]);
+        });
+        let pressed = frame.buttons & !core.pad_buttons;
+        if pressed & 0x0040 != 0 {
+            on_active(core, |runtime| {
+                let _ = runtime.sit_toggle();
+            });
+        }
+        if pressed & 0x0001 != 0 {
+            on_active(core, |runtime| {
+                let _ = runtime.trigger_skill("roulade");
+            });
+        }
+        if pressed & 0x0002 != 0 {
+            on_active(core, |runtime| {
+                let _ = runtime.trigger_skill("kick_left");
+            });
+        }
+        core.pad_buttons = frame.buttons;
+    } else {
+        core.pad_buttons = 0;
     }
     // A sudden loud sound in the room is an external event, never a sense.
     // The sensor registry is on DuckCore; hand its verdict to the loop.
