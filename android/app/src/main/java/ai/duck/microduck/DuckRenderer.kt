@@ -11,6 +11,7 @@ import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.sin
 
 /**
@@ -29,6 +30,13 @@ class DuckRenderer(
         val body: Int,
         val local: FloatArray,
         val color: FloatArray,
+        /// The lower beak: the one geom the shell animates itself. The
+        /// `jaw` mesh shares its body with the upper beak, the eyes and the
+        /// bottom shell — the hinge rotation is composed BEFORE the geom's
+        /// own local, in mesh space, so only this geom moves.
+        val isJaw: Boolean = false,
+        val jawPivotZ: Float = 0f,
+        val jawPivotY: Float = 0f,
     )
 
     private var program = 0
@@ -45,6 +53,10 @@ class DuckRenderer(
     private var aPos = 0
     private var aNormal = 0
     private val meshes = mutableMapOf<Int, Mesh>()
+    /** Mesh-space bounds per mesh id, from the soup's positions only: the
+     *  jaw's hinge is the rear-top corner of its own bounds (the iOS renderer
+     *  derives the same pivot the same way). */
+    private val meshBounds = mutableMapOf<Int, FloatArray>()
     private val instances = mutableListOf<Instance>()
     private var floor: Mesh? = null
     /// 全屏背景板：盖住 NDC 的大三角，顶点就是 NDC 坐标，MVP 用单位阵。
@@ -58,6 +70,11 @@ class DuckRenderer(
 
     private var viewportWidth = 0
     private var viewportHeight = 0
+    /// The beak the renderer draws, smoothed toward the core's mouth value
+    /// with the same 90 ms time constant the iOS shell uses for a quack —
+    /// a step open would snap, this sways. The core clamps it shut while the
+    /// duck is asleep, so a reading duck's beak shuts the moment it dozes.
+    private var visualMouth = 0f
     /// Set by the Director shutter: the next finished frame is read back and
     /// handed over instead of only being presented.
     @Volatile private var captureCallback: ((android.graphics.Bitmap?) -> Unit)? = null
@@ -103,6 +120,7 @@ class DuckRenderer(
             if (builtGeneration >= 0) {
                 instances.clear()
                 meshes.clear()
+                meshBounds.clear()
                 floor = null
                 backdrop = null
             }
@@ -112,6 +130,10 @@ class DuckRenderer(
         // The 50 Hz loop runs on DuckLoop's own scheduler; this only draws.
         input.frames.incrementAndGet()
         val status = core.status()
+        // The beak follows the core's mouth (an intent write, the idle yawn
+        // included), smoothed with the quack's own 90 ms time constant.
+        val mouthTarget = if (status.size > 12) status[12].toFloat().coerceIn(0f, 1f) else 0f
+        visualMouth += (mouthTarget - visualMouth) * (1f - exp(-0.02f / 0.09f))
         // The camera follows the interpolated trunk, not the status sample: a
         // camera on a slower clock than the duck makes the room judder.
         val trunkPose = core.poses.interpolated(1)
@@ -247,8 +269,21 @@ class DuckRenderer(
             )
             val world = FloatArray(16)
             Matrix.multiplyMM(world, 0, body, 0, rotation, 0)
-            val model = FloatArray(16)
+            var model = FloatArray(16)
             Matrix.multiplyMM(model, 0, world, 0, instance.local, 0)
+            if (instance.isJaw && visualMouth > 0.01f) {
+                // Hinge on the geom-local X axis through the rear-top corner
+                // of the mesh bounds; rotation composed BEFORE the geom's own
+                // local, in mesh space, so nothing else in the head moves.
+                val jaw = identity()
+                Matrix.translateM(jaw, 0, 0f, instance.jawPivotY, instance.jawPivotZ)
+                // Kotlin's Matrix.rotateM takes DEGREES; 0.30 rad ≈ 17.19°.
+                Matrix.rotateM(jaw, 0, visualMouth * 0.30f * 57.29578f, 1f, 0f, 0f)
+                Matrix.translateM(jaw, 0, 0f, -instance.jawPivotY, -instance.jawPivotZ)
+                val withJaw = FloatArray(16)
+                Matrix.multiplyMM(withJaw, 0, model, 0, jaw, 0)
+                model = withJaw
+            }
             draw(
                 instance.mesh, model, instance.color, headlight,
                 look = 0, viewProjection = viewProjection,
@@ -313,12 +348,22 @@ class DuckRenderer(
             val transform = FloatArray(16)
             Matrix.multiplyMM(transform, 0, local, 0, rotation, 0)
             val alpha = if (info[14] > 0) info[14].toFloat() else 1f
+            // The visible lower beak is the geom whose MESH is `jaw` — the
+            // `jaw_soft` mesh is the servo rack inside the head. The hinge is
+            // the geom-local X axis through the rear-top corner of the mesh's
+            // own bounds; a POSITIVE angle swings the front tip down (the
+            // same 0.30 rad ≈ 17 mm gape the iOS renderer verified).
+            val bounds = meshBounds[meshId]
+            val isJaw = core.meshName(meshId) == "jaw" && bounds != null
             instances.add(
                 Instance(
                     mesh,
                     body,
                     transform,
                     floatArrayOf(info[11].toFloat(), info[12].toFloat(), info[13].toFloat(), alpha),
+                    isJaw = isJaw,
+                    jawPivotZ = bounds?.get(3) ?: 0f,
+                    jawPivotY = bounds?.get(4) ?: 0f,
                 )
             )
         }
@@ -338,6 +383,17 @@ class DuckRenderer(
         buffer.put(floats).position(0)
         val mesh = Mesh(buffer, floats.size / 6)
         meshes[meshId] = mesh
+        // Position + normal per vertex: bounds come from the positions only.
+        var lowX = Float.MAX_VALUE; var lowY = Float.MAX_VALUE; var lowZ = Float.MAX_VALUE
+        var highX = -Float.MAX_VALUE; var highY = -Float.MAX_VALUE; var highZ = -Float.MAX_VALUE
+        var index = 0
+        while (index + 2 < floats.size) {
+            val x = floats[index]; val y = floats[index + 1]; val z = floats[index + 2]
+            if (x < lowX) lowX = x; if (y < lowY) lowY = y; if (z < lowZ) lowZ = z
+            if (x > highX) highX = x; if (y > highY) highY = y; if (z > highZ) highZ = z
+            index += 6
+        }
+        meshBounds[meshId] = floatArrayOf(lowX, lowY, lowZ, highX, highY, highZ)
         return mesh
     }
 

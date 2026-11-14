@@ -344,6 +344,13 @@ final class DuckController: ObservableObject {
     private var lastPush = Date.distantPast
     /// The duck's own voice: the core decides when, this owns the speaker.
     let voice = Voice()
+    /// The system voice speaking for the duck (diary reads): possession-mode,
+    /// honestly labelled. It renders through Voice's session without owning
+    /// it; the tick's mouth target follows it like a quack.
+    private let speaker = Speaker()
+    /// Observed by the diary's button so the icon flips the moment speech
+    /// starts and ends. Written only on the main thread.
+    @Published private(set) var ttsSpeaking = false
     /// Main-thread only: paces the voice diagnostic line, not the control loop.
     private var diagnosticFrames = 0
     /// Director mode: the rear camera behind the duck. The renderer goes
@@ -471,6 +478,16 @@ final class DuckController: ObservableObject {
                 guard let self else { return }
                 self.cameraActive = self.wantsCamera && available
             }
+        // The diary's speak button follows the synthesizer's start/stop the
+        // moment it happens; every callback is already on the main thread.
+        // The same client intent a robot-side chorus writes goes out for the
+        // open AND the close — a natural finish must not leave /state holding
+        // a beak the duck is not keeping open.
+        speaker.onChange = { [weak self] speaking in
+            guard let self else { return }
+            self.ttsSpeaking = speaking
+            self.postJSON("/mouth", ["open": speaking ? 1.0 : 0.0])
+        }
         // A refused camera has no readings; mirror the answer so the sheet
         // can say "denied" without importing AVFoundation.
         cameraDeniedCancellable = camera.$denied
@@ -1188,15 +1205,34 @@ final class DuckController: ObservableObject {
     }
 
     private func executeAI(_ decision: AIDecision) {
+        // The duck's answer comes first: `say` is the conversation, the
+        // action is the body following it. A talk-only turn executes
+        // nothing and just speaks. The system voice reads it in the
+        // language the app is showing; the jaw follows through the
+        // speaker's onChange, exactly as the diary reading does.
+        if !decision.say.isEmpty {
+            speaker.updateLanguage(Copy.language)
+            speaker.speak(decision.say)
+        }
+        guard decision.action != "talk" else {
+            aiDecision = decision.say
+            return
+        }
         // The model answers with wire names (`kick_left`). The stage says
         // what a person calls them; the instrument/API keep the wire.
-        let shownValue = decision.action == "skill" || decision.action == "emotion"
-            ? SkillLabel.of(decision.value)
-            : decision.value
-        let shown = decision.value.isEmpty
-            ? decision.action
-            : "\(decision.action) · \(shownValue)"
-        aiDecision = decision.why.isEmpty ? "AI · \(shown)" : "AI · \(shown) — \(decision.why)"
+        // When the duck also said something, the pill shows the sentence —
+        // the words are the conversation, the action is the footnote.
+        if !decision.say.isEmpty {
+            aiDecision = decision.say
+        } else {
+            let shownValue = decision.action == "skill" || decision.action == "emotion"
+                ? SkillLabel.of(decision.value)
+                : decision.value
+            let shown = decision.value.isEmpty
+                ? decision.action
+                : "\(decision.action) · \(shownValue)"
+            aiDecision = decision.why.isEmpty ? "AI · \(shown)" : "AI · \(shown) — \(decision.why)"
+        }
         // Every decision cancels a previous bounded move. Otherwise an old
         // twist chain would keep posting after a stop or a new look.
         moveGeneration &+= 1
@@ -1721,6 +1757,20 @@ final class DuckController: ObservableObject {
     /// Fire-and-forget; `nightActive` updates when the poll reads it back.
     func postNight(on: Bool) {
         postJSON("/night", ["on": on])
+    }
+
+    /// The system voice reading the diary aloud. The jaw follows locally
+    /// (zero-latency, same 90 ms time constant as a quack); the /mouth intent
+    /// rides the speaker's onChange, so start, natural finish, cancel and the
+    /// sheet's dismissal all leave the same state behind. The core keeps the
+    /// honest overrides: asleep shuts the beak regardless.
+    func speakDiary(_ text: String) {
+        speaker.updateLanguage(Copy.language)
+        speaker.speak(text)
+    }
+
+    func stopSpeaking() {
+        speaker.stop()
     }
 
     /// Paint a route: POST /path with body-frame waypoints in metres (+x
@@ -2263,7 +2313,7 @@ final class DuckController: ObservableObject {
         // The beak follows the voice. robotd's chorus opens the mouth servo
         // through a 90 ms time constant; the shell uses the same one, so a
         // quack opens the jaw instead of snapping it open and shut.
-        let mouthTarget = voice.isSpeaking ? 1.0 : 0.0
+        let mouthTarget = (voice.isSpeaking || speaker.isSpeaking) ? 1.0 : 0.0
         visualMouth += (mouthTarget - visualMouth) * (1 - exp(-0.02 / 0.09))
         if Voice.diagnosticsEnabled {
             // Five times a second is enough for the UI test's polling and
