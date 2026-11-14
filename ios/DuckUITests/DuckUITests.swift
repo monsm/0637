@@ -622,11 +622,19 @@ final class DuckUITests: XCTestCase {
         var line = waitForVoiceLine(timeout: 30)
         let before = Int(voiceField("sched", in: line)) ?? 0
         quack.tap()
-        let deadline = Date().addingTimeInterval(15)
+        // The core keeps one one-shot sound and a later idle emotion replaces
+        // a queued quack — that is the "one voice" rule, and tapping again is
+        // the interaction it allows. Keep asking until one reaches the engine.
+        var lastTap = Date()
+        let deadline = Date().addingTimeInterval(30)
         while Date() < deadline {
             line = voiceStateElement().exists ? voiceStateElement().label : line
             let now = Int(voiceField("sched", in: line)) ?? 0
             if now > before && voiceField("tag", in: line) == "chirp" { break }
+            if Date().timeIntervalSince(lastTap) >= 1 {
+                quack.tap()
+                lastTap = Date()
+            }
             usleep(200_000)
         }
         let after = Int(voiceField("sched", in: line)) ?? 0
