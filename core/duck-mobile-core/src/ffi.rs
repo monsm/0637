@@ -1183,7 +1183,6 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 "count": lines.len(),
                 "lines": lines,
             })
-            .to_string()
         }
         Intent::FloorHeight(z) => {
             // Only a MuJoCo body has a ground to move; the feature-gated
