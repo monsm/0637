@@ -985,6 +985,13 @@ PY
 # was never asked to switch. A missing row is now a failure that prints what
 # the drawer actually held.
 tap_text "More" > /dev/null 2>&1 || tap_text "更多" > /dev/null 2>&1 || true
+# The Language row is the LAST row of the drawer. On the smoke emulator's
+# 320x640 screen the sheet needs one scroll to reach it: uiautomator only
+# reports on-screen nodes, so poll for the row and swipe up between tries.
+# A slide-in sheet reports its final bounds while still off-screen, so a
+# found row must also be fully inside the display before it is tappable.
+HEIGHT=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -dx -f2)
+[ -n "$HEIGHT" ] || HEIGHT=640
 LANGUAGE_FOUND=0
 for _ in $(seq 1 25); do
   sleep 0.2
@@ -992,22 +999,17 @@ for _ in $(seq 1 25); do
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
   adb exec-out cat /sdcard/ui.xml > language-ui.xml 2>/dev/null || true
   [ -s language-ui.xml ] || continue
-  if python3 - <<'PY'
-import xml.etree.ElementTree as ET
+  if python3 - "$HEIGHT" <<'PY'
+import sys, xml.etree.ElementTree as ET
+height = int(sys.argv[1])
 try:
     root = ET.parse('language-ui.xml').getroot()
 except Exception:
     raise SystemExit(1)
 for node in root.iter('node'):
     if 'Language' in ((node.get('text') or ''), (node.get('content-desc') or '')):
-        # A slide-in sheet reports its final bounds while still off-screen:
-        # tapping those coordinates is a no-op and the switch below silently
-        # never happens. Only trust a row that is actually on the display.
-        m = node.get('bounds', '')
-        if not m:
-            continue
-        parts = m.replace('][', ',').strip('[]').split(',')
-        if len(parts) == 4 and int(parts[1]) >= 0 and int(parts[3]) > 0:
+        parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4 and int(parts[1]) >= 0 and int(parts[3]) <= height:
             raise SystemExit(0)
 raise SystemExit(1)
 PY
@@ -1015,6 +1017,9 @@ PY
     LANGUAGE_FOUND=1
     break
   fi
+  # Not visible yet: the sheet may still be sliding in, or the row sits
+  # below the fold. Scroll the sheet's content up and look again.
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
 done
 if [ "$LANGUAGE_FOUND" -ne 1 ]; then
   echo "::error::the More drawer never showed the Language row"
@@ -1030,11 +1035,12 @@ PY
 fi
 # The switch is a recomposition: wait for a Chinese control before pressing
 # BACK, so the first-screen assertion below cannot race the redraw. The tap
-# itself is retried: a sheet caught mid-slide taps nothing, and one silent
-# miss left the shell English for every check after it.
+# itself is retried with a re-scroll between tries: the row can still be
+# sliding, and one silent miss left the shell English for every check after.
 TAP_OK=0
 for _ in $(seq 1 10); do
   if tap_text "Language" > /dev/null 2>&1; then TAP_OK=1; break; fi
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
   sleep 0.3
 done
 SWITCHED=0
