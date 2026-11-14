@@ -897,6 +897,25 @@ mod tests {
         );
     }
 
+    /// A visible, PAIRED neighbour: announce, then the two halves of the
+    /// pairing handshake. The window bookkeeping uses wall-clock epoch
+    /// milliseconds in production; the tests' simulated clock starts near
+    /// zero, so every gate that reads `last_*_ms` starts from a "just now"
+    /// default. Paired tests therefore talk at t >= 20_000, past the first
+    /// window of every counter.
+    fn with_paired_peer(duck: &mut Inner) {
+        with_peer(duck);
+        duck.pair_code = Some("123456".to_owned());
+        let reply = ingest(
+            duck,
+            &json!({ "v": 1, "type": "pair", "from": "peer01", "name": "Sunny", "code": "123456" }),
+            source(8767),
+            1100,
+        );
+        assert!(reply.is_some(), "the pairing request is answered");
+        assert!(duck.peers[0].paired);
+    }
+
     #[test]
     fn an_ensemble_needs_a_paired_peer_and_official_names() {
         let mut duck = inner();
@@ -909,7 +928,9 @@ mod tests {
         ingest(&mut duck, &packet, source(8767), 1200);
         assert!(duck.events.is_empty(), "an unpaired duck led a dance");
         duck.peers[0].paired = true;
-        ingest(&mut duck, &packet, source(8767), 1200);
+        // The ensemble window also reads the "just happened" default on the
+        // small simulated clock: the accepted packet goes past it.
+        ingest(&mut duck, &packet, source(8767), 20_000);
         assert!(matches!(duck.events.last(), Some(PeerEvent::Ensemble { role: 0, .. })));
     }
 
@@ -977,13 +998,15 @@ mod tests {
             1200,
         );
         assert!(back.is_none());
-        // Paired now: a real gift lands, once per three seconds.
+        // Paired now: a real gift lands, once per three seconds. The
+        // counters default to "just happened" on the tests' small simulated
+        // clock, so the first trusted packet has to arrive past the window.
         ingest(
             &mut duck,
             &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny",
                      "to": "self0001", "gift": "treat", "value": "" }),
             source(8767),
-            1300,
+            20_000,
         );
         assert!(matches!(duck.events.last(), Some(PeerEvent::Gift { .. })));
     }
@@ -1110,22 +1133,17 @@ mod tests {
     #[test]
     fn a_gift_from_a_known_peer_becomes_an_event() {
         let mut duck = inner();
-        ingest(
-            &mut duck,
-            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
-            source(8767),
-            1000,
-        );
+        with_paired_peer(&mut duck);
         ingest(
             &mut duck,
             &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "self0001", "gift": "treat", "value": "" }),
             source(8767),
-            10_000,
+            20_000,
         );
         assert_eq!(duck.peers.len(), 1);
         // The gift is not a discovery, but it keeps the sender alive.
-        assert_eq!(duck.peers[0].last_seen_ms, 10_000);
-        assert_eq!(duck.peers[0].last_gift_ms, 10_000);
+        assert_eq!(duck.peers[0].last_seen_ms, 20_000);
+        assert_eq!(duck.peers[0].last_gift_ms, 20_000);
         match duck.events.first() {
             Some(PeerEvent::Gift {
                 from,
@@ -1176,18 +1194,13 @@ mod tests {
     #[test]
     fn a_gift_flood_is_one_gift() {
         let mut duck = inner();
-        ingest(
-            &mut duck,
-            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
-            source(8767),
-            1000,
-        );
+        with_paired_peer(&mut duck);
         for index in 0..20 {
             ingest(
                 &mut duck,
                 &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "treat", "value": "" }),
                 source(8767),
-                10_000 + index * 100,
+                20_000 + index * 100,
             );
         }
         let gifts = duck
@@ -1201,7 +1214,7 @@ mod tests {
             &mut duck,
             &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "emotion", "value": "excited" }),
             source(8767),
-            13_000,
+            23_001,
         );
         assert_eq!(duck.events.len(), 2);
     }
@@ -1209,17 +1222,12 @@ mod tests {
     #[test]
     fn a_chorus_from_a_known_peer_becomes_an_event() {
         let mut duck = inner();
-        ingest(
-            &mut duck,
-            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
-            source(8767),
-            1000,
-        );
+        with_paired_peer(&mut duck);
         ingest(
             &mut duck,
             &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": "c1", "moves": ["laugh", "excited"] }),
             source(8767),
-            10_000,
+            20_000,
         );
         assert!(matches!(
             duck.events.first(),
@@ -1240,18 +1248,13 @@ mod tests {
         );
         assert!(duck.peers.is_empty());
         assert!(duck.events.is_empty());
-        ingest(
-            &mut duck,
-            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
-            source(8767),
-            1000,
-        );
+        with_paired_peer(&mut duck);
         // An unknown move refuses the whole song; the window is not spent.
         ingest(
             &mut duck,
             &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": "c1", "moves": ["moonwalk"] }),
             source(8767),
-            10_000,
+            20_000,
         );
         assert!(duck.events.is_empty());
         // Four moves is over the budget.
@@ -1259,7 +1262,7 @@ mod tests {
             &mut duck,
             &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": "c1", "moves": ["laugh", "laugh", "laugh", "laugh"] }),
             source(8767),
-            10_000,
+            20_000,
         );
         assert!(duck.events.is_empty());
         // A real one lands, and a flood inside ten seconds is one song.
@@ -1268,7 +1271,7 @@ mod tests {
                 &mut duck,
                 &json!({ "v": 1, "type": "chorus", "from": "peer01", "name": "Sunny", "to": "all", "id": format!("c{index}"), "moves": ["laugh"] }),
                 source(8767),
-                10_000 + index * 100,
+                20_000 + index * 100,
             );
         }
         let songs = duck
@@ -1286,17 +1289,12 @@ mod tests {
         // take a place in the event queue. The runtime stays the authority
         // at apply time (a mood could have been swapped since the snapshot).
         let mut duck = inner();
-        ingest(
-            &mut duck,
-            &json!({ "v": 1, "type": "announce", "from": "peer01", "name": "Sunny" }),
-            source(8767),
-            1000,
-        );
+        with_paired_peer(&mut duck);
         ingest(
             &mut duck,
             &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "emotion", "value": "moonwalk" }),
             source(8767),
-            10_000,
+            20_000,
         );
         assert!(duck.events.is_empty());
         // The window is not spent by a refused gift: a real one right after
@@ -1305,7 +1303,7 @@ mod tests {
             &mut duck,
             &json!({ "v": 1, "type": "gift", "from": "peer01", "name": "Sunny", "to": "all", "gift": "emotion", "value": "laugh" }),
             source(8767),
-            10_000,
+            20_000,
         );
         assert!(matches!(
             duck.events.first(),
