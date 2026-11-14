@@ -13,28 +13,6 @@ warning: unused import: `crate::control::Tuning`
    |
    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
-error[E0308]: mismatched types
-    --> duck-mobile-core/src/ffi.rs:1180:13
-     |
- 776 |   fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
-     |                                                                  ----------------- expected `serde_json::Value` because of return type
-...
-1180 | /             json!({
-1181 | |                 "format": "microduck-trajectory/1",
-1182 | |                 "fingerprint": core.fingerprint.to_string_lossy(),
-1183 | |                 "count": lines.len(),
-1184 | |                 "lines": lines,
-1185 | |             })
-1186 | |             .to_string()
-     | |________________________^ expected `Value`, found `String`
-     |
-help: try removing the method call
-     |
-1185 -             })
-1186 -             .to_string()
-1185 +             })
-     |
-
 warning: variable does not need to be mutable
    --> duck-mobile-core/src/lan.rs:203:13
     |
@@ -45,6 +23,20 @@ warning: variable does not need to be mutable
     |
     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
 
+warning: unused variable: `name`
+   --> duck-mobile-core/src/ffi.rs:805:23
+    |
+805 |         Intent::Skill(name) if core.runtime.shutting_down() => {
+    |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `dir`
+    --> duck-mobile-core/src/ffi.rs:1337:24
+     |
+1337 |         Intent::Reload(dir) if core.runtime.shutting_down() => {
+     |                        ^^^ help: if this is intentional, prefix it with an underscore: `_dir`
+
 warning: variable does not need to be mutable
    --> duck-mobile-core/src/mujoco.rs:554:13
     |
@@ -53,6 +45,35 @@ warning: variable does not need to be mutable
     |             |
     |             help: remove this `mut`
 
-For more information about this error, try `rustc --explain E0308`.
-warning: `duck-mobile-core` (lib) generated 3 warnings
-error: could not compile `duck-mobile-core` (lib) due to 1 previous error; 3 warnings emitted
+warning: type `DuckMj` is more private than the item `MujocoIo::handle`
+   --> duck-mobile-core/src/mujoco.rs:587:5
+    |
+587 |     pub fn handle(&self) -> *mut DuckMj {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `MujocoIo::handle` is reachable at visibility `pub`
+    |
+note: but type `DuckMj` is only usable at visibility `pub(self)`
+   --> duck-mobile-core/src/mujoco.rs:23:1
+    |
+ 23 | struct DuckMj {
+    | ^^^^^^^^^^^^^
+    = note: `#[warn(private_interfaces)]` on by default
+
+warning: field `provenance` is never read
+  --> duck-mobile-core/src/ffi.rs:59:5
+   |
+48 | pub struct DuckCore {
+   |            -------- field in this struct
+...
+59 |     provenance: crate::provenance::Provenance,
+   |     ^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `duck_mj_timestep` is never used
+  --> duck-mobile-core/src/mujoco.rs:43:8
+   |
+43 |     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
+   |        ^^^^^^^^^^^^^^^^
+
+warning: `duck-mobile-core` (lib) generated 8 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 5 suggestions)
+    Finished `release` profile [optimized] target(s) in 2m 33s
