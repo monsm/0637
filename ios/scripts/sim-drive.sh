@@ -523,6 +523,22 @@ LAN=$(api POST /peers/start '{"name":"CI Duck"}' || true)
 PAIR=$(api POST /peers/pair '{"code":"424242"}' || true)
 printf '%s' "$PAIR" | grep -q '"ok":true'
 check $? "the six-digit pairing code is set" "$(printf '%s' "$PAIR" | head -c 120)"
+
+# The pairing handshake has its own script and its own socket: the greet
+# test below reads ONE reply and must see hello, not our pair's answer.
+python3 - <<'HERE'
+import json, socket, time
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("127.0.0.1", 8798))
+sock.settimeout(3.0)
+sock.sendto(json.dumps({"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}).encode(), ("127.0.0.1", 8766))
+time.sleep(0.15)
+sock.sendto(json.dumps({"v": 1, "type": "pair", "from": "peerci01", "name": "Sunny", "code": "424242"}).encode(), ("127.0.0.1", 8766))
+try:
+    sock.recvfrom(2048)
+except Exception:
+    pass
+HERE
 printf '%s' "$LAN" | grep -q '"ok":true'
 check $? "the duck opens its LAN socket" "$(printf '%s' "$LAN" | head -c 140)"
 # Starting discovery is queued; wait until /peers publishes our name before
@@ -537,11 +553,8 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(("127.0.0.1", 8799))
 sock.settimeout(3.0)
 announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
-pair = {"v": 1, "type": "pair", "from": "peerci01", "name": "Sunny", "code": "424242"}
 greet = {"v": 1, "type": "greet", "from": "peerci01", "name": "Sunny", "to": "all"}
 sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
-time.sleep(0.05)
-sock.sendto(json.dumps(pair).encode(), ("127.0.0.1", 8766))
 time.sleep(0.15)
 sock.sendto(json.dumps(greet).encode(), ("127.0.0.1", 8766))
 try:
@@ -584,15 +597,12 @@ sock.bind(("127.0.0.1", 8799))
 # announcing while we wait.
 deadline = time.time() + 55.0
 announce = {"v": 1, "type": "announce", "from": "peerci01", "name": "Sunny"}
-pair = {"v": 1, "type": "pair", "from": "peerci01", "name": "Sunny", "code": "424242"}
 next_announce = 0.0
 result = "timeout"
 while time.time() < deadline:
     now = time.time()
     if now >= next_announce:
         sock.sendto(json.dumps(announce).encode(), ("127.0.0.1", 8766))
-time.sleep(0.05)
-sock.sendto(json.dumps(pair).encode(), ("127.0.0.1", 8766))
         next_announce = now + 5.0
     sock.settimeout(max(0.1, min(1.0, deadline - now)))
     try:

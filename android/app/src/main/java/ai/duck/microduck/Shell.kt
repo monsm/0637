@@ -145,17 +145,6 @@ fun Shell(
     var nightActive by remember { mutableStateOf(false) }
     var dex by remember { mutableStateOf(emptyList<DexEntryUi>()) }
     val dance = remember(context) { DanceStudio(context) }
-    // The palm's heartbeat: the core's care numbers as a vibration rhythm.
-    // A reading of the real state, never a fact; silent until the row says on.
-    val heart = remember(context) { Heart(context) }
-    var heartOn by remember { mutableStateOf(
-        context.getSharedPreferences("duck", Context.MODE_PRIVATE).getBoolean("duck_heart_on", false)
-    ) }
-    LaunchedEffect(heartOn) {
-        heart.setEnabled(heartOn)
-        context.getSharedPreferences("duck", Context.MODE_PRIVATE)
-            .edit().putBoolean("duck_heart_on", heartOn).apply()
-    }
     var danceShow by remember { mutableStateOf(0) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
     var aiStatus by remember { mutableStateOf("") }
@@ -337,12 +326,7 @@ fun Shell(
             // snapshot it persists.
             val stateText = withContext(Dispatchers.IO) { fetchRawState() }
             val careNow = stateText?.let(::parseCare)
-            if (careNow != null) {
-                careUi = careNow
-                // The palm reads the same numbers the pill does; one tick
-                // checks whether the next beat is due.
-                heart.tick(careNow.heartBpm, System.currentTimeMillis())
-            }
+            if (careNow != null) careUi = careNow
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
             val nightNow = stateText?.let(::parseNight)
@@ -1052,6 +1036,14 @@ fun Shell(
             onFeed = {
                 dance.record("feed", label = Copy.feed)
                 onFeed?.invoke()
+            },
+            onLight = { color ->
+                dance.record("light", color, color)
+                // The duck's own LED: the same client intent a rule uses.
+                postDuckCommand(
+                    "/flashlight",
+                    """{"toggle":false,"on":${color != "off"},"color":"$color"}""",
+                )
             },
             onClose = { showDance = false },
         )
@@ -3041,6 +3033,18 @@ private fun InstrumentSheet(
     var trickBook by remember { mutableStateOf("—") }
     // The companion layer, read from /state.care on the same 1 Hz loop.
     var care by remember { mutableStateOf(CareUi()) }
+    // The palm's heartbeat lives IN THIS SHEET: the row is here, so the
+    // state and the vibrator are here. A reading of the real care numbers,
+    // never a fact; silent until the row says on.
+    val heart = remember(context) { Heart(context) }
+    var heartOn by remember { mutableStateOf(
+        context.getSharedPreferences("duck", Context.MODE_PRIVATE).getBoolean("duck_heart_on", false)
+    ) }
+    LaunchedEffect(heartOn) {
+        heart.setEnabled(heartOn)
+        context.getSharedPreferences("duck", Context.MODE_PRIVATE)
+            .edit().putBoolean("duck_heart_on", heartOn).apply()
+    }
     // The chosen night, the top-level /state.night beside that care: the
     // row says whether the duck is down for the night and how quietly.
     var night by remember { mutableStateOf(NightUi()) }
@@ -3079,7 +3083,11 @@ private fun InstrumentSheet(
             behaviorSummary = fetchBehaviorSummary()
             face = fetchFace()
             trickBook = fetchTrickBook()
-            fetchCare()?.let { care = it }
+            fetchCare()?.let {
+                care = it
+                // The palm reads the same numbers this loop already fetched.
+                heart.tick(it.heartBpm, System.currentTimeMillis())
+            }
             // The night rides the same /state: the row is only ever what the
             // core published, and a failed read keeps the last one.
             night = withContext(Dispatchers.IO) { fetchNight() } ?: night
