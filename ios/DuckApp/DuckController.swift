@@ -128,6 +128,12 @@ final class DuckController: ObservableObject {
     /// The scene has a mouth joint. The official walking scene does not, so
     /// the sheet does not claim a beak the duck cannot move.
     @Published var hasMouth = false
+    /// Main-thread only: the lower beak's opening, 0..1, for the renderer.
+    /// The shared MJCF has no jaw joint, so MuJoCo cannot move the mouth even
+    /// though the official robot's mouth is a servo. The shell animates the
+    /// beak itself while a sound is sounding — visual only; the 61-D
+    /// observation and the safety layer never see it.
+    private(set) var visualMouth: Double = 0
     /// "walk" or "roller", from /state.
     @Published var driveMode = "walk"
     /// The last skill the ring actually started. `duck_core_trigger_skill`
@@ -2240,6 +2246,11 @@ final class DuckController: ObservableObject {
         // the same main-thread tick that steps MuJoCo. Only the PCM crosses
         // to the audio queue.
         voice.poll(core: core)
+        // The beak follows the voice. robotd's chorus opens the mouth servo
+        // through a 90 ms time constant; the shell uses the same one, so a
+        // quack opens the jaw instead of snapping it open and shut.
+        let mouthTarget = voice.isSpeaking ? 1.0 : 0.0
+        visualMouth += (mouthTarget - visualMouth) * (1 - exp(-0.02 / 0.09))
         if Voice.diagnosticsEnabled {
             // Five times a second is enough for the UI test's polling and
             // cheap enough for the control loop; the string is only built

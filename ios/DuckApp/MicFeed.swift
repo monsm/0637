@@ -295,7 +295,7 @@ final class MicFeed: ObservableObject {
 enum SpeechState: Equatable {
     /// The ear is closed: the user has not asked for voice commands.
     case off
-    /// Listening for Mandarin.
+    /// Listening in the shell's language (Chinese or English).
     case listening
     /// The speech permission was refused.
     case denied
@@ -307,7 +307,7 @@ enum SpeechState: Equatable {
     case onDeviceMissing
 }
 
-/// The duck's ear: Mandarin in, verbs out.
+/// The duck's ear: the shell's language in, verbs out.
 ///
 /// Apple's recogniser turns the room's sound into text; the core's word
 /// table turns the text into the duck's own verbs. Only the text leaves the
@@ -322,8 +322,21 @@ final class SpeechListener: ObservableObject {
     /// The last thing the duck heard.
     @Published private(set) var text: String = ""
 
-    /// Mandarin. The duck's own words are Chinese.
-    private let recognizer: SFSpeechRecognizer?
+    /// The recogniser follows the language on screen: the core's verb table
+    /// accepts both, but a zh-CN recogniser transcribes English as Chinese
+    /// noise (and the other way round), so the ear must listen in the
+    /// language the user sees. Built per session, because the language row
+    /// can flip at any time and a stale recogniser would keep the old locale.
+    private static var localeIdentifier: String {
+        Copy.language == .chinese ? "zh-CN" : "en-US"
+    }
+
+    private static func makeRecognizer() -> SFSpeechRecognizer? {
+        // A recogniser for a locale this device does not know is nil, and a
+        // nil recogniser is a normal answer, not a crash.
+        SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier))
+    }
+
     /// All the recognition bookkeeping runs here: the task, the request, the
     /// restarts and the trailing POST. One serial queue, so only the request
     /// pointer itself needs a lock.
@@ -345,16 +358,10 @@ final class SpeechListener: ObservableObject {
     /// How many sessions may fail in a row before the ear gives up.
     private let failureLimit = 5
 
-    init() {
-        // A recogniser for a locale this device does not know is nil, and a
-        // nil recogniser is a normal answer, not a crash.
-        recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
-    }
-
     /// The user switched the duck's ear on. The speech permission is asked
     /// HERE and nowhere else — never at launch.
     func start() {
-        guard let recognizer else {
+        guard let recognizer = Self.makeRecognizer() else {
             publish(.unavailable)
             return
         }
@@ -439,7 +446,7 @@ final class SpeechListener: ObservableObject {
     /// One recognition session: a fresh request, a fresh task, and the
     /// request handed to the audio thread.
     private func startSession() {
-        guard enabled, let recognizer else { return }
+        guard enabled, let recognizer = Self.makeRecognizer() else { return }
         guard recognizer.isAvailable else {
             enabled = false
             publish(.unavailable)

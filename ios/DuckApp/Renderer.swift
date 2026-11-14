@@ -26,6 +26,10 @@ private struct Uniforms {
 private struct Mesh {
     let buffer: MTLBuffer
     let vertices: Int
+    /// The soup's bounds in mesh space: the jaw's hinge is derived from them
+    /// (the model has no jaw joint to ask).
+    let boundsMin: SIMD3<Float>
+    let boundsMax: SIMD3<Float>
 }
 
 private struct Instance {
@@ -33,6 +37,12 @@ private struct Instance {
     let body: Int
     let local: simd_float4x4
     let color: SIMD4<Float>
+    /// The lower beak: the one geom the shell animates itself. Pivot and axis
+    /// live in the head body's frame, computed once from the mesh's own
+    /// bounds and this geom's local transform.
+    let isJaw: Bool
+    let jawPivot: SIMD3<Float>
+    let jawAxis: SIMD3<Float>
 }
 
 /// Why the renderer could not start. Every one of these used to end in a
@@ -200,11 +210,29 @@ final class Renderer: NSObject, MTKViewDelegate {
                 Float(rotation[2]), Float(rotation[3])
             ))
             let alpha = color[3] > 0 ? color[3] : 1
+            // The jaw is a fixed geom in the shared MJCF (the official robot's
+            // mouth is a servo the model does not carry), so the shell rotates
+            // the lower beak itself while the voice plays. The hinge is the
+            // lateral axis through the rear-top edge of the jaw's own bounds.
+            let meshName = duck_core_mesh_name(core, meshID).map { String(cString: $0) } ?? ""
+            let isJaw = meshName == "jaw_soft"
+            var jawPivot = SIMD3<Float>(0, 0, 0)
+            var jawAxis = SIMD3<Float>(0, 1, 0)
+            if isJaw {
+                let pivotMesh = SIMD3<Float>(0, mesh.boundsMax.y, mesh.boundsMax.z)
+                let pivotBody = local * SIMD4<Float>(pivotMesh, 1)
+                let axisBody = local * SIMD4<Float>(1, 0, 0, 0)
+                jawPivot = SIMD3<Float>(pivotBody.x, pivotBody.y, pivotBody.z)
+                jawAxis = simd_normalize(SIMD3<Float>(axisBody.x, axisBody.y, axisBody.z))
+            }
             instances.append(Instance(
                 mesh: mesh,
                 body: Int(body),
                 local: local,
-                color: SIMD4<Float>(color[0], color[1], color[2], alpha)
+                color: SIMD4<Float>(color[0], color[1], color[2], alpha),
+                isJaw: isJaw,
+                jawPivot: jawPivot,
+                jawAxis: jawAxis
             ))
         }
         // NSLog, not print: the CI session reads this from the unified log,
@@ -239,7 +267,22 @@ final class Renderer: NSObject, MTKViewDelegate {
         ) else {
             return nil
         }
-        let mesh = Mesh(buffer: buffer, vertices: vertices.count / 6)
+        // Position + normal per vertex: bounds come from the positions only.
+        var low = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var high = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        var index = 0
+        while index + 2 < vertices.count {
+            let point = SIMD3<Float>(vertices[index], vertices[index + 1], vertices[index + 2])
+            low = simd_min(low, point)
+            high = simd_max(high, point)
+            index += 6
+        }
+        let mesh = Mesh(
+            buffer: buffer,
+            vertices: vertices.count / 6,
+            boundsMin: low,
+            boundsMax: high
+        )
         meshes[id] = mesh
         return mesh
     }
@@ -290,7 +333,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             length: vertices.count * MemoryLayout<Float>.stride,
             options: .storageModeShared
         )!
-        return Mesh(buffer: buffer, vertices: vertices.count / 6)
+        return Mesh(
+            buffer: buffer,
+            vertices: vertices.count / 6,
+            boundsMin: SIMD3<Float>(repeating: -extent),
+            boundsMax: SIMD3<Float>(repeating: extent)
+        )
     }
 
     /// 全屏背景板：一个盖住 NDC 的大三角，顶点直接给 NDC 坐标，MVP 用
@@ -308,7 +356,12 @@ final class Renderer: NSObject, MTKViewDelegate {
             length: vertices.count * MemoryLayout<Float>.stride,
             options: .storageModeShared
         )!
-        return Mesh(buffer: buffer, vertices: vertices.count / 6)
+        return Mesh(
+            buffer: buffer,
+            vertices: vertices.count / 6,
+            boundsMin: SIMD3<Float>(-1, -1, z),
+            boundsMax: SIMD3<Float>(3, 3, z)
+        )
     }
 
     // MARK: - 晨昏光
@@ -498,7 +551,18 @@ final class Renderer: NSObject, MTKViewDelegate {
                 }
             }
             guard let (position, rotation) = poses[instance.body] else { continue }
-            let model = translation(position) * quaternionMatrix(rotation) * instance.local
+            var jaw = matrix_identity_float4x4
+            if instance.isJaw, controller.visualMouth > 0.01 {
+                // 0.32 rad (~18°) fully open: the lower beak swings down about
+                // its own rear hinge while a sound is sounding. Visual only —
+                // the observation and the control loop never see this.
+                let pivot = instance.jawPivot
+                let angle = Float(controller.visualMouth) * 0.32
+                jaw = translation(pivot)
+                    * simd_float4x4(simd_quatf(angle: angle, axis: instance.jawAxis))
+                    * translation(SIMD3<Float>(-pivot.x, -pivot.y, -pivot.z))
+            }
+            let model = translation(position) * quaternionMatrix(rotation) * jaw * instance.local
             draw(mesh: instance.mesh, model: model, color: instance.color,
                  light: forward, look: 0, viewProjection: viewProjection,
                  halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)

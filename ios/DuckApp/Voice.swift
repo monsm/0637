@@ -28,6 +28,11 @@ final class Voice {
     private var configured = false
     /// Main-thread only: whether a buffer is still sounding.
     private var playing = false
+    /// Main-thread only: the shell draws the lower beak from this. The shared
+    /// MJCF models the jaw as a fixed geom (the official robot's mouth is a
+    /// servo the model does not carry), so the renderer, not MuJoCo, animates
+    /// the mouth — and only while a sound is actually sounding.
+    var isSpeaking: Bool { playing }
     /// Main-thread only: the mic tap is installed on `engine.inputNode`.
     private var micTapInstalled = false
     /// The session/engine notifications we keep; removed in `deinit`.
