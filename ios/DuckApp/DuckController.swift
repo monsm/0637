@@ -501,7 +501,8 @@ final class DuckController: ObservableObject {
         heardCancellable = mic.$heardText
             .receive(on: RunLoop.main)
             .sink { [weak self] text in
-                self?.heardText = text
+                guard let self, !text.isEmpty, text != self.heardText else { return }
+                self.speechArrived(text)
             }
         // A persisted "on" from a previous launch is resumed only when the
         // earlier grant is still valid. This is NOT a launch-time permission
@@ -1107,6 +1108,19 @@ final class DuckController: ObservableObject {
         else { return }
         lastAIThink = Date()
         aiThinkNow()
+    }
+
+    /// The person just said something. A conversation cannot wait out the
+    /// periodic think (10 s floor, 30 s default), so a fresh transcript asks
+    /// for one decision immediately — still rate-limited to the same floor,
+    /// because a model answered twice a second is not a conversation either.
+    func speechArrived(_ text: String) {
+        heardText = text
+        guard aiConfig.enabled, ready else { return }
+        if Date().timeIntervalSince(lastAIThink) >= 10 {
+            lastAIThink = Date()
+            aiThinkNow()
+        }
     }
 
     /// One decision now, whether or not the loop is on.
