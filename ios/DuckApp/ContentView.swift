@@ -271,6 +271,17 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
+        // What the duck heard you say, for a moment: without this, a spoken
+        // word that no verb matched simply vanished — the ear worked and the
+        // screen said nothing, which reads as a deaf duck.
+        .onChange(of: controller.heardText) { _, text in
+            guard !text.isEmpty else { return }
+            withAnimation(.easeIn(duration: 0.2)) { moodText = text }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                guard moodText == text else { return }
+                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+            }
+        }
         // A programmed block shows its work: "拍手 → 翻滚".
         .onChange(of: controller.ruleNotice) { _, notice in
             guard let notice, !notice.isEmpty else { return }
