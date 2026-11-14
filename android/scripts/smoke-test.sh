@@ -1158,12 +1158,53 @@ print(f"Chinese portrait screenshot: {width}x{height}")
 PY
 cp ui-b1-android-zh.png ui-b4-android.png
 
-# The B4 drawer, opened from the thumb deck's More button, in Chinese.
+# The B4 drawer, opened from the thumb deck's More button, in Chinese. The
+# drawer scrolls: on the 640 px emulator only its first rows are on screen,
+# so poll and swipe up between dumps, keeping every text seen, until the
+# whole inventory has been on the display at least once.
 tap_text "更多" > /dev/null 2>&1 || {
   echo "::error::the thumb deck has no More button"
   exit 1
 }
-sleep 2
+echo -n "" > /tmp/duck-drawer-seen.txt
+DRAWER_OK=0
+for _ in $(seq 1 20); do
+  sleep 0.4
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  [ -s ui.xml ] || continue
+  if python3 - <<'PY'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = []
+for node in root.iter('node'):
+    if node.get('package') != 'ai.duck.microduck':
+        continue
+    for attr in ('text', 'content-desc'):
+        value = node.get(attr) or ''
+        if value:
+            texts.append(value)
+with open('/tmp/duck-drawer-seen.txt', 'a', encoding='utf-8') as handle:
+    for text in texts:
+        handle.write(text + "\n")
+needed = (
+    '玩', '一起', '记录', '这只鸭子',
+    '画路走', '积木规则', '编舞铺', '操控方式',
+    '邻居', '每日任务', '鸭子日记', '明信片', '情绪图鉴',
+    'AI 伙伴', '晚安', '手电筒', '语言',
+)
+raise SystemExit(0 if all(word in texts for word in needed) else 1)
+PY
+  then
+    DRAWER_OK=1
+    break
+  fi
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
 rm -f ui.xml
 if ! adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
   echo "::error::uiautomator could not dump the More drawer"
@@ -1178,21 +1219,18 @@ try:
     root = ET.parse('ui.xml').getroot()
 except Exception as exc:
     raise SystemExit(f"::error::cannot read the drawer dump: {exc}")
-texts = [
-    node.get(attr) or ''
-    for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
-]
+seen = []
+with open('/tmp/duck-drawer-seen.txt', encoding='utf-8') as handle:
+    seen = [line.rstrip("\n") for line in handle if line.strip()]
 needed = (
     '玩', '一起', '记录', '这只鸭子',
     '画路走', '积木规则', '编舞铺', '操控方式',
     '邻居', '每日任务', '鸭子日记', '明信片', '情绪图鉴',
     'AI 伙伴', '晚安', '手电筒', '语言',
 )
-missing = [word for word in needed if word not in texts]
+missing = [word for word in needed if word not in seen]
 if missing:
-    raise SystemExit(f"::error::the drawer is missing {missing}: {texts[:24]}")
+    raise SystemExit(f"::error::the drawer is missing {missing}: {seen[:24]}")
 print("drawer: four groups, all rows, Chinese")
 PY
 adb exec-out screencap -p > ui-b4-android-more.png || true
