@@ -42,8 +42,8 @@ ExecuteExternalTool /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/X
 
 ExecuteExternalTool /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/actool --version --output-format xml1
 
-Build description signature: 3d7be81daf85b6f1d9591d2322e077d4
-Build description path: /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/XCBuildData/3d7be81daf85b6f1d9591d2322e077d4.xcbuilddata
+Build description signature: dffd857b18f9d1cb620c4c87f7a40048
+Build description path: /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/XCBuildData/dffd857b18f9d1cb620c4c87f7a40048.xcbuilddata
 ClangStatCache /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache
     cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
     /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -o /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache
@@ -95,13 +95,13 @@ WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.no
     cd /Users/runner/work/0637/0637/ios
     write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyStaticMetadataFileList
 
-WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyMetadataFileList (in target 'DuckUITests' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyMetadataFileList
-
 WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap
+
+WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyMetadataFileList (in target 'DuckUITests' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyMetadataFileList
 
 WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-own-target-headers.hmap (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -507,7 +507,7 @@ PhaseScriptExecution Check\ Rust\ core /Users/runner/work/0637/0637/ios/build/Bu
     export OTHER_LDFLAGS\=-L/Users/runner/work/0637/0637/ios/Frameworks\ -lduck_mobile_core
     export PACKAGE_TYPE\=com.apple.package-type.wrapper.application
     export PASCAL_STRINGS\=YES
-    export PATH\=/Applications/Xcode_26.6.app/Contents/SharedFrameworks/SwiftBuild.framework/Versions/A/PlugIns/SWBBuildService.bundle/Contents/PlugIns/SWBUniversalPlatformPlugin.bundle/Contents/Frameworks/SWBUniversalPlatform.framework/Resources:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain/usr/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain/usr/local/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/local/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/lib/ruby/gems/3.4.0/bin:/opt/homebrew/opt/ruby@3.4/bin:/Users/runner/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/runner/.cargo/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/local/sbin:/Users/runner/bin:/Users/runner/.yarn/bin:/Users/runner/Library/Android/sdk/tools:/Users/runner/Library/Android/sdk/platform-tools:/Library/Frameworks/Python.framework/Versions/Current/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/usr/bin:/bin:/usr/sbin:/sbin:/Users/runner/.dotnet/tools
+    export PATH\=/Applications/Xcode_26.6.app/Contents/SharedFrameworks/SwiftBuild.framework/Versions/A/PlugIns/SWBBuildService.bundle/Contents/PlugIns/SWBUniversalPlatformPlugin.bundle/Contents/Frameworks/SWBUniversalPlatform.framework/Resources:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain/usr/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain/usr/local/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/local/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/lib/ruby/gems/3.4.0/bin:/opt/homebrew/opt/ruby@3.4/bin:/Users/runner/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/runner/.cargo/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/local/sbin:/Users/runner/bin:/Users/runner/.yarn/bin:/Users/runner/Library/Android/sdk/tools:/Users/runner/Library/Android/sdk/platform-tools:/Library/Frameworks/Python.framework/Versions/Current/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/usr/bin:/bin:/usr/sbin:/sbin:/Users/runner/.dotnet/tools
     export PATH_PREFIXES_EXCLUDED_FROM_HEADER_DEPENDENCIES\=/usr/include\ /usr/local/include\ /System/Library/Frameworks\ /System/Library/PrivateFrameworks\ /Applications/Xcode_26.6.app/Contents/Developer/Headers\ /Applications/Xcode_26.6.app/Contents/Developer/SDKs\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms
     export PBDEVELOPMENTPLIST_PATH\=Duck.app/pbdevelopment.plist
     export PER_ARCH_MODULE_FILE_DIR\=/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/undefined_arch
@@ -685,7 +685,7 @@ PhaseScriptExecution Check\ Rust\ core /Users/runner/work/0637/0637/ios/build/Bu
     export TEST_FRAMEWORK_SEARCH_PATHS\=\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks
     export TEST_LIBRARY_SEARCH_PATHS\=\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib
     export TOOLCHAINS\=com.apple.dt.toolchain.Metal.32023.883\ com.apple.dt.toolchain.XcodeDefault
-    export TOOLCHAIN_DIR\=/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain
+    export TOOLCHAIN_DIR\=/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain
     export TOOLCHAIN_VERSION\=32023.883
     export TREAT_MISSING_BASELINES_AS_TEST_FAILURES\=NO
     export TREAT_MISSING_SCRIPT_PHASE_OUTPUTS_AS_ERRORS\=NO
@@ -773,13 +773,13 @@ ProcessProductPackagingDER /Users/runner/work/0637/0637/ios/build/Build/Intermed
 
 SwiftDriver DuckUITests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    builtin-SwiftDriver -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name DuckUITests -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList -DDEBUG -module-alias Testing\=_Testing_Unavailable -plugin-path /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -parse-as-library -c -j5 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
+    builtin-SwiftDriver -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name DuckUITests -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList -DDEBUG -module-alias Testing\=_Testing_Unavailable -plugin-path /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -parse-as-library -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCUIAutomation-AZGPR148138TUGKVYBX4EW3JM.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCTest-5PVG7J7HJWQ2OAO4GJKC59TVS.pcm
-
 SwiftExplicitDependencyCompileModuleFromInterface arm64 /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCUIAutomation-8Y5HRMJZISL.swiftmodule
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCTest-5PVG7J7HJWQ2OAO4GJKC59TVS.pcm
 
 SwiftExplicitDependencyCompileModuleFromInterface arm64 /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules/XCTest-1PMJ0R6HNSN8O.swiftmodule
 
@@ -799,19 +799,19 @@ SwiftDriverJobDiscovery normal arm64 Emitting module for DuckUITests (in target 
 
 SwiftDriver\ Compilation\ Requirements DuckUITests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    builtin-Swift-Compilation-Requirements -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name DuckUITests -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList -DDEBUG -module-alias Testing\=_Testing_Unavailable -plugin-path /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -parse-as-library -c -j5 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name DuckUITests -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList -DDEBUG -module-alias Testing\=_Testing_Unavailable -plugin-path /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -parse-as-library -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
 
 SwiftMergeGeneratedHeaders /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/DuckUITests-Swift.h /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     builtin-swiftHeaderTool -arch arm64 /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/DuckUITests-Swift.h
 
-Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftdoc (in target 'DuckUITests' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftdoc /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests.swiftmodule/arm64-apple-ios-simulator.swiftdoc
-
 Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests.swiftmodule/arm64-apple-ios-simulator.swiftmodule
+
+Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftdoc (in target 'DuckUITests' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftdoc /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests.swiftmodule/arm64-apple-ios-simulator.swiftdoc
 
 Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests.swiftmodule/arm64-apple-ios-simulator.abi.json /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.abi.json (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -825,14 +825,14 @@ SwiftDriverJobDiscovery normal arm64 Compiling DuckUITests.swift (in target 'Duc
 
 SwiftDriver\ Compilation DuckUITests normal arm64 com.apple.xcode.tools.swift.compiler (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    builtin-Swift-Compilation -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name DuckUITests -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList -DDEBUG -module-alias Testing\=_Testing_Unavailable -plugin-path /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -parse-as-library -c -j5 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
+    builtin-Swift-Compilation -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name DuckUITests -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList -DDEBUG -module-alias Testing\=_Testing_Unavailable -plugin-path /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -Isystem /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks -F /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks -parse-as-library -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests-Swift.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
 
 LinkAssetCatalog /Users/runner/work/0637/0637/ios/DuckApp/Assets.xcassets (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     builtin-linkAssetCatalog --thinned /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/thinned --thinned-dependencies /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_dependencies_thinned --thinned-info-plist-content /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist_thinned --unthinned /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/unthinned --unthinned-dependencies /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist_unthinned --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app --plist-output /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist
-note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Assets.car (in target 'Duck' from project 'Duck')
-note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/AppIcon60x60@2x.png (in target 'Duck' from project 'Duck')
 note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/AppIcon76x76@2x~ipad.png (in target 'Duck' from project 'Duck')
+note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/AppIcon60x60@2x.png (in target 'Duck' from project 'Duck')
+note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Assets.car (in target 'Duck' from project 'Duck')
 
 ProcessInfoPlistFile /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Info.plist /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -840,13 +840,13 @@ ProcessInfoPlistFile /Users/runner/work/0637/0637/ios/build/Build/Products/Debug
 
 ExtractAppIntentsMetadata (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain --module-name Duck --sdk-root /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk --xcode-version 17F113 --platform-family iOS --deployment-target 17.0 --bundle-identifier ai.duck.microduck --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app --target-triple arm64-apple-ios17.0-simulator --binary-file /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck --dependency-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_dependency_info.dat --stringsdata-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList --metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
-2026-11-14 08:30:12.368 appintentsmetadataprocessor[25900:76403] Starting appintentsmetadataprocessor export
-2026-11-14 08:30:12.370 appintentsmetadataprocessor[25900:76403] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain --module-name Duck --sdk-root /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk --xcode-version 17F113 --platform-family iOS --deployment-target 17.0 --bundle-identifier ai.duck.microduck --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app --target-triple arm64-apple-ios17.0-simulator --binary-file /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck --dependency-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_dependency_info.dat --stringsdata-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList --metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-11-14 09:14:40.120 appintentsmetadataprocessor[22699:64774] Starting appintentsmetadataprocessor export
+2026-11-14 09:14:40.140 appintentsmetadataprocessor[22699:64774] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
 
 CopySwiftLibs /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/PlugIns --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/SystemExtensions --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Extensions --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/Metal.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/MetalKit.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/CoreMotion.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/AVFoundation.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/Speech.framework --platform iphonesimulator --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain --toolchain /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/PlugIns --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/SystemExtensions --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Extensions --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/Metal.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/MetalKit.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/CoreMotion.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/AVFoundation.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/Speech.framework --platform iphonesimulator --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain --toolchain /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
 
 CodeSign /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -869,24 +869,28 @@ Ld /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/D
 
 CopySwiftLibs /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/DuckUITests --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Frameworks --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/PlugIns --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/SystemExtensions --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Extensions --platform iphonesimulator --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain --toolchain /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Frameworks --strip-bitcode --scan-executable /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
+    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/DuckUITests --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Frameworks --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/PlugIns --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/SystemExtensions --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Extensions --platform iphonesimulator --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain --toolchain /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Frameworks --strip-bitcode --scan-executable /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib --strip-bitcode-tool /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os
 
 ExtractAppIntentsMetadata (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.ZsptK3/Metal.xctoolchain --module-name DuckUITests --sdk-root /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk --xcode-version 17F113 --platform-family iOS --deployment-target 17.0 --bundle-identifier ai.duck.microduck.uitests --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest --target-triple arm64-apple-ios17.0-simulator --binary-file /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/DuckUITests --dependency-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_dependency_info.dat --stringsdata-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList --metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
-2026-11-14 08:30:12.978 appintentsmetadataprocessor[25904:76441] Starting appintentsmetadataprocessor export
-2026-11-14 08:30:12.980 appintentsmetadataprocessor[25904:76441] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.O1Wpyi/Metal.xctoolchain --module-name DuckUITests --sdk-root /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk --xcode-version 17F113 --platform-family iOS --deployment-target 17.0 --bundle-identifier ai.duck.microduck.uitests --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest --target-triple arm64-apple-ios17.0-simulator --binary-file /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/DuckUITests --dependency-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests_dependency_info.dat --stringsdata-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftFileList --metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/Objects-normal/arm64/DuckUITests.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-11-14 09:14:41.497 appintentsmetadataprocessor[22706:64816] Starting appintentsmetadataprocessor export
+2026-11-14 09:14:41.500 appintentsmetadataprocessor[22706:64816] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
 
 AppIntentsSSUTraining (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Info.plist --temp-dir-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/ssu --bundle-id ai.duck.microduck.uitests --product-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest --extracted-metadata-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Metadata.appintents --metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/DuckUITests.build/DuckUITests.DependencyMetadataFileList --source-file /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest/Info.plist --archive-ssu-assets
-2026-11-14 08:30:13.015 appintentsnltrainingprocessor[25905:76442] Parsing options for appintentsnltrainingprocessor
-2026-11-14 08:30:13.016 appintentsnltrainingprocessor[25905:76442] Starting AppIntents SSU YAML Generation
-2026-11-14 08:30:13.016 appintentsnltrainingprocessor[25905:76442] No AppShortcuts found - Skipping.
+2026-11-14 09:14:41.560 appintentsnltrainingprocessor[22707:64818] Parsing options for appintentsnltrainingprocessor
+2026-11-14 09:14:41.560 appintentsnltrainingprocessor[22707:64818] Starting AppIntents SSU YAML Generation
+2026-11-14 09:14:41.564 appintentsnltrainingprocessor[22707:64818] No AppShortcuts found - Skipping.
 
 MkDir /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     /bin/mkdir -p /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app
+
+CopyAndPreserveArchs /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/DuckUITests-Runner (in target 'DuckUITests' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/XCTRunner -output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/DuckUITests-Runner -extract arm64
 
 CopyPlistFile /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/Info.plist /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/Info.plist (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -895,10 +899,6 @@ CopyPlistFile /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphone
 Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PkgInfo /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/PkgInfo (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/PkgInfo /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app
-
-CopyAndPreserveArchs /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/DuckUITests-Runner (in target 'DuckUITests' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Xcode/Agents/XCTRunner.app/XCTRunner -output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/DuckUITests-Runner -extract arm64
 
 Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/Frameworks/libXCTestSwiftSupport.dylib /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libXCTestSwiftSupport.dylib (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -939,10 +939,6 @@ CodeSign /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimul
     
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest
 
-RegisterExecutionPolicyException /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest (in target 'DuckUITests' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    builtin-RegisterExecutionPolicyException /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest
-
 CodeSign /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     
@@ -951,750 +947,836 @@ CodeSign /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimul
     /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app
 /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app: replacing existing signature
 
+RegisterExecutionPolicyException /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest (in target 'DuckUITests' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-RegisterExecutionPolicyException /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest
+
 Touch /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest (in target 'DuckUITests' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     /usr/bin/touch -c /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/DuckUITests-Runner.app/PlugIns/DuckUITests.xctest
 
 note: Run script build phase 'Check Rust core' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Duck' from project 'Duck')
-2026-11-14 08:30:15.909408+0000 DuckUITests-Runner[25915:76680] [Default] Running tests...
+2026-11-14 09:15:12.217576+0000 DuckUITests-Runner[23841:68206] [Default] Running tests...
+2026-11-14 09:15:12.344003+0000 DuckUITests-Runner[23841:68788] [General] Failed to send CA Event for app launch measurements for ca_event_type: 0 event_name: com.apple.app_launch_measurement.FirstFramePresentationMetric
+2026-11-14 09:15:12.387445+0000 DuckUITests-Runner[23841:68788] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
     t =      nans Interface orientation changed to Portrait
-Test Suite 'All tests' started at 2026-11-14 08:30:21.086.
-Test Suite 'DuckUITests.xctest' started at 2026-11-14 08:30:21.087.
-Test Suite 'DuckUITests' started at 2026-11-14 08:30:21.087.
+Test Suite 'All tests' started at 2026-11-14 09:15:20.957.
+Test Suite 'DuckUITests.xctest' started at 2026-11-14 09:15:20.959.
+Test Suite 'DuckUITests' started at 2026-11-14 09:15:20.959.
+Test Case '-[DuckUITests.DuckUITests testDiarySpeakChannelIsHonest]' started.
+    t =     0.00s Start Test at 2026-11-14 09:15:20.960
+    t =     1.13s Set Up
+    t =     1.13s     Setting device orientation to Portrait
+    t =     1.16s         Device orientation changed to Portrait
+    t =     1.22s         Wait for com.apple.springboard to idle
+    t =     1.33s     Open ai.duck.microduck
+    t =     1.33s         Launch ai.duck.microduck
+2026-11-14 09:15:23.402 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:15:23.402 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    11.42s             Setting up automation session
+    t =    14.41s             Wait for ai.duck.microduck to idle
+    t =    18.10s     Find the Target Application 'ai.duck.microduck'
+    t =    18.56s     Find the Target Application 'ai.duck.microduck'
+    t =    18.69s     Find the Target Application 'ai.duck.microduck'
+    t =    18.84s     Find the Target Application 'ai.duck.microduck'
+    t =    18.93s Waiting 10.0s for "duck-more" Button to exist
+    t =    19.94s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
+    t =    19.95s         Checking existence of `"duck-more" Button`
+    t =    20.25s Tap "duck-more" Button
+    t =    20.25s     Wait for ai.duck.microduck to idle
+    t =    20.27s     Find the "duck-more" Button
+    t =    20.41s     Check for interrupting elements affecting "duck-more" Button
+    t =    20.60s     Synthesize event
+    t =    21.19s     Wait for ai.duck.microduck to idle
+    t =    21.69s Waiting 10.0s for "more-title" StaticText to exist
+    t =    22.69s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
+    t =    22.69s         Checking existence of `"more-title" StaticText`
+    t =    23.26s Checking existence of `"more-diary" Button`
+    t =    23.37s Tap "more-diary" Button
+    t =    23.37s     Wait for ai.duck.microduck to idle
+    t =    23.40s     Find the "more-diary" Button
+    t =    23.81s     Check for interrupting elements affecting "more-diary" Button
+    t =    24.11s     Synthesize event
+    t =    24.57s     Wait for ai.duck.microduck to idle
+    t =    24.97s Waiting 10.0s for "diary-title" StaticText to exist
+    t =    26.02s     Checking `Expect predicate `existsNoRetry == 1` for object "diary-title" StaticText`
+    t =    26.02s         Checking existence of `"diary-title" StaticText`
+    t =    26.34s Waiting 10.0s for "diary-speak-note" StaticText to exist
+    t =    27.41s     Checking `Expect predicate `existsNoRetry == 1` for object "diary-speak-note" StaticText`
+    t =    27.41s         Checking existence of `"diary-speak-note" StaticText`
+    t =    27.65s Checking existence of `"diary-speak" Button`
+    t =    27.79s Tap "diary-speak" Button
+    t =    27.79s     Wait for ai.duck.microduck to idle
+    t =    27.79s     Find the "diary-speak" Button
+    t =    28.02s     Check for interrupting elements affecting "diary-speak" Button
+    t =    28.31s     Synthesize event
+    t =    28.72s     Wait for ai.duck.microduck to idle
+    t =    31.13s Checking existence of `"diary-title" StaticText`
+    t =    33.54s Checking existence of `"diary-speak-note" StaticText`
+    t =    33.70s Waiting 5.0s for "diary-close" Button to exist
+    t =    34.76s     Checking `Expect predicate `existsNoRetry == 1` for object "diary-close" Button`
+    t =    34.76s         Checking existence of `"diary-close" Button`
+    t =    34.97s Tap "diary-close" Button
+    t =    34.97s     Wait for ai.duck.microduck to idle
+    t =    34.97s     Find the "diary-close" Button
+    t =    35.22s     Check for interrupting elements affecting "diary-close" Button
+    t =    35.37s     Synthesize event
+    t =    35.74s     Wait for ai.duck.microduck to idle
+    t =    36.18s Waiting 5.0s for "more-close" Button to exist
+    t =    37.25s     Checking `Expect predicate `existsNoRetry == 1` for object "more-close" Button`
+    t =    37.26s         Checking existence of `"more-close" Button`
+    t =    37.41s Tap "more-close" Button
+    t =    37.41s     Wait for ai.duck.microduck to idle
+    t =    37.42s     Find the "more-close" Button
+    t =    37.63s     Check for interrupting elements affecting "more-close" Button
+    t =    37.80s     Synthesize event
+    t =    38.54s     Wait for ai.duck.microduck to idle
+    t =    40.02s Checking `Expect predicate `exists == 0` for object "more-title" StaticText`
+    t =    40.03s     Checking existence of `"more-title" StaticText`
+    t =    42.74s Tear Down
+    t =    42.74s     Setting device orientation to Portrait
+    t =    42.77s         Wait for ai.duck.microduck to idle
+Test Case '-[DuckUITests.DuckUITests testDiarySpeakChannelIsHonest]' passed (44.451 seconds).
 Test Case '-[DuckUITests.DuckUITests testFirstScreenSpeaksHuman]' started.
-    t =     0.00s Start Test at 2026-11-14 08:30:21.088
-    t =     0.47s Set Up
-    t =     0.47s     Setting device orientation to Portrait
-    t =     0.47s         Device orientation changed to Portrait
-    t =     0.50s         Wait for com.apple.springboard to idle
-    t =     0.58s     Open ai.duck.microduck
-    t =     0.58s         Launch ai.duck.microduck
-2026-11-14 08:30:22.243 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:30:22.243 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     3.35s             Setting up automation session
-    t =     4.73s             Wait for ai.duck.microduck to idle
-    t =     6.50s     Find the Target Application 'ai.duck.microduck'
-    t =     6.93s     Find the Target Application 'ai.duck.microduck'
-    t =     6.96s     Find the Target Application 'ai.duck.microduck'
-    t =     6.97s     Find the Target Application 'ai.duck.microduck'
-    t =     6.99s Waiting 120.0s for "duck-label" Any to exist
-    t =     8.06s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
-    t =     8.06s         Checking existence of `"duck-label" Any`
-    t =     8.09s Checking existence of `"duck-label" Any`
-    t =     8.14s Find the "duck-label" Any
-    t =     8.18s Get number of matches for: Elements matching predicate 'label MATCHES "t [0-9]+"'
-    t =     8.25s Waiting 20.0s for "mood-pill" StaticText to exist
-    t =     9.33s     Checking `Expect predicate `existsNoRetry == 1` for object "mood-pill" StaticText`
-    t =     9.33s         Checking existence of `"mood-pill" StaticText`
-    t =     9.38s Find the "mood-pill" StaticText
-    t =     9.41s Get all elements bound by index for: Descendants matching type Button
-    t =     9.43s Checking existence of `Button (Element at index 0)`
-    t =     9.44s Find the Button (Element at index 0)
-    t =     9.50s Checking existence of `Button (Element at index 1)`
-    t =     9.53s Find the Button (Element at index 1)
-    t =     9.58s Checking existence of `Button (Element at index 2)`
-    t =     9.60s Find the Button (Element at index 2)
-    t =     9.67s Checking existence of `Button (Element at index 3)`
-    t =     9.69s Find the Button (Element at index 3)
-    t =     9.72s Checking existence of `Button (Element at index 4)`
-    t =     9.74s Find the Button (Element at index 4)
-    t =     9.79s Checking existence of `Button (Element at index 5)`
-    t =     9.81s Find the Button (Element at index 5)
-    t =     9.87s Checking existence of `Button (Element at index 6)`
-    t =     9.88s Find the Button (Element at index 6)
-    t =     9.93s Waiting 10.0s for "duck-more" Button to exist
-    t =    10.96s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
-    t =    10.96s         Checking existence of `"duck-more" Button`
-    t =    11.03s Tap "duck-more" Button
-    t =    11.03s     Wait for ai.duck.microduck to idle
-    t =    11.04s     Find the "duck-more" Button
-    t =    11.07s     Check for interrupting elements affecting "duck-more" Button
-    t =    11.11s     Synthesize event
-    t =    11.56s     Wait for ai.duck.microduck to idle
-    t =    11.74s Waiting 10.0s for "more-title" StaticText to exist
-    t =    12.79s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
-    t =    12.79s         Checking existence of `"more-title" StaticText`
-    t =    12.92s Waiting 5.0s for "more-quests" Button to exist
-    t =    13.97s     Checking `Expect predicate `existsNoRetry == 1` for object "more-quests" Button`
-    t =    13.97s         Checking existence of `"more-quests" Button`
-    t =    14.04s Checking existence of `"more-diary" Button`
-    t =    14.10s Checking existence of `"more-postcards" Button`
-    t =    14.17s Checking existence of `"more-dex" Button`
-    t =    14.22s Waiting 5.0s for "more-close" Button to exist
-    t =    15.28s     Checking `Expect predicate `existsNoRetry == 1` for object "more-close" Button`
-    t =    15.28s         Checking existence of `"more-close" Button`
-    t =    15.38s Tap "more-close" Button
-    t =    15.38s     Wait for ai.duck.microduck to idle
-    t =    15.39s     Find the "more-close" Button
-    t =    15.49s     Check for interrupting elements affecting "more-close" Button
-    t =    15.60s     Synthesize event
-    t =    15.92s     Wait for ai.duck.microduck to idle
-    t =    17.31s Checking `Expect predicate `exists == 0` for object "more-title" StaticText`
-    t =    17.31s     Checking existence of `"more-title" StaticText`
-    t =    17.33s Waiting 10.0s for "duck-skills" Button to exist
-    t =    18.41s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
-    t =    18.41s         Checking existence of `"duck-skills" Button`
-    t =    18.44s Tap "duck-skills" Button
-    t =    18.44s     Wait for ai.duck.microduck to idle
-    t =    18.44s     Find the "duck-skills" Button
-    t =    18.47s     Check for interrupting elements affecting "duck-skills" Button
-    t =    18.52s     Synthesize event
-    t =    18.83s     Wait for ai.duck.microduck to idle
-    t =    18.87s Waiting 10.0s for "ring-kick_left" Button to exist
-    t =    19.96s     Checking `Expect predicate `existsNoRetry == 1` for object "ring-kick_left" Button`
-    t =    19.96s         Checking existence of `"ring-kick_left" Button`
-    t =    20.05s Tap "ring-kick_left" Button
-    t =    20.05s     Wait for ai.duck.microduck to idle
-    t =    20.06s     Find the "ring-kick_left" Button
-    t =    20.17s     Check for interrupting elements affecting "ring-kick_left" Button
-    t =    20.27s     Synthesize event
-    t =    20.65s     Wait for ai.duck.microduck to idle
-    t =    20.66s Waiting 20.0s for "duck-last-skill" StaticText to exist
-    t =    21.73s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-last-skill" StaticText`
-    t =    21.73s         Checking existence of `"duck-last-skill" StaticText`
-    t =    21.76s Find the "duck-last-skill" StaticText
-    t =    21.79s Find the "duck-label" Any
-    t =    21.83s Tear Down
-    t =    21.83s     Setting device orientation to Portrait
-    t =    21.84s         Wait for ai.duck.microduck to idle
-Test Case '-[DuckUITests.DuckUITests testFirstScreenSpeaksHuman]' passed (22.277 seconds).
+    t =     0.00s Start Test at 2026-11-14 09:16:05.415
+    t =     0.17s Set Up
+    t =     0.17s     Setting device orientation to Portrait
+    t =     0.19s         Wait for ai.duck.microduck to idle
+    t =     0.19s     Open ai.duck.microduck
+    t =     0.20s         Launch ai.duck.microduck
+    t =     0.20s             Terminate ai.duck.microduck:24904
+2026-11-14 09:16:07.712 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:16:07.713 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     4.63s             Setting up automation session
+    t =     6.59s             Wait for ai.duck.microduck to idle
+    t =     8.61s     Find the Target Application 'ai.duck.microduck'
+    t =     8.85s     Find the Target Application 'ai.duck.microduck'
+    t =     9.25s     Find the Target Application 'ai.duck.microduck'
+    t =     9.46s     Find the Target Application 'ai.duck.microduck'
+    t =     9.61s Waiting 120.0s for "duck-label" Any to exist
+    t =    10.65s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
+    t =    10.65s         Checking existence of `"duck-label" Any`
+    t =    10.71s Checking existence of `"duck-label" Any`
+    t =    10.80s Find the "duck-label" Any
+    t =    11.07s Get number of matches for: Elements matching predicate 'label MATCHES "t [0-9]+"'
+    t =    11.12s Waiting 20.0s for "mood-pill" StaticText to exist
+    t =    12.18s     Checking `Expect predicate `existsNoRetry == 1` for object "mood-pill" StaticText`
+    t =    12.18s         Checking existence of `"mood-pill" StaticText`
+    t =    12.25s Find the "mood-pill" StaticText
+    t =    12.30s Get all elements bound by index for: Descendants matching type Button
+    t =    12.40s Checking existence of `Button (Element at index 0)`
+    t =    12.44s Find the Button (Element at index 0)
+    t =    12.56s Checking existence of `Button (Element at index 1)`
+    t =    12.63s Find the Button (Element at index 1)
+    t =    12.77s Checking existence of `Button (Element at index 2)`
+    t =    12.82s Find the Button (Element at index 2)
+    t =    12.96s Checking existence of `Button (Element at index 3)`
+    t =    13.01s Find the Button (Element at index 3)
+    t =    13.16s Checking existence of `Button (Element at index 4)`
+    t =    13.20s Find the Button (Element at index 4)
+    t =    13.34s Checking existence of `Button (Element at index 5)`
+    t =    13.41s Find the Button (Element at index 5)
+    t =    13.59s Checking existence of `Button (Element at index 6)`
+    t =    13.64s Find the Button (Element at index 6)
+    t =    13.81s Waiting 10.0s for "duck-more" Button to exist
+    t =    14.87s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
+    t =    14.87s         Checking existence of `"duck-more" Button`
+    t =    14.95s Tap "duck-more" Button
+    t =    14.95s     Wait for ai.duck.microduck to idle
+    t =    14.96s     Find the "duck-more" Button
+    t =    15.05s     Check for interrupting elements affecting "duck-more" Button
+    t =    15.15s     Synthesize event
+    t =    15.50s     Wait for ai.duck.microduck to idle
+    t =    15.80s Waiting 10.0s for "more-title" StaticText to exist
+    t =    16.87s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
+    t =    16.87s         Checking existence of `"more-title" StaticText`
+    t =    17.20s Waiting 5.0s for "more-quests" Button to exist
+    t =    18.27s     Checking `Expect predicate `existsNoRetry == 1` for object "more-quests" Button`
+    t =    18.27s         Checking existence of `"more-quests" Button`
+    t =    18.47s Checking existence of `"more-diary" Button`
+    t =    18.63s Checking existence of `"more-postcards" Button`
+    t =    18.70s Checking existence of `"more-dex" Button`
+    t =    18.80s Waiting 5.0s for "more-close" Button to exist
+    t =    19.85s     Checking `Expect predicate `existsNoRetry == 1` for object "more-close" Button`
+    t =    19.85s         Checking existence of `"more-close" Button`
+    t =    20.10s Tap "more-close" Button
+    t =    20.10s     Wait for ai.duck.microduck to idle
+    t =    20.18s     Find the "more-close" Button
+    t =    20.36s     Check for interrupting elements affecting "more-close" Button
+    t =    20.53s     Synthesize event
+    t =    20.85s     Wait for ai.duck.microduck to idle
+    t =    22.29s Checking `Expect predicate `exists == 0` for object "more-title" StaticText`
+    t =    22.29s     Checking existence of `"more-title" StaticText`
+    t =    22.39s Waiting 10.0s for "duck-skills" Button to exist
+    t =    23.44s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
+    t =    23.45s         Checking existence of `"duck-skills" Button`
+    t =    23.52s Tap "duck-skills" Button
+    t =    23.52s     Wait for ai.duck.microduck to idle
+    t =    23.54s     Find the "duck-skills" Button
+    t =    23.64s     Check for interrupting elements affecting "duck-skills" Button
+    t =    23.76s     Synthesize event
+    t =    24.13s     Wait for ai.duck.microduck to idle
+    t =    24.55s Waiting 10.0s for "ring-kick_left" Button to exist
+    t =    25.60s     Checking `Expect predicate `existsNoRetry == 1` for object "ring-kick_left" Button`
+    t =    25.60s         Checking existence of `"ring-kick_left" Button`
+    t =    25.71s Tap "ring-kick_left" Button
+    t =    25.71s     Wait for ai.duck.microduck to idle
+    t =    25.73s     Find the "ring-kick_left" Button
+    t =    25.93s     Check for interrupting elements affecting "ring-kick_left" Button
+    t =    26.03s     Synthesize event
+    t =    26.48s     Wait for ai.duck.microduck to idle
+    t =    26.48s Waiting 20.0s for "duck-last-skill" StaticText to exist
+    t =    27.54s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-last-skill" StaticText`
+    t =    27.54s         Checking existence of `"duck-last-skill" StaticText`
+    t =    27.57s Find the "duck-last-skill" StaticText
+    t =    27.61s Find the "duck-label" Any
+    t =    27.66s Tear Down
+    t =    27.66s     Setting device orientation to Portrait
+    t =    27.68s         Wait for ai.duck.microduck to idle
+Test Case '-[DuckUITests.DuckUITests testFirstScreenSpeaksHuman]' passed (28.276 seconds).
 Test Case '-[DuckUITests.DuckUITests testLandscapeRoundTrip]' started.
-    t =     0.00s Start Test at 2026-11-14 08:30:43.367
-    t =     0.06s Set Up
-    t =     0.06s     Setting device orientation to Portrait
+    t =     0.00s Start Test at 2026-11-14 09:16:33.692
+    t =     0.07s Set Up
+    t =     0.07s     Setting device orientation to Portrait
     t =     0.07s         Wait for ai.duck.microduck to idle
     t =     0.08s     Open ai.duck.microduck
     t =     0.08s         Launch ai.duck.microduck
-    t =     0.08s             Terminate ai.duck.microduck:26677
-2026-11-14 08:30:44.519 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:30:44.519 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     1.38s             Setting up automation session
-    t =     2.64s             Wait for ai.duck.microduck to idle
-    t =     4.31s     Find the Target Application 'ai.duck.microduck'
-    t =     4.37s     Find the Target Application 'ai.duck.microduck'
-    t =     4.38s     Find the Target Application 'ai.duck.microduck'
-    t =     4.41s     Find the Target Application 'ai.duck.microduck'
-    t =     4.43s Waiting 120.0s for "duck-label" Any to exist
-    t =     5.49s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
-    t =     5.49s         Checking existence of `"duck-label" Any`
-    t =     5.53s Checking existence of `"duck-label" Any`
-    t =     5.57s Find the "duck-label" Any
-    t =     5.60s Setting device orientation to Landscape Left
-    t =     5.61s     Device orientation changed to Landscape Left
-    t =     5.89s     Interface orientation changed to Landscape Right
-    t =     5.89s     Wait for ai.duck.microduck to idle
-    t =     5.95s Find the Target Application 'ai.duck.microduck'
-    t =     5.97s Find the Target Application 'ai.duck.microduck'
-    t =     5.99s Find the Target Application 'ai.duck.microduck'
-    t =     6.02s Find the Target Application 'ai.duck.microduck'
-    t =     6.06s Checking existence of `"duck-label" Button`
-    t =     6.10s Waiting 5.0s for "duck-label" StaticText to exist
-    t =     7.15s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" StaticText`
-    t =     7.15s         Checking existence of `"duck-label" StaticText`
-    t =     7.17s Checking existence of `"duck-menu" Button`
-    t =     7.20s Waiting 5.0s for "duck-menu" Button to exist
-    t =     8.25s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-menu" Button`
-    t =     8.25s         Checking existence of `"duck-menu" Button`
-    t =     8.27s Checking existence of `"surface-toggle" Button`
-    t =     8.29s Waiting 5.0s for "surface-toggle" Button to exist
-    t =     9.33s     Checking `Expect predicate `existsNoRetry == 1` for object "surface-toggle" Button`
-    t =     9.33s         Checking existence of `"surface-toggle" Button`
-    t =     9.38s Checking existence of `"duck-time" Button`
-    t =     9.40s Waiting 5.0s for "duck-time" Button to exist
-    t =    10.45s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-time" Button`
-    t =    10.45s         Checking existence of `"duck-time" Button`
-    t =    10.49s Checking existence of `"duck-skills" Button`
-    t =    10.51s Waiting 5.0s for "duck-skills" Button to exist
-    t =    11.56s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
-    t =    11.56s         Checking existence of `"duck-skills" Button`
-    t =    11.59s Checking existence of `"duck-quack" Button`
-    t =    11.62s Waiting 5.0s for "duck-quack" Button to exist
-    t =    12.65s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-quack" Button`
-    t =    12.65s         Checking existence of `"duck-quack" Button`
-    t =    12.68s Checking existence of `"duck-grab" Button`
-    t =    12.70s Waiting 5.0s for "duck-grab" Button to exist
-    t =    13.73s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-grab" Button`
-    t =    13.73s         Checking existence of `"duck-grab" Button`
-    t =    13.76s Waiting 10.0s for "duck-skills" Button to exist
-    t =    14.82s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
-    t =    14.82s         Checking existence of `"duck-skills" Button`
-    t =    14.85s Tap "duck-skills" Button
-    t =    14.85s     Wait for ai.duck.microduck to idle
-    t =    14.86s     Find the "duck-skills" Button
-    t =    14.88s     Check for interrupting elements affecting "duck-skills" Button
-    t =    14.94s     Synthesize event
-    t =    15.27s     Wait for ai.duck.microduck to idle
-    t =    15.29s Waiting 10.0s for "ring-roulade" Button to exist
-    t =    16.33s     Checking `Expect predicate `existsNoRetry == 1` for object "ring-roulade" Button`
-    t =    16.33s         Checking existence of `"ring-roulade" Button`
-    t =    16.40s Tap "ring-roulade" Button
-    t =    16.40s     Wait for ai.duck.microduck to idle
-    t =    16.41s     Find the "ring-roulade" Button
-    t =    16.48s     Check for interrupting elements affecting "ring-roulade" Button
-    t =    16.59s     Synthesize event
-    t =    16.95s     Wait for ai.duck.microduck to idle
-    t =    16.96s Waiting 20.0s for "duck-last-skill" StaticText to exist
-    t =    17.99s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-last-skill" StaticText`
-    t =    17.99s         Checking existence of `"duck-last-skill" StaticText`
-    t =    18.01s Find the "duck-last-skill" StaticText
-    t =    18.04s Setting device orientation to Portrait
-    t =    18.04s     Device orientation changed to Portrait
-    t =    18.15s     Interface orientation changed to Portrait
-    t =    18.15s     Wait for ai.duck.microduck to idle
-    t =    18.46s Find the Target Application 'ai.duck.microduck'
-    t =    18.49s Find the Target Application 'ai.duck.microduck'
-    t =    18.52s Checking existence of `"duck-label" Any`
-    t =    18.55s Find the "duck-label" Any
-    t =    18.58s Checking existence of `"duck-quack" Button`
-    t =    18.60s Tear Down
-    t =    18.60s     Setting device orientation to Portrait
-    t =    18.61s         Wait for ai.duck.microduck to idle
-Test Case '-[DuckUITests.DuckUITests testLandscapeRoundTrip]' passed (18.981 seconds).
+    t =     0.08s             Terminate ai.duck.microduck:25582
+2026-11-14 09:16:36.787 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:16:36.788 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     3.57s             Setting up automation session
+    t =     5.95s             Wait for ai.duck.microduck to idle
+    t =     9.84s     Find the Target Application 'ai.duck.microduck'
+    t =    10.33s     Find the Target Application 'ai.duck.microduck'
+    t =    10.38s     Find the Target Application 'ai.duck.microduck'
+    t =    10.42s     Find the Target Application 'ai.duck.microduck'
+    t =    10.46s Waiting 120.0s for "duck-label" Any to exist
+    t =    11.52s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
+    t =    11.52s         Checking existence of `"duck-label" Any`
+    t =    11.73s Checking existence of `"duck-label" Any`
+    t =    11.76s Find the "duck-label" Any
+    t =    11.79s Setting device orientation to Landscape Left
+    t =    11.83s     Device orientation changed to Landscape Left
+    t =    12.11s     Interface orientation changed to Landscape Right
+    t =    12.12s     Wait for ai.duck.microduck to idle
+    t =    12.34s Find the Target Application 'ai.duck.microduck'
+    t =    12.45s Find the Target Application 'ai.duck.microduck'
+    t =    12.50s Find the Target Application 'ai.duck.microduck'
+    t =    12.63s Find the Target Application 'ai.duck.microduck'
+    t =    12.69s Checking existence of `"duck-label" Button`
+    t =    12.74s Waiting 5.0s for "duck-label" StaticText to exist
+    t =    13.77s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" StaticText`
+    t =    13.77s         Checking existence of `"duck-label" StaticText`
+    t =    13.89s Checking existence of `"duck-menu" Button`
+    t =    14.03s Waiting 5.0s for "duck-menu" Button to exist
+    t =    15.04s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-menu" Button`
+    t =    15.04s         Checking existence of `"duck-menu" Button`
+    t =    15.29s Checking existence of `"surface-toggle" Button`
+    t =    15.43s Waiting 5.0s for "surface-toggle" Button to exist
+    t =    16.48s     Checking `Expect predicate `existsNoRetry == 1` for object "surface-toggle" Button`
+    t =    16.48s         Checking existence of `"surface-toggle" Button`
+    t =    16.61s Checking existence of `"duck-time" Button`
+    t =    16.69s Waiting 5.0s for "duck-time" Button to exist
+    t =    17.73s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-time" Button`
+    t =    17.73s         Checking existence of `"duck-time" Button`
+    t =    17.81s Checking existence of `"duck-skills" Button`
+    t =    17.90s Waiting 5.0s for "duck-skills" Button to exist
+    t =    18.94s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
+    t =    18.95s         Checking existence of `"duck-skills" Button`
+    t =    19.16s Checking existence of `"duck-quack" Button`
+    t =    19.40s Waiting 5.0s for "duck-quack" Button to exist
+    t =    20.42s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-quack" Button`
+    t =    20.42s         Checking existence of `"duck-quack" Button`
+    t =    20.61s Checking existence of `"duck-grab" Button`
+    t =    20.70s Waiting 5.0s for "duck-grab" Button to exist
+    t =    21.78s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-grab" Button`
+    t =    21.78s         Checking existence of `"duck-grab" Button`
+    t =    21.90s Waiting 10.0s for "duck-skills" Button to exist
+    t =    22.93s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
+    t =    22.93s         Checking existence of `"duck-skills" Button`
+    t =    23.02s Tap "duck-skills" Button
+    t =    23.02s     Wait for ai.duck.microduck to idle
+    t =    23.09s     Find the "duck-skills" Button
+    t =    23.26s     Check for interrupting elements affecting "duck-skills" Button
+    t =    23.50s     Synthesize event
+    t =    24.00s     Wait for ai.duck.microduck to idle
+    t =    24.02s Waiting 10.0s for "ring-roulade" Button to exist
+    t =    25.07s     Checking `Expect predicate `existsNoRetry == 1` for object "ring-roulade" Button`
+    t =    25.08s         Checking existence of `"ring-roulade" Button`
+    t =    25.24s Tap "ring-roulade" Button
+    t =    25.24s     Wait for ai.duck.microduck to idle
+    t =    25.25s     Find the "ring-roulade" Button
+    t =    25.36s     Check for interrupting elements affecting "ring-roulade" Button
+    t =    25.64s     Synthesize event
+    t =    26.10s     Wait for ai.duck.microduck to idle
+    t =    26.11s Waiting 20.0s for "duck-last-skill" StaticText to exist
+    t =    27.20s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-last-skill" StaticText`
+    t =    27.20s         Checking existence of `"duck-last-skill" StaticText`
+    t =    27.31s Find the "duck-last-skill" StaticText
+    t =    27.50s Setting device orientation to Portrait
+    t =    27.52s     Device orientation changed to Portrait
+    t =    27.78s     Interface orientation changed to Portrait
+    t =    27.79s     Wait for ai.duck.microduck to idle
+    t =    27.98s Find the Target Application 'ai.duck.microduck'
+    t =    28.32s Find the Target Application 'ai.duck.microduck'
+    t =    28.45s Checking existence of `"duck-label" Any`
+    t =    28.62s Find the "duck-label" Any
+    t =    28.77s Checking existence of `"duck-quack" Button`
+    t =    28.84s Tear Down
+    t =    28.84s     Setting device orientation to Portrait
+    t =    28.88s         Wait for ai.duck.microduck to idle
+Test Case '-[DuckUITests.DuckUITests testLandscapeRoundTrip]' passed (29.404 seconds).
 Test Case '-[DuckUITests.DuckUITests testPathModeOpensWithGoWaiting]' started.
-    t =     0.00s Start Test at 2026-11-14 08:31:02.349
-    t =     0.04s Set Up
-    t =     0.04s     Setting device orientation to Portrait
-    t =     0.05s         Wait for ai.duck.microduck to idle
-    t =     0.05s     Open ai.duck.microduck
-    t =     0.05s         Launch ai.duck.microduck
-    t =     0.05s             Terminate ai.duck.microduck:27888
-2026-11-14 08:31:03.424 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:31:03.424 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     1.29s             Setting up automation session
-    t =     2.58s             Wait for ai.duck.microduck to idle
-    t =     4.07s     Find the Target Application 'ai.duck.microduck'
-    t =     4.13s     Find the Target Application 'ai.duck.microduck'
-    t =     4.15s     Find the Target Application 'ai.duck.microduck'
-    t =     4.18s     Find the Target Application 'ai.duck.microduck'
-    t =     4.21s Waiting 120.0s for "duck-label" Any to exist
-    t =     5.23s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
-    t =     5.23s         Checking existence of `"duck-label" Any`
-    t =     5.27s Checking existence of `"duck-label" Any`
-    t =     5.30s Find the "duck-label" Any
-    t =     5.34s Waiting 10.0s for "duck-more" Button to exist
-    t =     6.40s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
-    t =     6.40s         Checking existence of `"duck-more" Button`
-    t =     6.43s Tap "duck-more" Button
-    t =     6.43s     Wait for ai.duck.microduck to idle
-    t =     6.44s     Find the "duck-more" Button
-    t =     6.48s     Check for interrupting elements affecting "duck-more" Button
-    t =     6.51s     Synthesize event
-    t =     6.82s     Wait for ai.duck.microduck to idle
-    t =     7.31s Waiting 10.0s for "more-title" StaticText to exist
-    t =     8.33s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
-    t =     8.33s         Checking existence of `"more-title" StaticText`
-    t =     8.39s Waiting 10.0s for "more-path" Button to exist
-    t =     9.42s     Checking `Expect predicate `existsNoRetry == 1` for object "more-path" Button`
-    t =     9.42s         Checking existence of `"more-path" Button`
-    t =     9.48s Tap "more-path" Button
-    t =     9.48s     Wait for ai.duck.microduck to idle
-    t =     9.49s     Find the "more-path" Button
-    t =     9.54s     Check for interrupting elements affecting "more-path" Button
-    t =     9.61s     Synthesize event
-    t =     9.92s     Wait for ai.duck.microduck to idle
-    t =    10.30s Waiting 10.0s for "path-go" Button to exist
-    t =    11.33s     Checking `Expect predicate `existsNoRetry == 1` for object "path-go" Button`
-    t =    11.34s         Checking existence of `"path-go" Button`
-    t =    11.37s Find the "path-go" Button
-    t =    11.40s Waiting 5.0s for "path-clear" Button to exist
-    t =    12.45s     Checking `Expect predicate `existsNoRetry == 1` for object "path-clear" Button`
-    t =    12.45s         Checking existence of `"path-clear" Button`
-    t =    12.48s Checking existence of `"path-progress" StaticText`
-    t =    12.51s Tear Down
-    t =    12.51s     Setting device orientation to Portrait
-    t =    12.52s         Wait for ai.duck.microduck to idle
-Test Case '-[DuckUITests.DuckUITests testPathModeOpensWithGoWaiting]' passed (12.830 seconds).
+    t =     0.00s Start Test at 2026-11-14 09:17:03.101
+    t =     0.07s Set Up
+    t =     0.07s     Setting device orientation to Portrait
+    t =     0.09s         Wait for ai.duck.microduck to idle
+    t =     0.10s     Open ai.duck.microduck
+    t =     0.10s         Launch ai.duck.microduck
+    t =     0.10s             Terminate ai.duck.microduck:26453
+2026-11-14 09:17:04.295 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:17:04.296 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     3.04s             Setting up automation session
+    t =     4.96s             Wait for ai.duck.microduck to idle
+    t =     6.97s     Find the Target Application 'ai.duck.microduck'
+    t =     7.77s     Find the Target Application 'ai.duck.microduck'
+    t =     8.22s     Find the Target Application 'ai.duck.microduck'
+    t =     8.42s     Find the Target Application 'ai.duck.microduck'
+    t =     8.63s Waiting 120.0s for "duck-label" Any to exist
+    t =     9.69s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
+    t =     9.69s         Checking existence of `"duck-label" Any`
+    t =    10.06s Checking existence of `"duck-label" Any`
+    t =    10.49s Find the "duck-label" Any
+    t =    10.74s Waiting 10.0s for "duck-more" Button to exist
+    t =    11.78s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
+    t =    11.79s         Checking existence of `"duck-more" Button`
+    t =    11.87s Tap "duck-more" Button
+    t =    11.87s     Wait for ai.duck.microduck to idle
+    t =    11.87s     Find the "duck-more" Button
+    t =    12.10s     Check for interrupting elements affecting "duck-more" Button
+    t =    12.27s     Synthesize event
+    t =    12.94s     Wait for ai.duck.microduck to idle
+    t =    13.25s Waiting 10.0s for "more-title" StaticText to exist
+    t =    14.32s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
+    t =    14.32s         Checking existence of `"more-title" StaticText`
+    t =    15.06s Waiting 10.0s for "more-path" Button to exist
+    t =    16.13s     Checking `Expect predicate `existsNoRetry == 1` for object "more-path" Button`
+    t =    16.13s         Checking existence of `"more-path" Button`
+    t =    16.43s Tap "more-path" Button
+    t =    16.44s     Wait for ai.duck.microduck to idle
+    t =    16.50s     Find the "more-path" Button
+    t =    16.93s     Check for interrupting elements affecting "more-path" Button
+    t =    17.60s     Synthesize event
+    t =    18.09s     Wait for ai.duck.microduck to idle
+    t =    18.63s Waiting 10.0s for "path-go" Button to exist
+    t =    19.71s     Checking `Expect predicate `existsNoRetry == 1` for object "path-go" Button`
+    t =    19.71s         Checking existence of `"path-go" Button`
+    t =    20.17s Find the "path-go" Button
+    t =    20.42s Waiting 5.0s for "path-clear" Button to exist
+    t =    21.50s     Checking `Expect predicate `existsNoRetry == 1` for object "path-clear" Button`
+    t =    21.51s         Checking existence of `"path-clear" Button`
+    t =    21.67s Checking existence of `"path-progress" StaticText`
+    t =    21.74s Tear Down
+    t =    21.75s     Setting device orientation to Portrait
+    t =    21.78s         Wait for ai.duck.microduck to idle
+Test Case '-[DuckUITests.DuckUITests testPathModeOpensWithGoWaiting]' passed (22.335 seconds).
 Test Case '-[DuckUITests.DuckUITests testTheDuckVoiceIsHeard]' started.
-    t =     0.00s Start Test at 2026-11-14 08:31:15.180
-    t =     0.04s Set Up
-    t =     0.04s     Setting device orientation to Portrait
-    t =     0.04s         Wait for ai.duck.microduck to idle
-    t =     0.05s     Open ai.duck.microduck
-    t =     0.05s         Launch ai.duck.microduck
-    t =     0.05s             Terminate ai.duck.microduck:28664
-2026-11-14 08:31:16.234 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:31:16.235 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     1.27s             Setting up automation session
-    t =     2.29s             Wait for ai.duck.microduck to idle
-    t =     3.88s     Find the Target Application 'ai.duck.microduck'
-    t =     3.91s     Find the Target Application 'ai.duck.microduck'
-    t =     3.92s     Find the Target Application 'ai.duck.microduck'
-    t =     3.94s     Find the Target Application 'ai.duck.microduck'
-    t =     3.96s Terminate ai.duck.microduck:29413
-    t =     5.00s Open ai.duck.microduck
-    t =     5.00s     Launch ai.duck.microduck
-2026-11-14 08:31:20.186 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:31:20.186 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     5.22s         Setting up automation session
-    t =     6.35s         Wait for ai.duck.microduck to idle
-    t =     7.98s Checking existence of `"duck-voice-state" Any`
-    t =     8.13s Find the "duck-voice-state" Any
-    t =     8.24s Waiting 30.0s for "duck-quack" Button to exist
-    t =     9.29s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-quack" Button`
-    t =     9.29s         Checking existence of `"duck-quack" Button`
-    t =     9.34s Checking existence of `"duck-voice-state" Any`
-    t =     9.42s Find the "duck-voice-state" Any
-    t =     9.50s Tap "duck-quack" Button
-    t =     9.50s     Wait for ai.duck.microduck to idle
-    t =     9.51s     Find the "duck-quack" Button
-    t =     9.54s     Check for interrupting elements affecting "duck-quack" Button
-    t =     9.59s     Synthesize event
-    t =     9.95s     Wait for ai.duck.microduck to idle
-    t =     9.96s Checking existence of `"duck-voice-state" Any`
-    t =    10.04s Find the "duck-voice-state" Any
-    t =    10.09s Terminate ai.duck.microduck:29495
-    t =    11.10s Open ai.duck.microduck
-    t =    11.10s     Launch ai.duck.microduck
-2026-11-14 08:31:26.292 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:31:26.292 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =    11.33s         Setting up automation session
-    t =    12.61s         Wait for ai.duck.microduck to idle
-    t =    14.93s Checking existence of `"duck-voice-state" Any`
-    t =    15.00s Find the "duck-voice-state" Any
-    t =    15.05s Waiting 30.0s for "duck-quack" Button to exist
-    t =    16.09s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-quack" Button`
-    t =    16.09s         Checking existence of `"duck-quack" Button`
-    t =    16.13s Checking existence of `"duck-voice-state" Any`
-    t =    16.19s Find the "duck-voice-state" Any
-    t =    16.24s Tap "duck-quack" Button
-    t =    16.24s     Wait for ai.duck.microduck to idle
-    t =    16.24s     Find the "duck-quack" Button
-    t =    16.27s     Check for interrupting elements affecting "duck-quack" Button
-    t =    16.31s     Synthesize event
-    t =    16.62s     Wait for ai.duck.microduck to idle
-    t =    16.63s Checking existence of `"duck-voice-state" Any`
-    t =    16.71s Find the "duck-voice-state" Any
-    t =    16.77s Tear Down
-    t =    16.77s     Setting device orientation to Portrait
-    t =    16.77s         Wait for ai.duck.microduck to idle
-Test Case '-[DuckUITests.DuckUITests testTheDuckVoiceIsHeard]' passed (17.068 seconds).
+    t =     0.00s Start Test at 2026-11-14 09:17:25.442
+    t =     0.07s Set Up
+    t =     0.07s     Setting device orientation to Portrait
+    t =     0.08s         Wait for ai.duck.microduck to idle
+    t =     0.10s     Open ai.duck.microduck
+    t =     0.10s         Launch ai.duck.microduck
+    t =     0.10s             Terminate ai.duck.microduck:26985
+2026-11-14 09:17:26.589 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:17:26.589 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     1.62s             Setting up automation session
+    t =     3.85s             Wait for ai.duck.microduck to idle
+    t =    10.37s     Find the Target Application 'ai.duck.microduck'
+    t =    10.71s     Find the Target Application 'ai.duck.microduck'
+    t =    10.76s     Find the Target Application 'ai.duck.microduck'
+    t =    10.80s     Find the Target Application 'ai.duck.microduck'
+    t =    10.89s Terminate ai.duck.microduck:27521
+    t =    11.93s Open ai.duck.microduck
+    t =    11.93s     Launch ai.duck.microduck
+2026-11-14 09:17:37.419 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:17:37.419 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    12.43s         Setting up automation session
+    t =    14.41s         Wait for ai.duck.microduck to idle
+    t =    16.17s Checking existence of `"duck-voice-state" Any`
+    t =    16.63s Find the "duck-voice-state" Any
+    t =    17.01s Checking existence of `"duck-voice-state" StaticText`
+    t =    17.18s Find the "duck-voice-state" StaticText
+    t =    17.30s Waiting 30.0s for "duck-quack" Button to exist
+    t =    18.35s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-quack" Button`
+    t =    18.35s         Checking existence of `"duck-quack" Button`
+    t =    18.45s Checking existence of `"duck-voice-state" Any`
+    t =    18.52s Find the "duck-voice-state" Any
+    t =    18.69s Tap "duck-quack" Button
+    t =    18.69s     Wait for ai.duck.microduck to idle
+    t =    18.70s     Find the "duck-quack" Button
+    t =    18.79s     Check for interrupting elements affecting "duck-quack" Button
+    t =    18.91s     Synthesize event
+    t =    19.27s     Wait for ai.duck.microduck to idle
+    t =    19.29s Checking existence of `"duck-voice-state" Any`
+    t =    19.44s Find the "duck-voice-state" Any
+    t =    19.50s Terminate ai.duck.microduck:27727
+    t =    20.54s Open ai.duck.microduck
+    t =    20.54s     Launch ai.duck.microduck
+2026-11-14 09:17:45.982 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:17:45.982 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    23.38s         Setting up automation session
+    t =    27.43s         Wait for ai.duck.microduck to idle
+    t =    29.15s Checking existence of `"duck-voice-state" Any`
+    t =    29.26s Find the "duck-voice-state" Any
+    t =    29.72s Checking existence of `"duck-voice-state" StaticText`
+    t =    30.01s Find the "duck-voice-state" StaticText
+    t =    30.32s Checking existence of `"duck-voice-state" StaticText`
+    t =    30.51s Find the "duck-voice-state" StaticText
+    t =    30.58s Waiting 30.0s for "duck-quack" Button to exist
+    t =    31.65s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-quack" Button`
+    t =    31.65s         Checking existence of `"duck-quack" Button`
+    t =    31.74s Checking existence of `"duck-voice-state" Any`
+    t =    31.88s Find the "duck-voice-state" Any
+    t =    32.05s Tap "duck-quack" Button
+    t =    32.05s     Wait for ai.duck.microduck to idle
+    t =    32.06s     Find the "duck-quack" Button
+    t =    32.11s     Check for interrupting elements affecting "duck-quack" Button
+    t =    32.21s     Synthesize event
+    t =    32.57s     Wait for ai.duck.microduck to idle
+    t =    32.62s Checking existence of `"duck-voice-state" Any`
+    t =    32.91s Find the "duck-voice-state" Any
+    t =    32.98s Tear Down
+    t =    32.98s     Setting device orientation to Portrait
+    t =    32.99s         Wait for ai.duck.microduck to idle
+Test Case '-[DuckUITests.DuckUITests testTheDuckVoiceIsHeard]' passed (33.346 seconds).
 Test Case '-[DuckUITests.DuckUITests testTheShellDrivesTheCore]' started.
-    t =     0.00s Start Test at 2026-11-14 08:31:32.248
-    t =     0.03s Set Up
-    t =     0.03s     Setting device orientation to Portrait
-    t =     0.04s         Wait for ai.duck.microduck to idle
-    t =     0.05s     Open ai.duck.microduck
-    t =     0.05s         Launch ai.duck.microduck
-    t =     0.05s             Terminate ai.duck.microduck:30154
-2026-11-14 08:31:33.317 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:31:33.318 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     1.28s             Setting up automation session
-    t =     2.40s             Wait for ai.duck.microduck to idle
-    t =     4.09s     Find the Target Application 'ai.duck.microduck'
-    t =     4.13s     Find the Target Application 'ai.duck.microduck'
-    t =     4.15s     Find the Target Application 'ai.duck.microduck'
-    t =     4.17s     Find the Target Application 'ai.duck.microduck'
-    t =     4.20s Waiting 120.0s for "duck-label" Any to exist
-    t =     5.25s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
-    t =     5.25s         Checking existence of `"duck-label" Any`
-    t =     5.28s Checking existence of `"duck-label" Any`
-    t =     5.31s Find the "duck-label" Any
-    t =     5.34s Waiting 10.0s for "duck-skills" Button to exist
-    t =     6.39s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
-    t =     6.40s         Checking existence of `"duck-skills" Button`
-    t =     6.46s Tap "duck-skills" Button
-    t =     6.46s     Wait for ai.duck.microduck to idle
-    t =     6.46s     Find the "duck-skills" Button
-    t =     6.57s     Check for interrupting elements affecting "duck-skills" Button
-    t =     6.74s     Synthesize event
-    t =     7.07s     Wait for ai.duck.microduck to idle
-    t =     7.17s Waiting 10.0s for "ring-roulade" Button to exist
-    t =     8.22s     Checking `Expect predicate `existsNoRetry == 1` for object "ring-roulade" Button`
-    t =     8.22s         Checking existence of `"ring-roulade" Button`
-    t =     8.29s Tap "ring-roulade" Button
-    t =     8.29s     Wait for ai.duck.microduck to idle
-    t =     8.30s     Find the "ring-roulade" Button
-    t =     8.38s     Check for interrupting elements affecting "ring-roulade" Button
-    t =     8.46s     Synthesize event
-    t =     8.87s     Wait for ai.duck.microduck to idle
-    t =     8.87s Waiting 20.0s for "duck-last-skill" StaticText to exist
-    t =     9.92s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-last-skill" StaticText`
-    t =     9.92s         Checking existence of `"duck-last-skill" StaticText`
-    t =     9.95s Find the "duck-last-skill" StaticText
-    t =     9.97s Checking existence of `"duck-label" Any`
-    t =    10.02s Find the "duck-label" Any
-    t =    10.05s Waiting 10.0s for "duck-time" Button to exist
-    t =    11.10s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-time" Button`
-    t =    11.10s         Checking existence of `"duck-time" Button`
-    t =    11.13s Tap "duck-time" Button
-    t =    11.13s     Wait for ai.duck.microduck to idle
-    t =    11.13s     Find the "duck-time" Button
-    t =    11.16s     Check for interrupting elements affecting "duck-time" Button
-    t =    11.20s     Synthesize event
-    t =    11.51s     Wait for ai.duck.microduck to idle
-    t =    11.73s Waiting 10.0s for "sheet-title" StaticText to exist
-    t =    12.76s     Checking `Expect predicate `existsNoRetry == 1` for object "sheet-title" StaticText`
-    t =    12.76s         Checking existence of `"sheet-title" StaticText`
-    t =    12.88s Waiting 5.0s for "time-pause.fill" Button to exist
-    t =    13.92s     Checking `Expect predicate `existsNoRetry == 1` for object "time-pause.fill" Button`
-    t =    13.92s         Checking existence of `"time-pause.fill" Button`
-    t =    14.05s Tap "time-pause.fill" Button
-    t =    14.05s     Wait for ai.duck.microduck to idle
-    t =    14.06s     Find the "time-pause.fill" Button
-    t =    14.23s     Check for interrupting elements affecting "time-pause.fill" Button
-    t =    14.37s     Synthesize event
-    t =    14.70s     Wait for ai.duck.microduck to idle
-    t =    15.95s Waiting 5.0s for "time-play.fill" Button to exist
-    t =    17.01s     Checking `Expect predicate `existsNoRetry == 1` for object "time-play.fill" Button`
-    t =    17.01s         Checking existence of `"time-play.fill" Button`
-    t =    17.21s Tap "time-play.fill" Button
-    t =    17.21s     Wait for ai.duck.microduck to idle
-    t =    17.22s     Find the "time-play.fill" Button
-    t =    17.47s     Check for interrupting elements affecting "time-play.fill" Button
-    t =    17.65s     Synthesize event
-    t =    17.99s     Wait for ai.duck.microduck to idle
-    t =    18.77s Waiting 5.0s for "care-hunger" ProgressIndicator to exist
-    t =    19.82s     Checking `Expect predicate `existsNoRetry == 1` for object "care-hunger" ProgressIndicator`
-    t =    19.82s         Checking existence of `"care-hunger" ProgressIndicator`
-    t =    19.92s Waiting 5.0s for "quests-title" StaticText to exist
-    t =    20.97s     Checking `Expect predicate `existsNoRetry == 1` for object "quests-title" StaticText`
-    t =    20.97s         Checking existence of `"quests-title" StaticText`
-    t =    21.19s Checking existence of `"export-vetbook" Button`
-    t =    21.34s Find the "export-vetbook" Button
-    t =    21.50s Checking existence of `ScrollView (First Match)`
-    t =    21.56s Swipe up ScrollView (First Match)
-    t =    21.56s     Wait for ai.duck.microduck to idle
-    t =    21.58s     Find the ScrollView (First Match)
-    t =    21.66s     Check for interrupting elements affecting ScrollView
-    t =    21.77s     Synthesize event
-    t =    22.31s     Wait for ai.duck.microduck to idle
-    t =    23.00s Checking existence of `"export-vetbook" Button`
-    t =    23.13s Find the "export-vetbook" Button
-    t =    23.33s Checking existence of `ScrollView at {{8.0, 415.0}, {386.0, 451.0}}`
-    t =    23.39s Swipe up ScrollView at {{8.0, 415.0}, {386.0, 451.0}}
-    t =    23.39s     Wait for ai.duck.microduck to idle
-    t =    23.43s     Find the ScrollView at {{8.0, 415.0}, {386.0, 451.0}}
-    t =    23.55s     Check for interrupting elements affecting ScrollView
-    t =    23.68s     Synthesize event
-    t =    24.20s     Wait for ai.duck.microduck to idle
-    t =    26.36s Checking existence of `"export-vetbook" Button`
-    t =    26.48s Find the "export-vetbook" Button
-    t =    26.65s Waiting 5.0s for "export-vetbook" Button to exist
-    t =    27.71s     Checking `Expect predicate `existsNoRetry == 1` for object "export-vetbook" Button`
-    t =    27.72s         Checking existence of `"export-vetbook" Button`
-    t =    27.83s Find the "export-vetbook" Button
-    t =    27.96s Checking existence of `"ai-open" Button`
-    t =    28.07s Find the "ai-open" Button
-    t =    28.26s Waiting 5.0s for "ai-open" Button to exist
-    t =    29.30s     Checking `Expect predicate `existsNoRetry == 1` for object "ai-open" Button`
-    t =    29.30s         Checking existence of `"ai-open" Button`
-    t =    29.42s Tap "ai-open" Button
-    t =    29.42s     Wait for ai.duck.microduck to idle
-    t =    29.45s     Find the "ai-open" Button
-    t =    29.55s     Check for interrupting elements affecting "ai-open" Button
-    t =    29.69s     Synthesize event
-    t =    30.02s     Wait for ai.duck.microduck to idle
-    t =    30.08s Waiting 10.0s for "ai-title" StaticText to exist
-    t =    31.12s     Checking `Expect predicate `existsNoRetry == 1` for object "ai-title" StaticText`
-    t =    31.12s         Checking existence of `"ai-title" StaticText`
-    t =    31.32s Waiting 5.0s for "ai-endpoint" TextField to exist
-    t =    32.36s     Checking `Expect predicate `existsNoRetry == 1` for object "ai-endpoint" TextField`
-    t =    32.36s         Checking existence of `"ai-endpoint" TextField`
-    t =    32.53s Tap "ai-close" Button
-    t =    32.53s     Wait for ai.duck.microduck to idle
-    t =    32.54s     Find the "ai-close" Button
-    t =    32.73s     Check for interrupting elements affecting "ai-close" Button
-    t =    32.87s     Synthesize event
-    t =    33.21s     Wait for ai.duck.microduck to idle
-    t =    33.72s Waiting 5.0s for "sheet-title" StaticText to exist
-    t =    34.77s     Checking `Expect predicate `existsNoRetry == 1` for object "sheet-title" StaticText`
-    t =    34.78s         Checking existence of `"sheet-title" StaticText`
-    t =    34.88s Find the "sheet-close" Button
-    t =    34.97s Swipe down ScrollView at {{0.0, 62.0}, {402.0, 812.0}}
-    t =    34.97s     Wait for ai.duck.microduck to idle
-    t =    34.99s     Find the ScrollView at {{0.0, 62.0}, {402.0, 812.0}}
-    t =    35.07s     Check for interrupting elements affecting ScrollView
-    t =    35.16s     Synthesize event
-    t =    35.67s     Wait for ai.duck.microduck to idle
-    t =    37.82s Find the "sheet-close" Button
-    t =    37.95s Waiting 5.0s for "sheet-close" Button to exist
-    t =    38.97s     Checking `Expect predicate `existsNoRetry == 1` for object "sheet-close" Button`
-    t =    38.98s         Checking existence of `"sheet-close" Button`
-    t =    39.07s Tap "sheet-close" Button
-    t =    39.07s     Wait for ai.duck.microduck to idle
-    t =    39.09s     Find the "sheet-close" Button
-    t =    39.19s     Check for interrupting elements affecting "sheet-close" Button
-    t =    39.29s     Synthesize event
-    t =    39.64s     Wait for ai.duck.microduck to idle
-    t =    41.10s Checking `Expect predicate `exists == 0` for object "sheet-title" StaticText`
-    t =    41.10s     Checking existence of `"sheet-title" StaticText`
-    t =    41.13s Waiting 10.0s for "duck-more" Button to exist
-    t =    42.17s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
-    t =    42.17s         Checking existence of `"duck-more" Button`
-    t =    42.20s Tap "duck-more" Button
-    t =    42.20s     Wait for ai.duck.microduck to idle
-    t =    42.20s     Find the "duck-more" Button
-    t =    42.25s     Check for interrupting elements affecting "duck-more" Button
-    t =    42.30s     Synthesize event
-    t =    42.62s     Wait for ai.duck.microduck to idle
-    t =    43.06s Waiting 10.0s for "more-title" StaticText to exist
-    t =    44.11s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
-    t =    44.11s         Checking existence of `"more-title" StaticText`
-    t =    44.17s Waiting 10.0s for "more-blocks" Button to exist
-    t =    45.18s     Checking `Expect predicate `existsNoRetry == 1` for object "more-blocks" Button`
-    t =    45.18s         Checking existence of `"more-blocks" Button`
-    t =    45.23s Tap "more-blocks" Button
-    t =    45.23s     Wait for ai.duck.microduck to idle
-    t =    45.23s     Find the "more-blocks" Button
-    t =    45.30s     Check for interrupting elements affecting "more-blocks" Button
-    t =    45.35s     Synthesize event
-    t =    45.66s     Wait for ai.duck.microduck to idle
-    t =    45.87s Waiting 10.0s for "rules-title" StaticText to exist
-    t =    46.88s     Checking `Expect predicate `existsNoRetry == 1` for object "rules-title" StaticText`
-    t =    46.88s         Checking existence of `"rules-title" StaticText`
-    t =    46.96s Waiting 5.0s for "rule-add" Button to exist
-    t =    47.98s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-add" Button`
-    t =    47.99s         Checking existence of `"rule-add" Button`
-    t =    48.06s Tap "rule-add" Button
-    t =    48.06s     Wait for ai.duck.microduck to idle
-    t =    48.07s     Find the "rule-add" Button
-    t =    48.15s     Check for interrupting elements affecting "rule-add" Button
-    t =    48.21s     Synthesize event
-    t =    48.52s     Wait for ai.duck.microduck to idle
-    t =    48.52s Waiting 5.0s for "rule-0" Other to exist
-    t =    49.55s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
-    t =    49.55s         Checking existence of `"rule-0" Other`
-    t =    49.67s         Capturing element debug description
-    t =    50.60s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
-    t =    50.60s         Checking existence of `"rule-0" Other`
-    t =    50.69s         Capturing element debug description
-    t =    51.53s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
-    t =    51.53s         Checking existence of `"rule-0" Other`
-    t =    51.61s         Capturing element debug description
-    t =    52.53s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
-    t =    52.54s         Checking existence of `"rule-0" Other`
-    t =    52.63s         Capturing element debug description
-    t =    53.54s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
-    t =    53.54s         Checking existence of `"rule-0" Other`
-    t =    53.61s         Capturing element debug description
-    t =    53.61s     Checking existence of `"rule-0" Other`
-    t =    53.68s Collecting debug information to assist test failure triage
-    t =    53.68s     Requesting snapshot of accessibility hierarchy for app with pid 30169
-    t =    53.78s Waiting 5.0s for StaticText (First Match) to exist
-    t =    54.80s     Checking `Expect predicate `existsNoRetry == 1` for object StaticText (First Match)`
-    t =    54.80s         Checking existence of `StaticText (First Match)`
-    t =    54.84s Tap "rules-close" Button
-    t =    54.84s     Wait for ai.duck.microduck to idle
-    t =    54.84s     Find the "rules-close" Button
-    t =    54.93s     Check for interrupting elements affecting "rules-close" Button
-    t =    55.04s     Synthesize event
-    t =    55.36s     Wait for ai.duck.microduck to idle
-    t =    56.75s Checking `Expect predicate `exists == 0` for object "rules-title" StaticText`
-    t =    56.76s     Checking existence of `"rules-title" StaticText`
-    t =    56.81s Waiting 5.0s for "more-close" Button to exist
-    t =    57.84s     Checking `Expect predicate `existsNoRetry == 1` for object "more-close" Button`
-    t =    57.84s         Checking existence of `"more-close" Button`
-    t =    57.90s Tap "more-close" Button
-    t =    57.90s     Wait for ai.duck.microduck to idle
-    t =    57.91s     Find the "more-close" Button
-    t =    57.97s     Check for interrupting elements affecting "more-close" Button
-    t =    58.03s     Synthesize event
-    t =    58.37s     Wait for ai.duck.microduck to idle
-    t =    59.77s Checking `Expect predicate `exists == 0` for object "more-title" StaticText`
-    t =    59.78s     Checking existence of `"more-title" StaticText`
-    t =    59.80s Waiting 10.0s for "duck-more" Button to exist
-    t =    60.84s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
-    t =    60.84s         Checking existence of `"duck-more" Button`
-    t =    60.86s Tap "duck-more" Button
-    t =    60.86s     Wait for ai.duck.microduck to idle
-    t =    60.87s     Find the "duck-more" Button
-    t =    60.90s     Check for interrupting elements affecting "duck-more" Button
-    t =    60.93s     Synthesize event
-    t =    61.26s     Wait for ai.duck.microduck to idle
-    t =    61.61s Waiting 10.0s for "more-title" StaticText to exist
-    t =    62.65s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
-    t =    62.66s         Checking existence of `"more-title" StaticText`
-    t =    62.71s Waiting 10.0s for "more-peers" Button to exist
-    t =    63.75s     Checking `Expect predicate `existsNoRetry == 1` for object "more-peers" Button`
-    t =    63.76s         Checking existence of `"more-peers" Button`
-    t =    63.80s Tap "more-peers" Button
-    t =    63.80s     Wait for ai.duck.microduck to idle
-    t =    63.80s     Find the "more-peers" Button
-    t =    63.86s     Check for interrupting elements affecting "more-peers" Button
-    t =    63.91s     Synthesize event
-    t =    64.25s     Wait for ai.duck.microduck to idle
-    t =    64.62s Waiting 10.0s for "peers-title" StaticText to exist
-    t =    65.65s     Checking `Expect predicate `existsNoRetry == 1` for object "peers-title" StaticText`
-    t =    65.66s         Checking existence of `"peers-title" StaticText`
-    t =    65.72s Waiting 5.0s for "peers-empty" StaticText to exist
-    t =    66.78s     Checking `Expect predicate `existsNoRetry == 1` for object "peers-empty" StaticText`
-    t =    66.78s         Checking existence of `"peers-empty" StaticText`
-    t =    66.84s Tap "peers-close" Button
-    t =    66.84s     Wait for ai.duck.microduck to idle
-    t =    66.85s     Find the "peers-close" Button
-    t =    66.92s     Check for interrupting elements affecting "peers-close" Button
-    t =    66.98s     Synthesize event
-    t =    67.31s     Wait for ai.duck.microduck to idle
-    t =    67.70s Waiting 5.0s for "more-close" Button to exist
-    t =    68.72s     Checking `Expect predicate `existsNoRetry == 1` for object "more-close" Button`
-    t =    68.72s         Checking existence of `"more-close" Button`
-    t =    68.78s Tap "more-close" Button
-    t =    68.78s     Wait for ai.duck.microduck to idle
-    t =    68.79s     Find the "more-close" Button
-    t =    68.85s     Check for interrupting elements affecting "more-close" Button
-    t =    68.91s     Synthesize event
-    t =    69.24s     Wait for ai.duck.microduck to idle
-    t =    70.62s Checking `Expect predicate `exists == 0` for object "more-title" StaticText`
-    t =    70.62s     Checking existence of `"more-title" StaticText`
-    t =    70.75s Checking existence of `"duck-label" Any`
-    t =    70.78s Find the "duck-label" Any
-    t =    70.80s Waiting 10.0s for "surface-toggle" Button to exist
-    t =    71.85s     Checking `Expect predicate `existsNoRetry == 1` for object "surface-toggle" Button`
-    t =    71.85s         Checking existence of `"surface-toggle" Button`
-    t =    71.89s Tap "surface-toggle" Button
-    t =    71.89s     Wait for ai.duck.microduck to idle
-    t =    71.89s     Find the "surface-toggle" Button
-    t =    71.92s     Check for interrupting elements affecting "surface-toggle" Button
-    t =    71.95s     Synthesize event
-    t =    72.29s     Wait for ai.duck.microduck to idle
-    t =    73.81s Checking existence of `"duck-label" Any`
-    t =    73.85s Find the "duck-label" Any
-    t =    73.88s Waiting 10.0s for "duck-photo" Button to exist
-    t =    74.92s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-photo" Button`
-    t =    74.92s         Checking existence of `"duck-photo" Button`
-    t =    74.94s Tap "duck-photo" Button
-    t =    74.94s     Wait for ai.duck.microduck to idle
-    t =    74.95s     Find the "duck-photo" Button
-    t =    74.99s     Check for interrupting elements affecting "duck-photo" Button
-    t =    75.01s         Wait for com.apple.springboard to idle
-    t =    75.11s     Found 1 interrupting element:
-    t =    75.11s         Find the "“MicroDuck” would like to access the Camera." Alert
-    t =    75.16s "“MicroDuck” would like to access the Camera." Alert from Application 'com.apple.springboard'
-    t =    75.16s     Invoking UI interruption monitors for "“MicroDuck” would like to access the Camera." Alert from Application 'com.apple.springboard'
-    t =    75.16s         Find the "“MicroDuck” would like to access the Camera." Alert
-    t =    75.21s         Checking existence of `Button (Elements matching predicate 'userTestingAttributes CONTAINS "cancel-button"')`
-    t =    75.27s         Get all elements bound by accessibility element for: Elements matching predicate 'userTestingAttributes CONTAINS "default-button"'
-    t =    75.33s         Checking existence of `"Allow" Button`
-    t =    75.38s Default interruption handler attempting to dismiss alert by tapping "Allow" Button.
-    t =    75.38s         Tap "Allow" Button
-    t =    75.38s             Wait for com.apple.springboard to idle
-    t =    75.39s             Find the "Allow" Button
-    t =    75.44s             Check for interrupting elements affecting "Allow" Button
-    t =    75.53s             Synthesize event
-    t =    75.84s             Wait for com.apple.springboard to idle
-    t =    76.09s         Waiting 1.0s for Alert to not exist
-    t =    77.09s             Checking `Expect predicate `existsNoRetry == 0` for object Alert`
-    t =    77.10s                 Checking existence of `Alert`
-    t =    77.13s             Checking existence of `Alert`
-    t =    77.17s         Verifying handling...
-    t =    77.19s Confirmed successful handling of interrupting element
-    t =    77.19s     Synthesize event
-    t =    77.52s     Wait for ai.duck.microduck to idle
-    t =    77.91s Waiting 15.0s for "photo-preview" Any to exist
-    t =    78.96s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-preview" Any`
-    t =    78.96s         Checking existence of `"photo-preview" Any`
-    t =    79.23s Waiting 10.0s for "postcard-caption" StaticText to exist
-    t =    80.24s     Checking `Expect predicate `existsNoRetry == 1` for object "postcard-caption" StaticText`
-    t =    80.24s         Checking existence of `"postcard-caption" StaticText`
-    t =    80.45s Waiting 5.0s for "photo-keep" Button to exist
-    t =    81.50s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-keep" Button`
-    t =    81.50s         Checking existence of `"photo-keep" Button`
-    t =    81.54s Tap "photo-keep" Button
-    t =    81.54s     Wait for ai.duck.microduck to idle
-    t =    81.55s     Find the "photo-keep" Button
-    t =    81.59s     Check for interrupting elements affecting "photo-keep" Button
-    t =    81.66s     Synthesize event
-    t =    82.07s     Wait for ai.duck.microduck to idle
-    t =    83.10s Checking `Expect predicate `label CONTAINS "Kept" OR label CONTAINS "已收藏"` for object "photo-keep" Button`
-    t =    83.10s     Find the "photo-keep" Button
-    t =    83.18s Waiting 5.0s for "photo-close" Button to exist
-    t =    84.22s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-close" Button`
-    t =    84.22s         Checking existence of `"photo-close" Button`
-    t =    84.26s Tap "photo-close" Button
-    t =    84.26s     Wait for ai.duck.microduck to idle
-    t =    84.26s     Find the "photo-close" Button
-    t =    84.31s     Check for interrupting elements affecting "photo-close" Button
-    t =    84.36s     Synthesize event
-    t =    84.69s     Wait for ai.duck.microduck to idle
-    t =    85.09s Waiting 10.0s for "duck-photo" Button to exist
-    t =    86.12s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-photo" Button`
-    t =    86.12s         Checking existence of `"duck-photo" Button`
-    t =    86.14s Tap "surface-toggle" Button
-    t =    86.14s     Wait for ai.duck.microduck to idle
-    t =    86.15s     Find the "surface-toggle" Button
-    t =    86.19s     Check for interrupting elements affecting "surface-toggle" Button
-    t =    86.23s     Synthesize event
-    t =    86.56s     Wait for ai.duck.microduck to idle
-    t =    86.56s Checking existence of `"duck-label" Any`
-    t =    86.61s Find the "duck-label" Any
-    t =    86.65s Tear Down
-    t =    86.65s     Setting device orientation to Portrait
-    t =    86.65s         Wait for ai.duck.microduck to idle
-Test Case '-[DuckUITests.DuckUITests testTheShellDrivesTheCore]' passed (87.156 seconds).
+    t =     0.00s Start Test at 2026-11-14 09:17:58.796
+    t =     0.07s Set Up
+    t =     0.07s     Setting device orientation to Portrait
+    t =     0.09s         Wait for ai.duck.microduck to idle
+    t =     0.10s     Open ai.duck.microduck
+    t =     0.10s         Launch ai.duck.microduck
+    t =     0.10s             Terminate ai.duck.microduck:28252
+2026-11-14 09:17:59.972 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:17:59.973 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     1.70s             Setting up automation session
+    t =     3.77s             Wait for ai.duck.microduck to idle
+    t =     5.72s     Find the Target Application 'ai.duck.microduck'
+    t =     5.92s     Find the Target Application 'ai.duck.microduck'
+    t =     6.12s     Find the Target Application 'ai.duck.microduck'
+    t =     6.15s     Find the Target Application 'ai.duck.microduck'
+    t =     6.34s Waiting 120.0s for "duck-label" Any to exist
+    t =     7.37s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
+    t =     7.38s         Checking existence of `"duck-label" Any`
+    t =     7.43s Checking existence of `"duck-label" Any`
+    t =     7.48s Find the "duck-label" Any
+    t =     7.58s Waiting 10.0s for "duck-skills" Button to exist
+    t =     8.64s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-skills" Button`
+    t =     8.64s         Checking existence of `"duck-skills" Button`
+    t =     8.73s Tap "duck-skills" Button
+    t =     8.73s     Wait for ai.duck.microduck to idle
+    t =     8.73s     Find the "duck-skills" Button
+    t =     8.79s     Check for interrupting elements affecting "duck-skills" Button
+    t =     8.90s     Synthesize event
+    t =     9.26s     Wait for ai.duck.microduck to idle
+    t =     9.27s Waiting 10.0s for "ring-roulade" Button to exist
+    t =    10.32s     Checking `Expect predicate `existsNoRetry == 1` for object "ring-roulade" Button`
+    t =    10.32s         Checking existence of `"ring-roulade" Button`
+    t =    10.54s Tap "ring-roulade" Button
+    t =    10.54s     Wait for ai.duck.microduck to idle
+    t =    10.59s     Find the "ring-roulade" Button
+    t =    10.77s     Check for interrupting elements affecting "ring-roulade" Button
+    t =    10.91s     Synthesize event
+    t =    11.27s     Wait for ai.duck.microduck to idle
+    t =    11.29s Waiting 20.0s for "duck-last-skill" StaticText to exist
+    t =    12.35s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-last-skill" StaticText`
+    t =    12.35s         Checking existence of `"duck-last-skill" StaticText`
+    t =    12.51s Find the "duck-last-skill" StaticText
+    t =    12.56s Checking existence of `"duck-label" Any`
+    t =    12.61s Find the "duck-label" Any
+    t =    12.63s Waiting 10.0s for "duck-time" Button to exist
+    t =    13.69s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-time" Button`
+    t =    13.69s         Checking existence of `"duck-time" Button`
+    t =    13.75s Tap "duck-time" Button
+    t =    13.75s     Wait for ai.duck.microduck to idle
+    t =    13.78s     Find the "duck-time" Button
+    t =    13.84s     Check for interrupting elements affecting "duck-time" Button
+    t =    13.89s     Synthesize event
+    t =    14.24s     Wait for ai.duck.microduck to idle
+    t =    15.01s Waiting 10.0s for "sheet-title" StaticText to exist
+    t =    16.02s     Checking `Expect predicate `existsNoRetry == 1` for object "sheet-title" StaticText`
+    t =    16.03s         Checking existence of `"sheet-title" StaticText`
+    t =    16.48s Waiting 5.0s for "time-pause.fill" Button to exist
+    t =    17.52s     Checking `Expect predicate `existsNoRetry == 1` for object "time-pause.fill" Button`
+    t =    17.52s         Checking existence of `"time-pause.fill" Button`
+    t =    17.87s Tap "time-pause.fill" Button
+    t =    17.88s     Wait for ai.duck.microduck to idle
+    t =    17.88s     Find the "time-pause.fill" Button
+    t =    18.07s     Check for interrupting elements affecting "time-pause.fill" Button
+    t =    18.32s     Synthesize event
+    t =    18.78s     Wait for ai.duck.microduck to idle
+    t =    19.66s Waiting 5.0s for "time-play.fill" Button to exist
+    t =    20.74s     Checking `Expect predicate `existsNoRetry == 1` for object "time-play.fill" Button`
+    t =    20.74s         Checking existence of `"time-play.fill" Button`
+    t =    21.00s Tap "time-play.fill" Button
+    t =    21.00s     Wait for ai.duck.microduck to idle
+    t =    21.00s     Find the "time-play.fill" Button
+    t =    21.22s     Check for interrupting elements affecting "time-play.fill" Button
+    t =    21.46s     Synthesize event
+    t =    21.90s     Wait for ai.duck.microduck to idle
+    t =    22.69s Waiting 5.0s for "care-hunger" ProgressIndicator to exist
+    t =    23.78s     Checking `Expect predicate `existsNoRetry == 1` for object "care-hunger" ProgressIndicator`
+    t =    23.78s         Checking existence of `"care-hunger" ProgressIndicator`
+    t =    24.10s Waiting 5.0s for "quests-title" StaticText to exist
+    t =    25.20s     Checking `Expect predicate `existsNoRetry == 1` for object "quests-title" StaticText`
+    t =    25.21s         Checking existence of `"quests-title" StaticText`
+    t =    26.48s Checking existence of `"export-vetbook" Button`
+    t =    26.77s Find the "export-vetbook" Button
+    t =    27.20s Checking existence of `ScrollView (First Match)`
+    t =    27.35s Swipe up ScrollView (First Match)
+    t =    27.35s     Wait for ai.duck.microduck to idle
+    t =    27.37s     Find the ScrollView (First Match)
+    t =    27.68s     Check for interrupting elements affecting ScrollView
+    t =    27.95s     Synthesize event
+    t =    28.76s     Wait for ai.duck.microduck to idle
+    t =    29.58s Checking existence of `"export-vetbook" Button`
+    t =    30.10s Find the "export-vetbook" Button
+    t =    30.32s Checking existence of `ScrollView at {{8.0, 415.0}, {386.0, 451.0}}`
+    t =    30.44s Swipe up ScrollView at {{8.0, 415.0}, {386.0, 451.0}}
+    t =    30.44s     Wait for ai.duck.microduck to idle
+    t =    30.48s     Find the ScrollView at {{8.0, 415.0}, {386.0, 451.0}}
+    t =    30.69s     Check for interrupting elements affecting ScrollView
+    t =    31.32s     Synthesize event
+    t =    32.18s     Wait for ai.duck.microduck to idle
+    t =    34.39s Checking existence of `"export-vetbook" Button`
+    t =    34.62s Find the "export-vetbook" Button
+    t =    34.80s Waiting 5.0s for "export-vetbook" Button to exist
+    t =    35.86s     Checking `Expect predicate `existsNoRetry == 1` for object "export-vetbook" Button`
+    t =    35.86s         Checking existence of `"export-vetbook" Button`
+    t =    36.05s Find the "export-vetbook" Button
+    t =    36.34s Checking existence of `"ai-open" Button`
+    t =    36.58s Find the "ai-open" Button
+    t =    36.97s Waiting 5.0s for "ai-open" Button to exist
+    t =    38.02s     Checking `Expect predicate `existsNoRetry == 1` for object "ai-open" Button`
+    t =    38.02s         Checking existence of `"ai-open" Button`
+    t =    38.28s Tap "ai-open" Button
+    t =    38.28s     Wait for ai.duck.microduck to idle
+    t =    38.28s     Find the "ai-open" Button
+    t =    38.58s     Check for interrupting elements affecting "ai-open" Button
+    t =    38.88s     Synthesize event
+    t =    39.80s     Wait for ai.duck.microduck to idle
+    t =    40.18s Waiting 10.0s for "ai-title" StaticText to exist
+    t =    41.28s     Checking `Expect predicate `existsNoRetry == 1` for object "ai-title" StaticText`
+    t =    41.28s         Checking existence of `"ai-title" StaticText`
+    t =    43.55s Waiting 5.0s for "ai-endpoint" TextField to exist
+    t =    44.61s     Checking `Expect predicate `existsNoRetry == 1` for object "ai-endpoint" TextField`
+    t =    44.61s         Checking existence of `"ai-endpoint" TextField`
+    t =    44.93s Tap "ai-close" Button
+    t =    44.93s     Wait for ai.duck.microduck to idle
+    t =    44.96s     Find the "ai-close" Button
+    t =    45.22s     Check for interrupting elements affecting "ai-close" Button
+    t =    45.72s     Synthesize event
+    t =    46.16s     Wait for ai.duck.microduck to idle
+    t =    46.53s Waiting 5.0s for "sheet-title" StaticText to exist
+    t =    47.59s     Checking `Expect predicate `existsNoRetry == 1` for object "sheet-title" StaticText`
+    t =    47.59s         Checking existence of `"sheet-title" StaticText`
+    t =    47.91s Find the "sheet-close" Button
+    t =    48.18s Swipe down ScrollView at {{0.0, 62.0}, {402.0, 812.0}}
+    t =    48.18s     Wait for ai.duck.microduck to idle
+    t =    48.22s     Find the ScrollView at {{0.0, 62.0}, {402.0, 812.0}}
+    t =    48.43s     Check for interrupting elements affecting ScrollView
+    t =    48.89s     Synthesize event
+    t =    49.73s     Wait for ai.duck.microduck to idle
+    t =    52.04s Find the "sheet-close" Button
+    t =    53.00s Waiting 5.0s for "sheet-close" Button to exist
+    t =    54.06s     Checking `Expect predicate `existsNoRetry == 1` for object "sheet-close" Button`
+    t =    54.06s         Checking existence of `"sheet-close" Button`
+    t =    54.46s Tap "sheet-close" Button
+    t =    54.46s     Wait for ai.duck.microduck to idle
+    t =    54.47s     Find the "sheet-close" Button
+    t =    54.87s     Check for interrupting elements affecting "sheet-close" Button
+    t =    55.06s     Synthesize event
+    t =    55.48s     Wait for ai.duck.microduck to idle
+    t =    57.02s Checking `Expect predicate `exists == 0` for object "sheet-title" StaticText`
+    t =    57.02s     Checking existence of `"sheet-title" StaticText`
+    t =    57.09s Waiting 10.0s for "duck-more" Button to exist
+    t =    58.12s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
+    t =    58.13s         Checking existence of `"duck-more" Button`
+    t =    58.18s Tap "duck-more" Button
+    t =    58.18s     Wait for ai.duck.microduck to idle
+    t =    58.18s     Find the "duck-more" Button
+    t =    58.26s     Check for interrupting elements affecting "duck-more" Button
+    t =    58.35s     Synthesize event
+    t =    58.72s     Wait for ai.duck.microduck to idle
+    t =    58.83s Waiting 10.0s for "more-title" StaticText to exist
+    t =    59.86s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
+    t =    59.86s         Checking existence of `"more-title" StaticText`
+    t =    60.00s Waiting 10.0s for "more-blocks" Button to exist
+    t =    61.06s     Checking `Expect predicate `existsNoRetry == 1` for object "more-blocks" Button`
+    t =    61.06s         Checking existence of `"more-blocks" Button`
+    t =    61.36s Tap "more-blocks" Button
+    t =    61.36s     Wait for ai.duck.microduck to idle
+    t =    61.37s     Find the "more-blocks" Button
+    t =    61.93s     Check for interrupting elements affecting "more-blocks" Button
+    t =    62.13s     Synthesize event
+    t =    62.50s     Wait for ai.duck.microduck to idle
+    t =    62.79s Waiting 10.0s for "rules-title" StaticText to exist
+    t =    63.88s     Checking `Expect predicate `existsNoRetry == 1` for object "rules-title" StaticText`
+    t =    63.88s         Checking existence of `"rules-title" StaticText`
+    t =    63.99s Waiting 5.0s for "rule-add" Button to exist
+    t =    65.03s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-add" Button`
+    t =    65.03s         Checking existence of `"rule-add" Button`
+    t =    65.16s Tap "rule-add" Button
+    t =    65.16s     Wait for ai.duck.microduck to idle
+    t =    65.17s     Find the "rule-add" Button
+    t =    65.34s     Check for interrupting elements affecting "rule-add" Button
+    t =    65.48s     Synthesize event
+    t =    65.86s     Wait for ai.duck.microduck to idle
+    t =    65.86s Waiting 5.0s for "rule-0" Other to exist
+    t =    66.91s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
+    t =    66.91s         Checking existence of `"rule-0" Other`
+    t =    67.06s         Capturing element debug description
+    t =    67.91s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
+    t =    67.91s         Checking existence of `"rule-0" Other`
+    t =    68.17s         Capturing element debug description
+    t =    68.89s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
+    t =    68.89s         Checking existence of `"rule-0" Other`
+    t =    69.05s         Capturing element debug description
+    t =    69.87s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
+    t =    69.87s         Checking existence of `"rule-0" Other`
+    t =    70.15s         Capturing element debug description
+    t =    70.87s     Checking `Expect predicate `existsNoRetry == 1` for object "rule-0" Other`
+    t =    70.87s         Checking existence of `"rule-0" Other`
+    t =    71.03s         Capturing element debug description
+    t =    71.03s     Checking existence of `"rule-0" Other`
+    t =    71.29s Collecting debug information to assist test failure triage
+    t =    71.29s     Requesting snapshot of accessibility hierarchy for app with pid 28379
+    t =    71.48s Waiting 5.0s for StaticText (First Match) to exist
+    t =    72.53s     Checking `Expect predicate `existsNoRetry == 1` for object StaticText (First Match)`
+    t =    72.53s         Checking existence of `StaticText (First Match)`
+    t =    72.75s Tap "rules-close" Button
+    t =    72.75s     Wait for ai.duck.microduck to idle
+    t =    72.79s     Find the "rules-close" Button
+    t =    72.96s     Check for interrupting elements affecting "rules-close" Button
+    t =    73.16s     Synthesize event
+    t =    73.64s     Wait for ai.duck.microduck to idle
+    t =    75.16s Checking `Expect predicate `exists == 0` for object "rules-title" StaticText`
+    t =    75.16s     Checking existence of `"rules-title" StaticText`
+    t =    75.27s Waiting 5.0s for "more-close" Button to exist
+    t =    76.29s     Checking `Expect predicate `existsNoRetry == 1` for object "more-close" Button`
+    t =    76.29s         Checking existence of `"more-close" Button`
+    t =    76.45s Tap "more-close" Button
+    t =    76.45s     Wait for ai.duck.microduck to idle
+    t =    76.47s     Find the "more-close" Button
+    t =    76.65s     Check for interrupting elements affecting "more-close" Button
+    t =    76.75s     Synthesize event
+    t =    77.27s     Wait for ai.duck.microduck to idle
+    t =    78.96s Checking `Expect predicate `exists == 0` for object "more-title" StaticText`
+    t =    78.96s     Checking existence of `"more-title" StaticText`
+    t =    79.03s Waiting 10.0s for "duck-more" Button to exist
+    t =    80.08s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-more" Button`
+    t =    80.08s         Checking existence of `"duck-more" Button`
+    t =    80.19s Tap "duck-more" Button
+    t =    80.19s     Wait for ai.duck.microduck to idle
+    t =    80.20s     Find the "duck-more" Button
+    t =    80.25s     Check for interrupting elements affecting "duck-more" Button
+    t =    80.36s     Synthesize event
+    t =    80.76s     Wait for ai.duck.microduck to idle
+    t =    81.16s Waiting 10.0s for "more-title" StaticText to exist
+    t =    82.20s     Checking `Expect predicate `existsNoRetry == 1` for object "more-title" StaticText`
+    t =    82.21s         Checking existence of `"more-title" StaticText`
+    t =    82.62s Waiting 10.0s for "more-peers" Button to exist
+    t =    83.66s     Checking `Expect predicate `existsNoRetry == 1` for object "more-peers" Button`
+    t =    83.66s         Checking existence of `"more-peers" Button`
+    t =    83.78s Tap "more-peers" Button
+    t =    83.78s     Wait for ai.duck.microduck to idle
+    t =    83.78s     Find the "more-peers" Button
+    t =    83.90s     Check for interrupting elements affecting "more-peers" Button
+    t =    84.10s     Synthesize event
+    t =    84.54s     Wait for ai.duck.microduck to idle
+    t =    84.58s Waiting 10.0s for "peers-title" StaticText to exist
+    t =    85.62s     Checking `Expect predicate `existsNoRetry == 1` for object "peers-title" StaticText`
+    t =    85.62s         Checking existence of `"peers-title" StaticText`
+    t =    85.96s Waiting 5.0s for "peers-empty" StaticText to exist
+    t =    87.01s     Checking `Expect predicate `existsNoRetry == 1` for object "peers-empty" StaticText`
+    t =    87.01s         Checking existence of `"peers-empty" StaticText`
+    t =    87.20s Tap "peers-close" Button
+    t =    87.20s     Wait for ai.duck.microduck to idle
+    t =    87.21s     Find the "peers-close" Button
+    t =    87.39s     Check for interrupting elements affecting "peers-close" Button
+    t =    87.65s     Synthesize event
+    t =    88.02s     Wait for ai.duck.microduck to idle
+    t =    88.42s Waiting 5.0s for "more-close" Button to exist
+    t =    89.46s     Checking `Expect predicate `existsNoRetry == 1` for object "more-close" Button`
+    t =    89.46s         Checking existence of `"more-close" Button`
+    t =    89.67s Tap "more-close" Button
+    t =    89.67s     Wait for ai.duck.microduck to idle
+    t =    89.69s     Find the "more-close" Button
+    t =    89.92s     Check for interrupting elements affecting "more-close" Button
+    t =    90.05s     Synthesize event
+    t =    90.45s     Wait for ai.duck.microduck to idle
+    t =    91.89s Checking `Expect predicate `exists == 0` for object "more-title" StaticText`
+    t =    91.90s     Checking existence of `"more-title" StaticText`
+    t =    91.99s Checking existence of `"duck-label" Any`
+    t =    92.11s Find the "duck-label" Any
+    t =    92.20s Waiting 10.0s for "surface-toggle" Button to exist
+    t =    93.24s     Checking `Expect predicate `existsNoRetry == 1` for object "surface-toggle" Button`
+    t =    93.24s         Checking existence of `"surface-toggle" Button`
+    t =    93.34s Tap "surface-toggle" Button
+    t =    93.34s     Wait for ai.duck.microduck to idle
+    t =    93.36s     Find the "surface-toggle" Button
+    t =    93.63s     Check for interrupting elements affecting "surface-toggle" Button
+    t =    93.74s     Synthesize event
+    t =    94.19s     Wait for ai.duck.microduck to idle
+    t =    95.86s Checking existence of `"duck-label" Any`
+    t =    96.24s Find the "duck-label" Any
+    t =    96.37s Waiting 10.0s for "duck-photo" Button to exist
+    t =    97.43s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-photo" Button`
+    t =    97.43s         Checking existence of `"duck-photo" Button`
+    t =    97.58s Tap "duck-photo" Button
+    t =    97.58s     Wait for ai.duck.microduck to idle
+    t =    97.79s     Find the "duck-photo" Button
+    t =    98.03s     Check for interrupting elements affecting "duck-photo" Button
+    t =    98.09s         Wait for com.apple.springboard to idle
+    t =    98.45s     Found 1 interrupting element:
+    t =    98.45s         Find the "“MicroDuck” would like to access the Camera." Alert
+    t =    98.56s "“MicroDuck” would like to access the Camera." Alert from Application 'com.apple.springboard'
+    t =    98.56s     Invoking UI interruption monitors for "“MicroDuck” would like to access the Camera." Alert from Application 'com.apple.springboard'
+    t =    98.56s         Find the "“MicroDuck” would like to access the Camera." Alert
+    t =    98.64s         Checking existence of `Button (Elements matching predicate 'userTestingAttributes CONTAINS "cancel-button"')`
+    t =    98.73s         Get all elements bound by accessibility element for: Elements matching predicate 'userTestingAttributes CONTAINS "default-button"'
+    t =    98.85s         Checking existence of `"Allow" Button`
+    t =    98.93s Default interruption handler attempting to dismiss alert by tapping "Allow" Button.
+    t =    98.93s         Tap "Allow" Button
+    t =    98.93s             Wait for com.apple.springboard to idle
+    t =    98.94s             Find the "Allow" Button
+    t =    99.03s             Check for interrupting elements affecting "Allow" Button
+    t =    99.14s             Synthesize event
+    t =    99.46s             Wait for com.apple.springboard to idle
+    t =    99.78s         Waiting 1.0s for Alert to not exist
+    t =   100.79s             Checking `Expect predicate `existsNoRetry == 0` for object Alert`
+    t =   100.79s                 Checking existence of `Alert`
+    t =   100.85s             Checking existence of `Alert`
+    t =   100.92s         Verifying handling...
+    t =   101.00s Confirmed successful handling of interrupting element
+    t =   101.01s     Synthesize event
+    t =   101.45s     Wait for ai.duck.microduck to idle
+    t =   101.50s Waiting 15.0s for "photo-preview" Any to exist
+    t =   102.57s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-preview" Any`
+    t =   102.58s         Checking existence of `"photo-preview" Any`
+    t =   102.89s Waiting 10.0s for "postcard-caption" StaticText to exist
+    t =   103.93s     Checking `Expect predicate `existsNoRetry == 1` for object "postcard-caption" StaticText`
+    t =   103.94s         Checking existence of `"postcard-caption" StaticText`
+    t =   104.14s Waiting 5.0s for "photo-keep" Button to exist
+    t =   105.19s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-keep" Button`
+    t =   105.19s         Checking existence of `"photo-keep" Button`
+    t =   105.27s Tap "photo-keep" Button
+    t =   105.27s     Wait for ai.duck.microduck to idle
+    t =   105.28s     Find the "photo-keep" Button
+    t =   105.33s     Check for interrupting elements affecting "photo-keep" Button
+    t =   105.42s     Synthesize event
+    t =   105.84s     Wait for ai.duck.microduck to idle
+    t =   107.49s Checking `Expect predicate `label CONTAINS "Kept" OR label CONTAINS "已收藏"` for object "photo-keep" Button`
+    t =   107.49s     Find the "photo-keep" Button
+    t =   107.68s Waiting 5.0s for "photo-close" Button to exist
+    t =   108.74s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-close" Button`
+    t =   108.77s         Checking existence of `"photo-close" Button`
+    t =   108.97s Tap "photo-close" Button
+    t =   108.97s     Wait for ai.duck.microduck to idle
+    t =   108.98s     Find the "photo-close" Button
+    t =   109.30s     Check for interrupting elements affecting "photo-close" Button
+    t =   109.50s     Synthesize event
+    t =   109.92s     Wait for ai.duck.microduck to idle
+    t =   110.28s Waiting 10.0s for "duck-photo" Button to exist
+    t =   111.29s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-photo" Button`
+    t =   111.30s         Checking existence of `"duck-photo" Button`
+    t =   111.45s Tap "surface-toggle" Button
+    t =   111.45s     Wait for ai.duck.microduck to idle
+    t =   111.47s     Find the "surface-toggle" Button
+    t =   111.67s     Check for interrupting elements affecting "surface-toggle" Button
+    t =   111.83s     Synthesize event
+    t =   112.27s     Wait for ai.duck.microduck to idle
+    t =   112.32s Checking existence of `"duck-label" Any`
+    t =   112.46s Find the "duck-label" Any
+    t =   112.56s Tear Down
+    t =   112.56s     Setting device orientation to Portrait
+    t =   112.58s         Wait for ai.duck.microduck to idle
+Test Case '-[DuckUITests.DuckUITests testTheShellDrivesTheCore]' passed (113.659 seconds).
 Test Case '-[DuckUITests.DuckUITests testZChinesePostcard]' started.
-    t =     0.00s Start Test at 2026-11-14 08:32:59.405
-    t =     0.04s Set Up
-    t =     0.04s     Setting device orientation to Portrait
-    t =     0.05s         Wait for ai.duck.microduck to idle
-    t =     0.06s     Open ai.duck.microduck
-    t =     0.06s         Launch ai.duck.microduck
-    t =     0.06s             Terminate ai.duck.microduck:30169
-2026-11-14 08:33:00.484 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:33:00.484 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     1.29s             Setting up automation session
-    t =     2.76s             Wait for ai.duck.microduck to idle
-    t =     4.51s     Find the Target Application 'ai.duck.microduck'
-    t =     4.55s     Find the Target Application 'ai.duck.microduck'
-    t =     4.57s     Find the Target Application 'ai.duck.microduck'
-    t =     4.58s     Find the Target Application 'ai.duck.microduck'
-    t =     4.60s Terminate ai.duck.microduck:35272
-    t =     5.61s Open ai.duck.microduck
-    t =     5.61s     Launch ai.duck.microduck
-2026-11-14 08:33:05.019 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
-2026-11-14 08:33:05.019 xcodebuild[25112:74521] [MT] IDELaunchParametersSnapshot: no debugger version
-    t =     5.83s         Setting up automation session
-    t =     6.84s         Wait for ai.duck.microduck to idle
-    t =     9.01s Waiting 120.0s for "duck-label" Any to exist
-    t =    10.06s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
-    t =    10.06s         Checking existence of `"duck-label" Any`
-    t =    10.13s Waiting 10.0s for "surface-toggle" Button to exist
-    t =    11.18s     Checking `Expect predicate `existsNoRetry == 1` for object "surface-toggle" Button`
-    t =    11.18s         Checking existence of `"surface-toggle" Button`
-    t =    11.21s Tap "surface-toggle" Button
-    t =    11.21s     Wait for ai.duck.microduck to idle
-    t =    11.21s     Find the "surface-toggle" Button
-    t =    11.24s     Check for interrupting elements affecting "surface-toggle" Button
-    t =    11.28s     Synthesize event
-    t =    11.60s     Wait for ai.duck.microduck to idle
-    t =    13.11s Waiting 10.0s for "duck-photo" Button to exist
-    t =    14.14s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-photo" Button`
-    t =    14.14s         Checking existence of `"duck-photo" Button`
-    t =    14.16s Tap "duck-photo" Button
-    t =    14.16s     Wait for ai.duck.microduck to idle
-    t =    14.17s     Find the "duck-photo" Button
-    t =    14.20s     Check for interrupting elements affecting "duck-photo" Button
-    t =    14.23s     Synthesize event
-    t =    14.55s     Wait for ai.duck.microduck to idle
-    t =    14.61s Waiting 15.0s for "postcard-caption" StaticText to exist
-    t =    15.64s     Checking `Expect predicate `existsNoRetry == 1` for object "postcard-caption" StaticText`
-    t =    15.64s         Checking existence of `"postcard-caption" StaticText`
-    t =    15.68s Waiting 5.0s for "photo-keep" Button to exist
-    t =    16.71s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-keep" Button`
-    t =    16.71s         Checking existence of `"photo-keep" Button`
-    t =    16.74s Tap "photo-keep" Button
-    t =    16.74s     Wait for ai.duck.microduck to idle
-    t =    16.74s     Find the "photo-keep" Button
-    t =    16.77s     Check for interrupting elements affecting "photo-keep" Button
-    t =    16.81s     Synthesize event
-    t =    17.11s     Wait for ai.duck.microduck to idle
-    t =    18.16s Checking `Expect predicate `label CONTAINS "已收藏"` for object "photo-keep" Button`
-    t =    18.16s     Find the "photo-keep" Button
-    t =    18.19s Tear Down
-    t =    18.19s     Setting device orientation to Portrait
-    t =    18.20s         Wait for ai.duck.microduck to idle
-Test Case '-[DuckUITests.DuckUITests testZChinesePostcard]' passed (18.454 seconds).
-Test Suite 'DuckUITests' passed at 2026-11-14 08:33:17.858.
-	 Executed 6 tests, with 0 failures (0 unexpected) in 176.766 (176.771) seconds
-Test Suite 'DuckUITests.xctest' passed at 2026-11-14 08:33:17.859.
-	 Executed 6 tests, with 0 failures (0 unexpected) in 176.766 (176.773) seconds
-Test Suite 'All tests' passed at 2026-11-14 08:33:17.860.
-	 Executed 6 tests, with 0 failures (0 unexpected) in 176.766 (176.774) seconds
-2026-11-14 08:33:34.090 xcodebuild[25112:74521] [MT] IDETestOperationsObserverDebug: 200.957 elapsed -- Testing started completed.
-2026-11-14 08:33:34.091 xcodebuild[25112:74521] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
-2026-11-14 08:33:34.091 xcodebuild[25112:74521] [MT] IDETestOperationsObserverDebug: 200.957 sec, +200.957 sec -- end
+    t =     0.00s Start Test at 2026-11-14 09:19:52.458
+    t =     0.15s Set Up
+    t =     0.15s     Setting device orientation to Portrait
+    t =     0.16s         Wait for ai.duck.microduck to idle
+    t =     0.17s     Open ai.duck.microduck
+    t =     0.17s         Launch ai.duck.microduck
+    t =     0.17s             Terminate ai.duck.microduck:28379
+2026-11-14 09:19:54.808 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:19:54.808 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     3.12s             Setting up automation session
+    t =     6.06s             Wait for ai.duck.microduck to idle
+    t =     7.98s     Find the Target Application 'ai.duck.microduck'
+    t =     8.96s     Find the Target Application 'ai.duck.microduck'
+    t =     9.22s     Find the Target Application 'ai.duck.microduck'
+    t =     9.31s     Find the Target Application 'ai.duck.microduck'
+    t =     9.38s Terminate ai.duck.microduck:31159
+    t =    10.48s Open ai.duck.microduck
+    t =    10.48s     Launch ai.duck.microduck
+2026-11-14 09:20:02.955 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: The operation couldn’t be completed. (DebuggerLLDB.DebuggerVersionStore.StoreError error 0.)
+2026-11-14 09:20:02.955 xcodebuild[20906:60639] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    11.01s         Setting up automation session
+    t =    12.90s         Wait for ai.duck.microduck to idle
+    t =    14.77s Waiting 120.0s for "duck-label" Any to exist
+    t =    15.83s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-label" Any`
+    t =    15.83s         Checking existence of `"duck-label" Any`
+    t =    16.03s Waiting 10.0s for "surface-toggle" Button to exist
+    t =    17.09s     Checking `Expect predicate `existsNoRetry == 1` for object "surface-toggle" Button`
+    t =    17.09s         Checking existence of `"surface-toggle" Button`
+    t =    17.20s Tap "surface-toggle" Button
+    t =    17.20s     Wait for ai.duck.microduck to idle
+    t =    17.20s     Find the "surface-toggle" Button
+    t =    17.29s     Check for interrupting elements affecting "surface-toggle" Button
+    t =    17.36s     Synthesize event
+    t =    17.71s     Wait for ai.duck.microduck to idle
+    t =    19.22s Waiting 10.0s for "duck-photo" Button to exist
+    t =    20.29s     Checking `Expect predicate `existsNoRetry == 1` for object "duck-photo" Button`
+    t =    20.30s         Checking existence of `"duck-photo" Button`
+    t =    20.50s Tap "duck-photo" Button
+    t =    20.50s     Wait for ai.duck.microduck to idle
+    t =    20.50s     Find the "duck-photo" Button
+    t =    21.35s     Check for interrupting elements affecting "duck-photo" Button
+    t =    22.95s     Synthesize event
+    t =    23.83s     Wait for ai.duck.microduck to idle
+    t =    24.12s Waiting 15.0s for "postcard-caption" StaticText to exist
+    t =    25.24s     Checking `Expect predicate `existsNoRetry == 1` for object "postcard-caption" StaticText`
+    t =    25.25s         Checking existence of `"postcard-caption" StaticText`
+    t =    33.94s Waiting 5.0s for "photo-keep" Button to exist
+    t =    35.00s     Checking `Expect predicate `existsNoRetry == 1` for object "photo-keep" Button`
+    t =    35.00s         Checking existence of `"photo-keep" Button`
+    t =    35.15s Tap "photo-keep" Button
+    t =    35.15s     Wait for ai.duck.microduck to idle
+    t =    35.16s     Find the "photo-keep" Button
+    t =    35.50s     Check for interrupting elements affecting "photo-keep" Button
+    t =    36.42s     Synthesize event
+    t =    37.51s     Wait for ai.duck.microduck to idle
+    t =    38.55s Checking `Expect predicate `label CONTAINS "已收藏"` for object "photo-keep" Button`
+    t =    38.55s     Find the "photo-keep" Button
+    t =    38.66s Tear Down
+    t =    38.66s     Setting device orientation to Portrait
+    t =    38.69s         Wait for ai.duck.microduck to idle
+Test Case '-[DuckUITests.DuckUITests testZChinesePostcard]' passed (39.715 seconds).
+Test Suite 'DuckUITests' passed at 2026-11-14 09:20:32.173.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 311.186 (311.214) seconds
+Test Suite 'DuckUITests.xctest' passed at 2026-11-14 09:20:32.176.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 311.186 (311.217) seconds
+Test Suite 'All tests' passed at 2026-11-14 09:20:32.177.
+	 Executed 7 tests, with 0 failures (0 unexpected) in 311.186 (311.220) seconds
+2026-11-14 09:21:10.754 xcodebuild[20906:60639] [MT] IDETestOperationsObserverDebug: 388.891 elapsed -- Testing started completed.
+2026-11-14 09:21:10.755 xcodebuild[20906:60639] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-11-14 09:21:10.755 xcodebuild[20906:60639] [MT] IDETestOperationsObserverDebug: 388.891 sec, +388.891 sec -- end
 
 Test session results, code coverage, and logs:
-	/Users/runner/work/0637/0637/ios/build/Logs/Test/Test-Duck-2026.11.14_08-30-01-+0000.xcresult
+	/Users/runner/work/0637/0637/ios/build/Logs/Test/Test-Duck-2026.11.14_09-14-07-+0000.xcresult
 
 ** TEST SUCCEEDED **
 
