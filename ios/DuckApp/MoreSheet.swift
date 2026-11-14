@@ -143,7 +143,6 @@ struct MoreSheet: View {
                         controller.toggleFlashlight()
                     }
                     row(
-                    row(
                         "arrow.counterclockwise", Copy.rewindPlay,
                         note: controller.rewinding ? Copy.flashlightOn : nil,
                         check: controller.rewinding,
@@ -182,6 +181,7 @@ struct MoreSheet: View {
                     ) {
                         controller.p2On.toggle()
                     }
+                    row(
                         "externaldrive", Copy.backup,
                         note: Copy.backupRowNote,
                         id: "more-backup"
@@ -198,12 +198,12 @@ struct MoreSheet: View {
                         controller.compassOn.toggle()
                     }
                     row(
-                    row(
                         "square.grid.3x3", Copy.tof,
                         note: controller.tofStrip,
                         showsChevron: false,
                         id: "more-tof"
                     ) { controller.refreshTofStrip() }
+                    row(
                         "lightbulb", Copy.roomLamp,
                         note: Copy.roomLampNote,
                         badge: String(format: "%.0f%%", controller.ambientScale * 100),
