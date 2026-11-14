@@ -82,6 +82,35 @@ pub struct Book {
     /// The last few things that happened, newest last. Capped, because a
     /// phone's storage is not a robot's.
     pub events: Vec<String>,
+    /// The parent's view, one row per calendar day: the duck's own deltas
+    /// between day boundaries. Capped at the last 30 days.
+    #[serde(default)]
+    pub days: Vec<DayRecord>,
+    /// The day the current deltas are counted against.
+    #[serde(default)]
+    pub day_started: DayStarted,
+}
+
+/// One calendar day's honest deltas, snapshotted at the rollover.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DayRecord {
+    pub day: String,
+    /// Metres walked that day, from the official contact odometry.
+    pub metres: f64,
+    /// Powered seconds that day.
+    pub powered_s: f64,
+    /// Roulades that day.
+    pub rolls: u64,
+}
+
+/// Where the current day's counters started. Values the duck already had
+/// when the day began are never claimed by it.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct DayStarted {
+    pub day: String,
+    pub metres: f64,
+    pub powered_s: f64,
+    pub rolls: u64,
 }
 
 /// How many events are kept.
@@ -133,6 +162,40 @@ pub fn is_known_event(event: &str) -> bool {
 impl Book {
     /// One tick's facts. The loop calls this every tick: no lock, no
     /// allocation beyond the counters themselves.
+    /// The calendar day rolled over (the shell posts the day it lives by):
+    /// snapshot yesterday's deltas and start counting from now.
+    pub fn roll_day(&mut self, day: &str) {
+        let metres = self.life.metres - self.day_started.metres;
+        let powered = self.life.powered_s - self.day_started.powered_s;
+        let rolls = self
+            .life
+            .skills
+            .get("roulade")
+            .copied()
+            .unwrap_or(0)
+            .saturating_sub(self.day_started.rolls);
+        if self.day_started.day == *day {
+            return;
+        }
+        if !self.day_started.day.is_empty() {
+            self.days.push(DayRecord {
+                day: self.day_started.day.clone(),
+                metres: (metres * 10.0).round() / 10.0,
+                powered_s: (powered * 10.0).round() / 10.0,
+                rolls,
+            });
+            if self.days.len() > 30 {
+                self.days.remove(0);
+            }
+        }
+        self.day_started = DayStarted {
+            day: day.to_owned(),
+            metres: self.life.metres,
+            powered_s: self.life.powered_s,
+            rolls: self.life.skills.get("roulade").copied().unwrap_or(0),
+        };
+    }
+
     pub fn tick(&mut self, facts: Facts) {
         let dt = facts.dt;
         if facts.powered {
@@ -198,6 +261,7 @@ impl Book {
             "soft_landings": self.life.soft_landings,
             "pickups": self.life.pickups,
             "ground_picks": self.life.ground_picks,
+            "days": self.days,
             "sit_downs": self.life.sit_downs,
             "stand_ups": self.life.stand_ups,
             "wake_ups": self.life.wake_ups,

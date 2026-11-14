@@ -755,6 +755,7 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
             | Intent::QuestDay(_, _)
             | Intent::Backup
             | Intent::RestoreBackup(_)
+            | Intent::TrajectoryExport
     );
     let selected = core.selected;
     if global || selected == 0 || selected > core.branches.len() {
@@ -1120,7 +1121,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             })
         }
         Intent::RestoreBackup(value) => {
-            if value.get("format").and_then(Value::as_str) != Some("microduck-backup/1") {
+            if value.get("format").and_then(serde_json::Value::as_str) != Some("microduck-backup/1") {
                 return refuse(core, "unknown backup format".to_owned());
             }
             // Three parts, three of the duck's own doors: the care restore
@@ -1133,7 +1134,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 core,
                 Intent::RestoreCare(value.get("care").cloned().unwrap_or(json!({}))),
             );
-            let day = value.get("day").and_then(Value::as_str).unwrap_or("").to_owned();
+            let day = value.get("day").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
             let quests = if day.len() == 10 {
                 apply_intent_active(
                     core,
@@ -1158,6 +1159,55 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             None => refuse(core, "the LAN peer port is not available".to_owned()),
         },
+        Intent::TrajectoryExport => {
+            // One JSON line per kept tick: tick, trunk pose, the 15 wire
+            // joints and the policy's own command. Every number is the tick
+            // the rewind machine saved; none is recomputed or smoothed.
+            let lines: Vec<String> = core
+                .timeline
+                .iter()
+                .map(|saved| {
+                    json!({
+                        "tick": saved.tick,
+                        "speed": saved.speed,
+                        "paused": saved.paused,
+                        "body": saved.body,
+                        "fallen": saved.fallen,
+                    })
+                    .to_string()
+                })
+                .collect();
+            json!({
+                "format": "microduck-trajectory/1",
+                "fingerprint": core.fingerprint.to_string_lossy(),
+                "count": lines.len(),
+                "lines": lines,
+            })
+            .to_string()
+        }
+        Intent::FloorHeight(z) => {
+            // Only a MuJoCo body has a ground to move; the feature-gated
+            // core answers honestly rather than pretending.
+            #[cfg(feature = "mujoco")]
+            {
+                // The closure carries the verdict out through a captured
+                // slot: on_active's own shape returns nothing.
+                let mut moved = false;
+                on_active(core, |runtime| {
+                    moved = runtime.set_floor_height(z).unwrap_or(false);
+                });
+                if moved {
+                    json!({ "ok": true, "floor_z": z })
+                } else {
+                    refuse(core, "the scene has no ground plane".to_owned())
+                }
+            }
+            #[cfg(not(feature = "mujoco"))]
+            {
+                let _ = z;
+                refuse(core, "this build has no physics ground".to_owned())
+            }
+        }
         Intent::ParentBudget(minutes) => {
             on_active(core, |runtime| runtime.set_parent_budget(minutes));
             let summary = active_runtime(core).care_summary();
@@ -1737,7 +1787,12 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     // eat today's minutes.
     if quest_day.len() == 10 && quest_day != core.parent_day {
         core.parent_day = quest_day.clone();
-        on_active(core, |runtime| runtime.reset_parent_day());
+        on_active(core, |runtime| {
+            runtime.reset_parent_day();
+            // The parent's view: the day boundary snapshots yesterday's own
+            // deltas into the vet book's rows.
+            runtime.book_mut().roll_day(&quest_day);
+        });
     }
     if quest_day.len() == 10 {
         // Measure the duck the client is driving: a selected branch's own

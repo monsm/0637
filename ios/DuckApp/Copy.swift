@@ -490,6 +490,18 @@ enum Copy {
     static var backupReady: String { pick("Backup written — share it", "备份已生成——分享它") }
     static var backupDone: String { pick("Restored", "已恢复") }
     static var backupFailed: String { pick("The duck refused that file", "鸭子没有收下那个文件") }
+    static var rewindPlay: String { pick("Rewind play", "倒放") }
+    static var pushCompare: String { pick("Push & compare", "推一把对比") }
+    static var abTry: String { pick("Policy A/B", "策略 AB 试穿") }
+    static var abNote: String {
+        pick(
+            "Fork, load a policy folder on B, watch both.",
+            "开分支，B 载入另一套策略，两边看。"
+        )
+    }
+    static var abLoaded: String { pick("Loaded on branch B", "已载入分支 B") }
+    static var hud: String { pick("Observation HUD", "观测摘录") }
+    static var twoPlayer: String { pick("Second player", "双人接机") }
     static var compass: String { pick("Home faces north", "家永远朝北") }
     static var compassNote: String {
         pick(

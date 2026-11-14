@@ -30,7 +30,7 @@ struct MoreSheet: View {
     /// several `.sheet` modifiers is unreliable, and this codebase says so
     /// about itself in ContentView.
     private enum Destination: Identifiable {
-        case rules, dance, peers, quests, diary, postcards, dex, ai, modes, big, backup
+        case rules, dance, peers, quests, diary, postcards, dex, ai, modes, big, backup, ab
 
         var id: String {
             switch self {
@@ -45,6 +45,7 @@ struct MoreSheet: View {
             case .modes: return "modes"
             case .big: return "big"
             case .backup: return "backup"
+            case .ab: return "ab"
             }
         }
     }
@@ -142,6 +143,45 @@ struct MoreSheet: View {
                         controller.toggleFlashlight()
                     }
                     row(
+                    row(
+                        "arrow.counterclockwise", Copy.rewindPlay,
+                        note: controller.rewinding ? Copy.flashlightOn : nil,
+                        check: controller.rewinding,
+                        showsChevron: false,
+                        id: "more-rewindplay"
+                    ) {
+                        controller.toggleRewindPlay()
+                    }
+                    row(
+                        "hand.draw", Copy.pushCompare,
+                        showsChevron: false,
+                        id: "more-pushcompare"
+                    ) {
+                        controller.pushCompare()
+                    }
+                    row(
+                        "scale.3d", Copy.abTry,
+                        note: Copy.abNote,
+                        id: "more-ab"
+                    ) {
+                        destination = .ab
+                    }
+                    row(
+                        "waveform.path", Copy.hud,
+                        check: controller.hudOn,
+                        showsChevron: false,
+                        id: "more-hud"
+                    ) {
+                        controller.hudOn.toggle()
+                    }
+                    row(
+                        "person.2", Copy.twoPlayer,
+                        check: controller.p2On,
+                        showsChevron: false,
+                        id: "more-p2"
+                    ) {
+                        controller.p2On.toggle()
+                    }
                         "externaldrive", Copy.backup,
                         note: Copy.backupRowNote,
                         id: "more-backup"
@@ -279,6 +319,10 @@ struct MoreSheet: View {
                 .presentationDragIndicator(.visible)
         case .backup:
             BackupSheet(controller: controller)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        case .ab:
+            ABSheet(controller: controller)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
         }

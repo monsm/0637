@@ -115,12 +115,33 @@ impl Sensors {
     }
 
     pub fn to_json(&self) -> Value {
+        // The 8x8 grid the duck's head would see, computed from whatever
+        // depth the phone published, by the OFFICIAL resampler. The array
+        // shape the client sends is its own choice; anything that does not
+        // parse publishes an empty grid rather than an invented one.
+        let grid: Vec<f64> = self
+            .depth
+            .as_ref()
+            .and_then(|reading| {
+                reading
+                    .value
+                    .get("values")
+                    .and_then(Value::as_array)
+                    .map(|rows| {
+                        rows.iter()
+                            .filter_map(Value::as_f64)
+                            .collect::<Vec<f64>>()
+                    })
+            })
+            .map(|values| to_tof_grid(&values, 8, 8))
+            .unwrap_or_default();
         json!({
             "mode": self.mode.unwrap_or(Mode::Twin).as_str(),
             "imu": self.imu,
             "camera": self.camera,
             "microphone": self.microphone,
             "depth": self.depth,
+            "tof_grid": grid,
             "note": "phone sensors never enter the 61-D observation; the IMU acts as an external disturbance",
         })
     }

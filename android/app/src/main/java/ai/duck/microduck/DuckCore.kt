@@ -357,6 +357,10 @@ class DuckInput {
     @Volatile var ambientScale: Float = 1.0f
     /** The last lux reading, or -1 when the device has no light sensor. */
     @Volatile var ambientLux: Float = -1.0f
+    /** The observation HUD overlay is up: a few real numbers over the stage. */
+    @Volatile var hudOn: Boolean = false
+    /** The second player's verb column is up on the stage's right edge. */
+    @Volatile var p2On: Boolean = false
     /**
      * The compass: a yaw offset in radians for the camera, derived from the
      * rotation vector when the person turns the compass on. Zero when off;

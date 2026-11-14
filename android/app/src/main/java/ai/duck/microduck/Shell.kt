@@ -600,6 +600,38 @@ fun Shell(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
                     )
+                    // The observation HUD: a few REAL numbers the stage is
+                    // running with - the same /state the instrument sheet
+                    // reads, drawn over the duck instead of behind a sheet.
+                    if (input.hudOn && core != null) {
+                        Text(
+                            "tick ${core.tickIndex()} · ${core.mode()} · mouth %.2f".format(
+                                core.status().getOrNull(12) ?: 0.0,
+                            ),
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 11.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .testTag("hud-overlay"),
+                        )
+                    }
+                    // The second player: the right edge belongs to them -
+                    // three verbs at arm's length while player one drives.
+                    if (input.p2On && core != null) {
+                        Row(
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            ButtonChip(Copy.bigButtonAction(0), "p2-pet") { postDuckCommand("/pet") }
+                            ButtonChip(Copy.bigButtonAction(2), "p2-quack") { quack?.invoke() }
+                            ButtonChip(Copy.bigButtonAction(3), "p2-sit") { core.sit() }
+                        }
+                    }
                     PortraitTimeRail(
                         core = duck,
                         surface = surface,
@@ -904,6 +936,7 @@ fun Shell(
     if (showSheet && core != null) {
         InstrumentSheet(
             core,
+            input = input,
             micState = micState,
             flashlightState = flashlightState,
             onFlashlight = toggleFlashlight,
@@ -2975,6 +3008,14 @@ private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
             LifeStat("${life.rolls}", Copy.rolls, Modifier.weight(1f))
             LifeStat("${life.pickups}", Copy.pickups, Modifier.weight(1f))
         }
+        if (life.days.isNotEmpty()) {
+            Text(
+                life.days.takeLast(7).joinToString("
+"),
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = 11.sp,
+            )
+        }
         ButtonChip(Copy.exportVetbook, "export-vetbook", onExport)
     }
 }
@@ -2997,6 +3038,7 @@ private fun LifeStat(value: String, label: String, modifier: Modifier = Modifier
 @Composable
 private fun InstrumentSheet(
     core: DuckCore,
+    input: DuckInput,
     micState: MicState,
     flashlightState: Int,
     onFlashlight: () -> Unit,
@@ -3014,6 +3056,13 @@ private fun InstrumentSheet(
     val scope = rememberCoroutineScope()
     var showDetails by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(core.paused()) }
+    var rewinding by remember { mutableStateOf(false) }
+    LaunchedEffect(rewinding) {
+        while (rewinding) {
+            core.seek(200)
+            delay(150)
+        }
+    }
     var speed by remember { mutableStateOf(core.speed()) }
     var branches by remember { mutableStateOf(0) }
     // The duck's own state, sampled while the sheet is up: /state publishes the
@@ -3515,6 +3564,21 @@ private fun InstrumentSheet(
                     core.setPaused(paused)
                 }
                 ButtonChip(Copy.step) { core.step() }
+                // Rewind-play: while on, the duck walks its own history
+                // backwards, 200 ticks a pop - the same /seek the rewind
+                // chip uses, just continuously.
+                ButtonChip(
+                    if (rewinding) Copy.flashlightOff else Copy.rewindPlay,
+                    "rewind-play",
+                ) { rewinding = !rewinding }
+                // Push & compare: checkpoint, fork, and push branch B -
+                // the split the rewind machine already keeps, one tap.
+                ButtonChip(Copy.pushCompare, "push-compare") {
+                    core.checkpoint()
+                    core.fork()
+                    postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
+                    Toast.makeText(context, Copy.pushCompareDone, Toast.LENGTH_SHORT).show()
+                }
                 ButtonChip(Copy.rewind) { core.seek(200) }
                 ButtonChip(Copy.fork) {
                     core.fork()
@@ -3529,6 +3593,37 @@ private fun InstrumentSheet(
                     core.setMode(if (core.mode() == "roller") "walk" else "roller")
                 }
             }
+            // Policy A/B: fork, then load a policy DIRECTORY on branch B and
+            // switch to it. The directories live beside the bundled policies;
+            // a folder the manifest cannot read is the reload route's own
+            // honest refusal.
+            var abFolder by remember { mutableStateOf("") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Spacer(Modifier.size(8.dp))
+                OutlinedTextField(
+                    value = abFolder,
+                    onValueChange = { abFolder = it.take(64) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).testTag("ab-folder"),
+                )
+                Spacer(Modifier.size(8.dp))
+                ButtonChip(Copy.flashlightOn, "ab-load") {
+                    core.fork()
+                    core.reload(abFolder)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ButtonChip(
+                    if (input.hudOn) Copy.flashlightOff else Copy.hud,
+                    "hud-toggle",
+                ) { input.hudOn = !input.hudOn }
+                ButtonChip(
+                    if (input.p2On) Copy.flashlightOff else Copy.twoPlayer,
+                    "p2-toggle",
+                ) { input.p2On = !input.p2On }
+            }
+            Text(Copy.abNote, color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(0.25, 0.5, 1.0, 2.0).forEach { option ->
                     ButtonChip(if (option == 1.0) "1×" else "${option}×") {

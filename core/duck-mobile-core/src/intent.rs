@@ -145,6 +145,12 @@ pub enum Intent {
     PadSwitch(bool),
     /// The parent's daily play allowance, in minutes; zero clears it.
     ParentBudget(u32),
+    /// The whole timeline between the rewind window's ends, for an export
+    /// file. Read-only: the duck's history leaves, nothing writes in.
+    TrajectoryExport,
+    /// The AR floor: the world's ground moves to this height in metres.
+    /// Twin observation never sees it; the physics does.
+    FloorHeight(f64),
     /// The whole duck's portable state: care, quests and rules, packed for
     /// a file the person carries to another phone.
     Backup,
@@ -1055,6 +1061,10 @@ fn handle(
         // it: the shells GET it, and the boundary probes POST it through
         // the same pipeline every other route is verified with.
         ("GET", "/backup") => Ok(queue.request(Intent::Backup).to_string()),
+        // The trajectory export is a plain read of the timeline the rewind
+        // machine already keeps: one JSON object per simulated tick in the
+        // requested window, no interpolation, no invention.
+        ("GET", "/export/trajectory") => Ok(queue.request(Intent::TrajectoryExport).to_string()),
         ("POST", "/backup") => Ok(queue.request(Intent::Backup).to_string()),
         ("POST", "/backup/restore") => {
             // The format check lives HERE, before anything is queued: a
@@ -1068,6 +1078,14 @@ fn handle(
                     "ok": false,
                     "error": "that file is not a microduck-backup/1",
                 }).to_string()),
+            }
+        }
+        ("POST", "/floor") => {
+            let z = value["z"].as_f64().unwrap_or(0.0);
+            if !(0.0..=2.0).contains(&z) {
+                Ok(json!({ "ok": false, "error": "the floor lives between 0 and 2 m" }).to_string())
+            } else {
+                Ok(queue.request(Intent::FloorHeight(z)).to_string())
             }
         }
         ("POST", "/parent") => Ok(queue
