@@ -68,4 +68,4 @@ warning: function `duck_mj_timestep` is never used
    |        ^^^^^^^^^^^^^^^^
 
 warning: `duck-mobile-core` (lib) generated 7 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 4 suggestions)
-    Finished `release` profile [optimized] target(s) in 25.92s
+    Finished `release` profile [optimized] target(s) in 48.03s
