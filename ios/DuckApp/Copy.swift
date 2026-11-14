@@ -458,6 +458,29 @@ enum Copy {
             "先设配对码，官方 DKPD 手柄才能开这只鸭。"
         )
     }
+    // The parent's daily allowance: when the duck's own powered time for
+    // the day is spent, it goes to the same real sleep the switch puts it in.
+    // The room's lamp: a render-layer multiplier. iOS has no ambient-light
+    // sensor API, so this is the person's hand — the label says so and never
+    // claims the duck can see.
+    static var roomLamp: String { pick("Room lamp", "房间灯") }
+    static var roomLampNote: String {
+        pick(
+            "Manual — iOS has no lux sensor; the duck cannot see it.",
+            "手动——iOS 没有照度 API；鸭子看不见它。"
+        )
+    }
+    static var parentTime: String { pick("Parent time", "家长时间") }
+    static var parentOff: String { pick("off", "不限") }
+    static func parentLeft(_ minutes: Int, _ leftMinutes: Int) -> String {
+        String(format: pick("%d min · %d left", "%d 分钟 · 剩 %d 分钟"), minutes, leftMinutes)
+    }
+    static var parentNote: String {
+        pick(
+            "When today's play is spent, the duck goes to bed on its own.",
+            "今天的游玩时间用完，鸭子就自己睡觉。"
+        )
+    }
     static var pairCode: String { pick("Pair code", "配对码") }
     static var pairNote: String {
         pick(

@@ -348,6 +348,15 @@ class DuckInput {
      * frame or command here reaches the duck's senses.
      */
     @Volatile var instrumentOpen: Boolean = false
+    /**
+     * The room's lamp: a render-layer multiplier on the daylight exposure
+     * (0.55 dark … 1.15 bright). Driven by the real lux sensor when the
+     * device has one, or by the sheet's manual stops; the duck's observation
+     * never sees it.
+     */
+    @Volatile var ambientScale: Float = 1.0f
+    /** The last lux reading, or -1 when the device has no light sensor. */
+    @Volatile var ambientLux: Float = -1.0f
     // Performance counters, reset once a second. The loop counts achieved
     // simulation ticks, the renderer counts frames on its own thread: an
     // atomic getAndSet is needed or a frame drawn between the read and the

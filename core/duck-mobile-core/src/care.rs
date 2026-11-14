@@ -56,6 +56,16 @@ pub struct Care {
     /// book's honest note, the way `woke` marks the wake for the sad grace.
     #[serde(skip)]
     pub woken_by_touch: bool,
+    /// The parent's daily play allowance, in SECONDS of the duck's own
+    /// powered time (`life.powered_s`). None = no limit. A number the
+    /// person set, carried across launches with the rest of care.
+    #[serde(default)]
+    pub budget_s: Option<u32>,
+    /// `powered_s` when the allowance's day began. The runtime resets it on
+    /// the calendar-day rollover and the tick derives "used" from the delta,
+    /// so the number is the duck's own accounting, not a wall clock.
+    #[serde(default)]
+    pub budget_base_s: f64,
 }
 
 impl Default for Care {
@@ -69,6 +79,8 @@ impl Default for Care {
             woke: false,
             night: None,
             woken_by_touch: false,
+            budget_s: None,
+            budget_base_s: 0.0,
         }
     }
 }
@@ -192,6 +204,16 @@ impl Care {
     /// loop already keeps, and nothing here mutates anything: it is a
     /// reading, not an event. A sleeping duck's heart slows like a resting
     /// animal's; a happy bonded one is quick; hunger races it a little.
+    /// Whether the day's allowance is spent: a pure reading of the delta
+    /// between the day's `powered_s` base and now. The runtime turns this
+    /// into the same real sleep a hand on the switch would.
+    pub fn budget_spent(&self, powered_s: f64) -> bool {
+        match self.budget_s {
+            Some(budget) => powered_s - self.budget_base_s >= f64::from(budget),
+            None => false,
+        }
+    }
+
     pub fn heart_bpm(&self) -> f64 {
         if self.asleep {
             return 46.0;
@@ -211,6 +233,9 @@ impl Care {
             // The hand's reading, not a new fact: derived here so every
             // client feels the same heart without re-deriving it.
             "heart_bpm": (self.heart_bpm() * 10.0).round() / 10.0,
+            // The parent's allowance, as the duck keeps it. `used_s` is
+            // filled in by the runtime, which owns `powered_s`.
+            "budget_s": self.budget_s,
             "last_touch": self.last_touch,
             // The night travels with the three numbers: the shells save this
             // object wholesale and hand it back, and the quiet span is always
@@ -242,6 +267,12 @@ impl Care {
         if let Some(v) = value.get("last_touch").and_then(serde_json::Value::as_u64) {
             self.last_touch = v;
         }
+        if let Some(v) = value.get("budget_s").and_then(serde_json::Value::as_u64) {
+            self.budget_s = if v == 0 { None } else { Some((v.min(u32::MAX as u64)) as u32) };
+        }
+        if let Some(v) = value.get("budget_base_s").and_then(serde_json::Value::as_f64) {
+            self.budget_base_s = v.max(0.0);
+        }
         if let Some(night) = value.get("night") {
             // Only a well-formed night starts one; a malformed row is
             // ignored rather than putting the duck to bed on a guess.
@@ -269,6 +300,32 @@ impl Care {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_parent_budget_is_the_ducks_own_accounting() {
+        let mut care = Care::default();
+        assert!(!care.budget_spent(10_000.0), "no allowance set, no limit");
+        care.budget_s = Some(60);
+        care.budget_base_s = 10.0;
+        assert!(!care.budget_spent(69.9));
+        assert!(care.budget_spent(70.0), "60 s of powered play have passed");
+        // A sleeping duck is not woken by the check; the tick only ever
+        // enters the night, never leaves it.
+        care.asleep = true;
+        assert!(care.budget_spent(70.0));
+        // The allowance travels with care: restore keeps it, and zero
+        // minutes mean no limit.
+        care.asleep = false;
+        let saved = care.summary();
+        let mut restored = Care::default();
+        restored.restore(&saved);
+        assert_eq!(restored.budget_s, Some(60));
+        // The wire's zero means no allowance, and restore turns it back
+        // into None — a zero-minute day is "no limit", never "always asleep".
+        restored.restore(&serde_json::json!({ "budget_s": 0, "budget_base_s": 0.0 }));
+        assert_eq!(restored.budget_s, None);
+        assert!(!restored.budget_spent(70.0), "zero minutes clears it");
+    }
 
     #[test]
     fn the_heart_is_a_pure_reading_of_the_care_numbers() {

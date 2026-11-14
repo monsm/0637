@@ -20,6 +20,10 @@ data class CareUi(
     val asleep: Boolean = false,
     /** The core's own heart reading (beats per minute), 0 before first read. */
     val heartBpm: Double = 0.0,
+    /** The parent's daily allowance in minutes, null when unlimited. */
+    val parentMinutes: Int? = null,
+    /** Powered seconds left today under the allowance. */
+    val parentLeftS: Double = 0.0,
 ) {
     /** Fullness fills the bar left-to-right: full means fed. */
     val fullness: Float get() = (1.0 - hunger).toFloat().coerceIn(0f, 1f)
@@ -276,6 +280,9 @@ fun parseCare(text: String): CareUi? = try {
         bond = care.optDouble("bond", 0.1),
         asleep = care.optBoolean("asleep", false),
         heartBpm = care.optDouble("heart_bpm", 0.0),
+        parentMinutes = if (care.has("parent") && care.getJSONObject("parent").has("minutes"))
+            care.getJSONObject("parent").getInt("minutes") else null,
+        parentLeftS = if (care.has("parent")) care.getJSONObject("parent").optDouble("left_s", 0.0) else 0.0,
     )
 } catch (_: Throwable) {
     null

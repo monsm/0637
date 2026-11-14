@@ -481,6 +481,11 @@ val quack get() = pick("Quack", "叫一声")
         "Set the pair code first; the official DKPD pad then drives this duck.",
         "先设配对码，官方 DKPD 手柄才能开这只鸭。",
     )
+    val roomLamp get() = pick("Room lamp", "房间灯")
+    val parentTime get() = pick("Parent time", "家长时间")
+    val parentOff get() = pick("off", "不限")
+    fun parentLeft(minutes: Int, leftMinutes: Int) =
+        pick("$minutes min · $leftMinutes left", "$minutes 分钟 · 剩 $leftMinutes 分钟")
     val pairCode get() = pick("Pair code", "配对码")
     val pairNote get() = pick(
         "Both phones type the same six digits before gifts or songs.",

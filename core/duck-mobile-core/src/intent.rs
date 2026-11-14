@@ -143,6 +143,8 @@ pub enum Intent {
     StartLan(String),
     /// Enable or disable the official UDP pad. Gated by a pair code in ffi.rs.
     PadSwitch(bool),
+    /// The parent's daily play allowance, in minutes; zero clears it.
+    ParentBudget(u32),
     /// The shell's calendar day, plus the quest board it saved. Quests are
     /// the person's day, not simulated time; a rewind must not rewrite them.
     QuestDay(String, serde_json::Value),
@@ -1043,6 +1045,9 @@ fn handle(
             Duration::from_secs(15),
         ).to_string()),
         ("POST", "/power") => Ok(queue.request(Intent::PowerOn).to_string()),
+        ("POST", "/parent") => Ok(queue
+            .request(Intent::ParentBudget(value["minutes"].as_u64().unwrap_or(0).min(600) as u32))
+            .to_string()),
         ("POST", "/pad") => Ok(queue
             .request(Intent::PadSwitch(value["on"].as_bool().unwrap_or(false)))
             .to_string()),

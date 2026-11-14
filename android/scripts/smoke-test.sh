@@ -322,6 +322,50 @@ if [ "$NIGHT_OFF" != "1" ]; then
   exit 1
 fi
 echo "night: on -> asleep and quiet, pet -> woken_by_touch, off ok"
+
+# The parent's allowance: one minute of powered play, on a 200x care clock
+# the block sets and restores, is under a real second — so the duck goes to
+# the same real bed, and zero minutes clears the allowance.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"care_time_scale":200}' http://127.0.0.1:8765/config > /dev/null || true
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"minutes":1}' http://127.0.0.1:8765/parent | grep -q '"ok":true' || {
+  echo "::error::the parent allowance POST was refused"
+  exit 1
+}
+BUDGET_SLEEP=0
+for _ in $(seq 1 40); do
+  BUDGET_SLEEP=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try: print(1 if (json.load(sys.stdin).get('care') or {}).get('asleep') else 0)
+except Exception: print(0)
+" 2>/dev/null || echo 0)
+  [ "$BUDGET_SLEEP" = "1" ] && break
+  sleep 0.2
+done
+if [ "$BUDGET_SLEEP" != "1" ]; then
+  echo "::error::a spent allowance never put the duck to bed"
+  exit 1
+fi
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{}' http://127.0.0.1:8765/pet > /dev/null || true
+sleep 0.3
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null || true
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"minutes":0}' http://127.0.0.1:8765/parent > /dev/null || true
+BUDGET_CLEAR=0
+for _ in $(seq 1 20); do
+  BUDGET_CLEAR=$(curl -sf --max-time 5 http://127.0.0.1:8765/care | python3 -c "
+import json,sys
+try:
+    parent=(json.load(sys.stdin).get('care') or {}).get('parent') or {}
+    print(1 if parent.get('minutes') is None else 0)
+except Exception: print(0)
+" 2>/dev/null || echo 0)
+  [ "$BUDGET_CLEAR" = "1" ] && break
+  sleep 0.2
+done
+if [ "$BUDGET_CLEAR" != "1" ]; then
+  echo "::error::zero minutes did not clear the allowance"
+  exit 1
+fi
+echo "parent: 1 min -> bed at 200x, pet wakes, 0 -> unlimited"
 # The microphone channel, classified: clap and whistle reach the duck's own
 # reaction and the published event. The RMS is the room, never a sense.
 sound_tick() { python3 -c 'import time; print(int(time.time()*1000))'; }

@@ -505,9 +505,12 @@ final class Renderer: NSObject, MTKViewDelegate {
         // —— Live 房间的三件套，每个 draw call 都带一份 ——
         // 晨昏光：Swift 按真实本地时间算好光色与曝光，shader 只做乘法。
         let day = Renderer.daylight()
+        // The room's lamp: the shell's own scale on the exposure, clamped so
+        // the room can dim but never go black (the floor stays readable).
+        let lamp = Float(max(0.55, min(1.15, controller.ambientScale)))
         let daylight = instrument
             ? SIMD4<Float>(1, 1, 1, 1)
-            : SIMD4<Float>(day.tint.x, day.tint.y, day.tint.z, day.exposure)
+            : SIMD4<Float>(day.tint.x, day.tint.y, day.tint.z, day.exposure * lamp)
         // 接触阴影跟着鸭子走：躯干的世界 xy 就是脚的位置（任务 §3）。
         // 0.62 是 STAGE_LOOK §2.1 的影子浓度。
         let shadow = SIMD4<Float>(focus.x, focus.y, 0.62, 0)

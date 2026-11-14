@@ -3368,6 +3368,71 @@ private fun InstrumentSheet(
                     ) { heartOn = !heartOn }
                 }
             }
+            // The room's lamp: real lux when the device has a sensor (the
+            // scale follows the room), or five manual stops. The duck cannot
+            // see it — render layer only.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.roomLamp, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (input.ambientLux >= 0f) "${input.ambientLux.roundToInt()} lx"
+                        else "${(input.ambientScale * 100).roundToInt()}%",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    ButtonChip(
+                        if (input.ambientLux >= 0f) Copy.flashlightOff else Copy.roomLamp,
+                        "lamp-toggle",
+                    ) {
+                        // Manual stops, only when there is no sensor to trust.
+                        if (input.ambientLux < 0f) {
+                            val stops = listOf(0.55f, 0.7f, 0.85f, 1.0f, 1.15f)
+                            input.ambientScale =
+                                stops[(stops.indexOf(input.ambientScale.coerceIn(0.55f, 1.15f)) + 1) % stops.size]
+                        }
+                    }
+                }
+            }
+            // The parent's daily allowance: one chip cycles off -> 15 -> 30
+            // -> 60 minutes. The number shown is the core's own accounting.
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(Copy.parentTime, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        care.parentMinutes?.let { minutes ->
+                            Copy.parentLeft(minutes, (care.parentLeftS / 60.0).toInt())
+                        } ?: Copy.parentOff,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    ButtonChip(
+                        (listOf(0, 15, 30, 60).indexOf(care.parentMinutes ?: 0) + 1)
+                            .let { listOf(15, 30, 60, 0)[it % 4] }
+                            .let { if (it == 0) Copy.parentOff else "$it" },
+                        "parent-toggle",
+                    ) {
+                        val next = when (care.parentMinutes) {
+                            null, 0 -> 15
+                            15 -> 30
+                            30 -> 60
+                            else -> 0
+                        }
+                        postDuckCommand("/parent", """{"minutes":$next}""")
+                    }
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(
                     if (paused) Copy.resume else Copy.freeze,
