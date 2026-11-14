@@ -165,22 +165,6 @@ struct ContentView: View {
                         .allowsHitTesting(false)
                         .zIndex(3)
                 }
-                if Voice.diagnosticsEnabled {
-                    // A launch-argument-only probe for the voice regression
-                    // test: the session, the engine and the count of sounds
-                    // that really reached AVAudioEngine. It is absent from
-                    // the product UI and takes no touches.
-                    Text(controller.voiceLine)
-                        .font(.system(size: 6, weight: .regular, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.2)
-                        .allowsHitTesting(false)
-                        .accessibilityIdentifier("duck-voice-state")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .padding(2)
-                        .zIndex(4)
-                }
             }
             // Halfway through a rotation the thumb's old translation means
             // something else; hand the duck back neutral, once.

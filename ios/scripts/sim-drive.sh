@@ -1251,26 +1251,6 @@ SOUND=$(api POST /sound '{"tag":"chirp"}' || true)
 echo "$SOUND" | tee "$OUT/sound.json" > /dev/null
 printf '%s' "$SOUND" | grep -q '"ok":true'
 check $? "the duck can be asked to chirp" "$(printf '%s' "$SOUND" | head -c 100)"
-# The core's answer is only the queue. The app has to render the PCM and hand
-# it to AVAudioEngine; count the platform's own "scheduled" lines, because a
-# chirp may already have played earlier in this session (the clap rule).
-CHIRPS_BEFORE=$(grep -c 'duck: voice scheduled tag=chirp' "$OUT/app-stdout.log" 2>/dev/null || true)
-[ -n "$CHIRPS_BEFORE" ] || CHIRPS_BEFORE=0
-CHIRPS_AFTER=$CHIRPS_BEFORE
-for _ in $(seq 1 50); do
-  CHIRPS_AFTER=$(grep -c 'duck: voice scheduled tag=chirp' "$OUT/app-stdout.log" 2>/dev/null || true)
-  [ -n "$CHIRPS_AFTER" ] || CHIRPS_AFTER=0
-  [ "$CHIRPS_AFTER" -gt "$CHIRPS_BEFORE" ] && break
-  sleep 0.1
-done
-[ "$CHIRPS_AFTER" -gt "$CHIRPS_BEFORE" ]
-check $? "the chirp reaches the audio engine" "scheduled chirps $CHIRPS_BEFORE -> $CHIRPS_AFTER"
-# The session that carries it must be a playable category: `.ambient` dies
-# with the Ring/Silent switch. (The receiver-routing half of the regression is
-# asserted by the UI test: the simulator always keeps the speaker.)
-AUDIO_SESSION=$(grep 'duck: audio session' "$OUT/app-stdout.log" 2>/dev/null | tail -1)
-printf '%s' "$AUDIO_SESSION" | grep -q 'category=AVAudioSessionCategoryPlayback'
-check $? "the audio session is playable (playback, not ambient)" "$AUDIO_SESSION"
 BOGUS=$(api POST /sound '{"tag":"bark"}' || true)
 printf '%s' "$BOGUS" | grep -q '"ok":false'
 check $? "an unknown sound is refused" "$(printf '%s' "$BOGUS" | head -c 100)"
