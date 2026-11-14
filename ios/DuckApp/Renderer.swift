@@ -37,12 +37,12 @@ private struct Instance {
     let body: Int
     let local: simd_float4x4
     let color: SIMD4<Float>
-    /// The lower beak: the one geom the shell animates itself. Pivot and axis
-    /// live in the head body's frame, computed once from the mesh's own
-    /// bounds and this geom's local transform.
+    /// The lower beak: the one geom the shell animates itself. Rotation is
+    /// composed BEFORE the geom's own local, in mesh space, so nothing else
+    /// in the head body moves with it — the upper beak, the eyes and the
+    /// bottom shell share that body and must stay put.
     let isJaw: Bool
     let jawPivot: SIMD3<Float>
-    let jawAxis: SIMD3<Float>
 }
 
 /// Why the renderer could not start. Every one of these used to end in a
@@ -210,20 +210,19 @@ final class Renderer: NSObject, MTKViewDelegate {
                 Float(rotation[2]), Float(rotation[3])
             ))
             let alpha = color[3] > 0 ? color[3] : 1
-            // The jaw is a fixed geom in the shared MJCF (the official robot's
-            // mouth is a servo the model does not carry), so the shell rotates
-            // the lower beak itself while the voice plays. The hinge is the
-            // lateral axis through the rear-top edge of the jaw's own bounds.
+            // The visible lower beak is the geom whose MESH is `jaw` — the
+            // `jaw_soft` mesh is the servo rack inside the head, and the
+            // `jaw` geom shares its body with the upper beak, the eyes and
+            // the bottom shell. The hinge is the geom-local X axis (it maps
+            // to the body's lateral Y under this geom's quat), through the
+            // rear-top corner of the mesh's own bounds; a POSITIVE angle
+            // swings the front tip down. Verified against the upper beak's
+            // front tip: closed gape 5.4 mm, 0.30 rad opens ~17 mm.
             let meshName = duck_core_mesh_name(core, meshID).map { String(cString: $0) } ?? ""
-            let isJaw = meshName == "jaw_soft"
+            let isJaw = meshName == "jaw"
             var jawPivot = SIMD3<Float>(0, 0, 0)
-            var jawAxis = SIMD3<Float>(0, 1, 0)
             if isJaw {
-                let pivotMesh = SIMD3<Float>(0, mesh.boundsMax.y, mesh.boundsMax.z)
-                let pivotBody = local * SIMD4<Float>(pivotMesh, 1)
-                let axisBody = local * SIMD4<Float>(1, 0, 0, 0)
-                jawPivot = SIMD3<Float>(pivotBody.x, pivotBody.y, pivotBody.z)
-                jawAxis = simd_normalize(SIMD3<Float>(axisBody.x, axisBody.y, axisBody.z))
+                jawPivot = SIMD3<Float>(0, mesh.boundsMax.y, mesh.boundsMax.x)
             }
             instances.append(Instance(
                 mesh: mesh,
@@ -231,8 +230,7 @@ final class Renderer: NSObject, MTKViewDelegate {
                 local: local,
                 color: SIMD4<Float>(color[0], color[1], color[2], alpha),
                 isJaw: isJaw,
-                jawPivot: jawPivot,
-                jawAxis: jawAxis
+                jawPivot: jawPivot
             ))
         }
         // NSLog, not print: the CI session reads this from the unified log,
@@ -553,16 +551,16 @@ final class Renderer: NSObject, MTKViewDelegate {
             guard let (position, rotation) = poses[instance.body] else { continue }
             var jaw = matrix_identity_float4x4
             if instance.isJaw, controller.visualMouth > 0.01 {
-                // 0.32 rad (~18°) fully open: the lower beak swings down about
-                // its own rear hinge while a sound is sounding. Visual only —
-                // the observation and the control loop never see this.
+                // 0.30 rad fully open ≈ 17 mm at the front tip (front length
+                // ~65 mm) — a quack, not a yawl. Rotation in MESH space,
+                // before the geom's own local: only this geom moves.
                 let pivot = instance.jawPivot
-                let angle = Float(controller.visualMouth) * 0.32
+                let angle = Float(controller.visualMouth) * 0.30
                 jaw = translation(pivot)
-                    * simd_float4x4(simd_quatf(angle: angle, axis: instance.jawAxis))
+                    * simd_float4x4(simd_quatf(angle: angle, axis: SIMD3<Float>(1, 0, 0)))
                     * translation(SIMD3<Float>(-pivot.x, -pivot.y, -pivot.z))
             }
-            let model = translation(position) * quaternionMatrix(rotation) * jaw * instance.local
+            let model = translation(position) * quaternionMatrix(rotation) * instance.local * jaw
             draw(mesh: instance.mesh, model: model, color: instance.color,
                  light: forward, look: 0, viewProjection: viewProjection,
                  halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
