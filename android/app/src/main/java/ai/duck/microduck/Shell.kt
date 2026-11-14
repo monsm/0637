@@ -145,17 +145,6 @@ fun Shell(
     var nightActive by remember { mutableStateOf(false) }
     var dex by remember { mutableStateOf(emptyList<DexEntryUi>()) }
     val dance = remember(context) { DanceStudio(context) }
-    // The palm's heartbeat: the core's care numbers as a vibration rhythm.
-    // A reading of the real state, never a fact; silent until the row says on.
-    val heart = remember(context) { Heart(context) }
-    var heartOn by remember { mutableStateOf(
-        context.getSharedPreferences("duck", Context.MODE_PRIVATE).getBoolean("duck_heart_on", false)
-    ) }
-    LaunchedEffect(heartOn) {
-        heart.setEnabled(heartOn)
-        context.getSharedPreferences("duck", Context.MODE_PRIVATE)
-            .edit().putBoolean("duck_heart_on", heartOn).apply()
-    }
     var danceShow by remember { mutableStateOf(0) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
     var aiStatus by remember { mutableStateOf("") }
@@ -337,12 +326,7 @@ fun Shell(
             // snapshot it persists.
             val stateText = withContext(Dispatchers.IO) { fetchRawState() }
             val careNow = stateText?.let(::parseCare)
-            if (careNow != null) {
-                careUi = careNow
-                // The palm reads the same numbers the pill does; one tick
-                // checks whether the next beat is due.
-                heart.tick(careNow.heartBpm, System.currentTimeMillis())
-            }
+            if (careNow != null) careUi = careNow
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
             val nightNow = stateText?.let(::parseNight)
