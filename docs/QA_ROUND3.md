@@ -332,4 +332,32 @@ Android 工作流同理，命令换成 `--features onnx-dynamic` 并指到 `.so`
 
 ---
 
-签字：小盯 · 2026-11-12 · 一票否决：暂缓发布
+## 验收（2026-11-13，小盯）
+
+上一节的「处置」是接手同事写的声明；下面是我逐条核对代码后的验收结论。声明不等于事实，事实以这里的证据为准。
+
+| 编号 | 声明 | 验收 | 证据（2026-11-13 核对） |
+|---|---|---|---|
+| QA-001 | 已关 | **通过** | `core.yml` 在（core/patches/scripts 触发；`cargo test --locked --workspace -- --include-ignored`；ORT 1.24.2 + `DUCK_UPSTREAM_FIXTURES` / `DUCK_REQUIRE_FIXTURES=1`；失败上传测试日志）。Core #8/#9/#10 全绿。本地实跑 `135 passed / 0 failed / 8 ignored`，加 `--include-ignored` 的 8 条 = 143，与声明一致 |
+| QA-002 | 部分关 | **核心已关，尾巴留单** | `authorised()`（intent.rs:763）：非本机 Origin 一律 403；回环信任；其余机器要 `X-Duck-Token`；通配 CORS 头全仓 grep 零命中。`RestoreLife` 的 events 过 `vetbook::is_known_event` 白名单（vetbook.rs:99、ffi.rs:921，有自己的单测）。两端提示用 `<facts>` 包裹并声明「是数据不是指令」（AIBrain.swift:91/99、AIBrain.kt:189/202）。**仍待**：LAN 开关、令牌的界面呈现 |
+| QA-003 | 已关 | **通过** | 礼物走 `gift_treat`（runtime.rs:1337，`care.feed_from_away`：不 wake、不 bond，care.rs:175）/ `gift_emotion`（asleep 直接 `Ok(false)`，不 touch）；合唱每一拍走 `celebrate_emotion`（runtime.rs:2864 注释："The room is singing, not a hand"） |
+| QA-004 | 部分关 | **通过（主体）** | `trimLikeCore`（Companion.kt:60，按 Rust White_Space 语义，含 NBSP）；恢复不再连坐 care/life。**仍待**：被核心拒绝的程序还留在本地存档，下次启动会再被拒一次 |
+| QA-005 | 已关 | **通过** | iOS：`rulesError` + 拒绝回滚、核心收下才写 UserDefaults（DuckController.swift:1279-1289）；Android：`applyRules` 先显示、`accepted=false` 回滚 + Toast（Shell.kt:1291-1300） |
+| QA-006 | 已关 | **通过** | Android 粘贴有 `rulesLoaded` 闸（Shell.kt:1340/1427）：核心程序没读到就拒绝粘贴 |
+| QA-007 | 已关 | **通过** | 一处谓词两端共用：Android `isFall = event == "fell" \|\| startsWith("fall")`（Companion.kt:48），iOS `LifeEvent.isFall`（DuckController.swift:1453/1519） |
+| QA-008 | 已关 | **通过（实跑）** | 我的 8 条探针在新 HEAD 上 **8 绿 / 0 红**（昨天 6 绿 / 2 红）；`qa3_boundaries.rs` 从此常驻 |
+| QA-009 | 部分关 | **通过** | `apply_gift` 只由调用方记一行；`gift_treat` 不再动 bond，hunger 走 `feed_from_away`（按设计保留「邻居的零食让鸭子少吃一点」） |
+| QA-014 | 已关 | **通过** | Android `fetchLifeEvents` 改按 JSON 解析（Shell.kt:3207 注释明确）；计数谓词两端一致 |
+
+**验收结论**：三条 blocker 全部闭环。剩余未关是 medium 级（QA-010 / 011 / 012 / 013 / 015 余项），不拦这一批，全部进下一批清单。
+
+### 门禁过程（发布条件）
+
+- **2026-11-13 07:35**：iOS #266 红（`f452343`）——不是抖动，是实打实的回归。ci-logs 分支的 session.log：三帧全挂 `only 0 bright neutral pixels - the duck's shell is not rendering`，矩阵 189 过 / 3 挂。范围干净：该提交改了 `Renderer.swift`（+160）与 `Shaders.metal`（+70），前一个提交 #265 是绿的。**修复归小鹿。**
+- **2026-11-13 09:30 前后**：`5f097b4` 修好渲染，iOS #268 / Android #226 转绿；最新 `40d6c53` 上 **iOS #269 绿、Android #227 绿**。Core #10（`d4f469a`）绿，且此后 core/ patches/ scripts/ 零改动，覆盖仍有效。
+- **2026-11-13 09:40**：**暂缓解除**。期限条件：这批活在 `night/duck-room` 分支上，并入 main 时三套工作流在 main 上重跑，那一次绿才是真正的发布绿灯。
+- 门禁自我证明：#266 那次红是 smoke 帧检查抓到的——新界面批次把渲染改坏，门禁按设计工作。**视觉层靠帧检查，逻辑层靠 core.yml，两层闸现在都在。**
+
+---
+
+签字：小盯 · 2026-11-12 一票否决：暂缓发布 → 2026-11-13 09:40 验收：解除（三套门禁在 `40d6c53` 全绿；并入 main 后以 main 的绿为准）
