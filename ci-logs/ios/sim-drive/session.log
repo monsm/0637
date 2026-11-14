@@ -2,261 +2,519 @@
 PASS  bundle has Shaders.metal  (ios/build/Build/Products/Debug-iphonesimulator/Duck.app/DuckResources)
 --- install and launch ---
 PASS  simctl install  (installed)
-app container: /Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/AFB2AC8F-3FD0-4935-B94D-D4B7A78F8DDB/Duck.app
-PASS  intent API answers on :8765  (walk)
-PASS  the 50 Hz control loop is ticking  (label=walk)
-PASS  policy reached ready (bringup=2)  (bringup=2)
-PASS  the walk policy drives the duck  (label=walk)
-PASS  status reports a gain  (gain=200)
-PASS  skill listed: roulade  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  skill listed: kick_left  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  skill listed: kick_right  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  skill listed: sit  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  skill listed: stand  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  skill listed: ground_pick  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: angry  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: curious  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: defiant  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: devastated  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: excited  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: impatient  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: laugh  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: mmh  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: mock  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: no  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: sad  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: yes  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  emotion listed: yes_fast  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
-PASS  an unknown skill is refused, not accepted  ({"error":"skill refused: no such skill","ok":false})
-PASS  the refusal names the reason  ({"error":"skill refused: no such skill","ok":false})
-PASS  state publishes the duck's proprioception
-PASS  measured joint positions are published
-PASS  commanded joint targets are published
-PASS  state publishes the platform's own performance
-PASS  the control loop reports 46.936963102065576 ticks/s
-PASS  the IMU reports warm once the loop is driving
-PASS  the beak is published
-PASS  build fingerprint is served  ("fingerprint":"69b4e43b681bead51f5736ff810c269316d5cb19903db6db3794b88c36bfe5c1")
+app container: /Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/0A58EAC9-4650-4594-B924-5FB12F9AD1A3/Duck.app
+FAIL  intent API answers on :8765
+PASS  the 50 Hz control loop is ticking  (label=)
+FAIL  policy reached ready (bringup=2)  (bringup=)
+FAIL  the walk policy drives the duck  (label=)
+FAIL  status reports a gain  (gain=)
+FAIL  skill listed: roulade
+FAIL  skill listed: kick_left
+FAIL  skill listed: kick_right
+FAIL  skill listed: sit
+FAIL  skill listed: stand
+FAIL  skill listed: ground_pick
+FAIL  emotion listed: angry
+FAIL  emotion listed: curious
+FAIL  emotion listed: defiant
+FAIL  emotion listed: devastated
+FAIL  emotion listed: excited
+FAIL  emotion listed: impatient
+FAIL  emotion listed: laugh
+FAIL  emotion listed: mmh
+FAIL  emotion listed: mock
+FAIL  emotion listed: no
+FAIL  emotion listed: sad
+FAIL  emotion listed: yes
+FAIL  emotion listed: yes_fast
+FAIL  an unknown skill is refused, not accepted
+FAIL  the refusal names the reason
+FAIL  state publishes the duck's proprioception
+FAIL  measured joint positions are published
+FAIL  commanded joint targets are published
+FAIL  state publishes the platform's own performance
+FAIL  performance ticks_per_second is  — counters not wired
+FAIL  the IMU reports warm once the loop is driving
+FAIL  the beak is published
+FAIL  build fingerprint is served
 --- idle look-around ---
-PASS  a still duck looks around  (takeover=1.0 head=0.2911923008545515)
+FAIL  a still duck looks around  (takeover=0 head=0)
 --- idle ritual ---
-PASS  a duck left alone does something by itself  (emotions 1 -> 2)
+FAIL  a duck left alone does something by itself  (emotions 0
+0 -> 0
+0)
 --- face ---
-PASS  state publishes the virtual face
-PASS  flashlight sets an official colour  ({"color":"cyan","flashlight":6,"ok":true})
-PASS  flashlight toggles back off  ({"color":null,"flashlight":0,"ok":true})
-PASS  the shell can restore the duck's record  ({"ok":true,"queued":true})
-PASS  the restored record is the one served
-PASS  the restored record keeps the ground picks  ({"boots":2,"claps":0,"emotions":{"angry":1,"excited":1,"impatient":1},"events":["emotion:angry","idle_ritual","emotion:i)
-PASS  the duck accepts a stroke  ({"ok":true,"queued":true})
+FAIL  state publishes the virtual face
+FAIL  flashlight sets an official colour
+FAIL  flashlight toggles back off
+FAIL  the shell can restore the duck's record
+FAIL  the restored record is the one served
+FAIL  the restored record keeps the ground picks
+FAIL  the duck accepts a stroke
 --- startle ---
-PASS  a loud room startles the duck  (last_sound=alarm)
+FAIL  a loud room startles the duck  (last_sound=)
 --- room sounds ---
-PASS  a clap is heard as a clap  (event=clap 1)
-PASS  a sustained tone is heard as a whistle  (event=whistle 1)
+FAIL  a clap is heard as a clap  (event= 0)
+FAIL  a sustained tone is heard as a whistle  (event= 0)
 --- block rules ---
-PASS  a child can program a rule  ({"ok":true,"rules":{"actions":["skill","emotion","sound","light"],"last":null,"rules":[{"action":"skill","trigger":"clap","value":"roulade"})
-PASS  the program is read back from the core
-PASS  a clap runs the programmed roulade  (rolls 0 -> 1)
-PASS  state publishes the block that fired  (event=clap roulade)
-PASS  a chain runs its steps in order  (last=laugh)
-PASS  the chain's second step really ran  (laughs 1 -> 2)
+FAIL  a child can program a rule
+FAIL  the program is read back from the core
+FAIL  a clap runs the programmed roulade  (rolls 0 -> 0)
+FAIL  state publishes the block that fired  (event= )
+FAIL  a chain runs its steps in order  (last=)
+FAIL  the chain's second step really ran  (laughs 0 -> 0)
 --- neighbours ---
-PASS  the six-digit pairing code is set  ({"code_set":true,"offered":null,"ok":true})
-PASS  the duck opens its LAN socket  ({"ok":true,"queued":true})
-PASS  the duck answers another duck's greet  (reply=hello peerci01)
-PASS  the neighbour is discovered and the greeting is published  (1 Sunny greeted Sunny)
-PASS  our greet reaches the other duck  (ack=greet)
-PASS  the other duck's answer is recorded  (state=True replied)
-PASS  the official UDP pad opens after a pair code  ({"ok":true,"on":true,"port":4210})
-PASS  a neighbour's chorus is joined  (state=join laugh)
-PASS  the joined chorus finishes and the vet book notes it  (state=done note=yes)
-PASS  an ensemble rejects an invented mood  ({"error":"no such mood or sound","ok":false})
-PASS  an ensemble needs a real beat  ({"error":"an ensemble needs a move or a sound","ok":false})
-PASS  an unknown chorus move is refused  ({"error":"no such emotion","ok":false})
-PASS  the duck queues its own chorus  ({"moves":["laugh"],"ok":true,"queued":true})
-PASS  the lead chorus is published  (role=lead)
+FAIL  the six-digit pairing code is set
+FAIL  the duck opens its LAN socket
+FAIL  the duck answers another duck's greet  (reply=timeout )
+FAIL  the neighbour is discovered and the greeting is published
+FAIL  our greet reaches the other duck  (ack=timeout)
+FAIL  the other duck's answer is recorded  (state= 
+ )
+FAIL  the official UDP pad opens after a pair code
+FAIL  a neighbour's chorus is joined  (state=)
+FAIL  the joined chorus finishes and the vet book notes it  (state=not-seen note=no
+no)
+FAIL  an ensemble rejects an invented mood
+FAIL  an ensemble needs a real beat
+FAIL  an unknown chorus move is refused
+FAIL  the duck queues its own chorus
+FAIL  the lead chorus is published  (role=)
 --- feed ---
-PASS  a treat starts the peck  ({"care":{"asleep":false,"bond":0.1495768518518491,"heart_bpm":77.7,"hunger":0.0,"idle_s":0.0,"last_touch":1828,"mood":0.)
+feed refused: 
+state at refusal: 
+FAIL  a treat starts the peck
 --- life ---
-PASS  life publishes the record  ({"boots":2,"claps":3,"emotions":{"angry":1,"curious":1,"excited":2,"impatient":1,"laugh":3,"yes":1},"events":["emotion:a)
-PASS  life counts the skills and emotions the duck ran
-PASS  life does not count a refused skill
-PASS  state carries the same record  (walking_s=0.0)
+FAIL  life publishes the record
+FAIL  life counts the skills and emotions the duck ran
+FAIL  life does not count a refused skill
+FAIL  state carries the same record  (walking_s=-1
+-1)
 --- care ---
-PASS  care publishes hunger, mood and bond  ({"care":{"asleep":false,"bond":0.14956712962962682,"heart_bpm":77.7,"hunger":0.0003111111111111113,"idle_s":0.84,"last_touch":1828,"mood":0.)
-PASS  a treat fills the tummy and a stroke warms the bond
-PASS  care publishes the palm's heart reading
-PASS  a long neglect puts the duck to sleep  (asleep=yes)
-PASS  a stroke wakes it  (awake)
-PASS  the duck coos when a hand wakes it  (last_sound=coo)
-PASS  a low mood plays the official sad timeline  (emotion=sad)
+FAIL  care publishes hunger, mood and bond
+FAIL  a treat fills the tummy and a stroke warms the bond
+FAIL  care publishes the palm's heart reading
+FAIL  a long neglect puts the duck to sleep  (asleep=no)
+FAIL  a stroke wakes it  (asleep)
+FAIL  the parent posts a one-minute allowance
+FAIL  a spent allowance puts the duck to bed  (asleep=no)
+FAIL  zero minutes clears the allowance
+FAIL  /care.parent.minutes goes back to null  (?)
+FAIL  a stroke wakes it after the budget  (asleep)
+FAIL  the duck coos when a hand wakes it  (last_sound=)
+FAIL  a low mood plays the official sad timeline  (emotion=)
 --- night ---
-PASS  a good night is accepted  ({"ok":true,"queued":true})
-PASS  the night puts the duck to sleep on purpose  (active/asleep=yes)
-PASS  the morning is accepted  ({"ok":true,"queued":true,"quiet_s":0.74})
-PASS  the morning reports how quiet the night was  (quiet_s=0.74)
-PASS  the morning clears the night  (active=yes)
-PASS  the vet book names the morning  (morning=yes)
-PASS  a stroke ends the night  (active=yes)
-PASS  the vet book names the hand that woke it  (woken_by_touch=yes)
+FAIL  a good night is accepted
+FAIL  the night puts the duck to sleep on purpose  (active/asleep=no
+no)
+FAIL  the morning is accepted
+FAIL  the morning reports how quiet the night was  (quiet_s=0)
+FAIL  the morning clears the night  (active=no
+no)
+FAIL  the vet book names the morning  (morning=no
+no)
+FAIL  a stroke ends the night  (active=no
+no)
+FAIL  the vet book names the hand that woke it  (woken_by_touch=no
+no)
 --- vet book export ---
-PASS  the vet book is a readable document  (# MicroDuck · 终身记录 / Vet book
-
-走过 / walked **0.9 m** · 翻滚 / rolls **1** · 被抱�)
-PASS  the vet book has a canonical JSON shape  ({"build":{"fingerprint":"69b4e43b681bead51f5736ff810c269316d5cb19903db6db3794b88c36bfe5c1"},"care":{"asleep":false,"bond)
+FAIL  the vet book is a readable document
+FAIL  the vet book has a canonical JSON shape
 --- daily quests ---
-PASS  a calendar day creates three real quests  ({"best_streak":0,"completed_today":1,"day":"2026-11-14","last_completed_day":"","quests":[{"done":false,"id":"roll","progress":0.5,"target":2.0,"title_en":"Roll)
-PASS  a completed February board keeps its streak on March 1  (streak=3)
+FAIL  a calendar day creates three real quests
+FAIL  a completed February board keeps its streak on March 1  (streak=0
+0)
 --- look ---
-PASS  look answers  ({"clamped":false,"head":[0.0,-0.023201852440437893,0.473724687320813,0.0],"ok":true})
-PASS  look aims where you asked  (head_yaw=0.473724687320813 False)
+FAIL  look answers
+FAIL  look aims where you asked  (head_yaw=0 ?)
 --- wheee ---
-PASS  the ride streams start/loop  (wheee:start:0)
-PASS  the ride ends on release  (wheee:end:0)
+FAIL  the ride never started
+FAIL  the ride never ended
 --- heard ---
-PASS  Chinese speech maps to a skill  ({"chained":false,"heard":"翻滚","ok":true,"phrase":"翻滚","skill":"roulade"})
-PASS  English speech maps to the same table  ({"chained":false,"heard":"excited","ok":true,"phrase":"excited","skill":"excited"})
-PASS  the heard words are published for an outside model  ({"last_heard":{"text":"excited","tick":2626}})
-PASS  站起来 on a standing duck is a no-op  ({"did":false,"heard":"站起来","ok":true,"phrase":"站起来","skill":"stand"})
-PASS  a greeting answers with the duck's voice  ({"heard":"你好","ok":true,"phrase":"你好","sound":"greet"})
-PASS  unrecognized speech is refused, not guessed  ({"heard":"qwertyuiop","ok":false,"reason":"no verb matched"})
+FAIL  Chinese speech maps to a skill
+FAIL  English speech maps to the same table
+FAIL  the heard words are published for an outside model
+FAIL  站起来 on a standing duck is a no-op
+FAIL  a greeting answers with the duck's voice
+FAIL  unrecognized speech is refused, not guessed
 --- odometry ---
-PASS  the duck publishes its own pose  (pose=0.303 0.028 0.115 -0.068)
+FAIL  the duck publishes its own pose  (pose=)
 --- walk ---
-trunk while walking: 1.1652 -0.0670 0.1151 -> 1.5795 -0.1626 0.1191
-PASS  twist moves the duck  (1.1652 -0.0670 0.1151 -> 1.5795 -0.1626 0.1191)
-PASS  the vet book counts the metres walked  (metres=2.051413435446253)
+trunk while walking:  -> 
+FAIL  twist moves the duck  ( -> )
+FAIL  the vet book counts the metres walked  (metres=0)
 --- sit and stand ---
-PASS  sit command seats the duck  (label=sit)
-PASS  sit toggle stands it back up  (label=rise)
+FAIL  sit command seats the duck  (label=)
+FAIL  sit toggle stands it back up  (label=)
 --- posture ---
-PASS  posture seats the duck  (label=sit)
-PASS  asking to sit twice does not stand it up  (label=sit)
-PASS  posture stands the duck  (label=rise)
+FAIL  posture seats the duck  (label=)
+FAIL  asking to sit twice does not stand it up  (label=)
+FAIL  posture stands the duck  (label=)
 --- skill roulade ---
-PASS  skill runs: roulade  (label=roulade)
+FAIL  skill runs: roulade  (label=)
 --- skill kick_left ---
-PASS  skill runs: kick_left  (label=kick_left)
+FAIL  skill runs: kick_left  (label=)
 --- skill kick_right ---
-PASS  skill runs: kick_right  (label=kick_right)
-PASS  life counts the skills that ran  (counted=3/3)
-PASS  an emotion plays: curious  (emotion=curious)
-PASS  an emotion's voice is queued  (last_emotion_sound=emotion:curious)
-PASS  the emotion clock advances  (0.7200000000000003 curious)
+FAIL  skill runs: kick_right  (label=)
+FAIL  life counts the skills that ran  (counted=0/3)
+FAIL  an emotion plays: curious  (emotion=)
+FAIL  an emotion's voice is queued  (last_emotion_sound=)
+FAIL  the emotion clock advances  (0 )
 --- ground pick ---
-PASS  ground pick runs  (label=ground_pick)
-PASS  the book counts the peck  (ground_picks=7)
+FAIL  ground pick runs  (label=)
+FAIL  the book counts the peck  (ground_picks=0)
 --- head and body control ---
-PASS  head command accepted
-PASS  body command accepted
-PASS  body pose released
-PASS  the duck walks again after releasing the pose  (1.8407 -0.4829 0.0935 -> 2.0569 -0.8911 0.1166)
+FAIL  head command accepted
+FAIL  body command accepted
+FAIL  body pose released
+FAIL  the duck walks again after releasing the pose  ( -> )
 --- voice ---
-PASS  the duck can be asked to chirp  ({"ok":true,"tag":"chirp"})
-PASS  the chirp reaches the audio engine  (scheduled chirps 1 -> 2)
-PASS  the audio session is playable (playback, not ambient)  (2026-11-14 10:17:11.186 Duck[17362:54145] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker)
-PASS  an unknown sound is refused  ({"error":"no such sound: bark","ok":false})
-PASS  MCP duck_sound plays the voice  ({"id":9,"jsonrpc":"2.0","result":{"content":[{"text":"{\"ok\":true,\"tag\":\"greet\"}","type":"text"}]}})
+FAIL  the duck can be asked to chirp
+2026-11-14 15:00:44.061 Duck[14894:47675] duck: voice scheduled tag=greet frames=19310 total=1
+FAIL  the chirp reaches the audio engine  (scheduled chirps 0 -> 0)
+PASS  the audio session is playable (playback, not ambient)  (2026-11-14 15:00:41.734 Duck[14894:47675] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker)
+FAIL  an unknown sound is refused
+FAIL  MCP duck_sound plays the voice
 --- beak ---
-PASS  a beak intent is refused when the scene has no mouth  ({"error":"beak refused: this scene has no mouth joint","ok":false})
-PASS  the scene says whether it has a beak  (has_mouth=False)
+FAIL  a beak intent is refused when the scene has no mouth
+FAIL  the scene says whether it has a beak  (has_mouth=)
 --- modes ---
-PASS  the duck starts in walk mode  (mode=walk)
-PASS  the duck can switch to roller mode  ({"mode":"roller","ok":true})
-PASS  the state reports roller  (mode=roller)
-PASS  roller keeps the skill: roulade
-PASS  roller keeps the skill: kick_left
-PASS  roller keeps the skill: sit
-PASS  the duck can switch back to walk  ({"mode":"walk","ok":true})
-PASS  the state reports walk again  (mode=walk)
-PASS  a mode switch keeps the companion  (bond 0.34953171296295993 -> 0.3494923611111078)
-PASS  a mode switch keeps the child's rules
-PASS  an unknown mode is refused  ({"error":"mode refused: no such mode: hover","ok":false})
+FAIL  the duck starts in walk mode  (mode=)
+FAIL  the duck can switch to roller mode
+FAIL  the state reports roller  (mode=)
+FAIL  roller keeps the skill: roulade
+FAIL  roller keeps the skill: kick_left
+FAIL  roller keeps the skill: sit
+FAIL  the duck can switch back to walk
+FAIL  the state reports walk again  (mode=)
+PASS  a mode switch keeps the companion  (bond 0 -> 0)
+FAIL  a mode switch keeps the child's rules
+FAIL  an unknown mode is refused
 --- shutdown ---
-PASS  shutdown accepted
-PASS  the duck sits, rests and powers off  (label=off)
-PASS  the state reports powered off  (powered_off=True)
-PASS  the vet book counts the power-off  (power_offs=1)
-PASS  power-on accepted
-PASS  the duck powers back on  (bringup=2)
-after power-on: label=walk trunk=-0.1042 0.1848 0.1179
-PASS  the walking networks have the duck after power-on  (label=walk)
+FAIL  shutdown accepted
+FAIL  the duck sits, rests and powers off  (label=)
+FAIL  the state reports powered off  (powered_off=)
+FAIL  the vet book counts the power-off  (power_offs=0)
+FAIL  power-on accepted
+FAIL  the duck powers back on  (bringup=)
+after power-on: label= trunk=
+FAIL  the walking networks have the duck after power-on  (label=)
 --- carry ---
-PASS  the duck can be picked up  ({"carrying":true,"ok":true})
-PASS  picking it up lifts the body  (z 0.1160 -> 0.3565)
-PASS  the duck can be set down
+FAIL  the duck can be picked up
+FAIL  picking it up lifts the body  (IndexError: list index out of range)
+FAIL  the duck can be set down
 --- external push ---
-PASS  push (external disturbance) accepted
-PASS  duck survives the push  (bringup=2)
+FAIL  push (external disturbance) accepted
+FAIL  duck survives the push  (bringup=)
 --- policy reload ---
-PASS  reload the bundled policy set  ({"ok":true})
-PASS  skills still available after reload  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
+FAIL  reload the bundled policy set
+FAIL  skills still available after reload
 --- time machine ---
-PASS  pause freezes the simulation clock  (954 -> 954)
-PASS  state reports the duck is paused  (paused=true)
-PASS  step advances exactly the ticks asked for  (954 -> 964 (want +10))
-PASS  the clock takes the half-speed setting  (speed=0.5000 paused=false)
-PASS  half speed advances about half as fast  (53 ticks in 2 s)
-PASS  the timeline lists checkpoints  ({"checkpoints":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,)
-PASS  seek rewinds the duck  (1077 -> 935)
-PASS  the rewound duck is still driving  (label=walk)
-PASS  the rewound duck is still ready  (bringup=2)
+PASS  pause freezes the simulation clock  ( -> )
+FAIL  state reports the duck is paused  (paused=)
+FAIL  step advances exactly the ticks asked for  ( ->  (want +10))
+FAIL  the clock takes the half-speed setting  (speed= paused=)
+FAIL  half speed advances about half as fast  (0 ticks in 2 s)
+FAIL  the timeline lists checkpoints
+FAIL  seek rewinds the duck  ( -> )
+FAIL  the rewound duck is still driving  (label=)
+FAIL  the rewound duck is still ready  (bringup=)
 --- mcp ---
-PASS  MCP initialize answers  ({"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2025-06-18","server)
-PASS  MCP tool listed: duck_state
-PASS  MCP tool listed: duck_move
-PASS  MCP tool listed: duck_skill
-PASS  MCP tool listed: duck_pause
-PASS  MCP tool listed: duck_fork
-PASS  MCP tool listed: duck_sensors
-PASS  MCP tool listed: duck_flashlight
-PASS  MCP tool listed: duck_hear
-PASS  MCP tool listed: duck_look
-PASS  MCP tool listed: duck_wheee
-PASS  MCP tool listed: duck_life
-PASS  MCP tool listed: duck_pet
-PASS  MCP tool listed: duck_feed
-PASS  MCP duck_state answers with content  ({"id":3,"jsonrpc":"2.0","result":{"content":[{"text":"{\"bringup\":2,\"care\":{\"asleep\":)
+FAIL  MCP initialize answers
+FAIL  MCP tool listed: duck_state
+FAIL  MCP tool listed: duck_move
+FAIL  MCP tool listed: duck_skill
+FAIL  MCP tool listed: duck_pause
+FAIL  MCP tool listed: duck_fork
+FAIL  MCP tool listed: duck_sensors
+FAIL  MCP tool listed: duck_flashlight
+FAIL  MCP tool listed: duck_hear
+FAIL  MCP tool listed: duck_look
+FAIL  MCP tool listed: duck_wheee
+FAIL  MCP tool listed: duck_life
+FAIL  MCP tool listed: duck_pet
+FAIL  MCP tool listed: duck_feed
+FAIL  MCP duck_state answers with content
 --- sensors ---
-PASS  sensors are served with their mode  ({"camera":null,"depth":null,"imu":null,"microphone":null,"mode":"twin","note":"phone sensors never e)
-PASS  sensor reading is published: camera
-PASS  sensor reading is published: microphone
-PASS  sensor reading is published: depth
-PASS  phone sensors stay out of the 61-D observation
-PASS  an IMU shake pushes the duck  (0.0478 -0.2587 0.1155 -> 0.2841 -0.2866 0.0358)
+FAIL  sensors are served with their mode
+FAIL  sensor reading is published: camera
+FAIL  sensor reading is published: microphone
+FAIL  sensor reading is published: depth
+FAIL  phone sensors stay out of the 61-D observation
+FAIL  an IMU shake pushes the duck  ( -> )
 --- fork ---
-PASS  fork creates a branch  ({"branches":[{"gravity":[0.029918927547481513,0.0034580166998930215,-0.9995463470469544],"label":"a","label_state":"ready","paused":false,"t)
-PASS  the branch reports its own tick
-PASS  a branch can be selected  (selected=a)
-PASS  a selected branch keeps recording checkpoints  (newest=1326)
-PASS  the branch's newest checkpoint is rewindable  ({"ok":true,"pending":true,"tick":1326})
-PASS  the ninth branch is refused (cap 8)  ({"error":"fork refused: at most 8 branches","ok":false})
+FAIL  fork creates a branch
+FAIL  the branch reports its own tick
+FAIL  a branch can be selected  (selected=)
+FAIL  a selected branch keeps recording checkpoints  (newest=)
+FAIL  the branch's newest checkpoint is rewindable
+PASS  the ninth branch is refused (cap 8)
 PASS  a branch can be dropped
 --- frames ---
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: F3CAD0E5-DA55-43F8-AC65-C3DBCF8B7F38 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: C1834C4C-EDD3-4876-A5AB-6B17934658BC (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-1.png
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: F3CAD0E5-DA55-43F8-AC65-C3DBCF8B7F38 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: C1834C4C-EDD3-4876-A5AB-6B17934658BC (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-2.png
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: F3CAD0E5-DA55-43F8-AC65-C3DBCF8B7F38 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: C1834C4C-EDD3-4876-A5AB-6B17934658BC (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-3.png
-PASS  frame 1: lit viewport with the duck's materials  (sim-drive/frame-1.png: bright neutral shell (>= 120) -> 111828 px (want >= 1200))
-PASS  frame 2: lit viewport with the duck's materials  (sim-drive/frame-2.png: bright neutral shell (>= 120) -> 100460 px (want >= 1200))
-PASS  frame 3: lit viewport with the duck's materials  (sim-drive/frame-3.png: bright neutral shell (>= 120) -> 101178 px (want >= 1200))
-PASS  frames 1-2 differ (scene is live)
-PASS  frames 2-3 differ (scene is live)
+FAIL  frame 1: lit viewport with the duck's materials  (::error::only 0 pixels match the duck's colour (255,140,50) - the model is not rendering its materials)
+FAIL  frame 2: lit viewport with the duck's materials  (::error::only 0 pixels match the duck's colour (255,140,50) - the model is not rendering its materials)
+FAIL  frame 3: lit viewport with the duck's materials  (::error::only 0 pixels match the duck's colour (255,140,50) - the model is not rendering its materials)
+FAIL  frames 1-2 differ (scene is live)
+FAIL  frames 2-3 differ (scene is live)
 --- companion survives a restart ---
-PASS  the duck wakes up with its tummy and bond  (hunger/bond=0.423 0.330)
+FAIL  the duck wakes up with its tummy and bond  (hunger/bond=)
 --- renderer log ---
-ios/scripts/sim-drive.sh: line 1802: printf: write error: Broken pipe
+ios/scripts/sim-drive.sh: line 1843: printf: write error: Broken pipe
 note  log: the startup trail was not in the captured stream (not a failure)
-ios/scripts/sim-drive.sh: line 1807: printf: write error: Broken pipe
+ios/scripts/sim-drive.sh: line 1848: printf: write error: Broken pipe
 note  log: the renderer line was not in the captured stream (not a failure)
 PASS  log: no renderer failure
-PASS  still running at the end  (bringup=2)
+FAIL  still running at the end  (bringup=)
 
-=== feature matrix: 200 passed, 0 failed ===
-the simulator session passed every check
+=== feature matrix: 9 passed, 196 failed ===
+=== app stdout ===
+        "ground_picks" = 0;
+        "held_s" = 0;
+        metres = 0;
+        pets = 0;
+        pickups = 0;
+        "power_offs" = 0;
+        "powered_s" = 0;
+        "sit_downs" = 0;
+        "sitting_s" = 0;
+        skills =         {
+        };
+        "soft_landings" = 0;
+        "stand_ups" = 0;
+        "standing_s" = 0;
+        "torqued_s" = 0;
+        "wake_ups" = 0;
+        "walking_s" = 0;
+        whistles = 0;
+    };
+} for key duck_companion_v1'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x00000001804f71d0 __exceptionPreprocess + 172
+	1   libobjc.A.dylib                     0x000000018009c094 objc_exception_throw + 72
+	2   CoreFoundation                      0x0000000180577488 -[__NSCFString characterAtIndex:].cold.1 + 0
+	3   CoreFoundation                      0x00000001804acaac _CFPrefsValidateValueForKey + 216
+	4   CoreFoundation                      0x00000001804ad4f0 createDeepCopyOfValueForKey + 160
+	5   CoreFoundation                      0x00000001804ad1b4 -[CFPrefsSource setValues:forKeys:count:copyValues:removeValuesForKeys:count:from:] + 312
+	6   CoreFoundation                      0x000000018057cb38 -[CFPrefsSource setValue:forKey:from:] + 68
+	7   CoreFoundation                      0x000000018055b864 __76-[_CFXPreferences setValue:forKey:appIdentifier:container:configurationURL:]_block_invoke + 56
+	8   CoreFoundation                      0x00000001805225a4 __108-[_CFXPreferences(SearchListAdditions) withSearchListForIdentifier:container:cloudConfigurationURL:perform:]_block_invoke + 348
+	9   CoreFoundation                      0x0000000180521e38 normalizeQuintuplet + 396
+	10  CoreFoundation                      0x0000000180582d1c -[_CFXPreferences withSearchListForIdentifier:container:cloudConfigurationURL:perform:] + 136
+	11  CoreFoundation                      0x000000018055b804 -[_CFXPreferences setValue:forKey:appIdentifier:container:configurationURL:] + 96
+	12  CoreFoundation                      0x000000018055eea8 _CFPreferencesSetAppValueWithContainerAndConfiguration + 116
+	13  Foundation                          0x0000000181146448 -[NSUserDefaults(NSUserDefaults) setObject:forKey:] + 64
+	14  Duck                                0x0000000102a8a170 $s4Duck0A10ControllerC18saveCompanionState33_94DB5C58396C7D537BFEC36DA87A3725LL4care4lifeySDySSypG_AHSgtF + 1368
+	15  Duck                                0x0000000102ab1904 $s4Duck0A10ControllerC11pollSensorsyyFy10Foundation4DataVSg_So13NSURLResponseCSgs5Error_pSgtYbcfU0_yyScMYccfU_ + 19924
+	16  Duck                                0x000000010292e420 $sIeg_IeyB_TR + 48
+	17  libdispatch.dylib                   0x00000001801c07a8 _dispatch_call_block_and_release + 24
+	18  libdispatch.dylib                   0x00000001801db4b0 _dispatch_client_callout + 12
+	19  libdispatch.dylib                   0x00000001801f74a0 _dispatch_main_queue_drain.cold.7 + 24
+	20  libdispatch.dylib                   0x00000001801d031c _dispatch_main_queue_drain + 1184
+	21  libdispatch.dylib                   0x00000001801cfe6c _dispatch_main_queue_callback_4CF + 40
+	22  CoreFoundation                      0x0000000180455ed8 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 12
+	23  CoreFoundation                      0x00000001804550b0 __CFRunLoopRun + 1884
+	24  CoreFoundation                      0x000000018044fcec _CFRunLoopRunSpecificWithOptions + 496
+	25  GraphicsServices                    0x0000000192a669bc GSEventRunModal + 116
+	26  UIKitCore                           0x0000000186348574 -[UIApplication _run] + 772
+	27  UIKitCore                           0x000000018634c79c UIApplicationMain + 124
+	28  SwiftUI                             0x00000001da58d620 $s7SwiftUI17KitRendererCommon33_ACC2C5639A7D76F611E170E831FCA491LLys5NeverOyXlXpFAESpySpys4Int8VGSgGXEfU_ + 164
+	29  SwiftUI                             0x00000001da58d368 $s7SwiftUI6runAppys5NeverOxAA0D0RzlF + 180
+	30  SwiftUI                             0x00000001da31b42c $s7SwiftUI3AppPAAE4mainyyFZ + 148
+	31  Duck                                0x0000000102a3a754 $s4Duck0A3AppV5$mainyyFZ + 40
+	32  Duck                                0x0000000102a3a800 main + 12
+	33  dyld                                0x000000010333d3d0 start_sim + 20
+	34  ???                                 0x00000001035cc4e4 0x0 + 4351378660
+)
+libc++abi: terminating due to uncaught exception of type NSException
+ai.duck.microduck: 14894
+=== simulator console ===
+        fed = 0;
+        "ground_picks" = 0;
+        "held_s" = 0;
+        metres = "0.000992517073534761";
+        pets = 0;
+        pickups = 0;
+        "power_offs" = 0;
+        "powered_s" = "0.08";
+        "sit_downs" = 0;
+        "sitting_s" = 0;
+        skills =         {
+        };
+        "soft_landings" = 0;
+        "stand_ups" = 0;
+        "standing_s" = "0.08";
+        "torqued_s" = "0.08";
+        "wake_ups" = 0;
+        "walking_s" = 0;
+        whistles = 0;
+    };
+} as an NSUserDefaults/CFPreferences value for key duck_companion_v1
+2026-11-14 15:31:17.927 Df Duck[43533:51ad2] (CoreFoundation) *** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: 'Attempt to insert non-property list object {
+    care =     {
+        asleep = 0;
+        bond = "0.099993287037037";
+        "budget_s" = "<null>";
+        "heart_bpm" = "77.5";
+        hunger = "0.1502148148148146";
+        "idle_s" = "0.58";
+        "last_touch" = 0;
+        mood = "0.3504335000284978";
+        night =         {
+            active = 0;
+            "started_tick" = 0;
+        };
+        parent =         {
+            "left_s" = 0;
+            minutes = "<null>";
+            "used_s" = "0.1";
+        };
+    };
+    life =     {
+        boots = 1;
+        claps = 0;
+        days =         (
+        );
+        emotions =         {
+        };
+        events =         (
+        );
+        falls = 0;
+        fed = 0;
+        "ground_picks" = 0;
+        "held_s" = 0;
+        metres = "0.000992517073534761";
+        pets = 0;
+        pickups = 0;
+        "power_offs" = 0;
+        "powered_s" = "0.08";
+     <…>
+=== unified log (Duck) ===
+2026-11-14 15:31:13.708 Df Duck[43533:51b06] [com.apple.UIKit:BackgroundTask] Creating new assertion because there is no existing background assertion.
+2026-11-14 15:31:13.715 Df Duck[43533:51b06] [com.apple.UIKit:BackgroundTask] Creating new background assertion
+2026-11-14 15:31:13.715 Df Duck[43533:51b06] [com.apple.UIKit:BackgroundTask] Created new background assertion <BKSProcessAssertion: 0x6000021077a0>
+2026-11-14 15:31:13.720 Df Duck[43533:51b06] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x6000021077a0>
+2026-11-14 15:31:13.741 Df Duck[43533:51ad2] [com.apple.runningboard:general] Added observer for process assertions expiration warning: <_RBSExpirationWarningClient: 0x600000210420>
+2026-11-14 15:31:14.744 Df Duck[43533:51b11] (Foundation) duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/0A58EAC9-4650-4594-B924-5FB12F9AD1A3/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
+2026-11-14 15:31:14.745 Df Duck[43533:51b11] (Foundation) duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/0A58EAC9-4650-4594-B924-5FB12F9AD1A3/Duck.app/DuckResources/policies
+2026-11-14 15:31:14.763 Df Duck[43533:51b0f] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x6000021077a0> (used by background task with identifier 1: <_UIBackgroundTaskInfo: 0x600001702400>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 2561 (elapsed = 1))
+2026-11-14 15:31:14.763 Df Duck[43533:51b0f] [com.apple.UIKit:BackgroundTask] Will invalidate assertion: <BKSProcessAssertion: 0x6000021077a0> for task identifier: 1
+2026-11-14 15:31:15.610 Df Duck[43533:51b0e] [com.apple.coreaudio:AudioConverter]        ACv2Workarounds.mm:51    ai.duck.microduck: fix84702776_86723525_86479548_89800354_SinglePacketDesc: false
+2026-11-14 15:31:15.709 Df Duck[43533:51ad2] (Foundation) duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
+2026-11-14 15:31:15.739 Df Duck[43533:51ad2] (Foundation) duck: voice resumed category=AVAudioSessionCategoryPlayback
+2026-11-14 15:31:16.739 Df Duck[43533:51b11] (Foundation) duck: built 38 meshes off the main thread
+2026-11-14 15:31:16.740 Df Duck[43533:51ad2] (Foundation) duck: core created
+2026-11-14 15:31:16.745 Df Duck[43533:51ad2] (Foundation) duck: pickup detector -> 0
+2026-11-14 15:31:16.768 Df Duck[43533:51ad2] (Foundation) duck: emotions -> 13
+2026-11-14 15:31:16.768 Df Duck[43533:51ad2] (Foundation) duck: intent server -> 0
+2026-11-14 15:31:16.769 Df Duck[43533:51ad2] (Foundation) duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
+2026-11-14 15:31:16.770 Df Duck[43533:51ad2] (Foundation) duck: voice ready at 48000 Hz
+2026-11-14 15:31:17.118 Df Duck[43533:51ad2] (Foundation) duck: renderer: 70 visual geoms
+2026-11-14 15:31:17.155 Df Duck[43533:51ad2] (Foundation) duck: voice scheduled tag=greet frames=19310 total=1
+=== crash reports ===
+--- /Users/runner/Library/Logs/DiagnosticReports/Duck-2026-11-14-153129.ips
+{"app_name":"Duck","timestamp":"2026-11-14 15:31:29.00 +0000","app_version":"0.1","slice_uuid":"7c7e40c0-9237-35c4-b8f7-f61208d57ae4","build_version":"1","platform":7,"bundleID":"ai.duck.microduck","share_with_app_devs":0,"is_first_party":0,"bug_type":"309","os_version":"macOS 26.7.2 (25G332)","roots_installed":0,"name":"Duck","incident_id":"3AEB066C-8CD2-4A04-A790-48FC0D0A5F96"}
+{
+  "uptime" : 2500,
+  "procRole" : "Foreground",
+  "version" : 2,
+  "userID" : 501,
+  "deployVersion" : 210,
+  "modelCode" : "VirtualMac2,1",
+  "coalitionID" : 1573,
+  "osVersion" : {
+    "train" : "macOS 26.7.2",
+    "build" : "25G332",
+    "releaseType" : "User"
+  },
+  "captureTime" : "2026-11-14 15:31:18.1441 +0000",
+  "codeSigningMonitor" : 0,
+  "incident" : "3AEB066C-8CD2-4A04-A790-48FC0D0A5F96",
+  "pid" : 43533,
+  "translated" : false,
+  "cpuType" : "ARM-64",
+  "procLaunch" : "2026-11-14 15:31:13.0399 +0000",
+  "procStartAbsTime" : 61457921124,
+  "procExitAbsTime" : 61575281169,
+  "procName" : "Duck",
+  "procPath" : "\/Users\/USER\/Library\/Developer\/CoreSimulator\/Devices\/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF\/data\/Containers\/Bundle\/Application\/0A58EAC9-4650-4594-B924-5FB12F9AD1A3\/Duck.app\/Duck",
+  "bundleInfo" : {"CFBundleShortVersionString":"0.1","CFBundleVersion":"1","CFBundleIdentifier":"ai.duck.microduck"},
+  "storeInfo" : {"deviceIdentifierForVendor":"013D1723-83DB-5141-84FE-E60828A7D8D9","thirdParty":true},
+  "parentProc" : "launchd_sim",
+  "parentPid" : 4664,
+  "coalitionName" : "com.apple.CoreSimulator.SimDevice.98A0BFA3-CEC3-4FD6-9916-5A2149774DBF",
+  "crashReporterKey" : "9C1B49E1-D841-455F-8E15-BE939D79938D",
+  "appleIntelligenceStatus" : {"state":"unavailable","reasons":["deviceNotCapable"]},
+  "developerMode" : 1,
+  "responsiblePid" : 4622,
+  "responsibleProc" : "SimulatorTrampoline",
+  "codeSigningID" : "ai.duck.microduck",
+  "codeSigningTeamID" : "",
+  "codeSigningFlags" : 570425857,
+  "codeSigningValidationCategory" : 10,
+  "codeSigningTrustLevel" : 4294967295,
+  "codeSigningAuxiliaryInfo" : 0,
+  "instructionByteStream" : {"beforePC":"4wAAVP17v6n9AwCRIOP\/l78DAJH9e8GowANf1sADX9YQKYDSARAA1A==","atPC":"4wAAVP17v6n9AwCRFuP\/l78DAJH9e8GowANf1sADX9ZwCoDSARAA1A=="},
+  "bootSessionUUID" : "E902F790-DBC9-4AB2-B3EB-EE272115A0CE",
+  "sip" : "disabled",
+  "exception" : {"codes":"0x0000000000000000, 0x0000000000000000","rawCodes":[0,0],"type":"EXC_CRASH","signal":"SIGABRT"},
+  "termination" : {"flags":0,"code":6,"namespace":"SIGNAL","indicator":"Abort trap: 6","byProc":"Duck","byPid":43533},
+  "extMods" : {"caller":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"system":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"targeted":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"warnings":0},
+  "lastExceptionBacktrace" : [{"imageOffset":1262020,"symbol":"__exceptionPreprocess","symbolLocation":160,"imageIndex":11},{"imageOffset":180372,"symbol":"objc_exception_throw","symbolLocation":72,"imageIndex":10},{"imageOffset":1787016,"symbol":"-[__NSCFString characterAtIndex:].cold.1","symbolLocation":0,"imageIndex":11},{"imageOffset":957100,"symbol":"_CFPrefsValidateValueForKey","symbolLocation":216,"imageIndex":11},{"imageOffset":959728,"symbol":"createDeepCopyOfValueForKey","symbolLocation":160,"imageIndex":11},{"imageOffset":958900,"symbol":"-[CFPrefsSource setValues:forKeys:count:copyValues:removeValuesForKeys:count:from:]","symbolLocation":312,"imageIndex":11},{"imageOffset":1809208,"symbol":"-[CFPrefsSource setValue:forKey:from:]","symbolLocation":68,"imageIndex":11},{"imageOffset":1673316,"symbol":"__76-[_CFXPreferences setValue:forKey:appIdentifier:container:configurationURL:]_block_invoke","symbolLocation":56,"imageIndex":11},{"imageOffset":1439140,"symbol":"__108-[_CFXPreferences(SearchListAdditions) withSearchListForIdentifier:container:cloudConfigurationURL:perform:]_block_invoke","symbolLocation":348,"imageIndex":11},{"imageOffset":1437240,"symbol":"normalizeQuintuplet","symbolLocation":396,"imageI--- /Users/runner/Library/Logs/DiagnosticReports/Duck-2026-11-14-150127.ips
+{"app_name":"Duck","timestamp":"2026-11-14 15:01:27.00 +0000","app_version":"0.1","slice_uuid":"7c7e40c0-9237-35c4-b8f7-f61208d57ae4","build_version":"1","platform":7,"bundleID":"ai.duck.microduck","share_with_app_devs":0,"is_first_party":0,"bug_type":"309","os_version":"macOS 26.7.2 (25G332)","roots_installed":0,"name":"Duck","incident_id":"72FD465E-4C5D-43EF-8FAC-B950030E99ED"}
+{
+  "uptime" : 730,
+  "procRole" : "Foreground",
+  "version" : 2,
+  "userID" : 501,
+  "deployVersion" : 210,
+  "modelCode" : "VirtualMac2,1",
+  "coalitionID" : 1573,
+  "osVersion" : {
+    "train" : "macOS 26.7.2",
+    "build" : "25G332",
+    "releaseType" : "User"
+  },
+  "captureTime" : "2026-11-14 15:00:45.1701 +0000",
+  "codeSigningMonitor" : 0,
+  "incident" : "72FD465E-4C5D-43EF-8FAC-B950030E99ED",
+  "pid" : 14894,
+  "translated" : false,
+  "cpuType" : "ARM-64",
+  "procLaunch" : "2026-11-14 15:00:37.4431 +0000",
+  "procStartAbsTime" : 17403598139,
+  "procExitAbsTime" : 17573410812,
+  "procName" : "Duck",
+  "procPath" : "\/Users\/USER\/Library\/Developer\/CoreSimulator\/Devices\/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF\/data\/Containers\/Bundle\/Application\/0A58EAC9-4650-4594-B924-5FB12F9AD1A3\/Duck.app\/Duck",
+  "bundleInfo" : {"CFBundleShortVersionString":"0.1","CFBundleVersion":"1","CFBundleIdentifier":"ai.duck.microduck"},
+  "storeInfo" : {"deviceIdentifierForVendor":"013D1723-83DB-5141-84FE-E60828A7D8D9","thirdParty":true},
+  "parentProc" : "launchd_sim",
+  "parentPid" : 4664,
+  "coalitionName" : "com.apple.CoreSimulator.SimDevice.98A0BFA3-CEC3-4FD6-9916-5A2149774DBF",
+  "crashReporterKey" : "9C1B49E1-D841-455F-8E15-BE939D79938D",
+  "appleIntelligenceStatus" : {"state":"unavailable","reasons":["deviceNotCapable"]},
+  "developerMode" : 1,
+  "responsiblePid" : 4622,
+  "responsibleProc" : "SimulatorTrampoline",
+  "codeSigningID" : "ai.duck.microduck",
+  "codeSigningTeamID" : "",
+  "codeSigningFlags" : 570425857,
+  "codeSigningValidationCategory" : 10,
+  "codeSigningTrustLevel" : 4294967295,
+  "codeSigningAuxiliaryInfo" : 0,
+  "instructionByteStream" : {"beforePC":"4wAAVP17v6n9AwCRIOP\/l78DAJH9e8GowANf1sADX9YQKYDSARAA1A==","atPC":"4wAAVP17v6n9AwCRFuP\/l78DAJH9e8GowANf1sADX9ZwCoDSARAA1A=="},
+  "bootSessionUUID" : "E902F790-DBC9-4AB2-B3EB-EE272115A0CE",
+  "sip" : "disabled",
+  "exception" : {"codes":"0x0000000000000000, 0x0000000000000000","rawCodes":[0,0],"type":"EXC_CRASH","signal":"SIGABRT"},
+  "termination" : {"flags":0,"code":6,"namespace":"SIGNAL","indicator":"Abort trap: 6","byProc":"Duck","byPid":14894},
+  "extMods" : {"caller":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"system":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"targeted":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"warnings":0},
+  "lastExceptionBacktrace" : [{"imageOffset":1262020,"symbol":"__exceptionPreprocess","symbolLocation":160,"imageIndex":11},{"imageOffset":180372,"symbol":"objc_exception_throw","symbolLocation":72,"imageIndex":10},{"imageOffset":1787016,"symbol":"-[__NSCFString characterAtIndex:].cold.1","symbolLocation":0,"imageIndex":11},{"imageOffset":957100,"symbol":"_CFPrefsValidateValueForKey","symbolLocation":216,"imageIndex":11},{"imageOffset":959728,"symbol":"createDeepCopyOfValueForKey","symbolLocation":160,"imageIndex":11},{"imageOffset":958900,"symbol":"-[CFPrefsSource setValues:forKeys:count:copyValues:removeValuesForKeys:count:from:]","symbolLocation":312,"imageIndex":11},{"imageOffset":1809208,"symbol":"-[CFPrefsSource setValue:forKey:from:]","symbolLocation":68,"imageIndex":11},{"imageOffset":1673316,"symbol":"__76-[_CFXPreferences setValue:forKey:appIdentifier:container:configurationURL:]_block_invoke","symbolLocation":56,"imageIndex":11},{"imageOffset":1439140,"symbol":"__108-[_CFXPreferences(SearchListAdditions) withSearchListForIdentifier:container:cloudConfigurationURL:perform:]_block_invoke","symbolLocation":348,"imageIndex":11},{"imageOffset":1437240,"symbol":"normalizeQuintuplet","symbolLocation":396,"imageIn::error::196 checks failed in the simulator session

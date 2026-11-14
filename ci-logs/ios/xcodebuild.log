@@ -10,76 +10,7 @@ Build settings from command line:
 
 --- xcodebuild: WARNING: Using the first of multiple matching destinations:
 { platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }
-{ platform:iOS Simulator, arch:arm64, id:F88D769D-D2A0-45B4-9AAF-DC4A07499FDC, OS:26.2, name:iPad (A16) }
-{ platform:iOS Simulator, arch:arm64, id:765E8D15-3A10-4A99-AD41-E387B1B01339, OS:26.4.1, name:iPad (A16) }
-{ platform:iOS Simulator, arch:arm64, id:847050DA-C081-44A0-9CA7-60AB408469F9, OS:26.5, name:iPad (A16) }
-{ platform:iOS Simulator, arch:arm64, id:926957D7-66BC-4B6B-A0EC-DA0ACCCA873D, OS:26.2, name:iPad Air 11-inch (M3) }
-{ platform:iOS Simulator, arch:arm64, id:5A89490D-8995-4595-8DA9-8EF009142D68, OS:26.4.1, name:iPad Air 11-inch (M4) }
-{ platform:iOS Simulator, arch:arm64, id:E102A086-EFC1-4962-9C16-D208D350A770, OS:26.5, name:iPad Air 11-inch (M4) }
-{ platform:iOS Simulator, arch:arm64, id:55B09493-EC1A-4656-BDF4-D94E1106BA5D, OS:26.2, name:iPad Air 13-inch (M3) }
-{ platform:iOS Simulator, arch:arm64, id:B7E534CA-283F-43A2-9029-7F68F9FEB952, OS:26.4.1, name:iPad Air 13-inch (M4) }
-{ platform:iOS Simulator, arch:arm64, id:753CE33E-CFE3-4303-BF36-7366817234C9, OS:26.5, name:iPad Air 13-inch (M4) }
-{ platform:iOS Simulator, arch:arm64, id:4F9CFA74-8394-4088-9D94-7C09457158B8, OS:26.2, name:iPad Pro 11-inch (M5) }
-{ platform:iOS Simulator, arch:arm64, id:B743B272-1C28-49A4-8816-6A9066BFCD54, OS:26.4.1, name:iPad Pro 11-inch (M5) }
-{ platform:iOS Simulator, arch:arm64, id:65E439BE-B365-4ED5-AD53-88133BA3829C, OS:26.5, name:iPad Pro 11-inch (M5) }
-{ platform:iOS Simulator, arch:arm64, id:1D202A62-75FA-4910-BFA1-14DDB30B0518, OS:26.2, name:iPad Pro 13-inch (M5) }
-{ platform:iOS Simulator, arch:arm64, id:E3D989D6-38E5-4AA3-9973-41E13D84B4A9, OS:26.4.1, name:iPad Pro 13-inch (M5) }
-{ platform:iOS Simulator, arch:arm64, id:9F9B4A17-4195-40F0-8B46-728F6A6AA8EB, OS:26.5, name:iPad Pro 13-inch (M5) }
-{ platform:iOS Simulator, arch:arm64, id:C2E25CF2-3F4D-400F-BB89-5ADB392F3437, OS:26.2, name:iPad mini (A17 Pro) }
-{ platform:iOS Simulator, arch:arm64, id:A7059F24-5886-4BAB-9BAB-870939051AA7, OS:26.4.1, name:iPad mini (A17 Pro) }
-{ platform:iOS Simulator, arch:arm64, id:9D5EE149-46EF-4BB8-93BB-086C5748FD94, OS:26.5, name:iPad mini (A17 Pro) }
-{ platform:iOS Simulator, arch:arm64, id:73903A6E-DECF-4552-ADBB-B4B1F348F51F, OS:26.2, name:iPhone 16e }
-{ platform:iOS Simulator, arch:arm64, id:A4AE0BE4-728E-4C2A-9F65-7F0E95DF3991, OS:26.2, name:iPhone 17 }
-{ platform:iOS Simulator, arch:arm64, id:DB19B152-E2EF-4A9D-878E-4818336329BF, OS:26.4.1, name:iPhone 17 }
-{ platform:iOS Simulator, arch:arm64, id:23C8F95C-765D-46A9-AE82-0BEE2921C8D7, OS:26.5, name:iPhone 17 }
-{ platform:iOS Simulator, arch:arm64, id:98A0BFA3-CEC3-4FD6-9916-5A2149774DBF, OS:26.2, name:iPhone 17 Pro }
-{ platform:iOS Simulator, arch:arm64, id:2CC7A2C1-E1A7-4633-911A-DB60BDEB97F0, OS:26.4.1, name:iPhone 17 Pro }
-{ platform:iOS Simulator, arch:arm64, id:FCC5F673-7BEC-4A7D-8F2A-4DC35E2668EC, OS:26.5, name:iPhone 17 Pro }
-{ platform:iOS Simulator, arch:arm64, id:78974B82-8A98-4B1E-B8FD-2C4852E3B705, OS:26.2, name:iPhone 17 Pro Max }
-{ platform:iOS Simulator, arch:arm64, id:A3D77CD3-CFC6-4299-9E39-0DEA239429FA, OS:26.4.1, name:iPhone 17 Pro Max }
-{ platform:iOS Simulator, arch:arm64, id:5277349A-B219-4ED4-853A-8AE666B9F5B1, OS:26.5, name:iPhone 17 Pro Max }
-{ platform:iOS Simulator, arch:arm64, id:1043FFFD-FAE7-4115-B535-47BF37427ADC, OS:26.4.1, name:iPhone 17e }
-{ platform:iOS Simulator, arch:arm64, id:FF6CDB2A-8791-4E78-86C5-C42F9F38E01F, OS:26.5, name:iPhone 17e }
-{ platform:iOS Simulator, arch:arm64, id:333FC301-11D8-442D-BA77-2343623A0906, OS:26.2, name:iPhone Air }
-{ platform:iOS Simulator, arch:arm64, id:6C145C74-660C-4A06-A1DF-457944A27BAB, OS:26.4.1, name:iPhone Air }
-{ platform:iOS Simulator, arch:arm64, id:D26ED71E-9D97-4E79-B376-C104ABB9517A, OS:26.5, name:iPhone Air }
-{ platform:iOS Simulator, arch:x86_64, id:F88D769D-D2A0-45B4-9AAF-DC4A07499FDC, OS:26.2, name:iPad (A16) }
-{ platform:iOS Simulator, arch:x86_64, id:765E8D15-3A10-4A99-AD41-E387B1B01339, OS:26.4.1, name:iPad (A16) }
-{ platform:iOS Simulator, arch:x86_64, id:847050DA-C081-44A0-9CA7-60AB408469F9, OS:26.5, name:iPad (A16) }
-{ platform:iOS Simulator, arch:x86_64, id:926957D7-66BC-4B6B-A0EC-DA0ACCCA873D, OS:26.2, name:iPad Air 11-inch (M3) }
-{ platform:iOS Simulator, arch:x86_64, id:5A89490D-8995-4595-8DA9-8EF009142D68, OS:26.4.1, name:iPad Air 11-inch (M4) }
-{ platform:iOS Simulator, arch:x86_64, id:E102A086-EFC1-4962-9C16-D208D350A770, OS:26.5, name:iPad Air 11-inch (M4) }
-{ platform:iOS Simulator, arch:x86_64, id:55B09493-EC1A-4656-BDF4-D94E1106BA5D, OS:26.2, name:iPad Air 13-inch (M3) }
-{ platform:iOS Simulator, arch:x86_64, id:B7E534CA-283F-43A2-9029-7F68F9FEB952, OS:26.4.1, name:iPad Air 13-inch (M4) }
-{ platform:iOS Simulator, arch:x86_64, id:753CE33E-CFE3-4303-BF36-7366817234C9, OS:26.5, name:iPad Air 13-inch (M4) }
-{ platform:iOS Simulator, arch:x86_64, id:4F9CFA74-8394-4088-9D94-7C09457158B8, OS:26.2, name:iPad Pro 11-inch (M5) }
-{ platform:iOS Simulator, arch:x86_64, id:B743B272-1C28-49A4-8816-6A9066BFCD54, OS:26.4.1, name:iPad Pro 11-inch (M5) }
-{ platform:iOS Simulator, arch:x86_64, id:65E439BE-B365-4ED5-AD53-88133BA3829C, OS:26.5, name:iPad Pro 11-inch (M5) }
-{ platform:iOS Simulator, arch:x86_64, id:1D202A62-75FA-4910-BFA1-14DDB30B0518, OS:26.2, name:iPad Pro 13-inch (M5) }
-{ platform:iOS Simulator, arch:x86_64, id:E3D989D6-38E5-4AA3-9973-41E13D84B4A9, OS:26.4.1, name:iPad Pro 13-inch (M5) }
-{ platform:iOS Simulator, arch:x86_64, id:9F9B4A17-4195-40F0-8B46-728F6A6AA8EB, OS:26.5, name:iPad Pro 13-inch (M5) }
-{ platform:iOS Simulator, arch:x86_64, id:C2E25CF2-3F4D-400F-BB89-5ADB392F3437, OS:26.2, name:iPad mini (A17 Pro) }
-{ platform:iOS Simulator, arch:x86_64, id:A7059F24-5886-4BAB-9BAB-870939051AA7, OS:26.4.1, name:iPad mini (A17 Pro) }
-{ platform:iOS Simulator, arch:x86_64, id:9D5EE149-46EF-4BB8-93BB-086C5748FD94, OS:26.5, name:iPad mini (A17 Pro) }
-{ platform:iOS Simulator, arch:x86_64, id:73903A6E-DECF-4552-ADBB-B4B1F348F51F, OS:26.2, name:iPhone 16e }
-{ platform:iOS Simulator, arch:x86_64, id:A4AE0BE4-728E-4C2A-9F65-7F0E95DF3991, OS:26.2, name:iPhone 17 }
-{ platform:iOS Simulator, arch:x86_64, id:DB19B152-E2EF-4A9D-878E-4818336329BF, OS:26.4.1, name:iPhone 17 }
-{ platform:iOS Simulator, arch:x86_64, id:23C8F95C-765D-46A9-AE82-0BEE2921C8D7, OS:26.5, name:iPhone 17 }
-{ platform:iOS Simulator, arch:x86_64, id:98A0BFA3-CEC3-4FD6-9916-5A2149774DBF, OS:26.2, name:iPhone 17 Pro }
-{ platform:iOS Simulator, arch:x86_64, id:2CC7A2C1-E1A7-4633-911A-DB60BDEB97F0, OS:26.4.1, name:iPhone 17 Pro }
-{ platform:iOS Simulator, arch:x86_64, id:FCC5F673-7BEC-4A7D-8F2A-4DC35E2668EC, OS:26.5, name:iPhone 17 Pro }
-{ platform:iOS Simulator, arch:x86_64, id:78974B82-8A98-4B1E-B8FD-2C4852E3B705, OS:26.2, name:iPhone 17 Pro Max }
-{ platform:iOS Simulator, arch:x86_64, id:A3D77CD3-CFC6-4299-9E39-0DEA239429FA, OS:26.4.1, name:iPhone 17 Pro Max }
-{ platform:iOS Simulator, arch:x86_64, id:5277349A-B219-4ED4-853A-8AE666B9F5B1, OS:26.5, name:iPhone 17 Pro Max }
-{ platform:iOS Simulator, arch:x86_64, id:1043FFFD-FAE7-4115-B535-47BF37427ADC, OS:26.4.1, name:iPhone 17e }
-{ platform:iOS Simulator, arch:x86_64, id:FF6CDB2A-8791-4E78-86C5-C42F9F38E01F, OS:26.5, name:iPhone 17e }
-{ platform:iOS Simulator, arch:x86_64, id:333FC301-11D8-442D-BA77-2343623A0906, OS:26.2, name:iPhone Air }
-{ platform:iOS Simulator, arch:x86_64, id:6C145C74-660C-4A06-A1DF-457944A27BAB, OS:26.4.1, name:iPhone Air }
-{ platform:iOS Simulator, arch:x86_64, id:D26ED71E-9D97-4E79-B376-C104ABB9517A, OS:26.5, name:iPhone Air }
-{ platform:visionOS Simulator, arch:arm64, variant:Designed for [iPad,iPhone], id:562B43F8-7531-445D-A19B-8CB5F0F27964, OS:26.2, name:Apple Vision Pro }
-{ platform:visionOS Simulator, arch:arm64, variant:Designed for [iPad,iPhone], id:C342DF28-8FD6-4BE7-960C-E9A8D5A2CEF9, OS:26.4.1, name:Apple Vision Pro }
-{ platform:visionOS Simulator, arch:arm64, variant:Designed for [iPad,iPhone], id:DD52165F-57FC-4563-9F12-DD0F8510B3E5, OS:26.5, name:Apple Vision Pro }
-{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:5439ae4d48bb703c0cff328b67a7889a44e57a05, name:My Mac }
+{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:77c06bacb4d4492ae97bf01b9e38f49df5167350, name:My Mac }
 { platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
 note: Using codesigning identity override: -
 ComputePackagePrebuildTargetDependencyGraph
@@ -111,12 +42,8 @@ ExecuteExternalTool /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/X
 
 ExecuteExternalTool /Applications/Xcode_26.6.app/Contents/Developer/usr/bin/actool --version --output-format xml1
 
-Build description signature: 29abecea942f37e10c0fa7b79f866eb1
-Build description path: /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/XCBuildData/29abecea942f37e10c0fa7b79f866eb1.xcbuilddata
-ClangStatCache /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache
-    cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
-    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -o /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache
-
+Build description signature: 886185c4251cb6a31b384c8b8319c443
+Build description path: /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/XCBuildData/886185c4251cb6a31b384c8b8319c443.xcbuilddata
 CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex
     cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
     builtin-create-build-directory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex
@@ -125,13 +52,25 @@ CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Products
     cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
     builtin-create-build-directory /Users/runner/work/0637/0637/ios/build/Build/Products
 
-CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+ClangStatCache /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache
     cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
-    builtin-create-build-directory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -o /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache
 
 WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck-c9c200c8fcb72f5c06654f3aa598dcbf-VFS-iphonesimulator/all-product-headers.yaml
     cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
     write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck-c9c200c8fcb72f5c06654f3aa598dcbf-VFS-iphonesimulator/all-product-headers.yaml
+
+CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator
+    cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
+    builtin-create-build-directory /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator
+
+CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+    cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
+    builtin-create-build-directory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules
+
+ProcessXCFramework /Users/runner/work/0637/0637/ios/third_party/onnxruntime.xcframework /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/onnxruntime.framework ios simulator
+    cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
+    builtin-process-xcframework --xcframework /Users/runner/work/0637/0637/ios/third_party/onnxruntime.xcframework --platform ios --environment simulator --target-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator
 
 CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/ExplicitPrecompiledModules
     cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
@@ -141,29 +80,21 @@ CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.
     cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
     builtin-create-build-directory /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator
 
-CreateBuildDirectory /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator
-    cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
-    builtin-create-build-directory /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator
-
-ProcessXCFramework /Users/runner/work/0637/0637/ios/third_party/onnxruntime.xcframework /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/onnxruntime.framework ios simulator
-    cd /Users/runner/work/0637/0637/ios/Duck.xcodeproj
-    builtin-process-xcframework --xcframework /Users/runner/work/0637/0637/ios/third_party/onnxruntime.xcframework --platform ios --environment simulator --target-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator
+WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist
 
 WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Script-45D3C0809D107E31A95930CD.sh (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Script-45D3C0809D107E31A95930CD.sh
 
-WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist (in target 'Duck' from project 'Duck')
+WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist
+    write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json
 
 WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList
-
-WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json
 
 WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftConstValuesFileList (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -213,13 +144,13 @@ WriteAuxiliaryFile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.no
     cd /Users/runner/work/0637/0637/ios
     write-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/Entitlements-Simulated.plist
 
-MkDir /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    /bin/mkdir -p /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app
-
 MkDir /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     /bin/mkdir -p /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks
+
+MkDir /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    /bin/mkdir -p /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app
 
 ProcessProductPackaging "" /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.app-Simulated.xcent (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -609,7 +540,7 @@ PhaseScriptExecution Check\ Rust\ core /Users/runner/work/0637/0637/ios/build/Bu
     export OTHER_LDFLAGS\=-L/Users/runner/work/0637/0637/ios/Frameworks\ -lduck_mobile_core
     export PACKAGE_TYPE\=com.apple.package-type.wrapper.application
     export PASCAL_STRINGS\=YES
-    export PATH\=/Applications/Xcode_26.6.app/Contents/SharedFrameworks/SwiftBuild.framework/Versions/A/PlugIns/SWBBuildService.bundle/Contents/PlugIns/SWBUniversalPlatformPlugin.bundle/Contents/Frameworks/SWBUniversalPlatform.framework/Resources:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.rZ4Kc2/Metal.xctoolchain/usr/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.rZ4Kc2/Metal.xctoolchain/usr/local/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.rZ4Kc2/Metal.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/local/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/lib/ruby/gems/3.4.0/bin:/opt/homebrew/opt/ruby@3.4/bin:/Users/runner/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/runner/.cargo/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/local/sbin:/Users/runner/bin:/Users/runner/.yarn/bin:/Users/runner/Library/Android/sdk/tools:/Users/runner/Library/Android/sdk/platform-tools:/Library/Frameworks/Python.framework/Versions/Current/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/usr/bin:/bin:/usr/sbin:/sbin:/Users/runner/.dotnet/tools
+    export PATH\=/Applications/Xcode_26.6.app/Contents/SharedFrameworks/SwiftBuild.framework/Versions/A/PlugIns/SWBBuildService.bundle/Contents/PlugIns/SWBUniversalPlatformPlugin.bundle/Contents/Frameworks/SWBUniversalPlatform.framework/Resources:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.oZ5EgF/Metal.xctoolchain/usr/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.oZ5EgF/Metal.xctoolchain/usr/local/bin:/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.oZ5EgF/Metal.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/local/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/bin:/Applications/Xcode_26.6.app/Contents/Developer/usr/local/bin:/opt/homebrew/opt/rustup/bin:/opt/homebrew/lib/ruby/gems/3.4.0/bin:/opt/homebrew/opt/ruby@3.4/bin:/Users/runner/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/runner/.cargo/bin:/usr/local/opt/curl/bin:/usr/local/bin:/usr/local/sbin:/Users/runner/bin:/Users/runner/.yarn/bin:/Users/runner/Library/Android/sdk/tools:/Users/runner/Library/Android/sdk/platform-tools:/Library/Frameworks/Python.framework/Versions/Current/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands:/usr/bin:/bin:/usr/sbin:/sbin:/Users/runner/.dotnet/tools
     export PATH_PREFIXES_EXCLUDED_FROM_HEADER_DEPENDENCIES\=/usr/include\ /usr/local/include\ /System/Library/Frameworks\ /System/Library/PrivateFrameworks\ /Applications/Xcode_26.6.app/Contents/Developer/Headers\ /Applications/Xcode_26.6.app/Contents/Developer/SDKs\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms
     export PBDEVELOPMENTPLIST_PATH\=Duck.app/pbdevelopment.plist
     export PER_ARCH_MODULE_FILE_DIR\=/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/undefined_arch
@@ -783,7 +714,7 @@ PhaseScriptExecution Check\ Rust\ core /Users/runner/work/0637/0637/ios/build/Bu
     export TEST_FRAMEWORK_SEARCH_PATHS\=\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/Developer/Library/Frameworks
     export TEST_LIBRARY_SEARCH_PATHS\=\ /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib
     export TOOLCHAINS\=com.apple.dt.toolchain.Metal.32023.883\ com.apple.dt.toolchain.XcodeDefault
-    export TOOLCHAIN_DIR\=/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.rZ4Kc2/Metal.xctoolchain
+    export TOOLCHAIN_DIR\=/var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.oZ5EgF/Metal.xctoolchain
     export TOOLCHAIN_VERSION\=32023.883
     export TREAT_MISSING_BASELINES_AS_TEST_FAILURES\=NO
     export TREAT_MISSING_SCRIPT_PHASE_OUTPUTS_AS_ERRORS\=NO
@@ -840,13 +771,13 @@ MkDir /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.bu
     cd /Users/runner/work/0637/0637/ios
     /bin/mkdir -p /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/unthinned
 
-CpResource /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/DuckResources /Users/runner/work/0637/0637/ios/DuckApp/DuckResources (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/runner/work/0637/0637/ios/DuckApp/DuckResources /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app
-
 MkDir /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/thinned (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     /bin/mkdir -p /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/thinned
+
+CpResource /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/DuckResources /Users/runner/work/0637/0637/ios/DuckApp/DuckResources (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks /Users/runner/work/0637/0637/ios/DuckApp/DuckResources /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app
 
 CompileAssetCatalogVariant thinned /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app /Users/runner/work/0637/0637/ios/DuckApp/Assets.xcassets (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -860,41 +791,41 @@ CompileAssetCatalogVariant thinned /Users/runner/work/0637/0637/ios/build/Build/
 
 SwiftDriver Duck normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    builtin-SwiftDriver -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Duck -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F Frameworks -F third_party -c -j5 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/core/duck-mobile-core/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-Swift.h -import-objc-header /Users/runner/work/0637/0637/ios/DuckApp/DuckCore-Bridging-Header.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_stdbool-5523CQ090X93AJXP6FL7KA3QQ.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_AvailabilityInternal-1IKAHQZAFT4C26MWTTT4QP99J.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_stdarg-67EP795Z1KY7390475EC6CJ4K.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_float-75X7V13J86KEJNSUI5L18DN8K.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_SwiftConcurrencyShims-7RYJRXBVM2TVWJ31IRNGJG421.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/DeveloperToolsSupport-1DMPWFRZ9QO4HOI00Q2I9XBH6.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/SwiftShims-AG0W2ZO9MSX9M4YBFI3AIM8WM.pcm
+    builtin-SwiftDriver -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Duck -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F Frameworks -F third_party -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/core/duck-mobile-core/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-Swift.h -import-objc-header /Users/runner/work/0637/0637/ios/DuckApp/DuckCore-Bridging-Header.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ptrauth-951BZYQ8ZME3QU6HX8B6W0QMX.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_stddef-L3GQ8Q6628PUA4ODLBH5VKPV.pcm
 
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_stdarg-67EP795Z1KY7390475EC6CJ4K.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_stdbool-5523CQ090X93AJXP6FL7KA3QQ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/SwiftShims-AG0W2ZO9MSX9M4YBFI3AIM8WM.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_float-75X7V13J86KEJNSUI5L18DN8K.pcm
+
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ptrcheck-D9N8MLGQK5EPTVDCKJ499C1YH.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_AvailabilityInternal-1IKAHQZAFT4C26MWTTT4QP99J.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/DeveloperToolsSupport-1DMPWFRZ9QO4HOI00Q2I9XBH6.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_SwiftConcurrencyShims-7RYJRXBVM2TVWJ31IRNGJG421.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_DarwinFoundation1-BMLAXBQUR4U9S47DAA6QOROSJ.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_limits-6D7I9YP4IGXT40C9FJJYOW79I.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ExtensionFoundation-79EVOR6ALKSZ21ZXZ7AWJXB57.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_DarwinFoundation2-70BIK2ORJZDQN789NB41WR2G4.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ExtensionFoundation-79EVOR6ALKSZ21ZXZ7AWJXB57.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_limits-6D7I9YP4IGXT40C9FJJYOW79I.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/sys_types-DC963MHRDFDXBD70XLBGQHC2U.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_stdint-ENME44L6U9074WEV8X7JX2A0I.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_tgmath-AT2BEQPCT5NXH72U8IFBRBWX2.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/sys_types-DC963MHRDFDXBD70XLBGQHC2U.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_intrinsics-20SL9ZKX9RL0DVJYHSHVXV8QT.pcm
 
@@ -904,19 +835,19 @@ SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_Builtin_inttypes-E5EOCAGSQM7L3OV0D1Q8T7VV1.pcm
 
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/simd-3JVFYCAH1JCNB7X53OV9TIEFQ.pcm
+
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Darwin-73XU4QCN1QX7XMVAI9YJQYKUV.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/simd-3JVFYCAH1JCNB7X53OV9TIEFQ.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/MachO-E78EQB0XIJFR9EQQ2A58TJYIJ.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ObjectiveC-7VHFV8LYZQ95NW4QIFFIAQJLK.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/MachO-E78EQB0XIJFR9EQQ2A58TJYIJ.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Spatial-7YVACLPI7982P4L1YKD7NW5DE.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/os_object-N9Y5MJKW3QT6G4DQ8AYWYF2W.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/os_workgroup-8GT7YH3304VCBB16OPZ3ILH51.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Spatial-7YVACLPI7982P4L1YKD7NW5DE.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Dispatch-3PZYYS972LR1KTB0G94FF9WT7.pcm
 
@@ -928,67 +859,67 @@ SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/os-1KSBEMGZV0248NSJ014CYWF2K.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreAudioTypes-15YEV5JZTO0KP70PRCN09K7MD.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreGraphics-ENIQRQMNG1FQN9UX76UNMVP0L.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Security-7DYK61V6VJFT4RT1XPJU279WD.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreAudioTypes-15YEV5JZTO0KP70PRCN09K7MD.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CFNetwork-5Z1MRCCXUI3MH4791PV1CT71X.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreGraphics-ENIQRQMNG1FQN9UX76UNMVP0L.pcm
-
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreAudio-ABJQGTBCTLD9LSVNCE94OVFCE.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Foundation-5XV8LYQINKY3IEWB0RGK749WM.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreText-A27A2HROJC5U73S1LNZMRGV4I.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ImageIO-CLQ4H0WHWLOH0B91YM9Q9K6MO.pcm
 
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreText-A27A2HROJC5U73S1LNZMRGV4I.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Security-7DYK61V6VJFT4RT1XPJU279WD.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Foundation-5XV8LYQINKY3IEWB0RGK749WM.pcm
+
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/UserNotifications-AQRNX1KV9P0XF4NMBKM1O7ETG.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreTransferable-DORXVIRFOEAJRQIWPC979OUF6.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/FileProvider-6F49XYHH1D4BB2Z5H05O2TP0A.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_LocationEssentials-2UCOITQMZPP134I68UN87GXV3.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreHaptics-941HBO618XZG48EZQ29W7W9MZ.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Symbols-6G88J2RDIB47LH1OEQWGY7N4B.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/DataDetection-78AWFNOU5RIGYO8TDH46NH0H.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/IOSurface-7OHWOBGJ881UUWPWP0ZYQQH0N.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ModelIO-1SA8LFO8NB3KKQ8MLY45OK2SI.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/OpenGLES-D5ZT4975FAG2SA0FN8J2PRPGX.pcm
-
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Accessibility-8OV3LZ2DUI15G7F6H25LDIVUT.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/UIUtilities-35ALH6DSJH1JN8EK6RNNL2Q48.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreMIDI-9OJ7I7KYOT6LQVQHBSM96V0CO.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/OSLog-65C2IGPIG3ZD85WNDPPCRY5R6.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Metal-BU77CMKXHJLPMREU9TN6FK68V.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/UniformTypeIdentifiers-55TY552RWW4LR99JJ4O8TPLMG.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreData-5F3HLQDEE8W6NU6EWGH72M0FH.pcm
-
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreLocation-7ZL5H0PO2JZYQMGLBCKQNNIF5.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/DataDetection-78AWFNOU5RIGYO8TDH46NH0H.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Network-1OELQVIQJ20R10GOY6ZELC6RV.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/AudioToolbox-50H8K3OJX5I9CWBOTIMGFH6AC.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/_LocationEssentials-2UCOITQMZPP134I68UN87GXV3.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreVideo-AB1NB3MXY36YPDQBNH4OZJD41.pcm
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreTransferable-DORXVIRFOEAJRQIWPC979OUF6.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreLocation-7ZL5H0PO2JZYQMGLBCKQNNIF5.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Symbols-6G88J2RDIB47LH1OEQWGY7N4B.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/ModelIO-1SA8LFO8NB3KKQ8MLY45OK2SI.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreMIDI-9OJ7I7KYOT6LQVQHBSM96V0CO.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreMotion-9D11RAN8YYJO7O0V58HKHXY68.pcm
 
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/OpenGLES-D5ZT4975FAG2SA0FN8J2PRPGX.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/AudioToolbox-50H8K3OJX5I9CWBOTIMGFH6AC.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreData-5F3HLQDEE8W6NU6EWGH72M0FH.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/UIUtilities-35ALH6DSJH1JN8EK6RNNL2Q48.pcm
+
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/AVRouting-7LLE9SUM8BRQ0WPZ1ODYDWUNJ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Metal-BU77CMKXHJLPMREU9TN6FK68V.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/FileProvider-6F49XYHH1D4BB2Z5H05O2TP0A.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreHaptics-941HBO618XZG48EZQ29W7W9MZ.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/UniformTypeIdentifiers-55TY552RWW4LR99JJ4O8TPLMG.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreVideo-AB1NB3MXY36YPDQBNH4OZJD41.pcm
+
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/OSLog-65C2IGPIG3ZD85WNDPPCRY5R6.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/CoreMedia-71763KJXNYU0SDWCJMSGVLZPV.pcm
 
@@ -998,22 +929,11 @@ SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/SwiftUICore-9NXDVW1YDQRDYYX1OZNI0GV9Y.pcm
 
-SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/MediaToolbox-3DEGEZEBGVFI0ZT8L7RM5SBYL.pcm
-
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/AVFAudio-D5XV0QQYRCYRAVF54YSBPKYNW.pcm
 
-LinkAssetCatalog /Users/runner/work/0637/0637/ios/DuckApp/Assets.xcassets (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    builtin-linkAssetCatalog --thinned /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/thinned --thinned-dependencies /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_dependencies_thinned --thinned-info-plist-content /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist_thinned --unthinned /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/unthinned --unthinned-dependencies /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist_unthinned --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app --plist-output /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist
-note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/AppIcon76x76@2x~ipad.png (in target 'Duck' from project 'Duck')
-note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Assets.car (in target 'Duck' from project 'Duck')
-note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/AppIcon60x60@2x.png (in target 'Duck' from project 'Duck')
+SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/MediaToolbox-3DEGEZEBGVFI0ZT8L7RM5SBYL.pcm
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/UIKit-BUI687MG8KABCZXM3K2OJKYQM.pcm
-
-ProcessInfoPlistFile /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Info.plist /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    builtin-infoPlistUtility /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist -producttype com.apple.product-type.application -genpkginfo /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/PkgInfo -expandbuildsettings -format binary -platform iphonesimulator -additionalcontentfile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist -o /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Info.plist
 
 SwiftExplicitDependencyGeneratePcm arm64 /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/AVFoundation-DBOYCKB3GXP8T6Z3NYLNWYOLV.pcm
 
@@ -1057,47 +977,7 @@ optional func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor re
 @interface AVSpeechSynthesizer : NSObject
            ^
 
-SwiftCompile normal arm64 Compiling\ ABSheet.swift,\ AIBrain.swift,\ AISheet.swift,\ BackupSheet.swift,\ BigButtonsSheet.swift,\ CameraBackdrop.swift,\ ContentView.swift /Users/runner/work/0637/0637/ios/DuckApp/ABSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/AIBrain.swift /Users/runner/work/0637/0637/ios/DuckApp/AISheet.swift /Users/runner/work/0637/0637/ios/DuckApp/BackupSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/BigButtonsSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift /Users/runner/work/0637/0637/ios/DuckApp/ContentView.swift (in target 'Duck' from project 'Duck')
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/ABSheet.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/AIBrain.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/AISheet.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/BackupSheet.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/BigButtonsSheet.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/ContentView.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 Compiling\ PadSender.swift,\ PeersSheet.swift,\ PhotoPreviewSheet.swift,\ PostcardCompose.swift,\ PostcardShelf.swift,\ PostcardShelfView.swift /Users/runner/work/0637/0637/ios/DuckApp/PadSender.swift /Users/runner/work/0637/0637/ios/DuckApp/PeersSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/PhotoPreviewSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardCompose.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelf.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelfView.swift (in target 'Duck' from project 'Duck')
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/PadSender.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/PeersSheet.swift (in target 'Duck' from project 'Duck')
-    cd /Users/runner/work/0637/0637/ios
-    
-/Users/runner/work/0637/0637/ios/DuckApp/PeersSheet.swift:107:33: warning: result of call to 'chip(_:id:enabled:action:)' is unused
-                                chip(
-                                ^   ~
+SwiftCompile normal arm64 Compiling\ PhotoPreviewSheet.swift,\ PostcardCompose.swift,\ PostcardShelf.swift,\ PostcardShelfView.swift,\ ProgressKit.swift,\ Renderer.swift,\ RulesSheet.swift,\ ShareSheet.swift,\ Speaker.swift,\ Voice.swift /Users/runner/work/0637/0637/ios/DuckApp/PhotoPreviewSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardCompose.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelf.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelfView.swift /Users/runner/work/0637/0637/ios/DuckApp/ProgressKit.swift /Users/runner/work/0637/0637/ios/DuckApp/Renderer.swift /Users/runner/work/0637/0637/ios/DuckApp/RulesSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/ShareSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/Speaker.swift /Users/runner/work/0637/0637/ios/DuckApp/Voice.swift (in target 'Duck' from project 'Duck')
 
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/PhotoPreviewSheet.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -1114,8 +994,6 @@ SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelf
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelfView.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     
-
-SwiftCompile normal arm64 Compiling\ ProgressKit.swift,\ Renderer.swift,\ RulesSheet.swift,\ ShareSheet.swift,\ Speaker.swift,\ Voice.swift /Users/runner/work/0637/0637/ios/DuckApp/ProgressKit.swift /Users/runner/work/0637/0637/ios/DuckApp/Renderer.swift /Users/runner/work/0637/0637/ios/DuckApp/RulesSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/ShareSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/Speaker.swift /Users/runner/work/0637/0637/ios/DuckApp/Voice.swift (in target 'Duck' from project 'Duck')
 
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/ProgressKit.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -1150,7 +1028,51 @@ SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/Voice.swift (
     cd /Users/runner/work/0637/0637/ios
     
 
-SwiftCompile normal arm64 Compiling\ Copy.swift,\ DanceSheet.swift,\ DanceStudio.swift,\ DexSheet.swift,\ DiarySheet.swift,\ DuckApp.swift /Users/runner/work/0637/0637/ios/DuckApp/Copy.swift /Users/runner/work/0637/0637/ios/DuckApp/DanceSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DanceStudio.swift /Users/runner/work/0637/0637/ios/DuckApp/DexSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DiarySheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DuckApp.swift (in target 'Duck' from project 'Duck')
+SwiftCompile normal arm64 Compiling\ ABSheet.swift,\ AIBrain.swift,\ AISheet.swift,\ BackupSheet.swift,\ BigButtonsSheet.swift,\ CameraBackdrop.swift,\ ContentView.swift,\ Copy.swift,\ DanceSheet.swift,\ DanceStudio.swift,\ DexSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/ABSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/AIBrain.swift /Users/runner/work/0637/0637/ios/DuckApp/AISheet.swift /Users/runner/work/0637/0637/ios/DuckApp/BackupSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/BigButtonsSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift /Users/runner/work/0637/0637/ios/DuckApp/ContentView.swift /Users/runner/work/0637/0637/ios/DuckApp/Copy.swift /Users/runner/work/0637/0637/ios/DuckApp/DanceSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DanceStudio.swift /Users/runner/work/0637/0637/ios/DuckApp/DexSheet.swift (in target 'Duck' from project 'Duck')
+
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/ABSheet.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/AIBrain.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/AISheet.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/BackupSheet.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/BigButtonsSheet.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+/Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift:241:10: warning: instance method 'photoOutput(_:didFinishCaptureFor:error:)' nearly matches optional requirement 'photoOutput(_:didFinishCaptureFor:error:)' of protocol 'AVCapturePhotoCaptureDelegate'
+    func photoOutput(
+         ^
+/Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift:241:10: note: candidate has non-matching type '(AVCapturePhotoOutput, AVCapturePhotoSettings, (any Error)?) -> ()'
+    func photoOutput(
+         ^
+/Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift:241:10: note: move 'photoOutput(_:didFinishCaptureFor:error:)' to another extension to silence this warning
+    func photoOutput(
+         ^
+/Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift:241:10: note: make 'photoOutput(_:didFinishCaptureFor:error:)' private to silence this warning
+    func photoOutput(
+         ^
+    private 
+AVFoundation.AVCapturePhotoCaptureDelegate.photoOutput:2:15: note: requirement 'photoOutput(_:didFinishCaptureFor:error:)' declared here
+optional func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: (any Error)?)}
+              ^
+
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/ContentView.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
 
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/Copy.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -1168,6 +1090,16 @@ SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/DexSheet.swif
     cd /Users/runner/work/0637/0637/ios
     
 
+SwiftDriverJobDiscovery normal arm64 Emitting module for Duck (in target 'Duck' from project 'Duck')
+
+SwiftDriver\ Compilation\ Requirements Duck normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Duck -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F Frameworks -F third_party -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/core/duck-mobile-core/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-Swift.h -import-objc-header /Users/runner/work/0637/0637/ios/DuckApp/DuckCore-Bridging-Header.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling PhotoPreviewSheet.swift, PostcardCompose.swift, PostcardShelf.swift, PostcardShelfView.swift, ProgressKit.swift, Renderer.swift, RulesSheet.swift, ShareSheet.swift, Speaker.swift, Voice.swift (in target 'Duck' from project 'Duck')
+
+SwiftCompile normal arm64 Compiling\ DiarySheet.swift,\ DuckApp.swift,\ DuckController.swift,\ Heart.swift,\ Icons.swift,\ InstrumentSheet.swift,\ MicFeed.swift,\ MoreSheet.swift,\ PadSender.swift,\ PeersSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DiarySheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DuckApp.swift /Users/runner/work/0637/0637/ios/DuckApp/DuckController.swift /Users/runner/work/0637/0637/ios/DuckApp/Heart.swift /Users/runner/work/0637/0637/ios/DuckApp/Icons.swift /Users/runner/work/0637/0637/ios/DuckApp/InstrumentSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/MicFeed.swift /Users/runner/work/0637/0637/ios/DuckApp/MoreSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/PadSender.swift /Users/runner/work/0637/0637/ios/DuckApp/PeersSheet.swift (in target 'Duck' from project 'Duck')
+
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/DiarySheet.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     
@@ -1175,10 +1107,6 @@ SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/DiarySheet.sw
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/DuckApp.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     
-
-SwiftCompile normal arm64 Compiling\ DuckController.swift,\ Heart.swift,\ Icons.swift,\ InstrumentSheet.swift,\ MicFeed.swift,\ MoreSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DuckController.swift /Users/runner/work/0637/0637/ios/DuckApp/Heart.swift /Users/runner/work/0637/0637/ios/DuckApp/Icons.swift /Users/runner/work/0637/0637/ios/DuckApp/InstrumentSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/MicFeed.swift /Users/runner/work/0637/0637/ios/DuckApp/MoreSheet.swift (in target 'Duck' from project 'Duck')
-Failed frontend command:
-/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-frontend -frontend -c /Users/runner/work/0637/0637/ios/DuckApp/ABSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/AIBrain.swift /Users/runner/work/0637/0637/ios/DuckApp/AISheet.swift /Users/runner/work/0637/0637/ios/DuckApp/BackupSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/BigButtonsSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/CameraBackdrop.swift /Users/runner/work/0637/0637/ios/DuckApp/ContentView.swift /Users/runner/work/0637/0637/ios/DuckApp/Copy.swift /Users/runner/work/0637/0637/ios/DuckApp/DanceSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DanceStudio.swift /Users/runner/work/0637/0637/ios/DuckApp/DexSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DiarySheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DuckApp.swift -primary-file /Users/runner/work/0637/0637/ios/DuckApp/DuckController.swift -primary-file /Users/runner/work/0637/0637/ios/DuckApp/Heart.swift -primary-file /Users/runner/work/0637/0637/ios/DuckApp/Icons.swift -primary-file /Users/runner/work/0637/0637/ios/DuckApp/InstrumentSheet.swift -primary-file /Users/runner/work/0637/0637/ios/DuckApp/MicFeed.swift -primary-file /Users/runner/work/0637/0637/ios/DuckApp/MoreSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/PadSender.swift /Users/runner/work/0637/0637/ios/DuckApp/PeersSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/PhotoPreviewSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardCompose.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelf.swift /Users/runner/work/0637/0637/ios/DuckApp/PostcardShelfView.swift /Users/runner/work/0637/0637/ios/DuckApp/ProgressKit.swift /Users/runner/work/0637/0637/ios/DuckApp/Renderer.swift /Users/runner/work/0637/0637/ios/DuckApp/RulesSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/ShareSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/Speaker.swift /Users/runner/work/0637/0637/ios/DuckApp/Voice.swift -supplementary-output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/supplementaryOutputs-3 -target arm64-apple-ios17.0-simulator -load-resolved-plugin /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libFoundationMacros.dylib\#/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#FoundationMacros -load-resolved-plugin /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libObservationMacros.dylib\#/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#ObservationMacros -load-resolved-plugin /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libPreviewsMacros.dylib\#/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#PreviewsMacros -load-resolved-plugin /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftMacros.dylib\#/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftMacros -load-resolved-plugin /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/lib/swift/host/plugins/libSwiftUIMacros.dylib\#/Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/usr/bin/swift-plugin-server\#SwiftUIMacros -disable-implicit-swift-modules -Xcc -fno-implicit-modules -Xcc -fno-implicit-module-maps -explicit-swift-module-map-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-dependencies-1.json -debug-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule -Xllvm -aarch64-use-tbi -enable-objc-interop -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/0637/0637/ios/Frameworks -F /Users/runner/work/0637/0637/ios/third_party -no-color-diagnostics -Xcc -fno-color-diagnostics -enable-testing -g -debug-info-format\=dwarf -dwarf-version\=4 -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -swift-version 5 -Onone -D DEBUG -serialize-debugging-options -const-gather-protocols-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -empty-abi-descriptor -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -working-directory -Xcc /Users/runner/work/0637/0637/ios -enable-anonymous-context-mangled-names -file-compilation-dir /Users/runner/work/0637/0637/ios -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/swift-overrides.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/core/duck-mobile-core/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources -Xcc -DDEBUG\=1 -import-objc-header /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-primary-Bridging-header.pch -no-auto-bridging-header-chaining -module-name Duck -frontend-parseable-output -disable-clang-spi -clang-target arm64-apple-ios26.5-simulator -target-sdk-version 26.5 -target-sdk-name iphonesimulator26.5 -in-process-plugin-server-path /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/libSwiftInProcPluginServer.dylib -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/DuckController.o -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Heart.o -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Icons.o -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/InstrumentSheet.o -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/MicFeed.o -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/MoreSheet.o -index-unit-output-path /Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/DuckController.o -index-unit-output-path /Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Heart.o -index-unit-output-path /Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Icons.o -index-unit-output-path /Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/InstrumentSheet.o -index-unit-output-path /Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/MicFeed.o -index-unit-output-path /Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/MoreSheet.o -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -index-system-modules
 
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/DuckController.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -1211,21 +1139,23 @@ SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/MicFeed.swift
 SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/MoreSheet.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     
-/Users/runner/work/0637/0637/ios/DuckApp/MoreSheet.swift:221:49: error: cannot convert value of type '(Int, Int) -> String' to expected argument type 'String'
-                            String(format: Copy.parentLeft, minutes, Int(controller.parentLeftS / 60.0))
-                                                ^
 
-SwiftDriverJobDiscovery normal arm64 Emitting module for Duck (in target 'Duck' from project 'Duck')
-
-SwiftDriver\ Compilation\ Requirements Duck normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Duck' from project 'Duck')
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/PadSender.swift (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
-    builtin-Swift-Compilation-Requirements -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Duck -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F Frameworks -F third_party -c -j5 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/core/duck-mobile-core/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-Swift.h -import-objc-header /Users/runner/work/0637/0637/ios/DuckApp/DuckCore-Bridging-Header.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
+    
 
-SwiftDriverJobDiscovery normal arm64 Compiling Copy.swift, DanceSheet.swift, DanceStudio.swift, DexSheet.swift, DiarySheet.swift, DuckApp.swift (in target 'Duck' from project 'Duck')
+SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/PeersSheet.swift (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+/Users/runner/work/0637/0637/ios/DuckApp/PeersSheet.swift:107:33: warning: result of call to 'chip(_:id:enabled:action:)' is unused
+                                chip(
+                                ^   ~
 
 SwiftMergeGeneratedHeaders /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/Duck-Swift.h /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-Swift.h (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
     builtin-swiftHeaderTool -arch arm64 /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-Swift.h -o /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/Duck-Swift.h
+
+SwiftDriverJobDiscovery normal arm64 Compiling ABSheet.swift, AIBrain.swift, AISheet.swift, BackupSheet.swift, BigButtonsSheet.swift, CameraBackdrop.swift, ContentView.swift, Copy.swift, DanceSheet.swift, DanceStudio.swift, DexSheet.swift (in target 'Duck' from project 'Duck')
 
 Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule (in target 'Duck' from project 'Duck')
     cd /Users/runner/work/0637/0637/ios
@@ -1243,16 +1173,76 @@ Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator
     cd /Users/runner/work/0637/0637/ios
     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftsourceinfo /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo
 
-SwiftDriverJobDiscovery normal arm64 Compiling PadSender.swift, PeersSheet.swift, PhotoPreviewSheet.swift, PostcardCompose.swift, PostcardShelf.swift, PostcardShelfView.swift (in target 'Duck' from project 'Duck')
+SwiftDriverJobDiscovery normal arm64 Compiling DiarySheet.swift, DuckApp.swift, DuckController.swift, Heart.swift, Icons.swift, InstrumentSheet.swift, MicFeed.swift, MoreSheet.swift, PadSender.swift, PeersSheet.swift (in target 'Duck' from project 'Duck')
 
-SwiftDriverJobDiscovery normal arm64 Compiling ProgressKit.swift, Renderer.swift, RulesSheet.swift, ShareSheet.swift, Speaker.swift, Voice.swift (in target 'Duck' from project 'Duck')
+SwiftDriver\ Compilation Duck normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-Swift-Compilation -- /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Duck -Onone @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList -DDEBUG -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/runner/work/0637/0637/ios/build/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F Frameworks -F third_party -c -j3 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/runner/work/0637/0637/ios/build/SDKStatCaches.noindex/iphonesimulator26.5-23F81a-688ef53f1462e2c8f657fdc38a81448ff45c64a1807a658693f2a61704f17a36.sdkstatcache -output-file-map /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -sdk-module-cache-path /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/0637/0637/ios/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-generated-files.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-own-target-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck-project-headers.hmap -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/runner/work/0637/0637/core/duck-mobile-core/include -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-Swift.h -import-objc-header /Users/runner/work/0637/0637/ios/DuckApp/DuckCore-Bridging-Header.h -working-directory /Users/runner/work/0637/0637/ios -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck normal (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios17.0-simulator -isysroot /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk -O0 -L/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -F/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator -FFrameworks -Fthird_party -filelist /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.LinkFileList -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker @executable_path/Frameworks -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.swiftmodule @/Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck-linker-args.resp -L/Users/runner/work/0637/0637/ios/Frameworks -lduck_mobile_core -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.app-Simulated.xcent -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __ents_der -Xlinker /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.app-Simulated.xcent.der -lduck_mobile_core -framework onnxruntime -framework Metal -framework MetalKit -framework CoreMotion -framework AVFoundation -framework Speech -Xlinker -no_adhoc_codesign -o /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck
+/Users/runner/work/0637/0637/ios/Duck.xcodeproj: Duck: ld: warning: ignoring duplicate libraries: '-lduck_mobile_core'
+
+LinkAssetCatalog /Users/runner/work/0637/0637/ios/DuckApp/Assets.xcassets (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-linkAssetCatalog --thinned /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/thinned --thinned-dependencies /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_dependencies_thinned --thinned-info-plist-content /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist_thinned --unthinned /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_output/unthinned --unthinned-dependencies /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist_unthinned --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app --plist-output /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist
+note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/AppIcon60x60@2x.png (in target 'Duck' from project 'Duck')
+note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Assets.car (in target 'Duck' from project 'Duck')
+note: Emplaced /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/AppIcon76x76@2x~ipad.png (in target 'Duck' from project 'Duck')
+
+ProcessInfoPlistFile /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Info.plist /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-infoPlistUtility /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/empty-Duck.plist -producttype com.apple.product-type.application -genpkginfo /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/PkgInfo -expandbuildsettings -format binary -platform iphonesimulator -additionalcontentfile /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/assetcatalog_generated_info.plist -o /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Info.plist
+
+Copy /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks/libduck_mobile_core.dylib /Users/runner/work/0637/0637/ios/Frameworks/libduck_mobile_core.dylib (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/runner/work/0637/0637/ios/Frameworks/libduck_mobile_core.dylib /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks
+
+CodeSign /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks/libduck_mobile_core.dylib (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --preserve-metadata\=identifier,entitlements,flags --generate-entitlement-der /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks/libduck_mobile_core.dylib
+/Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks/libduck_mobile_core.dylib: replacing existing signature
+
+ExtractAppIntentsMetadata (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.oZ5EgF/Metal.xctoolchain --module-name Duck --sdk-root /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk --xcode-version 17F113 --platform-family iOS --deployment-target 17.0 --bundle-identifier ai.duck.microduck --output /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app --target-triple arm64-apple-ios17.0-simulator --binary-file /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck --dependency-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck_dependency_info.dat --stringsdata-file /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftFileList --metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Objects-normal/arm64/Duck.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-11-14 14:59:34.431 appintentsmetadataprocessor[12508:41696] Starting appintentsmetadataprocessor export
+2026-11-14 14:59:34.512 appintentsmetadataprocessor[12508:41696] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+CopySwiftLibs /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Duck --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/PlugIns --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/SystemExtensions --scan-folder /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Extensions --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/Metal.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/MetalKit.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/CoreMotion.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/AVFoundation.framework --scan-folder /Applications/Xcode_26.6.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk/System/Library/Frameworks/Speech.framework --platform iphonesimulator --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.6.109.0.oZ5EgF/Metal.xctoolchain --toolchain /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+
+AppIntentsSSUTraining (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Info.plist --temp-dir-path /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/ssu --bundle-id ai.duck.microduck --product-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app --extracted-metadata-path /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Metadata.appintents --metadata-file-list /Users/runner/work/0637/0637/ios/build/Build/Intermediates.noindex/Duck.build/Debug-iphonesimulator/Duck.build/Duck.DependencyMetadataFileList --source-file /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app/Info.plist --archive-ssu-assets
+2026-11-14 14:59:34.703 appintentsnltrainingprocessor[12512:41702] Parsing options for appintentsnltrainingprocessor
+2026-11-14 14:59:34.705 appintentsnltrainingprocessor[12512:41702] Starting AppIntents SSU YAML Generation
+2026-11-14 14:59:34.728 appintentsnltrainingprocessor[12512:41702] No AppShortcuts found - Skipping.
+
+CodeSign /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app
+
+RegisterExecutionPolicyException /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-RegisterExecutionPolicyException /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app
+
+Validate /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    builtin-validationUtility /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app -shallow-bundle -infoplist-subpath Info.plist
+
+Touch /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app (in target 'Duck' from project 'Duck')
+    cd /Users/runner/work/0637/0637/ios
+    /usr/bin/touch -c /Users/runner/work/0637/0637/ios/build/Build/Products/Debug-iphonesimulator/Duck.app
 
 note: Run script build phase 'Check Rust core' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'Duck' from project 'Duck')
-** BUILD FAILED **
+** BUILD SUCCEEDED **
 
-
-The following build commands failed:
-	SwiftCompile normal arm64 Compiling\ DuckController.swift,\ Heart.swift,\ Icons.swift,\ InstrumentSheet.swift,\ MicFeed.swift,\ MoreSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/DuckController.swift /Users/runner/work/0637/0637/ios/DuckApp/Heart.swift /Users/runner/work/0637/0637/ios/DuckApp/Icons.swift /Users/runner/work/0637/0637/ios/DuckApp/InstrumentSheet.swift /Users/runner/work/0637/0637/ios/DuckApp/MicFeed.swift /Users/runner/work/0637/0637/ios/DuckApp/MoreSheet.swift (in target 'Duck' from project 'Duck')
-	SwiftCompile normal arm64 /Users/runner/work/0637/0637/ios/DuckApp/MoreSheet.swift (in target 'Duck' from project 'Duck')
-	Building project Duck with scheme Duck and configuration Debug
-(3 failures)

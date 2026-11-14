@@ -1,53 +1,104 @@
-2026-11-14 10:17:07.906 Duck[17362:54149] duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/AFB2AC8F-3FD0-4935-B94D-D4B7A78F8DDB/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
-2026-11-14 10:17:07.906 Duck[17362:54149] duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/AFB2AC8F-3FD0-4935-B94D-D4B7A78F8DDB/Duck.app/DuckResources/policies
-2026-11-14 10:17:09.284 Duck[17362:54145] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-14 10:17:09.312 Duck[17362:54145] duck: voice resumed category=AVAudioSessionCategoryPlayback
-2026-11-14 10:17:11.165 Duck[17362:54149] duck: built 38 meshes off the main thread
-2026-11-14 10:17:11.166 Duck[17362:54145] duck: core created
-2026-11-14 10:17:11.172 Duck[17362:54145] duck: pickup detector -> 0
-2026-11-14 10:17:11.184 Duck[17362:54145] duck: emotions -> 13
-2026-11-14 10:17:11.184 Duck[17362:54145] duck: intent server -> 0
-2026-11-14 10:17:11.186 Duck[17362:54145] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-14 10:17:11.186 Duck[17362:54145] duck: voice ready at 48000 Hz
-2026-11-14 10:17:13.499 Duck[17362:54145] duck: renderer: 70 visual geoms
-2026-11-14 10:17:13.563 Duck[17362:54145] duck: voice scheduled tag=greet frames=19310 total=1
-2026-11-14 10:17:19.554 Duck[17362:54145] duck: voice scheduled tag=emotion:angry frames=112790 total=2
-2026-11-14 10:17:28.197 Duck[17362:54145] duck: voice scheduled tag=emotion:impatient frames=110399 total=3
-2026-11-14 10:17:30.502 Duck[17362:54145] duck: voice scheduled tag=coo frames=43944 total=4
-2026-11-14 10:17:33.360 Duck[17362:54145] duck: voice scheduled tag=alarm frames=9227 total=5
-2026-11-14 10:17:33.921 Duck[17362:54145] duck: voice scheduled tag=emotion:laugh frames=116254 total=6
-2026-11-14 10:17:36.361 Duck[17362:54145] duck: voice scheduled tag=emotion:curious frames=68331 total=7
-2026-11-14 10:17:43.670 Duck[17362:54145] duck: voice scheduled tag=alarm frames=13388 total=8
-2026-11-14 10:17:45.565 Duck[17362:54145] duck: voice scheduled tag=emotion:laugh frames=116254 total=9
-2026-11-14 10:17:48.039 Duck[17362:54145] duck: voice scheduled tag=emotion:excited frames=136319 total=10
-2026-11-14 10:17:50.890 Duck[17362:54145] duck: voice scheduled tag=emotion:yes frames=38399 total=11
-2026-11-14 10:17:53.589 Duck[17362:54145] duck: voice scheduled tag=emotion:laugh frames=116254 total=12
-2026-11-14 10:17:56.696 Duck[17362:54145] duck: voice scheduled tag=coo frames=40659 total=13
-2026-11-14 10:18:02.076 Duck[17362:54145] duck: voice scheduled tag=emotion:sad frames=146047 total=14
-2026-11-14 10:18:05.141 Duck[17362:54145] duck: voice scheduled tag=coo frames=38490 total=15
-2026-11-14 10:18:08.167 Duck[17362:54145] duck: voice scheduled tag=wheee:start:0 frames=42367 total=16
-2026-11-14 10:18:09.079 Duck[17362:54145] duck: voice scheduled tag=wheee:end:0 frames=24614 total=17
-2026-11-14 10:18:10.979 Duck[17362:54145] duck: voice scheduled tag=alarm frames=13101 total=18
-2026-11-14 10:18:11.659 Duck[17362:54145] duck: voice scheduled tag=emotion:excited frames=136319 total=19
-2026-11-14 10:18:14.526 Duck[17362:54145] duck: voice scheduled tag=greet frames=40716 total=20
-2026-11-14 10:18:27.729 Duck[17362:54145] duck: voice scheduled tag=alarm frames=13046 total=21
-2026-11-14 10:18:31.029 Duck[17362:54145] duck: voice scheduled tag=emotion:curious frames=68331 total=22
-2026-11-14 10:18:39.052 Duck[17362:54145] duck: voice scheduled tag=chirp frames=4558 total=23
-2026-11-14 10:18:39.211 Duck[17362:54145] duck: voice scheduled tag=chirp frames=4558 total=24
-2026-11-14 10:18:39.696 Duck[17362:54145] duck: voice scheduled tag=greet frames=24377 total=25
-2026-11-14 10:18:41.738 Duck[17362:54145] duck: renderer: 76 visual geoms
-2026-11-14 10:18:41.749 Duck[17362:54145] duck: voice scheduled tag=chirp frames=4558 total=26
-2026-11-14 10:18:47.115 Duck[17362:54145] duck: renderer: 70 visual geoms
-2026-11-14 10:18:47.185 Duck[17362:54145] duck: voice scheduled tag=chirp frames=4558 total=27
-2026-11-14 10:18:51.200 Duck[17362:54145] duck: voice scheduled tag=peck frames=11706 total=28
-2026-11-14 10:18:56.942 Duck[17362:54145] duck: voice scheduled tag=greet frames=19310 total=29
-2026-11-14 10:19:00.512 Duck[17362:54145] duck: voice scheduled tag=emotion:angry frames=112790 total=30
-2026-11-14 10:19:02.911 Duck[17362:54145] duck: voice scheduled tag=coo frames=43944 total=31
-2026-11-14 10:19:03.826 Duck[17362:54145] duck: voice scheduled tag=alarm frames=9227 total=32
-2026-11-14 10:19:20.034 Duck[17362:54145] duck: voice scheduled tag=alarm frames=9227 total=33
-2026-11-14 10:19:23.214 Duck[17362:54145] duck: voice scheduled tag=emotion:excited frames=136319 total=34
-2026-11-14 10:19:41.026 Duck[17362:54145] duck: voice scheduled tag=inquire frames=19919 total=35
-2026-11-14 10:19:48.291 Duck[17362:54145] duck: voice scheduled tag=emotion:curious frames=68331 total=36
-2026-11-14 10:20:20.744 Duck[17362:54145] duck: voice scheduled tag=emotion:defiant frames=67198 total=37
-2026-11-14 10:20:51.160 Duck[17362:54145] duck: voice scheduled tag=emotion:excited frames=136319 total=38
-ai.duck.microduck: 17362
+2026-11-14 15:00:39.212 Duck[14894:47733] duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/0A58EAC9-4650-4594-B924-5FB12F9AD1A3/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
+2026-11-14 15:00:39.212 Duck[14894:47733] duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/0A58EAC9-4650-4594-B924-5FB12F9AD1A3/Duck.app/DuckResources/policies
+2026-11-14 15:00:40.209 Duck[14894:47675] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
+2026-11-14 15:00:40.235 Duck[14894:47675] duck: voice resumed category=AVAudioSessionCategoryPlayback
+2026-11-14 15:00:41.693 Duck[14894:47733] duck: built 38 meshes off the main thread
+2026-11-14 15:00:41.696 Duck[14894:47675] duck: core created
+2026-11-14 15:00:41.710 Duck[14894:47675] duck: pickup detector -> 0
+2026-11-14 15:00:41.730 Duck[14894:47675] duck: emotions -> 13
+2026-11-14 15:00:41.732 Duck[14894:47675] duck: intent server -> 0
+2026-11-14 15:00:41.734 Duck[14894:47675] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
+2026-11-14 15:00:41.735 Duck[14894:47675] duck: voice ready at 48000 Hz
+2026-11-14 15:00:43.954 Duck[14894:47675] duck: renderer: 70 visual geoms
+2026-11-14 15:00:44.061 Duck[14894:47675] duck: voice scheduled tag=greet frames=19310 total=1
+*** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: 'Attempt to insert non-property list object {
+    care =     {
+        asleep = 0;
+        bond = "0.09999837962962962";
+        "budget_s" = "<null>";
+        "heart_bpm" = "77.5";
+        hunger = "0.1500518518518518";
+        "idle_s" = "0.14";
+        "last_touch" = 0;
+        mood = "0.3501049162113479";
+        night =         {
+            active = 0;
+            "started_tick" = 0;
+        };
+        parent =         {
+            "left_s" = 0;
+            minutes = "<null>";
+            "used_s" = 0;
+        };
+    };
+    life =     {
+        boots = 1;
+        claps = 0;
+        days =         (
+        );
+        emotions =         {
+        };
+        events =         (
+        );
+        falls = 0;
+        fed = 0;
+        "ground_picks" = 0;
+        "held_s" = 0;
+        metres = 0;
+        pets = 0;
+        pickups = 0;
+        "power_offs" = 0;
+        "powered_s" = 0;
+        "sit_downs" = 0;
+        "sitting_s" = 0;
+        skills =         {
+        };
+        "soft_landings" = 0;
+        "stand_ups" = 0;
+        "standing_s" = 0;
+        "torqued_s" = 0;
+        "wake_ups" = 0;
+        "walking_s" = 0;
+        whistles = 0;
+    };
+} for key duck_companion_v1'
+*** First throw call stack:
+(
+	0   CoreFoundation                      0x00000001804f71d0 __exceptionPreprocess + 172
+	1   libobjc.A.dylib                     0x000000018009c094 objc_exception_throw + 72
+	2   CoreFoundation                      0x0000000180577488 -[__NSCFString characterAtIndex:].cold.1 + 0
+	3   CoreFoundation                      0x00000001804acaac _CFPrefsValidateValueForKey + 216
+	4   CoreFoundation                      0x00000001804ad4f0 createDeepCopyOfValueForKey + 160
+	5   CoreFoundation                      0x00000001804ad1b4 -[CFPrefsSource setValues:forKeys:count:copyValues:removeValuesForKeys:count:from:] + 312
+	6   CoreFoundation                      0x000000018057cb38 -[CFPrefsSource setValue:forKey:from:] + 68
+	7   CoreFoundation                      0x000000018055b864 __76-[_CFXPreferences setValue:forKey:appIdentifier:container:configurationURL:]_block_invoke + 56
+	8   CoreFoundation                      0x00000001805225a4 __108-[_CFXPreferences(SearchListAdditions) withSearchListForIdentifier:container:cloudConfigurationURL:perform:]_block_invoke + 348
+	9   CoreFoundation                      0x0000000180521e38 normalizeQuintuplet + 396
+	10  CoreFoundation                      0x0000000180582d1c -[_CFXPreferences withSearchListForIdentifier:container:cloudConfigurationURL:perform:] + 136
+	11  CoreFoundation                      0x000000018055b804 -[_CFXPreferences setValue:forKey:appIdentifier:container:configurationURL:] + 96
+	12  CoreFoundation                      0x000000018055eea8 _CFPreferencesSetAppValueWithContainerAndConfiguration + 116
+	13  Foundation                          0x0000000181146448 -[NSUserDefaults(NSUserDefaults) setObject:forKey:] + 64
+	14  Duck                                0x0000000102a8a170 $s4Duck0A10ControllerC18saveCompanionState33_94DB5C58396C7D537BFEC36DA87A3725LL4care4lifeySDySSypG_AHSgtF + 1368
+	15  Duck                                0x0000000102ab1904 $s4Duck0A10ControllerC11pollSensorsyyFy10Foundation4DataVSg_So13NSURLResponseCSgs5Error_pSgtYbcfU0_yyScMYccfU_ + 19924
+	16  Duck                                0x000000010292e420 $sIeg_IeyB_TR + 48
+	17  libdispatch.dylib                   0x00000001801c07a8 _dispatch_call_block_and_release + 24
+	18  libdispatch.dylib                   0x00000001801db4b0 _dispatch_client_callout + 12
+	19  libdispatch.dylib                   0x00000001801f74a0 _dispatch_main_queue_drain.cold.7 + 24
+	20  libdispatch.dylib                   0x00000001801d031c _dispatch_main_queue_drain + 1184
+	21  libdispatch.dylib                   0x00000001801cfe6c _dispatch_main_queue_callback_4CF + 40
+	22  CoreFoundation                      0x0000000180455ed8 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 12
+	23  CoreFoundation                      0x00000001804550b0 __CFRunLoopRun + 1884
+	24  CoreFoundation                      0x000000018044fcec _CFRunLoopRunSpecificWithOptions + 496
+	25  GraphicsServices                    0x0000000192a669bc GSEventRunModal + 116
+	26  UIKitCore                           0x0000000186348574 -[UIApplication _run] + 772
+	27  UIKitCore                           0x000000018634c79c UIApplicationMain + 124
+	28  SwiftUI                             0x00000001da58d620 $s7SwiftUI17KitRendererCommon33_ACC2C5639A7D76F611E170E831FCA491LLys5NeverOyXlXpFAESpySpys4Int8VGSgGXEfU_ + 164
+	29  SwiftUI                             0x00000001da58d368 $s7SwiftUI6runAppys5NeverOxAA0D0RzlF + 180
+	30  SwiftUI                             0x00000001da31b42c $s7SwiftUI3AppPAAE4mainyyFZ + 148
+	31  Duck                                0x0000000102a3a754 $s4Duck0A3AppV5$mainyyFZ + 40
+	32  Duck                                0x0000000102a3a800 main + 12
+	33  dyld                                0x000000010333d3d0 start_sim + 20
+	34  ???                                 0x00000001035cc4e4 0x0 + 4351378660
+)
+libc++abi: terminating due to uncaught exception of type NSException
+ai.duck.microduck: 14894
