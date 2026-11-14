@@ -218,7 +218,7 @@ struct MoreSheet: View {
                     row(
                         "hourglass", Copy.parentTime,
                         note: controller.parentMinutes.map { minutes in
-                            String(format: Copy.parentLeft, minutes, Int(controller.parentLeftS / 60.0))
+                            Copy.parentLeft(minutes, Int(controller.parentLeftS / 60.0))
                         } ?? Copy.parentOff,
                         showsChevron: false,
                         id: "more-parent"
