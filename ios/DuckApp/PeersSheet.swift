@@ -122,6 +122,21 @@ struct PeersSheet: View {
                 .accessibilityIdentifier("peer-greet-all")
             }
 
+            HStack(spacing: 8) {
+                chip(Copy.formation, id: "ensemble-formation", enabled: !controller.peers.isEmpty) {
+                    controller.startEnsemble(moves: ["laugh", "yes_fast", "excited", "curious"])
+                }
+                chip(Copy.roleDance, id: "ensemble-roles", enabled: !controller.peers.isEmpty) {
+                    controller.startEnsemble(moves: ["laugh", "yes_fast", "excited", "curious", "sad", "inquire"])
+                }
+                chip(Copy.voiceChoir, id: "ensemble-choir", enabled: !controller.peers.isEmpty) {
+                    controller.startEnsemble(
+                        moves: ["laugh", "curious"],
+                        sounds: ["chirp", "coo", "greet", "inquire"]
+                    )
+                }
+            }
+
             // One song for the whole room: this duck leads and every known
             // neighbour joins. A lone duck has nobody to sing with, so the
             // chip stays visible but disabled rather than disappearing.

@@ -108,6 +108,9 @@ pub enum Intent {
     /// Start a chorus: the listed official moves, performed by every duck in
     /// the room together. One to three moves, already validated by the route.
     Chorus(Vec<String>),
+    /// A room-wide score: official mood names, and optional sound tags.
+    /// The lead plays role 0; paired neighbours get their own roles.
+    Ensemble(Vec<String>, Vec<String>),
     /// The lifetime record a shell saved across launches, handed back so the
     /// duck's history survives an app restart.
     RestoreLife(serde_json::Value),
@@ -1079,6 +1082,27 @@ fn handle(
         },
         // A chorus is a tap for the whole room: validated here, broadcast,
         // and the tick starts the countdown. Defaults to laugh + yes_fast.
+        ("POST", "/ensemble") => {
+            let strings = |key: &str| -> Vec<String> {
+                value[key]
+                    .as_array()
+                    .map(|rows| {
+                        rows.iter()
+                            .filter_map(serde_json::Value::as_str)
+                            .take(8)
+                            .map(str::to_owned)
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            let moves = strings("moves");
+            let sounds = strings("sounds");
+            if moves.is_empty() && sounds.is_empty() {
+                Ok(json!({ "ok": false, "error": "an ensemble needs a move or a sound" }).to_string())
+            } else {
+                Ok(queue.request(Intent::Ensemble(moves, sounds)).to_string())
+            }
+        },
         ("POST", "/chorus") => {
             // A body without `moves` sings the default pair. A body *with*
             // `moves` must be a list of names: a malformed list is refused

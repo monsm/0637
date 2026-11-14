@@ -97,7 +97,7 @@ const MAX_EVENTS: usize = 40;
 /// could have written: one of the words below, or a name in one of the
 /// prefixes it uses for the ones that carry a name.
 pub fn is_known_event(event: &str) -> bool {
-    const WORDS: [&str; 13] = [
+    const WORDS: [&str; 14] = [
         "pet",
         "feed",
         "fell",
@@ -109,6 +109,7 @@ pub fn is_known_event(event: &str) -> bool {
         "idle_ritual",
         "sad",
         "chorus",
+        "ensemble",
         "ground_pick",
         "gift:treat",
     ];

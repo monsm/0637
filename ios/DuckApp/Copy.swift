@@ -448,6 +448,9 @@ enum Copy {
     // The palm's heartbeat: the duck's care numbers as a haptic rhythm.
     // A reading of the real state, not a new fact; off until asked for.
     static var heart: String { pick("Heartbeat", "手心心跳") }
+    static var formation: String { pick("Dance together", "家庭舞团") }
+    static var roleDance: String { pick("Role dance", "角色编舞") }
+    static var voiceChoir: String { pick("Voice choir", "多鸭合奏") }
     static var netPad: String { pick("UDP pad (port 4210)", "网控手柄 (4210)") }
     static var netPadNote: String {
         pick(

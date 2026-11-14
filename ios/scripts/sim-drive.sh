@@ -719,6 +719,15 @@ done
 check $? "the joined chorus finishes and the vet book notes it" "state=$CHORUS_DONE note=$CHORUS_NOTE"
 # This duck leads: an unknown mood is refused before anything is queued or
 # broadcast; a real one queues and /state says who leads.
+# The room-wide ensemble: an invented mood is refused at the route, and a
+# plain all-moves score is refused when nobody is paired to dance with.
+ENS_BAD=$(api POST /ensemble '{"moves":["not_a_mood"],"sounds":[]}' || true)
+printf '%s' "$ENS_BAD" | grep -q '"ok":false'
+check $? "an ensemble rejects an invented mood" "$(printf '%s' "$ENS_BAD" | head -c 120)"
+ENS_EMPTY=$(api POST /ensemble '{"moves":[],"sounds":[]}' || true)
+printf '%s' "$ENS_EMPTY" | grep -q '"ok":false'
+check $? "an ensemble needs a real beat" "$(printf '%s' "$ENS_EMPTY" | head -c 120)"
+
 CHORUS_BAD=$(api POST /chorus '{"moves":["not_a_mood"]}' || true)
 printf '%s' "$CHORUS_BAD" | grep -q '"ok":false'
 check $? "an unknown chorus move is refused" "$(printf '%s' "$CHORUS_BAD" | head -c 120)"

@@ -1070,6 +1070,33 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 None => refuse(core, "the LAN peer port is not available".to_owned()),
             }
         }
+        Intent::Ensemble(moves, sounds) => {
+            if active_runtime(core).chorus_active() {
+                return refuse(core, "a performance is already playing".to_owned());
+            }
+            if !moves.iter().all(|name| {
+                active_runtime(core).emotion_names().iter().any(|loaded| loaded == name)
+            }) || !sounds.iter().all(|tag| crate::voice::TAGS.contains(&tag.as_str())) {
+                return refuse(core, "no such mood or sound".to_owned());
+            }
+            let id = format!("ensemble-{}", active_runtime(core).clock().tick);
+            let sent = core
+                .lan
+                .as_ref()
+                .map(|lan| lan.ensemble(&id, &moves, &sounds));
+            match sent {
+                Ok(Ok(roles)) => {
+                    let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
+                    // The lead plays too: its own part is the first role.
+                    on_active(core, |runtime| {
+                        runtime.start_ensemble("lead", 0, roles + 1, moves.clone(), sounds.clone(), peers, Some(id.clone()));
+                    });
+                    json!({ "ok": true, "roles": roles + 1, "moves": moves, "sounds": sounds })
+                }
+                Ok(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
+                Err(_) => refuse(core, "the LAN peer port is not available".to_owned()),
+            }
+        }
         Intent::PeerName(name) => match &core.lan {
             Some(lan) => {
                 lan.set_name(&name);
@@ -1687,6 +1714,14 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
             // the runtime dedupes by id and the one-at-a-time rule.
             crate::lan::PeerEvent::Chorus { id, moves, .. } => {
                 choruses.push((id, moves))
+            }
+            crate::lan::PeerEvent::Ensemble { id, role, roles, moves, sounds, .. } => {
+                if !active_runtime(core).chorus_active() {
+                    let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
+                    on_active(core, |runtime| {
+                        runtime.start_ensemble("join", role, roles, moves, sounds, peers, Some(id));
+                    });
+                }
             }
             event => on_active(core, |runtime| runtime.peer_event(&event)),
         }

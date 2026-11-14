@@ -1414,6 +1414,23 @@ private fun PeersSheet(
                 if (pairCode.length == 6) {
                     ButtonChip(Copy.pairCode, "peers-pair-code-set") { onPair(pairCode, null) }
                 }
+                val sendEnsemble: (List<String>, List<String>) -> Unit = { moves, sounds ->
+                    val body = org.json.JSONObject()
+                        .put("moves", org.json.JSONArray(moves))
+                        .put("sounds", org.json.JSONArray(sounds))
+                    Thread { postDuckCommand("/ensemble", body.toString()) }.start()
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ButtonChip(Copy.formation, "ensemble-formation") {
+                        sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious"), emptyList())
+                    }
+                    ButtonChip(Copy.roleDance, "ensemble-roles") {
+                        sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious", "sad", "inquire"), emptyList())
+                    }
+                    ButtonChip(Copy.voiceChoir, "ensemble-choir") {
+                        sendEnsemble(listOf("laugh", "curious"), listOf("chirp", "coo", "greet", "inquire"))
+                    }
+                }
                 // A chorus needs someone to sing with: a lone duck sees the
                 // disabled affordance rather than losing the idea of it.
                 // PathChip is the shared chip face that carries `enabled`.

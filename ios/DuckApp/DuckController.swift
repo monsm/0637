@@ -1306,6 +1306,13 @@ final class DuckController: ObservableObject {
     }
 
     /// Say hello to one duck, or to every duck on the Wi-Fi.
+    /// A room-wide score — a formation, a role dance or a voice choir.
+    /// The wire carries only official mood/sound names; every duck plays
+    /// its own part through its own 50 Hz runtime.
+    func startEnsemble(moves: [String], sounds: [String] = []) {
+        postJSON("/ensemble", ["moves": moves, "sounds": sounds])
+    }
+
     /// The official UDP pad: OFF by default, gated in the core by the pair
     /// code. A standard DKPD sender (duckctl udp-pad, a script) then drives
     /// this duck through the same twist the joystick uses.

@@ -473,6 +473,9 @@ val quack get() = pick("Quack", "叫一声")
     val flashlightOff get() = pick("off", "关")
     // The palm's heartbeat: the duck's care numbers as a haptic rhythm.
     // A reading of the real state, not a new fact; off until asked for.
+    val formation get() = pick("Dance together", "家庭舞团")
+    val roleDance get() = pick("Role dance", "角色编舞")
+    val voiceChoir get() = pick("Voice choir", "多鸭合奏")
     val netPad get() = pick("UDP pad (4210)", "网控手柄 (4210)")
     val netPadNote get() = pick(
         "Set the pair code first; the official DKPD pad then drives this duck.",
