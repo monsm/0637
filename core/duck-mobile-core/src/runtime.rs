@@ -2245,6 +2245,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             // Five simulated seconds: enough for the coo (or the hand's
             // skill) to own the moment, not enough to hide a sad duck.
             self.sad_grace_until = Some(self.clock.tick.saturating_add(250));
+            // A hand that wakes the duck is not stillness: the idle ritual
+            // waits a full period instead of speaking over the wake coo on
+            // the next tick.
+            self.last_idle_ritual = Some(self.clock.tick);
         }
         if self.care.woken_by_touch {
             // A hand ended the night: the book keeps the honest reason, the
@@ -2985,6 +2989,65 @@ impl<T: RobotIo> DuckRuntime<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use duck_control::io::{IoError, JointTargets, RobotIo, Sensors};
+
+    /// A body with no hardware behind it: the sensors stay still and
+    /// `Controller::step` fails, so the loop holds the pose while the state
+    /// machine advances.
+    #[derive(Clone)]
+    struct Probe {
+        sensors: Sensors,
+        targets: [f64; NUM_JOINTS],
+    }
+
+    impl RobotIo for Probe {
+        fn read(&mut self) -> Result<Sensors, IoError> {
+            Ok(self.sensors)
+        }
+        fn write(&mut self, targets: &JointTargets) -> Result<(), IoError> {
+            self.targets = targets.positions;
+            Ok(())
+        }
+        fn measures_velocity(&self) -> bool {
+            true
+        }
+        fn measures_load(&self) -> bool {
+            true
+        }
+        fn set_gain(&mut self, _: u16) -> Result<(), IoError> {
+            Ok(())
+        }
+        fn set_torque(&mut self, _: bool) -> Result<(), IoError> {
+            Ok(())
+        }
+        fn reboot(&mut self, _: u8) -> Result<(), IoError> {
+            Ok(())
+        }
+        fn slow_sensors(&mut self) -> Result<duck_control::io::SlowSensors, IoError> {
+            Ok(duck_control::io::SlowSensors {
+                volts: 7.4,
+                temps_c: [25.0; NUM_JOINTS],
+            })
+        }
+        fn snapshot(&self) -> Option<Vec<f64>> {
+            let mut state = vec![0.0; 1 + NUM_JOINTS * 2];
+            state[0] = 1.0;
+            state[1..1 + NUM_JOINTS].copy_from_slice(&self.sensors.positions);
+            state[1 + NUM_JOINTS..].copy_from_slice(&self.targets);
+            Some(state)
+        }
+        fn restore(&mut self, state: &[f64]) -> bool {
+            if state.len() != 1 + NUM_JOINTS * 2 {
+                return false;
+            }
+            self.sensors
+                .positions
+                .copy_from_slice(&state[1..1 + NUM_JOINTS]);
+            self.targets
+                .copy_from_slice(&state[1 + NUM_JOINTS..]);
+            true
+        }
+    }
 
     /// Heading-error sign, verified against the frame the shells and the
     /// policy use: a waypoint on the duck's left is a positive error and a
@@ -3194,63 +3257,6 @@ mod tests {
 
     #[test]
     fn a_rewind_replays_the_same_trajectory() {
-        use duck_control::io::{IoError, JointTargets, RobotIo, Sensors};
-
-        #[derive(Clone)]
-        struct Probe {
-            sensors: Sensors,
-            targets: [f64; NUM_JOINTS],
-        }
-
-        impl RobotIo for Probe {
-            fn read(&mut self) -> Result<Sensors, IoError> {
-                Ok(self.sensors)
-            }
-            fn write(&mut self, targets: &JointTargets) -> Result<(), IoError> {
-                self.targets = targets.positions;
-                Ok(())
-            }
-            fn measures_velocity(&self) -> bool {
-                true
-            }
-            fn measures_load(&self) -> bool {
-                true
-            }
-            fn set_gain(&mut self, _: u16) -> Result<(), IoError> {
-                Ok(())
-            }
-            fn set_torque(&mut self, _: bool) -> Result<(), IoError> {
-                Ok(())
-            }
-            fn reboot(&mut self, _: u8) -> Result<(), IoError> {
-                Ok(())
-            }
-            fn slow_sensors(&mut self) -> Result<duck_control::io::SlowSensors, IoError> {
-                Ok(duck_control::io::SlowSensors {
-                    volts: 7.4,
-                    temps_c: [25.0; NUM_JOINTS],
-                })
-            }
-            fn snapshot(&self) -> Option<Vec<f64>> {
-                let mut state = vec![0.0; 1 + NUM_JOINTS * 2];
-                state[0] = 1.0;
-                state[1..1 + NUM_JOINTS].copy_from_slice(&self.sensors.positions);
-                state[1 + NUM_JOINTS..].copy_from_slice(&self.targets);
-                Some(state)
-            }
-            fn restore(&mut self, state: &[f64]) -> bool {
-                if state.len() != 1 + NUM_JOINTS * 2 {
-                    return false;
-                }
-                self.sensors
-                    .positions
-                    .copy_from_slice(&state[1..1 + NUM_JOINTS]);
-                self.targets
-                    .copy_from_slice(&state[1 + NUM_JOINTS..]);
-                true
-            }
-        }
-
         // No policies are loaded here: `Controller::step` fails, the loop holds
         // the pose, and the state machine still advances. That is enough to
         // exercise every checkpointed field.
@@ -3313,5 +3319,56 @@ mod tests {
         let json = serde_json::to_string(&playing).unwrap();
         let back: crate::emotion::Playing = serde_json::from_str(&json).unwrap();
         assert_eq!(back.elapsed, 1.25);
+    }
+
+    /// A hand that wakes the duck is not stillness: the idle ritual keeps
+    /// its distance for a full period instead of speaking over the wake coo
+    /// on the very next tick.
+    #[test]
+    fn a_waking_duck_keeps_its_coo_before_the_idle_ritual() {
+        let probe = Probe {
+            sensors: Sensors::default(),
+            targets: [0.0; NUM_JOINTS],
+        };
+        let mut runtime = DuckRuntime::new(
+            probe,
+            test_policy(),
+            Tuning::default(),
+            SkillTuning::default(),
+            SafetyConfig::default(),
+        );
+        runtime.enable().ok();
+
+        // The official timelines are data; the ritual picks one of them.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../upstream/microduck/robotd/emotions");
+        runtime.emotions = crate::emotion::Library::load(&dir).expect("official emotions");
+        // A one-tick period makes the ritual due the moment the duck is
+        // still; the warm-up lets the idle head take over first.
+        runtime.set_idle_ritual(0.02);
+        runtime.last_idle_ritual = None;
+        runtime.care.asleep = true;
+        for _ in 0..400 {
+            let _ = runtime.tick();
+        }
+        assert!(runtime.care.asleep, "the duck must still be dozing");
+        assert!(
+            runtime.last_idle.takeover > 0.9,
+            "the head must be idle enough for the ritual: {}",
+            runtime.last_idle.takeover
+        );
+
+        runtime.pet();
+        assert_eq!(
+            runtime.last_sound(),
+            Some("coo"),
+            "a pet answers with a coo"
+        );
+        let _ = runtime.tick();
+        assert_eq!(
+            runtime.last_sound(),
+            Some("coo"),
+            "a due idle ritual must not speak over the wake coo"
+        );
     }
 }
