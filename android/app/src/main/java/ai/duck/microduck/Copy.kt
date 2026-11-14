@@ -490,6 +490,18 @@ val quack get() = pick("Quack", "叫一声")
         else -> pick("Sit down", "坐下")
     }
     val compass get() = pick("Home faces north", "家永远朝北")
+    val roomLampNote get() = pick(
+        "Manual or lux-driven; the duck cannot see it.",
+        "手动或照度驱动；鸭子看不见它。",
+    )
+    val compassNote get() = pick(
+        "Turn around - the room turns with you. Honest, not 1:1.",
+        "转个身，房间跟着你转。诚实标注：非 1:1。",
+    )
+    val parentNote get() = pick(
+        "When today's play is spent, the duck goes to bed on its own.",
+        "今天的游玩时间用完，鸭子就自己睡觉。",
+    )
     val roomLamp get() = pick("Room lamp", "房间灯")
     val parentTime get() = pick("Parent time", "家长时间")
     val parentOff get() = pick("off", "不限")
