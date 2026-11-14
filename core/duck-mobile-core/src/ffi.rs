@@ -1085,7 +1085,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 .as_ref()
                 .map(|lan| lan.ensemble(&id, &moves, &sounds));
             match sent {
-                Ok(Ok(roles)) => {
+                Some(Ok(roles)) => {
                     let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
                     // The lead plays too: its own part is the first role.
                     on_active(core, |runtime| {
@@ -1093,8 +1093,8 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                     });
                     json!({ "ok": true, "roles": roles + 1, "moves": moves, "sounds": sounds })
                 }
-                Ok(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
-                Err(_) => refuse(core, "the LAN peer port is not available".to_owned()),
+                Some(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
+                None => refuse(core, "the LAN peer port is not available".to_owned()),
             }
         }
         Intent::PeerName(name) => match &core.lan {

@@ -1842,6 +1842,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             // either: it is a scheduled performance of its own moves.
             crate::lan::PeerEvent::Gift { .. } => return,
             crate::lan::PeerEvent::Chorus { .. } => return,
+            // An ensemble is its own scheduled performance too: the tick
+            // already started the duck's part, so no greeting voice here.
+            crate::lan::PeerEvent::Ensemble { .. } => return,
         };
         self.last_peer_event = Some(serde_json::json!({
             "kind": kind,
@@ -2918,9 +2921,11 @@ impl<T: RobotIo> DuckRuntime<T> {
         // and the last move closes the chorus with its honest note.
         let mut due_moves: Vec<String> = Vec::new();
         let mut due_sounds: Vec<String> = Vec::new();
-        let mut beat_count = 0usize;
+        let beat_count = self
+            .chorus
+            .as_ref()
+            .map_or(0, |task| task.moves.len().max(task.sounds.len()));
         if let Some(task) = self.chorus.as_mut() {
-            beat_count = task.moves.len().max(task.sounds.len());
             while task.next_move < beat_count
                 && self.clock.tick
                     >= task
