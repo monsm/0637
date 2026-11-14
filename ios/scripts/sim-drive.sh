@@ -219,8 +219,15 @@ for name in $EMOTIONS; do
 done
 
 # An action route answers with the tick's verdict. A skill that does not exist
-# is refused in words, not accepted and dropped.
-REFUSED=$(api POST /skill '{"name":"fly"}' || true)
+# is refused in words, not accepted and dropped. At session start the core may
+# still be loading and the 300 ms intent deadline can expire before the first
+# tick; a "pending" answer means the app has not ticked yet, not that the skill
+# was accepted, so ask again until the tick answers.
+for _ in $(seq 1 40); do
+  REFUSED=$(api POST /skill '{"name":"fly"}' || true)
+  printf '%s' "$REFUSED" | grep -q '"pending":true' || break
+  sleep 0.25
+done
 echo "$REFUSED" | tee "$OUT/skill-refused.json" > /dev/null
 printf '%s' "$REFUSED" | grep -q '"ok":false'
 check $? "an unknown skill is refused, not accepted" "$(printf '%s' "$REFUSED" | head -c 120)"
@@ -1257,7 +1264,9 @@ check $? "the duck can be asked to chirp" "$(printf '%s' "$SOUND" | head -c 100)
 CHIRPS_BEFORE=$(grep -c 'duck: voice scheduled tag=chirp' "$OUT/app-stdout.log" 2>/dev/null || true)
 [ -n "$CHIRPS_BEFORE" ] || CHIRPS_BEFORE=0
 CHIRPS_AFTER=$CHIRPS_BEFORE
-for _ in $(seq 1 50); do
+# The core plays one sound at a time; the skill matrix ahead of this check can
+# leave an emotion queue, so the chirp may wait tens of seconds for its turn.
+for _ in $(seq 1 300); do
   CHIRPS_AFTER=$(grep -c 'duck: voice scheduled tag=chirp' "$OUT/app-stdout.log" 2>/dev/null || true)
   [ -n "$CHIRPS_AFTER" ] || CHIRPS_AFTER=0
   [ "$CHIRPS_AFTER" -gt "$CHIRPS_BEFORE" ] && break
