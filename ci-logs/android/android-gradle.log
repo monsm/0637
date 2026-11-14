@@ -25,18 +25,18 @@ Daemon will be stopped at the end of the build
 > Task :app:processDebugResources
 > Task :app:compressDebugAssets
 > Task :app:checkDebugDuplicateClasses
+> Task :app:mergeLibDexDebug
+> Task :app:mergeDebugJniLibFolders
+> Task :app:mergeDebugNativeLibs
+> Task :app:validateSigningDebug
+> Task :app:writeDebugAppMetadata
+> Task :app:writeDebugSigningConfigVersions
+> Task :app:stripDebugDebugSymbols
+> Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:304:17 Conflicting declarations:
-local val nightNow: NightUi?
-local val nightNow: NightUi?
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:339:17 Conflicting declarations:
-local val nightNow: NightUi?
-local val nightNow: NightUi?
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:1809:18 This foundation API is experimental and is likely to change or be removed in the future.
-
-> Task :app:mergeExtDexDebug
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794622699963.json
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:418:20 Cannot access 'onUtterance': it is private in 'ai/duck/microduck/SpeechFeed'.
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794642414215.json
 
 FAILURE: Build failed with an exception.
 
@@ -240,5 +240,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 1m 8s
-21 actionable tasks: 21 executed
+BUILD FAILED in 29s
+28 actionable tasks: 28 executed

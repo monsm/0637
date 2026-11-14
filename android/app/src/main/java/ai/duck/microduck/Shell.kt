@@ -412,6 +412,17 @@ fun Shell(
     // thread because SpeechRecognizer and its callbacks must live on the main
     // Looper; the sheet reads its Compose state directly.
     val speechFeed = remember(context) { SpeechFeed(context) }
+    // A fresh transcript asks the model for one decision immediately: a
+    // conversation cannot wait out the periodic think. Same 10 s floor.
+    LaunchedEffect(Unit) {
+        speechFeed.onUtterance = { _ ->
+            val now = System.currentTimeMillis()
+            if (aiConfig.enabled && !aiThinking && now - lastAIThink >= 10_000L) {
+                lastAIThink = now
+                thinkAI()
+            }
+        }
+    }
     val voiceLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
