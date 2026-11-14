@@ -1,12 +1,12 @@
-2026-11-14 02:58:55.329 Duck[10712:35254] duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/6D2988A9-F029-4AAA-A7B3-99605A49E243/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
-2026-11-14 02:58:55.331 Duck[10712:35254] duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/6D2988A9-F029-4AAA-A7B3-99605A49E243/Duck.app/DuckResources/policies
-2026-11-14 02:58:58.162 Duck[10712:35254] duck: built 38 meshes off the main thread
-2026-11-14 02:58:58.164 Duck[10712:35226] duck: core created
-2026-11-14 02:58:58.188 Duck[10712:35226] duck: pickup detector -> 0
-2026-11-14 02:58:58.220 Duck[10712:35226] duck: emotions -> 13
-2026-11-14 02:58:58.221 Duck[10712:35226] duck: intent server -> 0
-2026-11-14 02:58:59.303 Duck[10712:35226] duck: voice ready at 48000 Hz
-2026-11-14 02:59:02.901 Duck[10712:35226] duck: renderer: 70 visual geoms
-2026-11-14 03:00:47.413 Duck[10712:35226] duck: renderer: 76 visual geoms
-2026-11-14 03:00:51.658 Duck[10712:35226] duck: renderer: 70 visual geoms
-ai.duck.microduck: 10712
+2026-11-14 03:22:08.900 Duck[8777:30740] duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/94A3064D-0A79-41BD-943D-ABCF125240E8/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
+2026-11-14 03:22:08.900 Duck[8777:30740] duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/94A3064D-0A79-41BD-943D-ABCF125240E8/Duck.app/DuckResources/policies
+2026-11-14 03:22:12.426 Duck[8777:30740] duck: built 38 meshes off the main thread
+2026-11-14 03:22:12.458 Duck[8777:30734] duck: core created
+2026-11-14 03:22:12.475 Duck[8777:30734] duck: pickup detector -> 0
+2026-11-14 03:22:12.532 Duck[8777:30734] duck: emotions -> 13
+2026-11-14 03:22:12.534 Duck[8777:30734] duck: intent server -> 0
+2026-11-14 03:22:14.263 Duck[8777:30734] duck: voice ready at 48000 Hz
+2026-11-14 03:22:17.236 Duck[8777:30734] duck: renderer: 70 visual geoms
+2026-11-14 03:24:07.986 Duck[8777:30734] duck: renderer: 76 visual geoms
+2026-11-14 03:24:20.124 Duck[8777:30734] duck: renderer: 70 visual geoms
+ai.duck.microduck: 8777

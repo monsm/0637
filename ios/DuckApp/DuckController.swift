@@ -138,11 +138,6 @@ final class DuckController: ObservableObject {
     /// The platform's own measurements, once a second.
     @Published var fps: Double = 0
     @Published var ticksPerSecond: Double = 0
-    /// The voice's own state, published only when `-duck.voiceDiagnostics`
-    /// asks for it: category and options, engine/player, and how many sounds
-    /// really reached the audio engine. The regression test reads this; the
-    /// product UI never shows it.
-    @Published var voiceLine = ""
     @Published var trunk = SIMD3<Float>(0, 0, 0.12)
     @Published var gravity = SIMD3<Float>(0, 0, -1)
     /// The time machine, as the shell shows it.
@@ -338,8 +333,6 @@ final class DuckController: ObservableObject {
     private var lastPush = Date.distantPast
     /// The duck's own voice: the core decides when, this owns the speaker.
     let voice = Voice()
-    /// Main-thread only: paces the voice diagnostic line, not the control loop.
-    private var diagnosticFrames = 0
     /// Director mode: the rear camera behind the duck. The renderer goes
     /// transparent and drops its floor, and the room is the real one.
     let camera = CameraFeed()
@@ -1500,10 +1493,6 @@ final class DuckController: ObservableObject {
     /// suspended in the background, so fetch the current events first;
     /// otherwise the diff would always be empty.
     func appBecameActive() {
-        // The OS deactivates the audio session while the app is suspended.
-        // Without this, the first background trip muted the duck until the
-        // next launch — a real phone behaviour the simulator does not show.
-        voice.resume()
         guard let url = URL(string: "http://127.0.0.1:8765/state") else { return }
         var request = URLRequest(url: url)
         request.timeoutInterval = 2.0
@@ -2240,15 +2229,6 @@ final class DuckController: ObservableObject {
         // the same main-thread tick that steps MuJoCo. Only the PCM crosses
         // to the audio queue.
         voice.poll(core: core)
-        if Voice.diagnosticsEnabled {
-            // Five times a second is enough for the UI test's polling and
-            // cheap enough for the control loop; the string is only built
-            // when the launch argument asked for it.
-            diagnosticFrames &+= 1
-            if diagnosticFrames % 10 == 0 {
-                voiceLine = voice.diagnostics
-            }
-        }
 
         // The core has robotd's 500 ms deadman: a twist must keep arriving.
         // The joystick is sent every tick, zero included.
