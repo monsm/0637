@@ -185,7 +185,8 @@ ARKit/ARCore 检测的桌面/地板高度写进 MuJoCo 地面平面，鸭子真�
 | blocked | #21 自愈爬起 | ⛔ 官方未发布 standup.onnx 权重，等上游——不自己训，不编造 | — |
 | 五a | #15 存档搬家（核心 backup/restore + 双端导出导入 + 边界探针） | ✅ | `fbcebad` |
 | 六 | #13 定时触发器（核心+词表校验）、#20 地面高度（核心+POST /floor，ARKit/ARCore 接线待真机）、#9 ToF 网格（官方降采样进 /state.sensors）、#10 轨迹导出（/export/trajectory）、#25 日子行（核心按天快照+双端）、#16 AB 试穿、#22 推一把对比、#23 倒放、#12 观测摘录 HUD、#24 双人接机浮层 | ✅ 代码落地，CI 验证中 | `812d516` |
-| 余 | #11 发送端（手机当 DKPD 手柄）、#13 积木编辑器的 timer 触发 UI、#8 全家福 credit、#9 取景器 UI、#20 ARKit/ARCore 接线（需真机验收）、#4 深度障碍（需 MuJoCo 世界编辑验证） | ⏳ 下一轮；#21 blocked | — |
+| 七 | #13 编辑器 timer 触发（period_s 独立字段，双端四档）、#8 同框 credit（双端照片预览，真实 paired 邻居名）、#9 8×8 热条（双端仪表页）、#11 发送端 Android（PadSender，30Hz 官方 28 字节） | ✅ 代码落地，CI 验证中 | `a2f8dc7` |
+| 余 | #11 发送端 iOS、#20 ARKit/ARCore 手机侧接线（需真机）、#4 深度障碍（需 MuJoCo 世界编辑验证） | ⏳；#21 blocked（官方无 standup 权重） | — |
 | 四–七 | #4/#20/#9、#8/#14/#15、#13/#22/#23/#27/#10/#12/#16/#18/#19/#24/#25/#26/#21 | ⏳ 待 CI 验证前三批后开工 | — |
 
 > 验证口径：本机 Windows 无 Rust 工具链 / Xcode / Android SDK，所有编译与运行验证以 GitHub Actions 三条工作流为准（core 单测、iOS 模拟器 15 步、Android 冒烟）。台账不得在 CI 全绿前把条目标成「完成」——未验证就是未验证。

@@ -16,16 +16,16 @@ Daemon will be stopped at the end of the build
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:desugarDebugFileDependencies
-> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
 > Task :app:compressDebugAssets
 > Task :app:checkDebugDuplicateClasses
 > Task :app:mergeLibDexDebug
-> Task :app:processDebugResources
 > Task :app:mergeDebugJniLibFolders
 > Task :app:mergeDebugNativeLibs
 > Task :app:validateSigningDebug
@@ -35,39 +35,39 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:39:51 Unresolved reference 'TouchApp'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:40:51 Unresolved reference 'Pets'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:41:51 Unresolved reference 'Chair'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:88:88 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:88:92 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:91:27 None of the following candidates is applicable:
-fun registerListener(p0: SensorListener!, p1: Int, p2: Int): Boolean
-fun registerListener(p0: SensorEventListener!, p1: Sensor!, p2: Int): Boolean
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:92:19 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:94:31 Unresolved reference 'sensor'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:97:106 Unresolved reference 'values'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:112:78 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:112:82 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:113:27 None of the following candidates is applicable:
-fun registerListener(p0: SensorListener!, p1: Int, p2: Int): Boolean
-fun registerListener(p0: SensorEventListener!, p1: Sensor!, p2: Int): Boolean
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:114:19 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:115:31 Unresolved reference 'sensor'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:116:44 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:116:50 Unresolved reference 'values'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:117:47 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:117:53 Unresolved reference 'values'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MainActivity.kt:117:63 None of the following candidates is applicable:
-fun BigDecimal.div(other: BigDecimal): BigDecimal
-fun BigInteger.div(other: BigInteger): BigInteger
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3394:29 Unresolved reference 'input'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3394:56 Unresolved reference 'input'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3395:34 Unresolved reference 'input'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3402:29 Unresolved reference 'input'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3406:29 Unresolved reference 'input'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3408:29 Unresolved reference 'input'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3409:54 Unresolved reference 'input'.
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794655546481.json
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:41:28 Variable 'more' must be initialized.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:42:28 Variable 'grab' must be initialized.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:43:28 Variable 'night' must be initialized.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:629:34 'fun Modifier.align(alignment: Alignment): Modifier' cannot be called in this context with an implicit receiver. Use an explicit receiver if necessary.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3051:53 Syntax error: Expecting '"'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3051:53 Syntax error: Expecting ','.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3051:53 Syntax error: Incorrect template entry: .
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3052:4 Syntax error: Expecting '"'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3052:4 Syntax error: Incorrect template entry: .
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:17 Unresolved reference 'color'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:23 Syntax error: Expecting an element.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:30 Syntax error: Expecting an element.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:36 Syntax error: Expecting an element.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:42 Unresolved reference 'alpha'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:42 Only expressions are allowed in this context.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3054:17 No parameter with name 'fontSize' found.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3055:14 Syntax error: Expecting ')'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3154:24 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3154:24 Not enough information to infer type argument for 'I'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3154:24 Not enough information to infer type argument for 'O'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3155:35 Unresolved reference 'ActivityResultContracts'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3156:9 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3160:49 Argument type mismatch: actual type is 'kotlin.Any', but 'android.net.Uri' was expected.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3576:70 'val' cannot be reassigned.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3576:85 Assignment type mismatch: actual type is 'kotlin.Boolean', but 'androidx.activity.compose.ManagedActivityResultLauncher<ERROR CLASS: Cannot infer argument for type parameter I, ERROR CLASS: Cannot infer argument for type parameter O>' was expected.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3632:26 Unresolved reference 'checkpoint'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:28 Syntax error: Expecting '"'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:28 Syntax error: Expecting ','.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:28 Syntax error: Incorrect template entry: .
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Expecting '"'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Expecting ')'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Incorrect template entry: .
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794666426654.json
 
 FAILURE: Build failed with an exception.
 
@@ -271,5 +271,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 33s
+BUILD FAILED in 26s
 28 actionable tasks: 28 executed
