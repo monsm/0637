@@ -978,24 +978,97 @@ PY
 # Switch the shell to Chinese through the More drawer (B4 removed the top-bar
 # menu): More -> Language. The row shows the language it is IN, so only tap
 # it when the drawer is still English.
+#
+# Poll instead of one fixed dump: a Compose sheet animates in, and a single
+# read after 1 s caught it half-drawn. The old code then skipped the tap in
+# silence (`|| true`) and the Chinese assertion below failed on an app that
+# was never asked to switch. A missing row is now a failure that prints what
+# the drawer actually held.
 tap_text "More" > /dev/null 2>&1 || tap_text "更多" > /dev/null 2>&1 || true
-sleep 1
-rm -f language-ui.xml
-adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-adb exec-out cat /sdcard/ui.xml > language-ui.xml 2>/dev/null || true
-if python3 - <<'PY'
+LANGUAGE_FOUND=0
+for _ in $(seq 1 25); do
+  sleep 0.2
+  rm -f language-ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
+  adb exec-out cat /sdcard/ui.xml > language-ui.xml 2>/dev/null || true
+  [ -s language-ui.xml ] || continue
+  if python3 - <<'PY'
 import xml.etree.ElementTree as ET
 try:
     root = ET.parse('language-ui.xml').getroot()
 except Exception:
     raise SystemExit(1)
-texts = [node.get('text') or '' for node in root.iter('node')]
-raise SystemExit(0 if 'Language' in texts else 1)
+for node in root.iter('node'):
+    if 'Language' in ((node.get('text') or ''), (node.get('content-desc') or '')):
+        # A slide-in sheet reports its final bounds while still off-screen:
+        # tapping those coordinates is a no-op and the switch below silently
+        # never happens. Only trust a row that is actually on the display.
+        m = node.get('bounds', '')
+        if not m:
+            continue
+        parts = m.replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4 and int(parts[1]) >= 0 and int(parts[3]) > 0:
+            raise SystemExit(0)
+raise SystemExit(1)
 PY
-then
-  tap_text "Language" > /dev/null 2>&1 || true
+  then
+    LANGUAGE_FOUND=1
+    break
+  fi
+done
+if [ "$LANGUAGE_FOUND" -ne 1 ]; then
+  echo "::error::the More drawer never showed the Language row"
+  python3 - <<'PY' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('language-ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"cannot read the drawer dump: {exc}")
+print("drawer held:", [n.get('text') or n.get('content-desc') for n in root.iter('node')][:20])
+PY
+  exit 1
 fi
-sleep 1
+# The switch is a recomposition: wait for a Chinese control before pressing
+# BACK, so the first-screen assertion below cannot race the redraw. The tap
+# itself is retried: a sheet caught mid-slide taps nothing, and one silent
+# miss left the shell English for every check after it.
+TAP_OK=0
+for _ in $(seq 1 10); do
+  if tap_text "Language" > /dev/null 2>&1; then TAP_OK=1; break; fi
+  sleep 0.3
+done
+SWITCHED=0
+for _ in $(seq 1 25); do
+  sleep 0.2
+  rm -f language-ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
+  adb exec-out cat /sdcard/ui.xml > language-ui.xml 2>/dev/null || true
+  [ -s language-ui.xml ] || continue
+  if python3 - <<'PY'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('language-ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+joined = ' '.join(
+    (node.get('text') or '') + ' ' + (node.get('content-desc') or '')
+    for node in root.iter('node')
+)
+raise SystemExit(0 if any(w in joined for w in ('技能', '时间', '语言', '心情不错')) else 1)
+PY
+  then
+    SWITCHED=1
+    break
+  fi
+done
+if [ "$SWITCHED" -ne 1 ]; then
+  if [ "$TAP_OK" -ne 1 ]; then
+    echo "::error::the Language row was visible but never tappable"
+  else
+    echo "::error::the Language tap happened but no Chinese control appeared"
+  fi
+  exit 1
+fi
 adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
 sleep 1
 
