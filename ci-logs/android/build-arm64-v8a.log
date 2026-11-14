@@ -1,0 +1,349 @@
+[0/2] Re-checking globbed directories...
+[1/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/stat_r.c.o
+[2/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/global_r.c.o
+[3/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/geom2_r.c.o
+[4/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/libqhull_r.c.o
+[5/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/geom_r.c.o
+[6/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/poly2_r.c.o
+[7/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/qset_r.c.o
+[8/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/poly_r.c.o
+[9/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/mem_r.c.o
+[10/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/random_r.c.o
+[11/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/usermem_r.c.o
+[12/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/merge_r.c.o
+[13/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/userprintf_r.c.o
+[14/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/user_r.c.o
+[15/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/accessors_r.c.o
+[16/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/userprintf_rbox_r.c.o
+[17/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/rboxlib_r.c.o
+[18/110] Building C object _deps/qhull-build/CMakeFiles/qhullstatic_r.dir/src/libqhull_r/io_r.c.o
+[19/110] Building C object _deps/ccd-build/src/CMakeFiles/ccd.dir/ccd.c.o
+[20/110] Building C object _deps/ccd-build/src/CMakeFiles/ccd.dir/mpr.c.o
+[21/110] Building CXX object _deps/tinyxml2-build/CMakeFiles/tinyxml2.dir/tinyxml2.cpp.o
+[22/110] Building C object _deps/ccd-build/src/CMakeFiles/ccd.dir/polytope.c.o
+[23/110] Building C object _deps/ccd-build/src/CMakeFiles/ccd.dir/support.c.o
+[24/110] Building C object _deps/ccd-build/src/CMakeFiles/ccd.dir/vec3.c.o
+[25/110] Building C object _deps/miniz-build/CMakeFiles/miniz.dir/miniz.c.o
+In file included from /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.c:27:
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:502:31: warning: unused function 'deflateInit' [-Wunused-function]
+  502 |     static MZ_FORCEINLINE int deflateInit(mz_streamp pStream, int level)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:506:31: warning: unused function 'deflateInit2' [-Wunused-function]
+  506 |     static MZ_FORCEINLINE int deflateInit2(mz_streamp pStream, int level, int method, int window_bits, int mem_level, int strategy)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:510:31: warning: unused function 'deflateReset' [-Wunused-function]
+  510 |     static MZ_FORCEINLINE int deflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:514:31: warning: unused function 'deflate' [-Wunused-function]
+  514 |     static MZ_FORCEINLINE int deflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:518:31: warning: unused function 'deflateEnd' [-Wunused-function]
+  518 |     static MZ_FORCEINLINE int deflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:522:36: warning: unused function 'deflateBound' [-Wunused-function]
+  522 |     static MZ_FORCEINLINE mz_ulong deflateBound(mz_streamp pStream, mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:526:31: warning: unused function 'compress' [-Wunused-function]
+  526 |     static MZ_FORCEINLINE int compress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len)
+      |                               ^~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:530:31: warning: unused function 'compress2' [-Wunused-function]
+  530 |     static MZ_FORCEINLINE int compress2(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len, int level)
+      |                               ^~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:534:36: warning: unused function 'compressBound' [-Wunused-function]
+  534 |     static MZ_FORCEINLINE mz_ulong compressBound(mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:542:31: warning: unused function 'inflateInit' [-Wunused-function]
+  542 |     static MZ_FORCEINLINE int inflateInit(mz_streamp pStream)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:547:31: warning: unused function 'inflateInit2' [-Wunused-function]
+  547 |     static MZ_FORCEINLINE int inflateInit2(mz_streamp pStream, int window_bits)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:552:31: warning: unused function 'inflateReset' [-Wunused-function]
+  552 |     static MZ_FORCEINLINE int inflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:557:31: warning: unused function 'inflate' [-Wunused-function]
+  557 |     static MZ_FORCEINLINE int inflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:562:31: warning: unused function 'inflateEnd' [-Wunused-function]
+  562 |     static MZ_FORCEINLINE int inflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:567:31: warning: unused function 'uncompress' [-Wunused-function]
+  567 |     static MZ_FORCEINLINE int uncompress(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong source_len)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:572:31: warning: unused function 'uncompress2' [-Wunused-function]
+  572 |     static MZ_FORCEINLINE int uncompress2(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong* pSource_len)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:578:36: warning: unused function 'crc32' [-Wunused-function]
+  578 |     static MZ_FORCEINLINE mz_ulong crc32(mz_ulong crc, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:583:36: warning: unused function 'adler32' [-Wunused-function]
+  583 |     static MZ_FORCEINLINE mz_ulong adler32(mz_ulong adler, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:591:39: warning: unused function 'zError' [-Wunused-function]
+  591 |     static MZ_FORCEINLINE const char* zError(int err)
+      |                                       ^~~~~~
+19 warnings generated.
+[26/110] Building C object _deps/miniz-build/CMakeFiles/miniz.dir/miniz_tinfl.c.o
+In file included from /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz_tinfl.c:27:
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:502:31: warning: unused function 'deflateInit' [-Wunused-function]
+  502 |     static MZ_FORCEINLINE int deflateInit(mz_streamp pStream, int level)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:506:31: warning: unused function 'deflateInit2' [-Wunused-function]
+  506 |     static MZ_FORCEINLINE int deflateInit2(mz_streamp pStream, int level, int method, int window_bits, int mem_level, int strategy)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:510:31: warning: unused function 'deflateReset' [-Wunused-function]
+  510 |     static MZ_FORCEINLINE int deflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:514:31: warning: unused function 'deflate' [-Wunused-function]
+  514 |     static MZ_FORCEINLINE int deflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:518:31: warning: unused function 'deflateEnd' [-Wunused-function]
+  518 |     static MZ_FORCEINLINE int deflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:522:36: warning: unused function 'deflateBound' [-Wunused-function]
+  522 |     static MZ_FORCEINLINE mz_ulong deflateBound(mz_streamp pStream, mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:526:31: warning: unused function 'compress' [-Wunused-function]
+  526 |     static MZ_FORCEINLINE int compress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len)
+      |                               ^~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:530:31: warning: unused function 'compress2' [-Wunused-function]
+  530 |     static MZ_FORCEINLINE int compress2(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len, int level)
+      |                               ^~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:534:36: warning: unused function 'compressBound' [-Wunused-function]
+  534 |     static MZ_FORCEINLINE mz_ulong compressBound(mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:542:31: warning: unused function 'inflateInit' [-Wunused-function]
+  542 |     static MZ_FORCEINLINE int inflateInit(mz_streamp pStream)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:547:31: warning: unused function 'inflateInit2' [-Wunused-function]
+  547 |     static MZ_FORCEINLINE int inflateInit2(mz_streamp pStream, int window_bits)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:552:31: warning: unused function 'inflateReset' [-Wunused-function]
+  552 |     static MZ_FORCEINLINE int inflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:557:31: warning: unused function 'inflate' [-Wunused-function]
+  557 |     static MZ_FORCEINLINE int inflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:562:31: warning: unused function 'inflateEnd' [-Wunused-function]
+  562 |     static MZ_FORCEINLINE int inflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:567:31: warning: unused function 'uncompress' [-Wunused-function]
+  567 |     static MZ_FORCEINLINE int uncompress(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong source_len)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:572:31: warning: unused function 'uncompress2' [-Wunused-function]
+  572 |     static MZ_FORCEINLINE int uncompress2(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong* pSource_len)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:578:36: warning: unused function 'crc32' [-Wunused-function]
+  578 |     static MZ_FORCEINLINE mz_ulong crc32(mz_ulong crc, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:583:36: warning: unused function 'adler32' [-Wunused-function]
+  583 |     static MZ_FORCEINLINE mz_ulong adler32(mz_ulong adler, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:591:39: warning: unused function 'zError' [-Wunused-function]
+  591 |     static MZ_FORCEINLINE const char* zError(int err)
+      |                                       ^~~~~~
+19 warnings generated.
+[27/110] Building C object _deps/miniz-build/CMakeFiles/miniz.dir/miniz_zip.c.o
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz_zip.c:189:9: warning: Using fopen, ftello, fseeko, stat() etc. path for file I/O - this path may not support large files. [-W#pragma-messages]
+  189 | #pragma message("Using fopen, ftello, fseeko, stat() etc. path for file I/O - this path may not support large files.")
+      |         ^
+In file included from /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz_zip.c:27:
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:502:31: warning: unused function 'deflateInit' [-Wunused-function]
+  502 |     static MZ_FORCEINLINE int deflateInit(mz_streamp pStream, int level)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:506:31: warning: unused function 'deflateInit2' [-Wunused-function]
+  506 |     static MZ_FORCEINLINE int deflateInit2(mz_streamp pStream, int level, int method, int window_bits, int mem_level, int strategy)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:510:31: warning: unused function 'deflateReset' [-Wunused-function]
+  510 |     static MZ_FORCEINLINE int deflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:514:31: warning: unused function 'deflate' [-Wunused-function]
+  514 |     static MZ_FORCEINLINE int deflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:518:31: warning: unused function 'deflateEnd' [-Wunused-function]
+  518 |     static MZ_FORCEINLINE int deflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:522:36: warning: unused function 'deflateBound' [-Wunused-function]
+  522 |     static MZ_FORCEINLINE mz_ulong deflateBound(mz_streamp pStream, mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:526:31: warning: unused function 'compress' [-Wunused-function]
+  526 |     static MZ_FORCEINLINE int compress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len)
+      |                               ^~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:530:31: warning: unused function 'compress2' [-Wunused-function]
+  530 |     static MZ_FORCEINLINE int compress2(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len, int level)
+      |                               ^~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:534:36: warning: unused function 'compressBound' [-Wunused-function]
+  534 |     static MZ_FORCEINLINE mz_ulong compressBound(mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:542:31: warning: unused function 'inflateInit' [-Wunused-function]
+  542 |     static MZ_FORCEINLINE int inflateInit(mz_streamp pStream)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:547:31: warning: unused function 'inflateInit2' [-Wunused-function]
+  547 |     static MZ_FORCEINLINE int inflateInit2(mz_streamp pStream, int window_bits)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:552:31: warning: unused function 'inflateReset' [-Wunused-function]
+  552 |     static MZ_FORCEINLINE int inflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:557:31: warning: unused function 'inflate' [-Wunused-function]
+  557 |     static MZ_FORCEINLINE int inflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:562:31: warning: unused function 'inflateEnd' [-Wunused-function]
+  562 |     static MZ_FORCEINLINE int inflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:567:31: warning: unused function 'uncompress' [-Wunused-function]
+  567 |     static MZ_FORCEINLINE int uncompress(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong source_len)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:572:31: warning: unused function 'uncompress2' [-Wunused-function]
+  572 |     static MZ_FORCEINLINE int uncompress2(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong* pSource_len)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:578:36: warning: unused function 'crc32' [-Wunused-function]
+  578 |     static MZ_FORCEINLINE mz_ulong crc32(mz_ulong crc, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:583:36: warning: unused function 'adler32' [-Wunused-function]
+  583 |     static MZ_FORCEINLINE mz_ulong adler32(mz_ulong adler, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:591:39: warning: unused function 'zError' [-Wunused-function]
+  591 |     static MZ_FORCEINLINE const char* zError(int err)
+      |                                       ^~~~~~
+20 warnings generated.
+[28/110] Building C object _deps/miniz-build/CMakeFiles/miniz.dir/miniz_tdef.c.o
+In file included from /home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz_tdef.c:27:
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:502:31: warning: unused function 'deflateInit' [-Wunused-function]
+  502 |     static MZ_FORCEINLINE int deflateInit(mz_streamp pStream, int level)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:506:31: warning: unused function 'deflateInit2' [-Wunused-function]
+  506 |     static MZ_FORCEINLINE int deflateInit2(mz_streamp pStream, int level, int method, int window_bits, int mem_level, int strategy)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:510:31: warning: unused function 'deflateReset' [-Wunused-function]
+  510 |     static MZ_FORCEINLINE int deflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:514:31: warning: unused function 'deflate' [-Wunused-function]
+  514 |     static MZ_FORCEINLINE int deflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:518:31: warning: unused function 'deflateEnd' [-Wunused-function]
+  518 |     static MZ_FORCEINLINE int deflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:522:36: warning: unused function 'deflateBound' [-Wunused-function]
+  522 |     static MZ_FORCEINLINE mz_ulong deflateBound(mz_streamp pStream, mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:526:31: warning: unused function 'compress' [-Wunused-function]
+  526 |     static MZ_FORCEINLINE int compress(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len)
+      |                               ^~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:530:31: warning: unused function 'compress2' [-Wunused-function]
+  530 |     static MZ_FORCEINLINE int compress2(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char *pSource, mz_ulong source_len, int level)
+      |                               ^~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:534:36: warning: unused function 'compressBound' [-Wunused-function]
+  534 |     static MZ_FORCEINLINE mz_ulong compressBound(mz_ulong source_len)
+      |                                    ^~~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:542:31: warning: unused function 'inflateInit' [-Wunused-function]
+  542 |     static MZ_FORCEINLINE int inflateInit(mz_streamp pStream)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:547:31: warning: unused function 'inflateInit2' [-Wunused-function]
+  547 |     static MZ_FORCEINLINE int inflateInit2(mz_streamp pStream, int window_bits)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:552:31: warning: unused function 'inflateReset' [-Wunused-function]
+  552 |     static MZ_FORCEINLINE int inflateReset(mz_streamp pStream)
+      |                               ^~~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:557:31: warning: unused function 'inflate' [-Wunused-function]
+  557 |     static MZ_FORCEINLINE int inflate(mz_streamp pStream, int flush)
+      |                               ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:562:31: warning: unused function 'inflateEnd' [-Wunused-function]
+  562 |     static MZ_FORCEINLINE int inflateEnd(mz_streamp pStream)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:567:31: warning: unused function 'uncompress' [-Wunused-function]
+  567 |     static MZ_FORCEINLINE int uncompress(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong source_len)
+      |                               ^~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:572:31: warning: unused function 'uncompress2' [-Wunused-function]
+  572 |     static MZ_FORCEINLINE int uncompress2(unsigned char* pDest, mz_ulong* pDest_len, const unsigned char* pSource, mz_ulong* pSource_len)
+      |                               ^~~~~~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:578:36: warning: unused function 'crc32' [-Wunused-function]
+  578 |     static MZ_FORCEINLINE mz_ulong crc32(mz_ulong crc, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:583:36: warning: unused function 'adler32' [-Wunused-function]
+  583 |     static MZ_FORCEINLINE mz_ulong adler32(mz_ulong adler, const unsigned char *ptr, size_t buf_len)
+      |                                    ^~~~~~~
+/home/runner/work/0637/0637/android/third_party/mujoco/build-arm64-v8a/_deps/miniz-src/miniz.h:591:39: warning: unused function 'zError' [-Wunused-function]
+  591 |     static MZ_FORCEINLINE const char* zError(int err)
+      |                                       ^~~~~~
+19 warnings generated.
+[29/110] Building CXX object CMakeFiles/mujoco.dir/plugin/stl_decoder/stl_decoder.cc.o
+[30/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_callback.c.o
+[31/110] Building CXX object CMakeFiles/lodepng.dir/_deps/lodepng-src/lodepng.cpp.o
+[32/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_box.c.o
+[33/110] Linking CXX static library lib/liblodepng.a
+[34/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_convex.c.o
+[35/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_driver.c.o
+[36/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_gjk.c.o
+[37/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_primitive.c.o
+[38/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_collision_sdf.c.o
+[39/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_util.c.o
+[40/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_constraint.c.o
+[41/110] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_crossplatform.cc.o
+[42/110] Building CXX object _deps/tinyobjloader-build/CMakeFiles/tinyobjloader.dir/tiny_obj_loader.cc.o
+[43/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_core_smooth.c.o
+[44/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_derivative_fd.c.o
+[45/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_derivative.c.o
+[46/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_inverse.c.o
+[47/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_init.c.o
+[48/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_island.c.o
+[49/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_forward.c.o
+[50/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_memory.c.o
+[51/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_name.c.o
+[52/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_passive.c.o
+[53/110] Building CXX object CMakeFiles/mujoco.dir/plugin/obj_decoder/obj_decoder.cc.o
+[54/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_ray.c.o
+[55/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_print.c.o
+[56/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_sensor.c.o
+[57/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_sleep.c.o
+[58/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_setconst.c.o
+[59/110] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_plugin.cc.o
+[60/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_support.c.o
+[61/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_solver.c.o
+[62/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_blas.c.o
+[63/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_errmem.c.o
+[64/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_solve.c.o
+[65/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_misc.c.o
+[66/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_spatial.c.o
+[67/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_init.c.o
+[68/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_util_sparse.c.o
+[69/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_interact.c.o
+[70/110] Building CXX object CMakeFiles/mujoco.dir/src/engine/engine_thread.cc.o
+[71/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_vis_visualize.c.o
+[72/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_cache.cc.o
+[73/110] Building C object CMakeFiles/mujoco.dir/src/engine/engine_io.c.o
+[74/110] Building C object CMakeFiles/mujoco.dir/src/user/user_init.c.o
+[75/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_api.cc.o
+[76/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_composite.cc.o
+[77/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_flexcomp.cc.o
+[78/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_resolver.cc.o
+[79/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_resource.cc.o
+[80/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_mesh.cc.o
+[81/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_threadpool.cc.o
+[82/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_util.cc.o
+[83/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_vfs.cc.o
+[84/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_objects.cc.o
+[85/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_api.cc.o
+[86/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_base.cc.o
+[87/110] Building CXX object CMakeFiles/mujoco.dir/src/user/user_model.cc.o
+[88/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_numeric_format.cc.o
+[89/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_global.cc.o
+[90/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml.cc.o
+[91/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_urdf.cc.o
+[92/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_native_reader.cc.o
+[93/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_native_writer.cc.o
+[94/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/mjz/mjz_decoder.cc.o
+[95/110] Building C object CMakeFiles/mujoco.dir/src/render/classic/glad/glad.c.o
+[96/110] Building CXX object CMakeFiles/mujoco.dir/src/render/classic/glad/loader.cc.o
+[97/110] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_gl2.c.o
+[98/110] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_gl3.c.o
+[99/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/xml_util.cc.o
+[100/110] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_util.c.o
+[101/110] Linking C static library lib/libqhullstatic_r.a
+[102/110] Linking CXX static library lib/libtinyxml2.a
+[103/110] Linking CXX static library lib/libtinyobjloader.a
+[104/110] Linking C static library lib/libccd.a
+[105/110] Linking C static library lib/libminiz.a
+[106/110] Building C object CMakeFiles/mujoco.dir/src/render/classic/render_context.c.o
+[107/110] Building C object CMakeFiles/mujoco.dir/src/ui/ui_main.c.o
+[108/110] Building CXX object CMakeFiles/mujoco.dir/src/xml/mjz/mjz_encoder.cc.o
+[109/110] Linking CXX static library lib/libmujoco.a
