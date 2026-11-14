@@ -85,9 +85,14 @@ impl Shared {
         };
         if let Some(previous) = self.seq {
             let ahead = frame.seq.wrapping_sub(previous);
-            // A restarted sender starts anywhere: a big jump is a NEW pad,
-            // not a stale frame. Only a small backwards step is stale.
-            if ahead > u32::MAX / 2 && ahead < 1000 {
+            // A restarted sender starts anywhere: a big jump (forward or a
+            // far backwards wrap) is a NEW pad, not a stale frame. Only a
+            // SMALL backwards step — the last few frames arriving out of
+            // order on the network — is stale. `ahead` measures the forward
+            // distance, so "backwards by less than 1000" is
+            // `ahead > 2^32 - 1000`; the written form can never be true
+            // (no number is both > 2^31 and < 1000) and dropped nothing.
+            if ahead > u32::MAX - 1000 {
                 self.drops += 1;
                 return;
             }
