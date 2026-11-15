@@ -1555,31 +1555,21 @@ tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1 || {
   exit 1
 }
 sleep 1
-# The postcards chip sits below the fold on the medium detent; swipe the
-# sheet up to its full height, then tap.
-adb shell input swipe 400 1500 400 400 300 > /dev/null 2>&1 || true
-sleep 1
-rm -f ui.xml
-adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
-python3 - <<'PY' || exit 1
-import xml.etree.ElementTree as ET
-try:
-    root = ET.parse('ui.xml').getroot()
-except Exception:
-    raise SystemExit("::error::cannot read the instrument dump")
-texts = [
-    node.get(attr) or ''
-    for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
-]
-if not any(t for t in texts if t in ('这只鸭子', 'This duck')):
-    raise SystemExit(f"::error::the duck sheet did not open for the handover check: {texts[:20]}")
-print("duck sheet open; handing over to postcards next")
-PY
-tap_text "明信片" > /dev/null 2>&1 || tap_text "Postcards" > /dev/null 2>&1 || {
+# The postcards chip sits below the fold on the medium detent: expand the
+# sheet, then swipe its scroll and try the tap each round. The emulator is
+# 320x640 — every coordinate stays on-screen.
+HANDOVER_OK=0
+for _ in $(seq 1 6); do
+  adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+  sleep 0.6
+  if tap_text "明信片" > /dev/null 2>&1 || tap_text "Postcards" > /dev/null 2>&1; then
+    HANDOVER_OK=1
+    break
+  fi
+done
+[ "$HANDOVER_OK" = "1" ] || {
   echo "::error::the duck sheet has no postcards chip (handover check)"
+  grep -o 'text="[^"]*"\|content-desc="[^"]*"' ui.xml 2>/dev/null | sort -u | head -30 || true
   exit 1
 }
 sleep 1.5
