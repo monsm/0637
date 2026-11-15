@@ -347,6 +347,82 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// The DKPD sender's UI: with a fixture peer, the paired-peer gift rows
+    /// and the pad-send chip must actually be on the sheet — the chip used
+    /// to be built inside the gift-emotion action closure and never entered
+    /// the tree (FE-1). Tapping gift-emotion must survive (the core refuses
+    /// a gift to a fixture id, which is honest), and tapping pad-send must
+    /// flip the chip into its driving label.
+    func testPairedPeerRowsRenderAndRespond() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        app.terminate()
+        app.launchArguments += ["-duck.peerFixture", "YES"]
+        app.launch()
+        openMore()
+        let peersButton = app.buttons["more-peers"]
+        XCTAssertTrue(peersButton.waitForExistence(timeout: 10), "the drawer has no Neighbours row")
+        peersButton.tap()
+        XCTAssertTrue(
+            app.staticTexts["peers-title"].waitForExistence(timeout: 10),
+            "the neighbours sheet did not open"
+        )
+        let treat = app.buttons["gift-treat-fixture"]
+        XCTAssertTrue(treat.waitForExistence(timeout: 10), "the fixture peer's gift-treat row is missing")
+        XCTAssertTrue(app.buttons["gift-emotion-fixture"].exists, "the gift-emotion chip is missing")
+        let padSend = app.buttons["pad-send-fixture"]
+        XCTAssertTrue(padSend.waitForExistence(timeout: 10), "the pad-send chip never rendered (FE-1)")
+        treat.tap()
+        XCTAssertTrue(
+            app.staticTexts["peers-title"].waitForExistence(timeout: 5),
+            "tapping a gift took the sheet down"
+        )
+        padSend.tap()
+        XCTAssertEqual(
+            app.buttons["pad-send-fixture"].label, "Driving",
+            "tapping pad-send did not start the pad"
+        )
+        app.buttons["peers-close"].tap()
+        closeMore()
+    }
+
+    /// The day rows the core publishes (per-day metres/powered/rolls) must
+    /// reach the duck sheet — the data loaded since batch six but no view
+    /// consumed it (FE-3). The fixture pins two synthetic rows; the view
+    /// shows them verbatim and never invents numbers.
+    func testDayRowsShowInTheDuckSheet() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        app.terminate()
+        app.launchArguments += ["-duck.dayFixture", "YES"]
+        app.launch()
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared on the relaunch"
+        )
+        let timeButton = app.buttons["duck-time"]
+        XCTAssertTrue(timeButton.waitForExistence(timeout: 10), "the time rail has no Time button")
+        timeButton.tap()
+        XCTAssertTrue(
+            app.staticTexts["sheet-title"].waitForExistence(timeout: 10),
+            "the duck sheet did not open"
+        )
+        let rows = app.staticTexts["day-rows"]
+        // The life card sits below the medium detent's fold; existence alone
+        // would pass on an unreachable element, so scroll it into view.
+        bringIntoView(rows, scroll: app.scrollViews.firstMatch)
+        XCTAssertTrue(rows.waitForExistence(timeout: 10), "the day rows never reached the duck sheet (FE-3)")
+        XCTAssertTrue(
+            rows.label.contains("2026-11-15"),
+            "the day rows lost the newest day: \(rows.label)"
+        )
+        app.buttons["sheet-close"].tap()
+    }
+
     /// The Path Painter: the mode opens from the More drawer, and with
     /// nothing drawn Go must exist but wait for a route with two real steps.
     func testPathModeOpensWithGoWaiting() throws {

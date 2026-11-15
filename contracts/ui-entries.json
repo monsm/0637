@@ -319,10 +319,13 @@
       "id": "netpad-tx",
       "zh": "网控手柄（发送端）",
       "conform_b4": "extension",
-      "note": "七批 #11 发送端；iOS pad-send chip 嵌在 gift-emotion action 闭包内从未渲染（FE-1，B3 批修复），代码在、UI 不可达",
+      "note": "七批 #11 发送端；B3 修了 FE-1（chip 曾嵌在 gift-emotion action 闭包内永不渲染）；UI 测试经 -duck.peerFixture 验证可达",
       "ios": {
-        "implemented": false,
-        "note": "UI 不可达：PeersSheet.swift:103-115 闭包死链，台账 #11『发送端 iOS ⏳』属实"
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/PeersSheet.swift",
+          "pad-send-"
+        ]
       },
       "android": {
         "implemented": true,
@@ -429,10 +432,13 @@
       "id": "day-rows",
       "zh": "日子行",
       "conform_b4": "extension",
-      "note": "七批 #25；iOS 数据已加载但无视图消费（FE-3，渲染缺失——修渲染，不统一数据链）；Android 仪表内渲染",
+      "note": "七批 #25；B3 修了 iOS 渲染缺失（InstrumentSheet 生命卡，最近 7 天）；Android 仪表内渲染（violation 停放）",
       "ios": {
-        "implemented": false,
-        "note": "vetbookDays 无视图消费（DuckController.swift:1473,2217 仅声明与赋值）"
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/InstrumentSheet.swift",
+          "day-rows"
+        ]
       },
       "android": {
         "implemented": true,

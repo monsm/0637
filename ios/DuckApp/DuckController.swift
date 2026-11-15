@@ -204,6 +204,16 @@ final class DuckController: ObservableObject {
         let addr: String
     }
     @Published var peers: [PeerInfo] = []
+    /// The UI tests' fixture: `-duck.peerFixture YES` pins one paired
+    /// neighbour so the peers sheet's paired-peer rows render on a machine
+    /// with no LAN duck. Presentation only — the address is TEST-NET, the
+    /// pad dials nothing that exists, and no gift is ever recorded.
+    private let peerFixture =
+        UserDefaults.standard.string(forKey: "duck.peerFixture") == "YES"
+    /// Same family, for the day rows: `-duck.dayFixture YES` pins two sample
+    /// rows so the sheet's view is testable without a recorded history.
+    private let dayFixture =
+        UserDefaults.standard.string(forKey: "duck.dayFixture") == "YES"
     /// The official UDP pad's gate, read back from /state.pad — the core is
     /// the authority, not the switch the finger just flipped.
     @Published var netPadOn = false
@@ -2138,7 +2148,12 @@ final class DuckController: ObservableObject {
                     if let peers = json["peers"] as? [String: Any] {
                         self.peerName = peers["name"] as? String ?? self.peerName
                         let list = peers["peers"] as? [[String: Any]] ?? []
-                        self.peers = list.compactMap { item in
+                        self.peers = peerFixture
+                            ? [PeerInfo(
+                                id: "fixture", name: "Sunny", replied: false,
+                                paired: true, addr: "192.0.2.10:8765"
+                            )]
+                            : list.compactMap { item in
                             guard let id = item["id"] as? String,
                                   let name = item["name"] as? String
                             else { return nil }
@@ -2224,6 +2239,15 @@ final class DuckController: ObservableObject {
                                     day, metres, Int(powered), rolls
                                 )
                             }
+                        }
+                        if dayFixture {
+                            // Same shape the core publishes; two synthetic
+                            // rows only for the view test, never shown without
+                            // the launch argument.
+                            self.vetbookDays = [
+                                "2026-11-14: 6.0m · 120s · 2 rolls",
+                                "2026-11-15: 3.5m · 60s · 1 roll",
+                            ]
                         }
                         self.vetbookRolls = skills["roulade"] as? Int ?? 0
                         self.vetbookPickups = life["pickups"] as? Int ?? 0

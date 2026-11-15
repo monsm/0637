@@ -101,6 +101,8 @@ struct PeersSheet: View {
                                 controller.giftPeer(peer.id, gift: "treat", value: "")
                             }
                             chip(Copy.giftEmotion, id: "gift-emotion-\(peer.id)") {
+                                controller.giftPeer(peer.id, gift: "emotion", value: "excited")
+                            }
                             // This phone as the official pad, aimed at THIS
                             // paired neighbour. One tap dials, one stops.
                             if peer.paired && !peer.addr.isEmpty {
@@ -110,8 +112,6 @@ struct PeersSheet: View {
                                 ) {
                                     controller.togglePad(peer: peer)
                                 }
-                            }
-                                controller.giftPeer(peer.id, gift: "emotion", value: "excited")
                             }
                         }
                     }

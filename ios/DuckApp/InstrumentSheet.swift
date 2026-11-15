@@ -145,6 +145,16 @@ struct InstrumentSheet: View {
                 lifeStat("\(controller.vetbookRolls)", Copy.rolls)
                 lifeStat("\(controller.vetbookPickups)", Copy.pickups)
             }
+            // The per-day rows the core already publishes, newest last — the
+            // same last seven the Android shell shows. The data was loading
+            // since batch six; this is the view that was missing (FE-3).
+            if !controller.vetbookDays.isEmpty {
+                Text(controller.vetbookDays.suffix(7).joined(separator: " | "))
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .accessibilityIdentifier("day-rows")
+            }
             Button {
                 shareURL = controller.vetbookFile()
             } label: {
