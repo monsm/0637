@@ -147,6 +147,14 @@ jobs:
         # values differ by language.
         run: python3 scripts/check-copy-keys.py .
 
+      - name: UI contracts (B1)
+        # Same static gate the Contracts workflow runs; here so a UI push
+        # fails on its own run instead of waiting for the contracts job.
+        run: |
+          python3 scripts/check-copy-values.py .
+          python3 scripts/check-ui-baseline.py .
+          python3 scripts/check-ui-entries.py .
+
       - name: Pre-boot simulator in the background
         id: preboot
         run: |

@@ -1,0 +1,55 @@
+name: Contracts
+
+# The UI contract gate (docs/UIUX_REFACTOR_2026-11-15.md, batch B1): static
+# checks that hold both shells to what the team decided. This workflow
+# exists because ios.yml/android.yml only watch their own platform trees —
+# a scripts/ or contracts/ change would never run a single check without
+# this one. The app workflows run the same checks on their own pushes.
+#
+# Current checks:
+#   check-copy-keys.py      — key SETS match (B4 §6.4, pre-existing)
+#   check-copy-values.py    — key VALUES match beyond declared exceptions
+#   check-ui-baseline.py    — debt ratchet (fonts/colors/modals/god files),
+#                             baseline computed from code, only shrinks
+#   check-ui-entries.py     — feature ledger anchors (46 features, both
+#                             platforms) — entries cannot silently vanish
+#   check-protected-paths.py — WARNING-LEVEL: names fidelity-carrying files
+#                             a push touched, for human review
+
+on:
+  push:
+    paths:
+      - "scripts/**"
+      - "contracts/**"
+      - "docs/**"
+      - "ios/**"
+      - "android/**"
+      - ".github/workflows/contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Copy key sets agree
+        run: python3 scripts/check-copy-keys.py .
+      - name: Copy values agree
+        run: python3 scripts/check-copy-values.py .
+      - name: UI debt ratchet
+        run: python3 scripts/check-ui-baseline.py .
+      - name: UI entry ledger
+        run: python3 scripts/check-ui-entries.py .
+      - name: Protected paths (warning)
+        if: github.event_name == 'push'
+        run: python3 scripts/check-protected-paths.py . ${{ github.event.before }}
