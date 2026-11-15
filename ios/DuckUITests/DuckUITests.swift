@@ -60,6 +60,12 @@ final class DuckUITests: XCTestCase {
         return last
     }
 
+    /// Any element carrying the identifier, whatever element TYPE SwiftUI
+    /// gave it - plain-styled buttons have surfaced as "other" elements.
+    private func anyElement(_ id: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: id).firstMatch
+    }
+
     /// Open the More drawer: one tap from the stage (B4 §2).
     private func openMore() {
         let more = app.buttons["duck-more"]
@@ -382,10 +388,14 @@ final class DuckUITests: XCTestCase {
             app.staticTexts["peers-empty"].exists,
             "the sheet still shows the empty state with a fixture peer"
         )
-        let treat = app.buttons["gift-treat-fixture"]
+        // The chips live inside a sheet-presented ForEach row; XCUITest's
+        // element TYPE for a plain-styled button has drifted before, so
+        // query any element carrying the identifier rather than betting on
+        // one type - the tree itself was already proven above.
+        let treat = anyElement("gift-treat-fixture")
         XCTAssertTrue(treat.waitForExistence(timeout: 10), "the fixture peer's gift-treat row is missing")
-        XCTAssertTrue(app.buttons["gift-emotion-fixture"].exists, "the gift-emotion chip is missing")
-        let padSend = app.buttons["pad-send-fixture"]
+        XCTAssertTrue(anyElement("gift-emotion-fixture").exists, "the gift-emotion chip is missing")
+        let padSend = anyElement("pad-send-fixture")
         XCTAssertTrue(padSend.waitForExistence(timeout: 10), "the pad-send chip never rendered (FE-1)")
         treat.tap()
         XCTAssertTrue(
@@ -394,7 +404,7 @@ final class DuckUITests: XCTestCase {
         )
         padSend.tap()
         XCTAssertEqual(
-            app.buttons["pad-send-fixture"].label, "Driving",
+            padSend.label, "Driving",
             "tapping pad-send did not start the pad"
         )
         app.buttons["peers-close"].tap()
