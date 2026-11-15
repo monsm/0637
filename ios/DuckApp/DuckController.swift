@@ -896,11 +896,32 @@ final class DuckController: ObservableObject {
         // with the tummy it went to sleep with. `simctl terminate` sends no
         // scenePhase change, so the cadence has to be frequent enough too.
         if let care = latestCare, companionRestored {
-            var payload: [String: Any] = ["care": care]
-            if let life = latestLife { payload["life"] = life }
+            var payload: [String: Any] = ["care": Self.plistSafe(care)]
+            if let life = latestLife { payload["life"] = Self.plistSafe(life) }
             UserDefaults.standard.set(payload, forKey: "duck_companion_v1")
         }
         saveCompanionNow()
+    }
+
+    /// UserDefaults is a property list: one NSNull anywhere in a saved
+    /// dictionary is an exception at write time, and the core publishes
+    /// optional fields as JSON null. Strip them before anything lands in
+    /// the shell's own store; a missing key reads as its default, which is
+    /// exactly what "no allowance yet" means.
+    static func plistSafe(_ value: Any) -> Any {
+        switch value {
+        case let dictionary as [String: Any]:
+            var safe: [String: Any] = [:]
+            for (key, inner) in dictionary {
+                if inner is NSNull { continue }
+                safe[key] = Self.plistSafe(inner)
+            }
+            return safe
+        case let array as [Any]:
+            return array.map { Self.plistSafe($0) }
+        default:
+            return value
+        }
     }
 
     /// One JSON body to one of the core's POST routes. Fire-and-forget: the
@@ -928,8 +949,8 @@ final class DuckController: ObservableObject {
         // race the restore and persist a fresh duck over the real one.
         guard companionRestored else { return }
         guard Date().timeIntervalSince(lastCompanionSave) >= 4 else { return }
-        var payload: [String: Any] = ["care": care]
-        if let life { payload["life"] = life }
+        var payload: [String: Any] = ["care": Self.plistSafe(care)]
+        if let life { payload["life"] = Self.plistSafe(life) }
         UserDefaults.standard.set(payload, forKey: "duck_companion_v1")
         lastCompanionSave = Date()
     }
@@ -946,8 +967,8 @@ final class DuckController: ObservableObject {
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let care = json["care"] as? [String: Any]
             else { return }
-            var payload: [String: Any] = ["care": care]
-            if let life = json["life"] as? [String: Any] { payload["life"] = life }
+            var payload: [String: Any] = ["care": Self.plistSafe(care)]
+            if let life = json["life"] as? [String: Any] { payload["life"] = Self.plistSafe(life) }
             UserDefaults.standard.set(payload, forKey: "duck_companion_v1")
         }.resume()
     }

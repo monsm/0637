@@ -235,7 +235,12 @@ impl Care {
             "heart_bpm": (self.heart_bpm() * 10.0).round() / 10.0,
             // The parent's allowance, as the duck keeps it. `used_s` is
             // filled in by the runtime, which owns `powered_s`.
-            "budget_s": self.budget_s,
+            // Omitted when unset: a null would ride the shell's save
+            // straight into a property-list exception on iOS.
+            "budget_s": match self.budget_s {
+                Some(seconds) => serde_json::json!(seconds),
+                None => serde_json::Value::Null,
+            },
             "last_touch": self.last_touch,
             // The night travels with the three numbers: the shells save this
             // object wholesale and hand it back, and the quiet span is always
