@@ -215,7 +215,7 @@ final class DuckController: ObservableObject {
         UserDefaults.standard.string(forKey: "duck.dayFixture") == "YES"
     /// The fixture peer exists from the first frame — the state parse keeps
     /// it pinned every tick, but the sheet must not race the first poll.
-    @Published var peers: [PeerInfo] = Self.peerFixtureOn
+    @Published var peers: [PeerInfo] = DuckController.peerFixtureOn
         ? [PeerInfo(id: "fixture", name: "Sunny", replied: false, paired: true, addr: "192.0.2.10:8765")]
         : []
     /// The official UDP pad's gate, read back from /state.pad — the core is
