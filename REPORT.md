@@ -582,6 +582,22 @@ iOS 真机 IPA 仍等签名凭据，Android arm64 真机仍没跑，真实双手
 | 第三轮 QA 的未关项 | 15 条里关了 8 条（核心门禁、礼物与夜、摔倒数、合唱形状、API 鉴权、规则导入的三条：空值判定三端统一、核心拒绝的导入不再落盘/不再报成功、Android 不再拿空表合并、规则恢复失败不再连坐 care/life）。**仍排着**：peer id 只有 32 位且 pid 被掩掉、合唱 id 只含 tick、日记没有「今天」（核心掉线会说「今天什么都没发生」）、模型输出零校验、Android 没接手机 IMU。逐条见 [docs/QA_ROUND3.md](docs/QA_ROUND3.md) |
 | 界面的账 | 设计审计（[docs/UI_AUDIT_2026-11-12.md](docs/UI_AUDIT_2026-11-12.md)）指出 Live 页面还露着引擎（状态串、原始技能名、tick 计数）、没有令牌层（9 个强调色/12 种字号/8 种圆角散在各处）、iOS 全部固定字号（171 处，Dynamic Type 完全无效）、手势没有无障碍等价物。方案在 [docs/UI_TOKENS.md](docs/UI_TOKENS.md) 与 [docs/STAGE_LOOK.md](docs/STAGE_LOOK.md)。**2026-11-13 进展**：B1 止血（状态人话、技能名翻译、首屏零 tick/百分比、失败卡与重试、编舞对比度）与 B3 舞台（暖石地面、渐变墙、光晕、接触阴影、Instrument 冷棋盘）已双端验收签字；B4 可发现性（入口预算、两端动词统一、同物异名）待规格。见 [docs/UI_REVIEW_2026-11-13.md](docs/UI_REVIEW_2026-11-13.md) |
 
+## 四之十八、UI/UX 重构整合会与契约门禁 B1（2026-11-15）
+
+会议全程见 [docs/UIUX_REFACTOR_2026-11-15.md](docs/UIUX_REFACTOR_2026-11-15.md)：七路读码单（39 条发现带 文件:行号）→ 四人 12 条方向 → 四镜头对抗（10 条纠错全组认账）→ 主轴拍板 **护栏契约(B1) → 双端止血(B2-B5) → DuckTheme 色批(B6) → 单路由合一(B7) → IntentClient 抽取(B8)**；IA 4×4 重排搁置待拍板（16 行预算 vs 46 功能台账、§5 无权威、三套互斥分组）。
+
+**B1 已交付（`234dd27`，Contracts/Core/iOS/Android 四工作流全绿）**——零 UI、先立规矩：
+
+| 门禁 | 守什么 |
+|---|---|
+| `scripts/check-copy-values.py` | 两端 Copy **值**一致：占位符按出现顺序归一（`%d`↔`$x`↔`\(...)`）、嵌套引号可解析；`roomLampNote/netPad/rewindPlay` 平台事实与 7 处待修值进 `contracts/copy-exceptions.json`（只缩不扩）；摘掉豁免实测能拦「叫醒 vs 唤醒」漂移 |
+| `scripts/check-ui-baseline.py` | 17 项债务棘轮（固定字号 193/143、深色硬写 16、按压零反馈 13、模态布尔 14、Shell.kt 4078 行……），基线在 `2458dec` 由脚本现算入库，只降不升 |
+| `scripts/check-ui-entries.py` + `contracts/ui-entries.json` | 46 功能台账、84 个源码锚点——入口不许悄悄消失；not-implemented 必须写明（地面高度/轨迹导出按 22+2 起账标 no-ui） |
+| `scripts/check-protected-paths.py` | **警告级**：push 触碰 61 维/物理/安全承载文件（sensors/mujoco/runtime/control/bam/pickup/upstream/policies）时列出供人工复核，刻意不拦正当核心修复 |
+| `contracts.yml`（新） | 补触发盲区：ios.yml/android.yml 不监听 scripts/contracts/docs，纯契约改动从此有独立快速工作流；两 App 工作流亦内联同组检查 |
+
+读码单揭出并已入台账的三个实 bug（B2/B3/B4 批修）：iOS pad-send chip 嵌在 gift-emotion action 闭包内从未渲染（FE-1）；first_gift 因 `record(.peer)` 零调用永不解锁（FE-2，只能挂 `gift_event` 成功分支，点击处记账=编造）；Android ensemble 无邻居时整个消失（IA-4）。
+
 ---
 
 ## 八、仓库与复现
