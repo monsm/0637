@@ -3572,7 +3572,9 @@ private fun InstrumentSheet(
                         exportBackup(context)
                     }
                     Spacer(Modifier.size(8.dp))
-                    ButtonChip(Copy.backupImport, "backup-import") { backupPicker = true }
+                    ButtonChip(Copy.backupImport, "backup-import") {
+                        backupPicker.launch(arrayOf("application/json", "text/plain"))
+                    }
                 }
             }
             // The parent's daily allowance: one chip cycles off -> 15 -> 30
@@ -3628,7 +3630,6 @@ private fun InstrumentSheet(
                 // Push & compare: checkpoint, fork, and push branch B -
                 // the split the rewind machine already keeps, one tap.
                 ButtonChip(Copy.pushCompare, "push-compare") {
-                    core.checkpoint()
                     core.fork()
                     postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
                     Toast.makeText(context, Copy.pushCompareDone, Toast.LENGTH_SHORT).show()
@@ -4049,8 +4050,7 @@ private fun fetchTofStrip(): String {
                 }
             }
         }
-        rows.joinToString("
-")
+        rows.joinToString(" / ")
     } catch (_: Throwable) {
         "—"
     }

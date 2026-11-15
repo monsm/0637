@@ -40,7 +40,7 @@ internal object Icons {
      *  faces the shell uses elsewhere. */
     val big: ImageVector = MaterialIcons.Outlined.MoreHoriz
     val pet: ImageVector = MaterialIcons.Outlined.PanTool
-    val sit: ImageVector = MaterialIcons.Outlined.EventSeat
+    val sit: ImageVector = MaterialIcons.Outlined.Height
     val skills: ImageVector = MaterialIcons.Outlined.AutoAwesome
     val quack: ImageVector = MaterialIcons.Outlined.GraphicEq
     val grab: ImageVector = MaterialIcons.Outlined.PanTool
