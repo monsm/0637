@@ -213,16 +213,22 @@ final class Renderer: NSObject, MTKViewDelegate {
             // The visible lower beak is the geom whose MESH is `jaw` — the
             // `jaw_soft` mesh is the servo rack inside the head, and the
             // `jaw` geom shares its body with the upper beak, the eyes and
-            // the bottom shell. The hinge is the geom-local X axis (it maps
-            // to the body's lateral Y under this geom's quat), through the
-            // rear-top corner of the mesh's own bounds; a POSITIVE angle
-            // swings the front tip down. Verified against the upper beak's
-            // front tip: closed gape 5.4 mm, 0.30 rad opens ~17 mm.
+            // the bottom shell. The rendered vertices come from MuJoCo's
+            // COMPILED mesh (re-centred and re-oriented to principal axes at
+            // compile time), not the raw STL — so the hinge is read off the
+            // compiled frame: lateral is mesh Z (STL lateral X maps to
+            // compiled Z under the compiler's principal-axis rotation),
+            // front tip is mesh +Y, up is mesh +X. The hinge is the lateral
+            // axis through the rear-TOP corner of the mesh bounds; a POSITIVE
+            // angle swings the front tip down. Verified in the compiled model
+            // (robot_walk_backlash): +0.30 rad drops the tip 17.5 mm with
+            // 0.05 mm lateral drift; the old mesh-X axis yawed the beak
+            // sideways instead.
             let meshName = duck_core_mesh_name(core, meshID).map { String(cString: $0) } ?? ""
             let isJaw = meshName == "jaw"
             var jawPivot = SIMD3<Float>(0, 0, 0)
             if isJaw {
-                jawPivot = SIMD3<Float>(0, mesh.boundsMax.y, mesh.boundsMax.x)
+                jawPivot = SIMD3<Float>(mesh.boundsMax.x, mesh.boundsMin.y, 0)
             }
             instances.append(Instance(
                 mesh: mesh,
@@ -554,13 +560,15 @@ final class Renderer: NSObject, MTKViewDelegate {
             guard let (position, rotation) = poses[instance.body] else { continue }
             var jaw = matrix_identity_float4x4
             if instance.isJaw, controller.visualMouth > 0.01 {
-                // 0.30 rad fully open ≈ 17 mm at the front tip (front length
-                // ~65 mm) — a quack, not a yawl. Rotation in MESH space,
-                // before the geom's own local: only this geom moves.
+                // 0.30 rad fully open ≈ 17.5 mm at the front tip — a quack,
+                // not a yawl. The hinge axis is mesh Z (lateral in the
+                // compiled frame); a POSITIVE angle swings the tip down.
+                // Rotation in MESH space, before the geom's own local: only
+                // this geom moves.
                 let pivot = instance.jawPivot
                 let angle = Float(controller.visualMouth) * 0.30
                 jaw = translation(pivot)
-                    * simd_float4x4(simd_quatf(angle: angle, axis: SIMD3<Float>(1, 0, 0)))
+                    * simd_float4x4(simd_quatf(angle: angle, axis: SIMD3<Float>(0, 0, 1)))
                     * translation(SIMD3<Float>(-pivot.x, -pivot.y, -pivot.z))
             }
             let model = translation(position) * quaternionMatrix(rotation) * instance.local * jaw
