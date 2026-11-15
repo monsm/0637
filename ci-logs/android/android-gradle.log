@@ -9,22 +9,22 @@ Daemon will be stopped at the end of the build
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
-> Task :app:mergeDebugResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
+> Task :app:mergeDebugResources
 > Task :app:parseDebugLocalResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
 > Task :app:javaPreCompileDebug
 > Task :app:mergeDebugShaders
 > Task :app:compileDebugShaders NO-SOURCE
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
-> Task :app:processDebugManifestForPackage
 > Task :app:desugarDebugFileDependencies
-> Task :app:checkDebugDuplicateClasses
-> Task :app:compressDebugAssets
 > Task :app:processDebugResources
+> Task :app:compressDebugAssets
+> Task :app:checkDebugDuplicateClasses
 > Task :app:mergeDebugJniLibFolders
 > Task :app:mergeLibDexDebug
 > Task :app:mergeDebugNativeLibs
@@ -35,39 +35,23 @@ Daemon will be stopped at the end of the build
 > Task :app:mergeExtDexDebug
 
 > Task :app:compileDebugKotlin FAILED
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:41:28 Variable 'more' must be initialized.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:42:28 Variable 'grab' must be initialized.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:43:28 Variable 'night' must be initialized.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:629:34 'fun Modifier.align(alignment: Alignment): Modifier' cannot be called in this context with an implicit receiver. Use an explicit receiver if necessary.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3051:53 Syntax error: Expecting '"'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3051:53 Syntax error: Expecting ','.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3051:53 Syntax error: Incorrect template entry: .
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3052:4 Syntax error: Expecting '"'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3052:4 Syntax error: Incorrect template entry: .
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:17 Unresolved reference 'color'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:23 Syntax error: Expecting an element.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:30 Syntax error: Expecting an element.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:36 Syntax error: Expecting an element.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:42 Unresolved reference 'alpha'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3053:42 Only expressions are allowed in this context.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3054:17 No parameter with name 'fontSize' found.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3055:14 Syntax error: Expecting ')'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3154:24 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3154:24 Not enough information to infer type argument for 'I'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3154:24 Not enough information to infer type argument for 'O'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3155:35 Unresolved reference 'ActivityResultContracts'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3156:9 Cannot infer type for this parameter. Please specify it explicitly.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3160:49 Argument type mismatch: actual type is 'kotlin.Any', but 'android.net.Uri' was expected.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3576:70 'val' cannot be reassigned.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3576:85 Assignment type mismatch: actual type is 'kotlin.Boolean', but 'androidx.activity.compose.ManagedActivityResultLauncher<ERROR CLASS: Cannot infer argument for type parameter I, ERROR CLASS: Cannot infer argument for type parameter O>' was expected.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3632:26 Unresolved reference 'checkpoint'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:28 Syntax error: Expecting '"'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:28 Syntax error: Expecting ','.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:28 Syntax error: Incorrect template entry: .
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Expecting '"'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Expecting ')'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Incorrect template entry: .
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794706673778.json
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:43:51 Unresolved reference 'Chair'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3153:24 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3153:24 Not enough information to infer type argument for 'I'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3153:24 Not enough information to infer type argument for 'O'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3154:35 Unresolved reference 'ActivityResultContracts'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3155:9 Cannot infer type for this parameter. Please specify it explicitly.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3159:49 Argument type mismatch: actual type is 'kotlin.Any', but 'android.net.Uri' was expected.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3575:70 'val' cannot be reassigned.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3575:85 Assignment type mismatch: actual type is 'kotlin.Boolean', but 'androidx.activity.compose.ManagedActivityResultLauncher<ERROR CLASS: Cannot infer argument for type parameter I, ERROR CLASS: Cannot infer argument for type parameter O>' was expected.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3631:26 Unresolved reference 'checkpoint'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4052:28 Syntax error: Expecting '"'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4052:28 Syntax error: Expecting ','.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4052:28 Syntax error: Incorrect template entry: .
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:3 Syntax error: Expecting '"'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:3 Syntax error: Expecting ')'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:3 Syntax error: Incorrect template entry: .
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794707569931.json
 
 FAILURE: Build failed with an exception.
 
@@ -112,6 +96,35 @@ org.gradle.api.tasks.TaskExecutionException: Execution failed for task ':app:com
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:44)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:267)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
@@ -236,6 +249,35 @@ Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionExcept
 	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph$BuildOperationAwareExecutionAction.execute(DefaultTaskExecutionGraph.java:303)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.execute(DefaultPlanExecutor.java:459)
 	at org.gradle.execution.plan.DefaultPlanExecutor$ExecutorWorker.run(DefaultPlanExecutor.java:376)
+	at org.gradle.execution.plan.DefaultPlanExecutor.process(DefaultPlanExecutor.java:111)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.executeWithServices(DefaultTaskExecutionGraph.java:138)
+	at org.gradle.execution.taskgraph.DefaultTaskExecutionGraph.execute(DefaultTaskExecutionGraph.java:123)
+	at org.gradle.execution.SelectedTaskExecutionAction.execute(SelectedTaskExecutionAction.java:35)
+	at org.gradle.execution.DryRunBuildExecutionAction.execute(DryRunBuildExecutionAction.java:51)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:54)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor$ExecuteTasks.call(BuildOperationFiringBuildWorkerExecutor.java:43)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.execution.BuildOperationFiringBuildWorkerExecutor.execute(BuildOperationFiringBuildWorkerExecutor.java:40)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.lambda$executeTasks$10(DefaultBuildLifecycleController.java:313)
+	at org.gradle.internal.model.StateTransitionController.doTransition(StateTransitionController.java:266)
+	at org.gradle.internal.model.StateTransitionController.lambda$tryTransition$8(StateTransitionController.java:177)
+	at org.gradle.internal.work.DefaultSynchronizer.withLock(DefaultSynchronizer.java:44)
+	at org.gradle.internal.model.StateTransitionController.tryTransition(StateTransitionController.java:177)
+	at org.gradle.internal.build.DefaultBuildLifecycleController.executeTasks(DefaultBuildLifecycleController.java:304)
+	at org.gradle.internal.build.DefaultBuildWorkGraphController$DefaultBuildWorkGraph.runWork(DefaultBuildWorkGraphController.java:220)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:267)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:131)
+	at org.gradle.composite.internal.DefaultBuildController.doRun(DefaultBuildController.java:181)
+	at org.gradle.composite.internal.DefaultBuildController.access$000(DefaultBuildController.java:50)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.lambda$run$0(DefaultBuildController.java:198)
+	at org.gradle.internal.operations.CurrentBuildOperationRef.with(CurrentBuildOperationRef.java:85)
+	at org.gradle.composite.internal.DefaultBuildController$BuildOpRunnable.run(DefaultBuildController.java:198)
 	at org.gradle.internal.concurrent.ExecutorPolicy$CatchAndRecordFailures.onExecute(ExecutorPolicy.java:64)
 	at org.gradle.internal.concurrent.AbstractManagedExecutor$1.run(AbstractManagedExecutor.java:48)
 Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
@@ -271,5 +313,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 28s
+BUILD FAILED in 42s
 28 actionable tasks: 28 executed
