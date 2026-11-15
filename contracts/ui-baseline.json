@@ -1,0 +1,70 @@
+{
+  "a11y_announcements": {
+    "count": 0,
+    "direction": "min"
+  },
+  "a11y_custom_actions": {
+    "count": 0,
+    "direction": "min"
+  },
+  "android_back_handler": {
+    "count": 0,
+    "direction": "min"
+  },
+  "android_color_literals": {
+    "count": 27,
+    "direction": "max"
+  },
+  "android_font_literals": {
+    "count": 143,
+    "direction": "max"
+  },
+  "android_modal_bools": {
+    "count": 14,
+    "direction": "max"
+  },
+  "android_press_no_feedback": {
+    "count": 13,
+    "direction": "max"
+  },
+  "android_remember_saveable": {
+    "count": 0,
+    "direction": "min"
+  },
+  "content_view_lines": {
+    "count": 1919,
+    "direction": "max"
+  },
+  "controller_published": {
+    "count": 107,
+    "direction": "max"
+  },
+  "ios_close_button_files": {
+    "count": 15,
+    "direction": "max"
+  },
+  "ios_color_literals": {
+    "count": 23,
+    "direction": "max"
+  },
+  "ios_dark_hardwrites": {
+    "count": 16,
+    "direction": "max"
+  },
+  "ios_font_literals": {
+    "count": 193,
+    "direction": "max"
+  },
+  "ios_missing_rounded": {
+    "count": 39,
+    "direction": "max"
+  },
+  "ios_reduce_motion": {
+    "count": 1,
+    "direction": "min"
+  },
+  "shell_kt_lines": {
+    "count": 4078,
+    "direction": "max"
+  }
+}

@@ -1,0 +1,887 @@
+{
+  "_readme": [
+    "UI entry ledger, seeded at the 2026-11-15 refactor meeting (2458dec).",
+    "check-ui-entries.py verifies every implemented platform row's anchor (file+regex) exists in source, so a feature cannot silently lose its entry; not-implemented rows must carry a note — no silent gaps.",
+    "conform_b4: ok = row exists in UI_B4_PLAN §2/§5's decided structure; extension = feature added after B4, parking spot not yet decided by a meeting (docs/UIUX_REFACTOR_2026-11-15.md §9-1); violation = parked where B4 §2:61 forbids (the instrument sheet must not accumulate feature entries).",
+    "anchors are source-level: a tag present in source is necessary but NOT sufficient (a chip inside a discarded closure carries a valid id — see pad-send on iOS). Runtime reachability belongs to UI tests; this ledger is the map, not the proof."
+  ],
+  "rows": [
+    {
+      "id": "feed",
+      "zh": "喂食",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/ContentView.swift",
+          "duck-feed"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "duck-feed"
+        ]
+      }
+    },
+    {
+      "id": "skills",
+      "zh": "技能",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/ContentView.swift",
+          "duck-skills"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "duck-skills"
+        ]
+      }
+    },
+    {
+      "id": "quack",
+      "zh": "叫一声",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/ContentView.swift",
+          "duck-quack"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "duck-quack"
+        ]
+      }
+    },
+    {
+      "id": "grab",
+      "zh": "拎起",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/ContentView.swift",
+          "duck-grab"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "duck-grab"
+        ]
+      }
+    },
+    {
+      "id": "time-machine",
+      "zh": "时间机器",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/ContentView.swift",
+          "duck-time"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "duck-time"
+        ]
+      }
+    },
+    {
+      "id": "director",
+      "zh": "取景 Director",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/ContentView.swift",
+          "surface-toggle"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "surface-toggle"
+        ]
+      }
+    },
+    {
+      "id": "path-draw",
+      "zh": "画路走",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-path"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-path"
+        ]
+      }
+    },
+    {
+      "id": "blocks",
+      "zh": "积木规则",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-blocks"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-blocks"
+        ]
+      }
+    },
+    {
+      "id": "dance",
+      "zh": "编舞铺",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-dance"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-dance"
+        ]
+      }
+    },
+    {
+      "id": "stick-modes",
+      "zh": "操控方式",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-controls"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-controls"
+        ]
+      }
+    },
+    {
+      "id": "peers",
+      "zh": "邻居",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-peers"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-peers"
+        ]
+      }
+    },
+    {
+      "id": "pairing",
+      "zh": "邻居配对码",
+      "conform_b4": "extension",
+      "note": "七批 #17；B4 §2 的『一起』组目标是 3 行（邻居/合唱/互送礼物），实现为邻居页内动作，分组未回会议拍板",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/PeersSheet.swift",
+          "peers-pair-code"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.pairCode"
+        ]
+      }
+    },
+    {
+      "id": "gifts",
+      "zh": "互送礼物",
+      "conform_b4": "extension",
+      "note": "七批补全；邻居页内动作（每行 gift-treat/gift-emotion chip），分组未回会议拍板",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/PeersSheet.swift",
+          "gift-treat-"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "gift-treat-"
+        ]
+      }
+    },
+    {
+      "id": "chorus",
+      "zh": "家庭合唱",
+      "conform_b4": "extension",
+      "note": "邻居页内动作；无邻居时按钮可见但禁用（COMPANION.md 承诺）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/PeersSheet.swift",
+          "chorus-start"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "chorus-start"
+        ]
+      }
+    },
+    {
+      "id": "ensemble",
+      "zh": "舞团/角色编舞/合奏",
+      "conform_b4": "extension",
+      "note": "七批 #7/#5/#6；邻居页内三 chips；Android 在无邻居分支内整个消失（IA-4，B2 批修复）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/PeersSheet.swift",
+          "ensemble-formation"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.formation"
+        ]
+      }
+    },
+    {
+      "id": "netpad-rx",
+      "zh": "网控手柄（接收）",
+      "conform_b4": "extension",
+      "note": "七批 #11；邻居页内开关，配对码门控",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/PeersSheet.swift",
+          "Copy.netPad"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.netPad"
+        ]
+      }
+    },
+    {
+      "id": "netpad-tx",
+      "zh": "网控手柄（发送端）",
+      "conform_b4": "extension",
+      "note": "七批 #11 发送端；iOS pad-send chip 嵌在 gift-emotion action 闭包内从未渲染（FE-1，B3 批修复），代码在、UI 不可达",
+      "ios": {
+        "implemented": false,
+        "note": "UI 不可达：PeersSheet.swift:103-115 闭包死链，台账 #11『发送端 iOS ⏳』属实"
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "pad-send"
+        ]
+      }
+    },
+    {
+      "id": "quests",
+      "zh": "每日任务",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-quests"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-quests"
+        ]
+      }
+    },
+    {
+      "id": "progress-book",
+      "zh": "成长手册/成就墙",
+      "conform_b4": "extension",
+      "note": "iOS 独有（本机 ProgressStore + 7 日瓦片 + 成就墙）；Android 无对应页——是新产品不是重排，另立产品批次（会议决议）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/ProgressKit.swift",
+          "成就墙"
+        ]
+      },
+      "android": {
+        "implemented": false,
+        "note": "Android 无 ProgressStore 事件账，无对应页；照会议决议不并入重排"
+      }
+    },
+    {
+      "id": "diary",
+      "zh": "鸭子日记",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-diary"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-diary"
+        ]
+      }
+    },
+    {
+      "id": "postcards",
+      "zh": "明信片",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-postcards"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-postcards"
+        ]
+      }
+    },
+    {
+      "id": "dex",
+      "zh": "情绪图鉴",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-dex"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-dex"
+        ]
+      }
+    },
+    {
+      "id": "day-rows",
+      "zh": "日子行",
+      "conform_b4": "extension",
+      "note": "七批 #25；iOS 数据已加载但无视图消费（FE-3，渲染缺失——修渲染，不统一数据链）；Android 仪表内渲染",
+      "ios": {
+        "implemented": false,
+        "note": "vetbookDays 无视图消费（DuckController.swift:1473,2217 仅声明与赋值）"
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Companion.kt",
+          "life.days"
+        ]
+      }
+    },
+    {
+      "id": "ai",
+      "zh": "AI 伙伴",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-ai"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-ai"
+        ]
+      }
+    },
+    {
+      "id": "night",
+      "zh": "晚安/早安",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-night"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-night"
+        ]
+      }
+    },
+    {
+      "id": "flashlight",
+      "zh": "手电筒",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-flashlight"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-flashlight"
+        ]
+      }
+    },
+    {
+      "id": "language",
+      "zh": "语言",
+      "conform_b4": "ok",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-language"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-language"
+        ]
+      }
+    },
+    {
+      "id": "big-buttons",
+      "zh": "大字模式",
+      "conform_b4": "extension",
+      "note": "七批 #26；两端入口不同组（iOS 这只鸭子组 / Android 记录组）——§5 无此行，归属待会议拍板",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-big"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-big"
+        ]
+      }
+    },
+    {
+      "id": "heart",
+      "zh": "手心心跳",
+      "conform_b4": "extension",
+      "note": "七批 #2；iOS 抽屉行（extension），Android 仪表内（violation：B4 §2:61 仪表不堆功能）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-heart"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "heart-toggle"
+        ]
+      }
+    },
+    {
+      "id": "led",
+      "zh": "LED 灯语",
+      "conform_b4": "extension",
+      "note": "七批 #3；仅编舞铺的灯光步（无独立入口），§5 无此行",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/DanceSheet.swift",
+          "kind: \"light\""
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/DanceSheet.kt",
+          "dance-try-light-"
+        ]
+      }
+    },
+    {
+      "id": "parent-time",
+      "zh": "家长时长",
+      "conform_b4": "extension",
+      "note": "七批 #14；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-parent"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.parentTime"
+        ]
+      }
+    },
+    {
+      "id": "room-lamp",
+      "zh": "房间灯",
+      "conform_b4": "extension",
+      "note": "七批 #18；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-lamp"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.roomLamp"
+        ]
+      }
+    },
+    {
+      "id": "compass",
+      "zh": "朝向罗盘",
+      "conform_b4": "extension",
+      "note": "七批 #19；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-compass"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.compass"
+        ]
+      }
+    },
+    {
+      "id": "backup",
+      "zh": "存档搬家",
+      "conform_b4": "extension",
+      "note": "七批 #15；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-backup"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.backup"
+        ]
+      }
+    },
+    {
+      "id": "tof",
+      "zh": "ToF 网格",
+      "conform_b4": "extension",
+      "note": "七批 #9；8×8 降采样进 /state.sensors，两端仪表内呈现（violation 停放）；iOS 抽屉行读数条（extension）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-tof"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.tof"
+        ]
+      }
+    },
+    {
+      "id": "ab-try",
+      "zh": "AB 试穿",
+      "conform_b4": "extension",
+      "note": "七批 #16；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-ab"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.abTry"
+        ]
+      }
+    },
+    {
+      "id": "push-compare",
+      "zh": "推一把对比",
+      "conform_b4": "extension",
+      "note": "七批 #22；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-pushcompare"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.pushCompare"
+        ]
+      }
+    },
+    {
+      "id": "rewind-play",
+      "zh": "倒放",
+      "conform_b4": "extension",
+      "note": "七批 #23；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-rewindplay"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.rewindPlay"
+        ]
+      }
+    },
+    {
+      "id": "hud",
+      "zh": "观测摘录 HUD",
+      "conform_b4": "extension",
+      "note": "七批 #12；opt-in 覆盖层默认关；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-hud"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.hud"
+        ]
+      }
+    },
+    {
+      "id": "two-player",
+      "zh": "双人接机",
+      "conform_b4": "extension",
+      "note": "七批 #24；iOS 抽屉行（extension），Android 仪表内（violation）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MoreSheet.swift",
+          "more-p2"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "Copy.twoPlayer"
+        ]
+      }
+    },
+    {
+      "id": "speak",
+      "zh": "开口说话（日记 TTS）",
+      "conform_b4": "extension",
+      "note": "七批 #1；日记页内 chip，首屏无入口（P2 记录：开口说话藏日记内 3 跳）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/DiarySheet.swift",
+          "Copy.speak"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/DiarySheet.kt",
+          "Copy.speak"
+        ]
+      }
+    },
+    {
+      "id": "voice-zh",
+      "zh": "语音指令（听懂中文）",
+      "conform_b4": "extension",
+      "note": "仪表内开关（violation 停放）；iOS 专项测试在、Android 无等价物（TQ-1）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/InstrumentSheet.swift",
+          "Copy.voiceCommands"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "sheet-voice-toggle"
+        ]
+      }
+    },
+    {
+      "id": "tilt-look",
+      "zh": "倾斜看",
+      "conform_b4": "extension",
+      "note": "iOS 独有（手机 IMU 当头部），Android 不提供是硬件/行为差异不是设计债（COMPANION.md §1 明文）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/InstrumentSheet.swift",
+          "Copy.tilt"
+        ]
+      },
+      "android": {
+        "implemented": false,
+        "note": "平台事实：Android 无此能力，文档已声明"
+      }
+    },
+    {
+      "id": "timer",
+      "zh": "定时器触发器",
+      "conform_b4": "extension",
+      "note": "七批 #13；积木规则页触发 chip 的一个档位，无独立入口",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/RulesSheet.swift",
+          "trigger == \"timer\""
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/Companion.kt",
+          "timer"
+        ]
+      }
+    },
+    {
+      "id": "floor-height",
+      "zh": "地面高度",
+      "conform_b4": "extension",
+      "note": "七批 #20；核心 POST /floor 已有（intent.rs:1083），两端 UI 0 命中——按 22+2 起账标 no-ui",
+      "ios": {
+        "implemented": false,
+        "note": "无 UI；台账记 no-ui，ARKit 接线待真机"
+      },
+      "android": {
+        "implemented": false,
+        "note": "无 UI；台账记 no-ui，ARCore 接线待真机"
+      }
+    },
+    {
+      "id": "trajectory-export",
+      "zh": "轨迹导出",
+      "conform_b4": "extension",
+      "note": "七批 #10；核心 GET /export/trajectory 已有（intent.rs:1067），两端 UI 0 命中——按 22+2 起账标 no-ui",
+      "ios": {
+        "implemented": false,
+        "note": "无 UI；核心路由已备"
+      },
+      "android": {
+        "implemented": false,
+        "note": "无 UI；核心路由已备"
+      }
+    }
+  ]
+}

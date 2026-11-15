@@ -1,0 +1,21 @@
+{
+  "_readme": [
+    "check-copy-values.py skips these keys when comparing the two phones' wording.",
+    "platform_facts: the two phones genuinely say different TRUE things (hardware/API differences). May only shrink; a meeting must bless any change.",
+    "pending: real drift queued for the copy batch (docs/UIUX_REFACTOR_2026-11-15.md B5). Entries leave this list only by fixing the value, not by editing this file to silence the gate."
+  ],
+  "platform_facts": [
+    "roomLampNote",
+    "netPad",
+    "rewindPlay"
+  ],
+  "pending": [
+    "waking",
+    "faceStatus",
+    "flashlight",
+    "heartRowNote",
+    "aiNote",
+    "abNote",
+    "backupReady"
+  ]
+}
