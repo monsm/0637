@@ -624,15 +624,15 @@ fun Shell(
                     // The second player: the right edge belongs to them -
                     // three verbs at arm's length while player one drives.
                     if (input.p2On && core != null) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
                         Row(
-                            Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 8.dp),
+                            Modifier.padding(end = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             ButtonChip(Copy.bigButtonAction(0), "p2-pet") { postDuckCommand("/pet") }
                             ButtonChip(Copy.bigButtonAction(2), "p2-quack") { quack?.invoke() }
                             ButtonChip(Copy.bigButtonAction(3), "p2-sit") { core.sit() }
+                        }
                         }
                     }
                     PortraitTimeRail(
@@ -3048,8 +3048,7 @@ private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
         }
         if (life.days.isNotEmpty()) {
             Text(
-                life.days.takeLast(7).joinToString("
-"),
+                life.days.takeLast(7).joinToString(" | "),
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 11.sp,
             )
@@ -3152,7 +3151,7 @@ private fun InstrumentSheet(
     // The move-out flow: the SAF picker's verdict lands as a status line.
     var backupStatus by remember { mutableStateOf<String?>(null) }
     val backupPicker = rememberLauncherForActivityResult(
-        androidx.activity.compose.ActivityResultContracts.OpenDocument(),
+        ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
             backupStatus = Copy.backupWorking
@@ -3573,7 +3572,9 @@ private fun InstrumentSheet(
                         exportBackup(context)
                     }
                     Spacer(Modifier.size(8.dp))
-                    ButtonChip(Copy.backupImport, "backup-import") { backupPicker = true }
+                    ButtonChip(Copy.backupImport, "backup-import") {
+                        backupPicker.launch(arrayOf("application/json", "text/plain"))
+                    }
                 }
             }
             // The parent's daily allowance: one chip cycles off -> 15 -> 30
@@ -3629,7 +3630,6 @@ private fun InstrumentSheet(
                 // Push & compare: checkpoint, fork, and push branch B -
                 // the split the rewind machine already keeps, one tap.
                 ButtonChip(Copy.pushCompare, "push-compare") {
-                    core.checkpoint()
                     core.fork()
                     postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
                     Toast.makeText(context, Copy.pushCompareDone, Toast.LENGTH_SHORT).show()
@@ -4050,8 +4050,7 @@ private fun fetchTofStrip(): String {
                 }
             }
         }
-        rows.joinToString("
-")
+        rows.joinToString(" / ")
     } catch (_: Throwable) {
         "—"
     }
