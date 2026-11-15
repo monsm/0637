@@ -364,10 +364,23 @@ final class DuckUITests: XCTestCase {
         openMore()
         let peersButton = app.buttons["more-peers"]
         XCTAssertTrue(peersButton.waitForExistence(timeout: 10), "the drawer has no Neighbours row")
+        // Bisect at the drawer: its badge reads the same controller.peers
+        // the sheet will read, so this splits "fixture never reached the
+        // controller" from "the sheet failed to render it".
+        let badge = app.staticTexts["1/3"]
+        XCTAssertTrue(
+            badge.waitForExistence(timeout: 5)
+                || peersButton.label.contains("1/3"),
+            "the fixture peer never reached the controller (badge='\(peersButton.label)')"
+        )
         peersButton.tap()
         XCTAssertTrue(
             app.staticTexts["peers-title"].waitForExistence(timeout: 10),
             "the neighbours sheet did not open"
+        )
+        XCTAssertFalse(
+            app.staticTexts["peers-empty"].exists,
+            "the sheet still shows the empty state with a fixture peer"
         )
         let treat = app.buttons["gift-treat-fixture"]
         XCTAssertTrue(treat.waitForExistence(timeout: 10), "the fixture peer's gift-treat row is missing")
