@@ -8,7 +8,7 @@
     "direction": "min"
   },
   "android_back_handler": {
-    "count": 0,
+    "count": 2,
     "direction": "min"
   },
   "android_color_literals": {
@@ -64,7 +64,7 @@
     "direction": "min"
   },
   "shell_kt_lines": {
-    "count": 4078,
+    "count": 4108,
     "direction": "max"
   }
 }
