@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -144,6 +145,28 @@ fun Shell(
     var showMore by remember { mutableStateOf(false) }
     var showBig by remember { mutableStateOf(false) }
     var showQuests by remember { mutableStateOf(false) }
+    // The back key closes the topmost layer instead of leaving the app:
+    // the ring first, then the innermost sheet, then the shell's sheets.
+    // With nothing open the system default (leave) stands (B2, IA-4 companion).
+    val layersOpen = showRing || showSheet || showRules || showPeers ||
+        showAI || showDance || showPostcards || showDex || showDiary ||
+        showMore || showBig || showQuests
+    BackHandler(enabled = layersOpen) {
+        when {
+            showRing -> showRing = false
+            showDiary -> showDiary = false
+            showDex -> showDex = false
+            showPostcards -> showPostcards = false
+            showQuests -> showQuests = false
+            showBig -> showBig = false
+            showMore -> showMore = false
+            showSheet -> showSheet = false
+            showRules -> showRules = false
+            showPeers -> showPeers = false
+            showAI -> showAI = false
+            showDance -> showDance = false
+        }
+    }
     // The drawer's night row follows /state.night, so it can offer
     // good night or good morning honestly.
     var nightActive by remember { mutableStateOf(false) }
@@ -984,9 +1007,12 @@ fun Shell(
                 }
             },
             quests = quests,
-            onPostcards = { showPostcards = true },
-            onDex = { showDex = true },
-            onDiary = { showDiary = true },
+            // One sheet at a time, like the More drawer: the instrument
+            // closes itself before handing over, or two ModalBottomSheets
+            // stack with two scrims and two back behaviors (P1-20).
+            onPostcards = { showSheet = false; showPostcards = true },
+            onDex = { showSheet = false; showDex = true },
+            onDiary = { showSheet = false; showDiary = true },
         ) { showSheet = false }
     }
 
@@ -1399,109 +1425,113 @@ private fun PeersSheet(
     )
 
     if (peers.peers.isEmpty()) {
-                Text(
-                    Copy.peersEmpty,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    modifier = Modifier.testTag("peers-empty"),
-                )
-            } else {
-                peers.peers.forEachIndexed { index, peer ->
-                    Column(
+        Text(
+            Copy.peersEmpty,
+            color = Color.White.copy(alpha = 0.6f),
+            fontSize = 12.sp,
+            modifier = Modifier.testTag("peers-empty"),
+        )
+    } else {
+        peers.peers.forEachIndexed { index, peer ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
                         Modifier
-                            .fillMaxWidth()
-                            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(8.dp)
-                                    .background(
-                                        if (peer.replied) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
-                                        CircleShape,
-                                    ),
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    peer.name,
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.testTag("peer-row-$index"),
-                                )
-                                Text(
-                                    if (peer.replied) Copy.peerRepliedLabel else Copy.peerNew,
-                                    color = Color.White.copy(alpha = 0.6f),
-                                    fontSize = 10.sp,
-                                )
-                            }
-                            if (!peer.paired) {
-                                ButtonChip(Copy.pairCode, "peer-pair-$index") {
-                                    if (pairCode.length == 6) onPair(pairCode, peer.id)
-                                }
-                            }
-                            ButtonChip(Copy.peerSayHi, "peer-greet-$index") { onGreet(peer.id) }
-                        }
-                        // Gifts in the greeting's own chip language: a treat
-                        // feeds through the real peck, a cheer runs the
-                        // official excited timeline on the other duck.
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ButtonChip(Copy.giftTreat, "gift-treat-${peer.id}") {
-                                sendGift(peer.id, "treat", "")
-                            }
-                            ButtonChip(Copy.giftEmotion, "gift-emotion-${peer.id}") {
-                                sendGift(peer.id, "emotion", "excited")
-                            }
-                            // This phone as the official pad, aimed at THIS
-                            // paired neighbour. One tap dials, one stops.
-                            if (peer.paired && peer.addr.isNotEmpty()) {
-                                ButtonChip(
-                                    if (onPadTarget == peer.name) Copy.padTarget else Copy.padSender,
-                                    "pad-send-${peer.id}",
-                                ) { onPad(peer) }
-                            }
+                            .size(8.dp)
+                            .background(
+                                if (peer.replied) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
+                                CircleShape,
+                            ),
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            peer.name,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.testTag("peer-row-$index"),
+                        )
+                        Text(
+                            if (peer.replied) Copy.peerRepliedLabel else Copy.peerNew,
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 10.sp,
+                        )
+                    }
+                    if (!peer.paired) {
+                        ButtonChip(Copy.pairCode, "peer-pair-$index") {
+                            if (pairCode.length == 6) onPair(pairCode, peer.id)
                         }
                     }
+                    ButtonChip(Copy.peerSayHi, "peer-greet-$index") { onGreet(peer.id) }
                 }
-                ButtonChip(Copy.peerSayAll, "peer-greet-all") { onGreet(null) }
-                if (pairCode.length == 6) {
-                    ButtonChip(Copy.pairCode, "peers-pair-code-set") { onPair(pairCode, null) }
-                }
-                val sendEnsemble: (List<String>, List<String>) -> Unit = { moves, sounds ->
-                    val body = org.json.JSONObject()
-                        .put("moves", org.json.JSONArray(moves))
-                        .put("sounds", org.json.JSONArray(sounds))
-                    Thread { postDuckCommand("/ensemble", body.toString()) }.start()
-                }
+                // Gifts in the greeting's own chip language: a treat
+                // feeds through the real peck, a cheer runs the
+                // official excited timeline on the other duck.
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ButtonChip(Copy.formation, "ensemble-formation") {
-                        sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious"), emptyList())
+                    ButtonChip(Copy.giftTreat, "gift-treat-${peer.id}") {
+                        sendGift(peer.id, "treat", "")
                     }
-                    ButtonChip(Copy.roleDance, "ensemble-roles") {
-                        sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious", "sad", "inquire"), emptyList())
+                    ButtonChip(Copy.giftEmotion, "gift-emotion-${peer.id}") {
+                        sendGift(peer.id, "emotion", "excited")
                     }
-                    ButtonChip(Copy.voiceChoir, "ensemble-choir") {
-                        sendEnsemble(listOf("laugh", "curious"), listOf("chirp", "coo", "greet", "inquire"))
+                    // This phone as the official pad, aimed at THIS
+                    // paired neighbour. One tap dials, one stops.
+                    if (peer.paired && peer.addr.isNotEmpty()) {
+                        ButtonChip(
+                            if (onPadTarget == peer.name) Copy.padTarget else Copy.padSender,
+                            "pad-send-${peer.id}",
+                        ) { onPad(peer) }
                     }
                 }
-                // A chorus needs someone to sing with: a lone duck sees the
-                // disabled affordance rather than losing the idea of it.
-                // PathChip is the shared chip face that carries `enabled`.
-                PathChip(
-                    Copy.chorus,
-                    enabled = peers.peers.isNotEmpty(),
-                    testTag = "chorus-start",
-                ) { startChorus() }
             }
-            if (peers.name.isEmpty()) {
-                ButtonChip(Copy.peerFind, "peers-start") { onStart() }
-            }
+        }
+        ButtonChip(Copy.peerSayAll, "peer-greet-all") { onGreet(null) }
+        if (pairCode.length == 6) {
+            ButtonChip(Copy.pairCode, "peers-pair-code-set") { onPair(pairCode, null) }
+        }
+    }
+    // A lone duck sees the ensemble and the chorus as disabled affordances
+    // rather than losing the idea of them (IA-4): the meeting's call was
+    // "disabled when alone, never gone". PathChip carries the enabled face;
+    // the click stays wired and simply does nothing while disabled.
+    val canEnsemble = peers.peers.isNotEmpty()
+    val sendEnsemble: (List<String>, List<String>) -> Unit = { moves, sounds ->
+        val body = org.json.JSONObject()
+            .put("moves", org.json.JSONArray(moves))
+            .put("sounds", org.json.JSONArray(sounds))
+        Thread { postDuckCommand("/ensemble", body.toString()) }.start()
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        PathChip(Copy.formation, enabled = canEnsemble, testTag = "ensemble-formation") {
+            sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious"), emptyList())
+        }
+        PathChip(Copy.roleDance, enabled = canEnsemble, testTag = "ensemble-roles") {
+            sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious", "sad", "inquire"), emptyList())
+        }
+        PathChip(Copy.voiceChoir, enabled = canEnsemble, testTag = "ensemble-choir") {
+            sendEnsemble(listOf("laugh", "curious"), listOf("chirp", "coo", "greet", "inquire"))
+        }
+    }
+    // A chorus needs someone to sing with: a lone duck sees the
+    // disabled affordance rather than losing the idea of it.
+    PathChip(
+        Copy.chorus,
+        enabled = canEnsemble,
+        testTag = "chorus-start",
+    ) { startChorus() }
+    if (peers.name.isEmpty()) {
+        ButtonChip(Copy.peerFind, "peers-start") { onStart() }
+    }
         }
     }
 }

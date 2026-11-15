@@ -1428,4 +1428,185 @@ if not any(word in ' '.join(texts) for word in ('左踢', 'kick left')):
 print("skill verdict is human: no underscores")
 PY
 
+# ------------------------------------------------------------------ B2 layers
+# The back key closes the topmost layer instead of leaving the app, the
+# instrument hands over one sheet at a time, and a lone duck keeps its
+# ensemble affordances — disabled, not gone (docs/UIUX_REFACTOR_2026-11-15.md
+# B2). The app is in Chinese here; every lookup keeps its English fallback.
+echo "--- layers: back key, one sheet, lone duck ---"
+
+# 1) IA-4: open More > Neighbours. Whatever the peer list holds, the
+#    ensemble and chorus affordances must be on the screen.
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || {
+  echo "::error::the thumb deck has no More button (layers check)"
+  exit 1
+}
+sleep 1
+tap_text "邻居" > /dev/null 2>&1 || tap_text "Neighbours" > /dev/null 2>&1 || {
+  echo "::error::the More drawer has no Neighbours row (layers check)"
+  exit 1
+}
+sleep 1.5
+rm -f ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+python3 - <<'PY' || exit 1
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the peers dump: {exc}")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+ensemble = {'Dance together', '家庭舞团'}
+chorus = {'Chorus', '合唱'}
+if not ensemble.intersection(texts):
+    raise SystemExit(f"::error::a lone duck lost its ensemble affordance (IA-4): {texts[:20]}")
+if not chorus.intersection(texts):
+    raise SystemExit(f"::error::the chorus affordance vanished from the peers sheet: {texts[:20]}")
+print("lone duck: ensemble and chorus affordances stay on the sheet")
+PY
+# The back key must close this sheet, not the app (the shell's BackHandler).
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+rm -f ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+python3 - <<'PY' || exit 1
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the dump after back from peers: {exc}")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+if not any(t for t in texts if t in ('喂食', 'Feed')):
+    raise SystemExit(f"::error::back from the peers sheet left the app, not the sheet: {texts[:20]}")
+print("back from a sheet returns to the first screen")
+PY
+
+# 2) The ring: open it, press back, and the app must survive with the ring
+#    closed — before this fix the back key left the application entirely.
+tap_text "技能" > /dev/null 2>&1 || tap_text "Skills" > /dev/null 2>&1 || {
+  echo "::error::the thumb deck has no Skills button (ring back check)"
+  exit 1
+}
+sleep 1
+rm -f ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+python3 - <<'PY' || exit 1
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit("::error::cannot read the ring dump")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+ring = {'动作', 'Actions'}
+if not ring.intersection(texts):
+    raise SystemExit(f"::error::the skill ring did not open for the back check: {texts[:20]}")
+print("ring is open; pressing back next")
+PY
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+rm -f ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+python3 - <<'PY' || exit 1
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the dump after back from the ring: {exc}")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+ring = {'动作', 'Actions'}
+alive = {'喂食', 'Feed'}
+if ring.intersection(texts):
+    raise SystemExit("::error::back did not close the skill ring")
+if not alive.intersection(texts):
+    raise SystemExit(f"::error::back from the ring left the app: {texts[:20]}")
+print("back closed the ring and the app survived")
+PY
+
+# 3) The instrument hands over to one sheet at a time: tapping Postcards
+#    from inside the duck sheet must close the duck sheet first, so two
+#    ModalBottomSheets never stack (P1-20).
+tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1 || {
+  echo "::error::the time rail has no Time button (handover check)"
+  exit 1
+}
+sleep 1
+# The postcards chip sits below the fold on the medium detent; swipe the
+# sheet up to its full height, then tap.
+adb shell input swipe 400 1500 400 400 300 > /dev/null 2>&1 || true
+sleep 1
+rm -f ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+python3 - <<'PY' || exit 1
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit("::error::cannot read the instrument dump")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+if not any(t for t in texts if t in ('这只鸭子', 'This duck')):
+    raise SystemExit(f"::error::the duck sheet did not open for the handover check: {texts[:20]}")
+print("duck sheet open; handing over to postcards next")
+PY
+tap_text "明信片" > /dev/null 2>&1 || tap_text "Postcards" > /dev/null 2>&1 || {
+  echo "::error::the duck sheet has no postcards chip (handover check)"
+  exit 1
+}
+sleep 1.5
+rm -f ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+python3 - <<'PY' || exit 1
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the dump after the handover: {exc}")
+texts = [
+    node.get(attr) or ''
+    for node in root.iter('node')
+    if node.get('package') == 'ai.duck.microduck'
+    for attr in ('text', 'content-desc')
+]
+duck = {'这只鸭子', 'This duck'}
+shelf = {'明信片', 'Postcards'}
+empty = {'还没有明信片', 'No postcards yet'}
+if duck.intersection(texts):
+    raise SystemExit("::error::two sheets are open at once: the duck sheet stayed under the shelf")
+if not shelf.intersection(texts) or not empty.intersection(texts):
+    raise SystemExit(f"::error::the postcards sheet did not take over: {texts[:20]}")
+print("handover: one sheet at a time (duck sheet closed, shelf open)")
+PY
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+
 echo "smoke test passed"
