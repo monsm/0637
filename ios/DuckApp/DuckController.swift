@@ -203,17 +203,21 @@ final class DuckController: ObservableObject {
         /// "ip:port" as the LAN announced it - the pad sender dials its ip.
         let addr: String
     }
-    @Published var peers: [PeerInfo] = []
     /// The UI tests' fixture: `-duck.peerFixture YES` pins one paired
     /// neighbour so the peers sheet's paired-peer rows render on a machine
     /// with no LAN duck. Presentation only — the address is TEST-NET, the
     /// pad dials nothing that exists, and no gift is ever recorded.
-    private let peerFixture =
+    private static let peerFixtureOn =
         UserDefaults.standard.string(forKey: "duck.peerFixture") == "YES"
     /// Same family, for the day rows: `-duck.dayFixture YES` pins two sample
     /// rows so the sheet's view is testable without a recorded history.
-    private let dayFixture =
+    private static let dayFixtureOn =
         UserDefaults.standard.string(forKey: "duck.dayFixture") == "YES"
+    /// The fixture peer exists from the first frame — the state parse keeps
+    /// it pinned every tick, but the sheet must not race the first poll.
+    @Published var peers: [PeerInfo] = Self.peerFixtureOn
+        ? [PeerInfo(id: "fixture", name: "Sunny", replied: false, paired: true, addr: "192.0.2.10:8765")]
+        : []
     /// The official UDP pad's gate, read back from /state.pad — the core is
     /// the authority, not the switch the finger just flipped.
     @Published var netPadOn = false
@@ -2148,7 +2152,7 @@ final class DuckController: ObservableObject {
                     if let peers = json["peers"] as? [String: Any] {
                         self.peerName = peers["name"] as? String ?? self.peerName
                         let list = peers["peers"] as? [[String: Any]] ?? []
-                        self.peers = self.peerFixture
+                        self.peers = Self.peerFixtureOn
                             ? [PeerInfo(
                                 id: "fixture", name: "Sunny", replied: false,
                                 paired: true, addr: "192.0.2.10:8765"
@@ -2240,7 +2244,7 @@ final class DuckController: ObservableObject {
                                 )
                             }
                         }
-                        if self.dayFixture {
+                        if Self.dayFixtureOn {
                             // Same shape the core publishes; two synthetic
                             // rows only for the view test, never shown without
                             // the launch argument.
