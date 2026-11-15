@@ -33,9 +33,11 @@ class DuckRenderer(
         /// The lower beak: the one geom the shell animates itself. The
         /// `jaw` mesh shares its body with the upper beak, the eyes and the
         /// bottom shell — the hinge rotation is composed BEFORE the geom's
-        /// own local, in mesh space, so only this geom moves.
+        /// own local, in mesh space, so only this geom moves. The hinge is
+        /// the mesh Z axis through the rear-top corner; jawPivotX/Y carry
+        /// the mesh-space X/Y of that corner (top and rear of the beak).
         val isJaw: Boolean = false,
-        val jawPivotZ: Float = 0f,
+        val jawPivotX: Float = 0f,
         val jawPivotY: Float = 0f,
     )
 
@@ -53,9 +55,10 @@ class DuckRenderer(
     private var aPos = 0
     private var aNormal = 0
     private val meshes = mutableMapOf<Int, Mesh>()
-    /** Mesh-space bounds per mesh id, from the soup's positions only: the
-     *  jaw's hinge is the rear-top corner of its own bounds (the iOS renderer
-     *  derives the same pivot the same way). */
+    /** Mesh-space bounds per mesh id ([lowX, lowY, lowZ, highX, highY, highZ]),
+     *  from the soup's positions only: the jaw's hinge sits at the
+     *  rear-top corner (highX, lowY) of its compiled bounds (the iOS
+     *  renderer derives the same pivot the same way). */
     private val meshBounds = mutableMapOf<Int, FloatArray>()
     private val instances = mutableListOf<Instance>()
     private var floor: Mesh? = null
@@ -278,14 +281,17 @@ class DuckRenderer(
             var model = FloatArray(16)
             Matrix.multiplyMM(model, 0, world, 0, instance.local, 0)
             if (instance.isJaw && visualMouth > 0.01f) {
-                // Hinge on the geom-local X axis through the rear-top corner
-                // of the mesh bounds; rotation composed BEFORE the geom's own
-                // local, in mesh space, so nothing else in the head moves.
+                // Hinge on the mesh Z axis (lateral in MuJoCo's compiled
+                // frame) through the rear-top corner (maxX, minY, 0) — same
+                // pivot the iOS renderer derives. Rotation composed BEFORE
+                // the geom's own local, in mesh space, so nothing else in
+                // the head moves.
                 val jaw = identity()
-                Matrix.translateM(jaw, 0, 0f, instance.jawPivotY, instance.jawPivotZ)
+                Matrix.translateM(jaw, 0, instance.jawPivotX, instance.jawPivotY, 0f)
                 // Kotlin's Matrix.rotateM takes DEGREES; 0.30 rad ≈ 17.19°.
-                Matrix.rotateM(jaw, 0, visualMouth * 0.30f * 57.29578f, 1f, 0f, 0f)
-                Matrix.translateM(jaw, 0, 0f, -instance.jawPivotY, -instance.jawPivotZ)
+                // Axis (0,0,1) = mesh Z: the tip swings down, not sideways.
+                Matrix.rotateM(jaw, 0, visualMouth * 0.30f * 57.29578f, 0f, 0f, 1f)
+                Matrix.translateM(jaw, 0, -instance.jawPivotX, -instance.jawPivotY, 0f)
                 val withJaw = FloatArray(16)
                 Matrix.multiplyMM(withJaw, 0, model, 0, jaw, 0)
                 model = withJaw
@@ -355,10 +361,13 @@ class DuckRenderer(
             Matrix.multiplyMM(transform, 0, local, 0, rotation, 0)
             val alpha = if (info[14] > 0) info[14].toFloat() else 1f
             // The visible lower beak is the geom whose MESH is `jaw` — the
-            // `jaw_soft` mesh is the servo rack inside the head. The hinge is
-            // the geom-local X axis through the rear-top corner of the mesh's
-            // own bounds; a POSITIVE angle swings the front tip down (the
-            // same 0.30 rad ≈ 17 mm gape the iOS renderer verified).
+            // `jaw_soft` mesh is the servo rack inside the head. The rendered
+            // soup is MuJoCo's COMPILED mesh (re-centred and re-oriented to
+            // principal axes at compile time), not the raw STL: lateral is
+            // mesh Z, the front tip is mesh +Y, up is mesh +X. The hinge is
+            // the lateral axis through the rear-top corner (maxX, minY, 0);
+            // a POSITIVE angle swings the front tip down (+0.30 rad verified:
+            // tip drops 17.5 mm, <0.1 mm lateral drift).
             val bounds = meshBounds[meshId]
             val isJaw = core.meshName(meshId) == "jaw" && bounds != null
             instances.add(
@@ -368,8 +377,8 @@ class DuckRenderer(
                     transform,
                     floatArrayOf(info[11].toFloat(), info[12].toFloat(), info[13].toFloat(), alpha),
                     isJaw = isJaw,
-                    jawPivotZ = bounds?.get(3) ?: 0f,
-                    jawPivotY = bounds?.get(4) ?: 0f,
+                    jawPivotX = bounds?.get(4) ?: 0f,
+                    jawPivotY = bounds?.get(1) ?: 0f,
                 )
             )
         }
