@@ -624,15 +624,15 @@ fun Shell(
                     // The second player: the right edge belongs to them -
                     // three verbs at arm's length while player one drives.
                     if (input.p2On && core != null) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
                         Row(
-                            Modifier.padding(end = 8.dp),
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             ButtonChip(Copy.bigButtonAction(0), "p2-pet") { postDuckCommand("/pet") }
                             ButtonChip(Copy.bigButtonAction(2), "p2-quack") { quack?.invoke() }
                             ButtonChip(Copy.bigButtonAction(3), "p2-sit") { core.sit() }
-                        }
                         }
                     }
                     PortraitTimeRail(
@@ -3048,7 +3048,8 @@ private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
         }
         if (life.days.isNotEmpty()) {
             Text(
-                life.days.takeLast(7).joinToString(" | "),
+                life.days.takeLast(7).joinToString("
+"),
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = 11.sp,
             )
@@ -3151,7 +3152,7 @@ private fun InstrumentSheet(
     // The move-out flow: the SAF picker's verdict lands as a status line.
     var backupStatus by remember { mutableStateOf<String?>(null) }
     val backupPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
+        androidx.activity.compose.ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
             backupStatus = Copy.backupWorking

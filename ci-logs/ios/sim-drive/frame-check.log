@@ -1,27 +1,27 @@
-sim-drive/frame-1.png: 1206x2622 lit=95.9357% colours=64
+sim-drive/frame-1.png: 1206x2622 lit=68.9195% colours=64
 frame has content
-sim-drive/frame-1.png: region (0.3, 0.3, 0.7, 0.7) lit=100.0000% colours=64
-sim-drive/frame-1.png: colour (255,140,50) +/-110 -> 0 px (want >= 300)
-::error::only 0 pixels match the duck's colour (255,140,50) - the model is not rendering its materials
-sim-drive/frame-2.png: 1206x2622 lit=95.9357% colours=64
+sim-drive/frame-1.png: region (0.3, 0.3, 0.7, 0.7) lit=75.0228% colours=64
+sim-drive/frame-1.png: colour (255,140,50) +/-110 -> 43444 px (want >= 300)
+sim-drive/frame-1.png: bright neutral shell (>= 120) -> 120216 px (want >= 1200)
+sim-drive/frame-2.png: 1206x2622 lit=68.9869% colours=64
 frame has content
-sim-drive/frame-2.png: region (0.3, 0.3, 0.7, 0.7) lit=100.0000% colours=64
-sim-drive/frame-2.png: colour (255,140,50) +/-110 -> 0 px (want >= 300)
-::error::only 0 pixels match the duck's colour (255,140,50) - the model is not rendering its materials
-sim-drive/frame-3.png: 1206x2622 lit=95.9357% colours=64
+sim-drive/frame-2.png: region (0.3, 0.3, 0.7, 0.7) lit=75.4924% colours=64
+sim-drive/frame-2.png: colour (255,140,50) +/-110 -> 41307 px (want >= 300)
+sim-drive/frame-2.png: bright neutral shell (>= 120) -> 121244 px (want >= 1200)
+sim-drive/frame-3.png: 1206x2622 lit=68.9937% colours=64
 frame has content
-sim-drive/frame-3.png: region (0.3, 0.3, 0.7, 0.7) lit=100.0000% colours=64
-sim-drive/frame-3.png: colour (255,140,50) +/-110 -> 0 px (want >= 300)
-::error::only 0 pixels match the duck's colour (255,140,50) - the model is not rendering its materials
-sim-drive/frame-1.png: 1206x2622 lit=95.9357% colours=64
+sim-drive/frame-3.png: region (0.3, 0.3, 0.7, 0.7) lit=75.6225% colours=64
+sim-drive/frame-3.png: colour (255,140,50) +/-110 -> 48440 px (want >= 300)
+sim-drive/frame-3.png: bright neutral shell (>= 120) -> 120924 px (want >= 1200)
+sim-drive/frame-1.png: 1206x2622 lit=68.9195% colours=64
 frame has content
-sim-drive/frame-2.png: 1206x2622 lit=95.9357% colours=64
+sim-drive/frame-2.png: 1206x2622 lit=68.9869% colours=64
 frame has content
-sim-drive/frame-1.png vs sim-drive/frame-2.png: 0/3162132 pixels differ (0.0000%)
-::error::the two frames are the same (0.0000% differ, want 0.0200%) - the renderer is frozen or never started
-sim-drive/frame-2.png: 1206x2622 lit=95.9357% colours=64
+sim-drive/frame-1.png vs sim-drive/frame-2.png: 134549/3162132 pixels differ (4.2550%)
+the frames differ - the scene is live
+sim-drive/frame-2.png: 1206x2622 lit=68.9869% colours=64
 frame has content
-sim-drive/frame-3.png: 1206x2622 lit=95.9357% colours=64
+sim-drive/frame-3.png: 1206x2622 lit=68.9937% colours=64
 frame has content
-sim-drive/frame-2.png vs sim-drive/frame-3.png: 0/3162132 pixels differ (0.0000%)
-::error::the two frames are the same (0.0000% differ, want 0.0200%) - the renderer is frozen or never started
+sim-drive/frame-2.png vs sim-drive/frame-3.png: 95527/3162132 pixels differ (3.0210%)
+the frames differ - the scene is live

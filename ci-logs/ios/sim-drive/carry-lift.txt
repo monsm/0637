@@ -1,3 +1,1 @@
-Traceback (most recent call last):
-  File "<stdin>", line 4, in <module>
-IndexError: list index out of range
+z 0.1157 -> 0.3557

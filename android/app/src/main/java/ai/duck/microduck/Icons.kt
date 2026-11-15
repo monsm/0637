@@ -38,9 +38,9 @@ internal object Icons {
     /** The big-button page: reuses the core icon set - the extended
      *  material set is not a dependency, and these three verbs already have
      *  faces the shell uses elsewhere. */
-    val big: ImageVector = MaterialIcons.Outlined.MoreHoriz
-    val pet: ImageVector = MaterialIcons.Outlined.PanTool
-    val sit: ImageVector = MaterialIcons.Outlined.EventSeat
+    val big: ImageVector = more
+    val pet: ImageVector = grab
+    val sit: ImageVector = night
     val skills: ImageVector = MaterialIcons.Outlined.AutoAwesome
     val quack: ImageVector = MaterialIcons.Outlined.GraphicEq
     val grab: ImageVector = MaterialIcons.Outlined.PanTool
