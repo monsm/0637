@@ -119,7 +119,11 @@ struct PeersSheet: View {
                     .padding(.vertical, 8)
                     .frame(minHeight: 56)
                     .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
-                    .accessibilityIdentifier("peer-row-\(index)")
+                    // No identifier here: one on a container reaches into the
+                    // tree and overwrites every child's identifier (the chips
+                    // below all vanished under "peer-row-N" in a CI dump).
+                    // Android's smoke owns the peer-row-N anchor; iOS asserts
+                    // the chips by their own ids.
                 }
                 Button {
                     controller.greetPeer(nil)
