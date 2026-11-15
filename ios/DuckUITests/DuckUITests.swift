@@ -393,6 +393,21 @@ final class DuckUITests: XCTestCase {
         // query any element carrying the identifier rather than betting on
         // one type - the tree itself was already proven above.
         let treat = anyElement("gift-treat-fixture")
+        if !treat.exists {
+            // The bisect proved the row composes; dump the identifiers the
+            // tree actually carries, so the next fix is not another guess.
+            let lines = app.debugDescription.split(separator: "\n")
+            let hits = lines.enumerated().compactMap { offset, line -> String? in
+                let text = String(line)
+                return text.contains("peer-row") || text.contains("gift")
+                    || text.contains("pad-send") || text.contains("Sunny")
+                    ? "\(offset): \(text.prefix(160))"
+                    : nil
+            }
+            print("TREE-DIAG lines=\(lines.count) hits=\(hits.prefix(16))")
+            let anyIds = lines.filter { $0.contains("identifier") }.prefix(20)
+            print("TREE-DIAG first-identifiers=\(anyIds)")
+        }
         XCTAssertTrue(treat.waitForExistence(timeout: 10), "the fixture peer's gift-treat row is missing")
         XCTAssertTrue(anyElement("gift-emotion-fixture").exists, "the gift-emotion chip is missing")
         let padSend = anyElement("pad-send-fixture")
