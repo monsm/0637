@@ -3151,7 +3151,7 @@ private fun InstrumentSheet(
     // The move-out flow: the SAF picker's verdict lands as a status line.
     var backupStatus by remember { mutableStateOf<String?>(null) }
     val backupPicker = rememberLauncherForActivityResult(
-        androidx.activity.compose.ActivityResultContracts.OpenDocument(),
+        ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
             backupStatus = Copy.backupWorking
