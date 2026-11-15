@@ -2148,7 +2148,7 @@ final class DuckController: ObservableObject {
                     if let peers = json["peers"] as? [String: Any] {
                         self.peerName = peers["name"] as? String ?? self.peerName
                         let list = peers["peers"] as? [[String: Any]] ?? []
-                        self.peers = peerFixture
+                        self.peers = self.peerFixture
                             ? [PeerInfo(
                                 id: "fixture", name: "Sunny", replied: false,
                                 paired: true, addr: "192.0.2.10:8765"
@@ -2240,7 +2240,7 @@ final class DuckController: ObservableObject {
                                 )
                             }
                         }
-                        if dayFixture {
+                        if self.dayFixture {
                             // Same shape the core publishes; two synthetic
                             // rows only for the view test, never shown without
                             // the launch argument.

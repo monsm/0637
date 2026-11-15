@@ -1551,6 +1551,7 @@ PY
 #    ModalBottomSheets never stack (P1-20).
 tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1 || {
   echo "::error::the time rail has no Time button (handover check)"
+  grep -o 'text="[^"]*"\|content-desc="[^"]*"' ui.xml 2>/dev/null | sort -u | head -30 || true
   exit 1
 }
 sleep 1

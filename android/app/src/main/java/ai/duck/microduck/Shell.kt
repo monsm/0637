@@ -2052,7 +2052,7 @@ private fun PortraitTimeRail(
         ) {
             Icon(
                 Icons.time,
-                contentDescription = null,
+                contentDescription = Copy.time,
                 tint = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier.size(18.dp),
             )
