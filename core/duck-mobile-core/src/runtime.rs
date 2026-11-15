@@ -1711,17 +1711,22 @@ impl<T: RobotIo> DuckRuntime<T> {
             object.insert("idle_s".to_owned(), serde_json::json!(idle));
             // The parent's day, as the duck keeps it: allowance in minutes,
             // and how much of the duck's own powered time it has used.
+            // `minutes` is OMITTED rather than null: iOS saves this object
+            // into UserDefaults, a property list, and a null inside it is
+            // an exception at save time - the smoke session proved it.
             let used = (self.book().life.powered_s - self.care.budget_base_s).max(0.0);
-            object.insert(
-                "parent".to_owned(),
-                serde_json::json!({
-                    "minutes": self.care.budget_s.map(|s| s / 60),
-                    "used_s": (used * 10.0).round() / 10.0,
-                    "left_s": self.care.budget_s.map_or(0.0, |budget| {
-                        (f64::from(budget) - used).max(0.0)
-                    }),
+            let mut parent = serde_json::json!({
+                "used_s": (used * 10.0).round() / 10.0,
+                "left_s": self.care.budget_s.map_or(0.0, |budget| {
+                    (f64::from(budget) - used).max(0.0)
                 }),
-            );
+            });
+            if let Some(seconds) = self.care.budget_s {
+                if let Some(map) = parent.as_object_mut() {
+                    map.insert("minutes".to_owned(), serde_json::json!(seconds / 60));
+                }
+            }
+            object.insert("parent".to_owned(), parent);
         }
         value
     }
