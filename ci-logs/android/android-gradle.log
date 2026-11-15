@@ -21,11 +21,11 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:processDebugManifestForPackage
-> Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
 > Task :app:checkDebugDuplicateClasses
-> Task :app:mergeDebugJniLibFolders
+> Task :app:compressDebugAssets
 > Task :app:processDebugResources
+> Task :app:mergeDebugJniLibFolders
 > Task :app:mergeLibDexDebug
 > Task :app:mergeDebugNativeLibs
 > Task :app:validateSigningDebug
@@ -67,7 +67,7 @@ e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduc
 e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Expecting '"'.
 e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Expecting ')'.
 e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4054:3 Syntax error: Incorrect template entry: .
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794705771810.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794706673778.json
 
 FAILURE: Build failed with an exception.
 
@@ -271,5 +271,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 41s
+BUILD FAILED in 28s
 28 actionable tasks: 28 executed

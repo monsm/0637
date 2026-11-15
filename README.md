@@ -7,7 +7,7 @@ iOS / Android 上的 MicroDuck 数字孪生。目标：官方 MJCF 身体 + 官�
 ```
 D:\AI\Duck
 ├─ FIDELITY.md          保真度定义、能做到/做不到的边界
-├─ M1_REPORT.md         桌面验证报告（已完成）
+├─ M1_REPORT.md         M1 桌面验证报告（历史；桌面面已移除）
 ├─ M2_PLAN.md           iOS 优先 / 原生 Metal / Rust 核心 / 全技能
 ├─ M2_PROGRESS.md       Rust 控制回路闭环实测
 ├─ upstream/
@@ -19,21 +19,24 @@ D:\AI\Duck
 │  └─ duck-mobile-core/ Rust 移动核心：官方 duck-control + robotd 调度器
 │                       + BAM M6 + 端内 MuJoCo + C ABI + manifest
 ├─ ios/                 SwiftUI + Metal + XcodeGen 工程与构建脚本
-├─ .github/workflows/   iOS macOS CI
-└─ work/
-   ├─ .venv/            Python 3.12 环境
-   ├─ run_trace.py      无界面官方策略轨迹运行器
-   ├─ body_bam.py       BAM MuJoCo TCP body server
-   ├─ shim/             Windows 下 termios/tty 兼容层
-   └─ traces/           M1 参考轨迹 CSV
+├─ android/             Kotlin + GLES3 + Gradle 工程与构建脚本
+└─ .github/workflows/   core / iOS / Android 三条 CI
 ```
 
 ## 快速复现
 
-```powershell
-D:\AI\Duck\work\.venv\Scripts\python.exe D:\AI\Duck\work\run_trace.py `
-  --walk-vx 0.4 --duration 10 --out D:\AI\Duck\work\traces\check.csv
+两端都由 CI 自动构建（见下表）。本地验证核心用 CI 同命令：
+
+```bash
+cd core && cargo test --locked --workspace -- --include-ignored
 ```
+
+（需要 Rust 1.99.1 与 ONNX Runtime >= 1.23 的动态库；核心引用官方
+fixture，缺文件即失败不是跳过。）
+
+**产品只有 iOS 和 Android 两端**——桌面 sim harness（work/run_trace、
+body_bam 与核心的 sim_* bins）已随桌面版移除；`upstream/` 里的官方
+duck-sim 仍是验证基准，但不是产品。
 
 ## CI（推送 GitHub 构建）
 
