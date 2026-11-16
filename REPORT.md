@@ -602,6 +602,14 @@ iOS 真机 IPA 仍等签名凭据，Android arm64 真机仍没跑，真实双手
 
 **B3 iOS 止血（`e966146`，iOS 工作流绿）**——pad-send chip 移出 gift-emotion action 闭包（FE-1；此前它在闭包里只构造不渲染——源码级 tag 断言对死链永远绿的活例）；日子行补视图消费（FE-3，生命卡显示与 Android 同款最近 7 天，语义字体 caption2 不破棘轮）；`-duck.peerFixture` / `-duck.dayFixture` 两个 launch-arg fixture（TEST-NET 地址、两行合成日子，演示性注入不记任何真账）；两条新 XCUITest 验收（三条 gift/pad chip 可见可点、日子行逐字上屏）。施工中立的两个教训留痕：fixture 断言红了五轮才定位——二分断言（抽屉徽标+空态）与树 dump（`app.debugDescription`）缺一不可；**行容器上的 accessibilityIdentifier 会下渗覆盖全部子元素**——chip 的 id 曾在树里全部变成 `peer-row-0`，行级 identifier 已删（Android 冒烟保留该锚点）。
 
+**B4 first_gift 接线（`0b90814`/`2e64fd0`，iOS 绿）**——`recordPeerGift(ok:)` 只认核心 `gift_event` 的 `ok=true`（鸭子真吃了/真播了情绪），点击处记账=把拒绝与节流记成成就的编造路径被堵死；新增项目首个 unit-test target（DuckTests，三用例：接受解锁/拒绝保持灰/摸喂不算礼物），Duck scheme 先跑单测再跑 UI 测试。施工中立的教训：`settle()` 断言「达到预期状态」，期望「不解锁」时应写正向断言——首推把逻辑写反被 CI 抓住。
+
+**B5 文案归一 + 8 开关对象名（`955aa97`，双端绿）**——老板拍板：`roomLampNote` 保留平台事实差（iOS 无照度 API，各端说各的真话），`rewindPlay/netPad` 统一；七处真漂移值统一（waking「叫醒/唤醒」→唤醒、faceStatus 大小写对齐核心 wire 词、flashlight、heartRowNote、aiNote、abNote、backupReady），`copy-exceptions.json` 收缩到 1 条平台事实——值门禁从此真守其余 254 个成员。Android 八个开关（网控手柄/心跳/房间灯/罗盘/倒放/AB 载入/HUD/双人接机）改说 `stateOn/stateOff`——TalkBack 听到「心跳，开」而不是八个一样的「手电筒 开」；iOS 同病两处（倒推行 note、脸部面板 LED 判定）一并治。
+
+**B6 DuckTheme 色批（`1925468`+`ad080ca`，双端绿）**——`DuckTheme.swift/.kt` 按 UI_TOKENS §7 钉死路径落地 13 色（暖黑房间、喙橙唯一行动色、冷蓝数据色、三态色）；色字面量 iOS 23→15（10 处即表本身）、Android 27→10（全在表内）；两处私有 Color 扩展退役；选中态两端统一 `accent.action`（iOS 的 cyan 是分化的另一半）；规则卡冷蓝渐变归位 `bg.surface`；PhotoCapture 无相机回退改画房间的暖褐地平线（经 Daylight，STAGE_LOOK §2.3），不再画蓝格世界；深色模式一处 plist 声明（`INFOPLIST_KEY_UIUserInterfaceStyle: Dark`），16 处逐视图硬写清零。棘轮同提交收紧（16→0、两计数器按新小值重定基线）。纪律留痕：首批漏提交 8 个 sheet，本地绿、提交树红——棘轮在 CI 上逮住了它；语音测试一次挂起为 flake（Voice/AVFoundation 零改动、复跑即绿）。
+
+三批后基线：色字面量 Android 0 处（全在 DuckTheme.kt）、iOS 仅 DuckTheme 自身 10 处 + 渲染层 2 处；深色硬写 0；Copy 值门禁守 254 成员、豁免仅 1 条平台事实。
+
 ---
 
 ## 八、仓库与复现
