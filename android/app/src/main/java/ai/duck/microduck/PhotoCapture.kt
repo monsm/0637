@@ -34,13 +34,26 @@ fun compositePhoto(room: Bitmap?, duck: Bitmap): Bitmap {
         canvas.drawBitmap(room, null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
     } else {
         // In Director the GL frame is transparent when no camera image came
-        // back. Paint the studio behind it instead of saving an empty PNG.
-        canvas.drawColor(android.graphics.Color.rgb(14, 19, 26))
+        // back. Paint the studio behind it instead of saving an empty PNG —
+        // and paint the room the Live screen paints, not a cold blue grid
+        // world (STAGE_LOOK §2.3): the hour's warm brown, horizon to zenith.
+        val light = Daylight.at(Daylight.localHour())
+        val horizon = intArrayOf(
+            (0.102f * light.tint[0] * light.exposure * 255f).toInt().coerceIn(0, 255),
+            (0.090f * light.tint[1] * light.exposure * 255f).toInt().coerceIn(0, 255),
+            (0.078f * light.tint[2] * light.exposure * 255f).toInt().coerceIn(0, 255),
+        )
+        val zenith = intArrayOf(
+            (horizon[0] * 0.55f).toInt().coerceIn(0, 255),
+            (horizon[1] * 0.55f).toInt().coerceIn(0, 255),
+            (horizon[2] * 0.55f).toInt().coerceIn(0, 255),
+        )
+        canvas.drawColor(android.graphics.Color.rgb(horizon[0], horizon[1], horizon[2]))
         val paint = Paint()
         paint.shader = android.graphics.LinearGradient(
             0f, 0f, 0f, height.toFloat(),
-            android.graphics.Color.rgb(14, 19, 26),
-            android.graphics.Color.rgb(23, 28, 36),
+            android.graphics.Color.rgb(horizon[0], horizon[1], horizon[2]),
+            android.graphics.Color.rgb(zenith[0], zenith[1], zenith[2]),
             android.graphics.Shader.TileMode.CLAMP,
         )
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)

@@ -1297,12 +1297,12 @@ private fun AISheet(
                 )
             }
             if (error != null) {
-                Text(error, color = Color(0xFFFFB74D), fontSize = 11.sp)
+                Text(error, color = DuckTheme.StateWarn, fontSize = 11.sp)
             }
             if (decision.isNotEmpty()) {
                 Text(
                     decision,
-                    color = Color(0xFF80DEEA),
+                    color = DuckTheme.AccentData,
                     fontSize = 12.sp,
                     modifier = Modifier.testTag("ai-decision"),
                 )
@@ -1449,7 +1449,7 @@ private fun PeersSheet(
                         Modifier
                             .size(8.dp)
                             .background(
-                                if (peer.replied) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
+                                if (peer.replied) DuckTheme.StateGood else DuckTheme.AccentData,
                                 CircleShape,
                             ),
                     )
@@ -1662,7 +1662,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                     Modifier
                         .fillMaxWidth()
                         .background(
-                            Color(0xFF2A4A5E),
+                            DuckTheme.BgSurface,
                             RoundedCornerShape(12.dp),
                         )
                         .padding(horizontal = 12.dp),
@@ -1893,7 +1893,7 @@ private fun TopBar(
             DropdownMenu(
                 expanded = menuOpen,
                 onDismissRequest = { onMenuOpen(false) },
-                modifier = Modifier.background(Color(0xFF141A22)),
+                modifier = Modifier.background(DuckTheme.BgSurface),
             ) {
                 DropdownMenuItem(
                     text = { Text(Copy.stick("drive"), color = Color.White) },
@@ -2074,7 +2074,7 @@ private fun PortraitTimeRail(
                             .fillMaxHeight()
                             // accent.data #7FB2D9, solid: the retained-history
                             // fill must read against the track (P1-10).
-                            .background(Color(0xFF7FB2D9), CircleShape),
+                            .background(DuckTheme.AccentData, CircleShape),
                     )
                 }
             }
@@ -2109,7 +2109,7 @@ private fun ThumbDeck(
     Row(
         modifier
             .height(90.dp)
-            .background(Color(0xFF141A22).copy(alpha = 0.94f), RoundedCornerShape(28.dp))
+            .background(DuckTheme.BgSurface.copy(alpha = 0.94f), RoundedCornerShape(28.dp))
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -2761,7 +2761,7 @@ private fun SkillRing(
                     }
                     )
                     .padding(horizontal = 12.dp)
-                    .background(Color(0xFF141A22).copy(alpha = 0.96f), RoundedCornerShape(22.dp))
+                    .background(DuckTheme.BgSurface.copy(alpha = 0.96f), RoundedCornerShape(22.dp))
                     // Taps on the panel itself (headings, padding) must not
                     // bubble to the scrim's dismissal: consuming them here
                     // keeps only taps outside the panel closing the ring.
@@ -2902,7 +2902,7 @@ internal fun QuestCard(board: QuestBoardUi) {
             if (board.streak > 0) {
                 Text(
                     Copy.questStreak(board.streak),
-                    color = Color(0xFFFFB74D),
+                    color = DuckTheme.StateWarn,
                     fontSize = 11.sp,
                 )
             }
@@ -2918,7 +2918,7 @@ internal fun QuestCard(board: QuestBoardUi) {
                     ) {
                         Text(
                             if (quest.done) "✓" else "${index + 1}",
-                            color = if (quest.done) Color(0xFF66BB6A) else Color.White.copy(alpha = 0.55f),
+                            color = if (quest.done) DuckTheme.StateGood else Color.White.copy(alpha = 0.55f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.width(18.dp),
@@ -2945,7 +2945,7 @@ internal fun QuestCard(board: QuestBoardUi) {
                             .height(5.dp)
                             .clip(RoundedCornerShape(3.dp))
                             .testTag("quest-progress-$index"),
-                        color = if (quest.done) Color(0xFF66BB6A) else Color(0xFF4FC3F7),
+                        color = if (quest.done) DuckTheme.StateGood else DuckTheme.AccentData,
                         trackColor = Color.White.copy(alpha = 0.10f),
                     )
                 }
@@ -2953,7 +2953,7 @@ internal fun QuestCard(board: QuestBoardUi) {
             if (board.quests.all { it.done }) {
                 Text(
                     Copy.questAllDone,
-                    color = Color(0xFF66BB6A),
+                    color = DuckTheme.StateGood,
                     fontSize = 11.sp,
                     modifier = Modifier.testTag("quest-all-done"),
                 )
@@ -2986,9 +2986,9 @@ private fun CareCard(care: CareUi) {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CareBar(Copy.fullness, care.fullness, Color(0xFFFFB74D), "care-hunger", Modifier.weight(1f))
-            CareBar(Copy.mood, care.moodFraction, Color(0xFFF48FB1), "care-mood", Modifier.weight(1f))
-            CareBar(Copy.bond, care.bondFraction, Color(0xFF80DEEA), "care-bond", Modifier.weight(1f))
+            CareBar(Copy.fullness, care.fullness, DuckTheme.StateWarn, "care-hunger", Modifier.weight(1f))
+            CareBar(Copy.mood, care.moodFraction, DuckTheme.AccentData, "care-mood", Modifier.weight(1f))
+            CareBar(Copy.bond, care.bondFraction, DuckTheme.AccentData, "care-bond", Modifier.weight(1f))
         }
         // The numbers live here, in the instrument: the stage says how the
         // duck feels, the dashboard says how much.
@@ -3857,10 +3857,10 @@ private fun PathOverlay(
             drawn.drop(1).forEach { stroke.lineTo(it.x, it.y) }
             drawPath(
                 stroke,
-                color = Color(0xFF4FC3F7),
+                color = DuckTheme.AccentData,
                 style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
             )
-            drawn.forEach { drawCircle(Color(0xFF4FC3F7).copy(alpha = 0.7f), 3.dp.toPx(), it) }
+            drawn.forEach { drawCircle(DuckTheme.AccentData.copy(alpha = 0.7f), 3.dp.toPx(), it) }
         } else if (active && mpp > 0f && accepted.isNotEmpty()) {
             // Metres back to pixels through the inverse of the draw mapping.
             val walk = Path()
@@ -3871,14 +3871,14 @@ private fun PathOverlay(
                 )
                 if (index == 0) walk.moveTo(here.x, here.y) else walk.lineTo(here.x, here.y)
                 drawCircle(
-                    if (index < reached) Color.White.copy(alpha = 0.25f) else Color(0xFF4FC3F7),
+                    if (index < reached) Color.White.copy(alpha = 0.25f) else DuckTheme.AccentData,
                     3.dp.toPx(),
                     here,
                 )
             }
             drawPath(
                 walk,
-                color = Color(0xFF4FC3F7).copy(alpha = 0.8f),
+                color = DuckTheme.AccentData.copy(alpha = 0.8f),
                 style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
             )
         }

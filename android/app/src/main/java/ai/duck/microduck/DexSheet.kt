@@ -86,7 +86,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
         ) {
             Text(
                 if (entry.count > 0) "✓" else "·",
-                color = if (entry.count > 0) Color(0xFF66BB6A) else Color.White.copy(alpha = 0.45f),
+                color = if (entry.count > 0) DuckTheme.StateGood else Color.White.copy(alpha = 0.45f),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )

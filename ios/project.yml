@@ -46,6 +46,11 @@ targets:
         ENABLE_DEBUG_DYLIB: NO
         ENABLE_PREVIEWS: NO
         GENERATE_INFOPLIST_FILE: YES
+        # Dark, once, for the whole app (UI_TOKENS §7): the room, the stage
+        # and the viewfinder are all dark; a light screen is not a variant
+        # this product has. The 16 per-view .preferredColorScheme(.dark)
+        # hardwrites went away with this key.
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         # Portrait is the product; landscape stays as the two-hand instrument

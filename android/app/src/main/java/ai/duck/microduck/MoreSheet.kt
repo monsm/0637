@@ -46,8 +46,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** UI_TOKENS v1 literals until B2 grows DuckTheme.kt. */
-internal val ShellSurface = Color(0xFF221F1D)   // bg.surface, warm
-internal val ActionAccent = Color(0xFFFF8A3D)   // accent.action
+// The shared table lives in DuckTheme.kt (UI_TOKENS §7); these two
+// names kept their call sites.
+internal val ShellSurface = DuckTheme.BgSurface
+internal val ActionAccent = DuckTheme.AccentAction
 
 /**
  * The one More drawer (B4 §2), mirrored from iOS's MoreSheet.swift: four

@@ -297,7 +297,7 @@ private fun DuckScreen(
         skills = (0 until active.skillCount()).mapNotNull { active.skillName(it) }
     }
 
-    Box(Modifier.fillMaxSize().background(Color(0xFF0E131A))) {
+    Box(Modifier.fillMaxSize().background(DuckTheme.BgRoot)) {
         val active = core
         if (active != null) {
             // Director: the room, then the duck over it. CameraX renders into
@@ -431,7 +431,7 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF0E131A), RoundedCornerShape(20.dp))
+                .background(DuckTheme.BgRoot, RoundedCornerShape(20.dp))
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -552,7 +552,7 @@ private fun FailureCard(
     Column(
         modifier
             .padding(24.dp)
-            .background(Color(0xFF141A22), RoundedCornerShape(18.dp))
+            .background(DuckTheme.BgSurface, RoundedCornerShape(18.dp))
             .padding(20.dp)
             .testTag("failure-card"),
         horizontalAlignment = Alignment.CenterHorizontally,
