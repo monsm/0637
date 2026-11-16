@@ -112,7 +112,6 @@ struct DiarySheet: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
         .onAppear { controller.loadDiary() }
         .onDisappear {
             // The synthesizer outlives the sheet; a duck that keeps reading

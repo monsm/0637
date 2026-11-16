@@ -64,6 +64,5 @@ struct ABSheet: View {
             Spacer()
         }
         .padding(20)
-        .preferredColorScheme(.dark)
     }
 }

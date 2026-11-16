@@ -47,7 +47,6 @@ struct BigButtonsSheet: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
     }
 
     /// One verb: a full-width 72 pt button, 20 pt words, the accent colour

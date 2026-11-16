@@ -34,7 +34,6 @@ struct DexSheet: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
     }
 
     @ViewBuilder

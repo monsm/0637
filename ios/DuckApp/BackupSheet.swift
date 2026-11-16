@@ -67,7 +67,6 @@ struct BackupSheet: View {
             Spacer()
         }
         .padding(20)
-        .preferredColorScheme(.dark)
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: [.json, .data],
