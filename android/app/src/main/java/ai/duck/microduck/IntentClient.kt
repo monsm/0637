@@ -192,8 +192,8 @@ internal fun parseBehaviorSummary(text: String): String {
     val emotion = Regex(""""emotion"\s*:\s*\{[^}]*\}""").find(text)?.value
     val name = emotion?.let { Regex(""""name"\s*:\s*"([^"]+)"""").find(it)?.groupValues?.get(1) }
     if (name != null) {
-        val elapsed = Regex(""""elapsed_s"\s*:\s*([0-9.]+)"""").find(emotion)?.groupValues?.get(1) ?: "0"
-        val duration = Regex(""""duration_s"\s*:\s*([0-9.]+)"""").find(emotion)?.groupValues?.get(1) ?: "0"
+        val elapsed = Regex(""""elapsed_s"\s*:\s*([0-9.]+)""").find(emotion)?.groupValues?.get(1) ?: "0"
+        val duration = Regex(""""duration_s"\s*:\s*([0-9.]+)""").find(emotion)?.groupValues?.get(1) ?: "0"
         // The wire name is `yes_fast`; the sheet says what a person calls
         // it. The clock is the instrument's own reading.
         return "${skillLabel(name)} $elapsed/${duration}s"
