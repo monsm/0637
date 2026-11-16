@@ -5,6 +5,15 @@ plugins {
 }
 
 android {
+    testOptions {
+        unitTests.all {
+            it.testLogging {
+                events("failed")
+                showStandardStreams = true
+                exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+            }
+        }
+    }
     namespace = "ai.duck.microduck"
     compileSdk = 35
     ndkVersion = "27.3.13750724"

@@ -71,6 +71,10 @@ class IntentClientTest {
         // this test pins is that the parser reads the wire name and the two
         // clocks, not a hard-coded English word.
         val actualEmotion = parseBehaviorSummary(emotion)
+        System.out.println(
+            "BEHAVIOUR TEST expected=[${skillLabel("yes_fast")} 1.5/2.0s] " +
+                "actual=[$actualEmotion] language=${Copy.language}"
+        )
         assertEquals(
             "behaviour line was '$actualEmotion' (language ${Copy.language})",
             "${skillLabel("yes_fast")} 1.5/2.0s",
