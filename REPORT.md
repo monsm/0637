@@ -610,6 +610,61 @@ iOS 真机 IPA 仍等签名凭据，Android arm64 真机仍没跑，真实双手
 
 三批后基线：色字面量 Android 0 处（全在 DuckTheme.kt）、iOS 仅 DuckTheme 自身 10 处 + 渲染层 2 处；深色硬写 0；Copy 值门禁守 254 成员、豁免仅 1 条平台事实。
 
+### 四之十九、回拍板三键与 IA 契约（2026-11-16，`4477a89`）
+
+老板看过 11-15 会议纪要后拍板三项，先落两项零 UI 的：
+
+- **平台事实差三键（已拍板「各端说各的真话」）**：`roomLampNote` 保留平台事实（iOS 无照度 API）；B5 曾把 `rewindPlay`/`netPad` 统一，本批恢复各端真值（iOS `Rewind play` / `UDP pad (port 4210)`，Android `Rewind` / `UDP pad (4210)`），三键一起进 `contracts/copy-exceptions.json` 的 `platform_facts`。`check-copy-values.py` 增加冻结断言：platform_facts 必须恰好等于这三键的集合——扩表要开会，缩表要改值，改文件本身不再能静音门禁。B5 的 exceptions allowlist 自此冻结。
+- **IA 4×4 契约（已拍板开工）**：`contracts/features.yaml` 落地为唯一事实源（三套方案取小满骨架——唯一引用 §5:116「时间类控制定在时间栏」的一版——再按「每目的页控件 ≤6」重算分组）；`scripts/check-ui-features.py` 守 4 组 × ≤4 行、每页 ≤6 控件、台账完整、not-implemented 必须写原因、无邻居时合唱/礼物/ensemble 可见禁用、倒放独占时间栏。按老板的「契约先红、再搬入口」执行：首跑红在唯一真实违规（iOS 抽屉 25 行 > 16 预算），搬运批把它转绿。
+- **中文圆体（已拍板暂不放包）**：字体档位收敛批继续搁置，等许可核实后再议；本轮零字形改动。
+
+### 四之二十、CI 稳定性：合唱边界探针不再和自己竞速（`ae5ad01`）
+
+Core 在 `4477a89` 红了一次，失败项 `a_chorus_without_moves_sings_the_documented_pair`。根因不是产品缺陷：`qa3_boundaries` 的 harness 为了给阻塞式 GET 探针回话，后台 applier 线程每 5 ms 抽干一次意图队列；该正向探针 POST 后立刻 drain 并要求队列里恰好有一条——快机器上 applier 先抽走，测试就报「the chorus was not queued」。修复按本仓既有的「固定等待改轮询」纪律：harness 记录 applier 抽到的意图，探针同时轮询两路（测试 drain + applier 记录），断言「鸭子恰好收到一次合唱」，不再断言「哪个线程先看到」。产品代码零改动；Core 与 Android 全绿。
+
+### 四之二十一、B7 单路由合一（`cd83714` + `eef62bb` 修复链）
+
+会议 §5 的 B7，按对抗评审的要求施工：**adapter 先转发、旧状态后删**，五个在用适配 bool 的写入点逐条迁走后才删除。
+
+- **iOS**：`ContentView.Modal`（8 case）、`MoreSheet.Destination`（12 case）、`InstrumentSheet` 四个散 bool 合成 `DuckRoute.swift` 一张表：`ShellRouteState` 两字段（sheet + overlay，技能环可浮在 sheet 之上）、纯 `ShellOverlayReducer`（open 替换、close 清空、back 先环后表），`DuckTests` 有同规则单测。目的地 switch 收进 `DuckRouteSheets.swift`；抽屉/仪表里的行在**当前 sheet 之上**打开目的地（`child` 嵌套），所以「关掉 AI 回到仪表」这类旧 UI 断言保持绿——这正是会议说的不能当僵尸删的适配层。
+- **Android**：12 个顶层 show* 布尔、`showDetails`、抽屉里的 `showModes` 全部收成一个 `rememberSaveable` 的 `ShellRouteState`，Saver 只存目的地 id；所有转移走纯 `ShellOverlayReducer`（JVM 8 条测试：替换不叠、环与表共存、back 先环后表、存档往返、未知 id 不崩、case 集登记）。`BackHandler` 改为按层关闭；横屏菜单消费同一张表；模式对话框成为路由而不是抽屉的私有 dialog。
+- **门禁**：新增 `scripts/check-routes.py`（两端 case 集 = 登记集、无散落 show*/destination/modal、BackHandler + saveable 在位、route- 前缀、两端 reducer 测试在位），挂 contracts.yml 与双端工作流。棘轮在同一提交里有意收紧：模态布尔 14→0、rememberSaveable 0→2、ContentView 1918→1838 行。
+- **UI 测试**：新增抽屉→Dex→返回抽屉、仪表→Dex→返回仪表两条往返断言；既有 ai-open 往返按原样保留并继续通过。
+
+**施工留痕（B7）**：Android 首推红在 MoreSheet 四处多行回调（`onRules/onDance/onBig/onDex`）没换成路由调用——补丁只替换了单行形态；iOS 首推红在类型检查超时，先后把 ZStack 舞台、生命周期修饰链三段拆出并绑定中间值，最后定位到真凶：`-duck.openMore` 的局部变量名 `open` 遮蔽了路由打开方法，`open(.more)` 变成对 String 的调用（Xcode 报成「unable to type-check」）。ContentView 行数的两次基线调整都是有意为之并在提交里写明；后续 IA 把横屏菜单移出后文件回落到 1758 行。
+
+### 四之二十二、B8 IntentClient 抽取（`899e885` + 修复）
+
+会议 §5 的 B8：Shell.kt 底部八处 `127.0.0.1:8765` 的 `URL()`/`HttpURLConnection`（一个 POST 助手 + 七个 GET 读取器）**逐字搬出**到 `IntentClient.kt`，零缓存、零重试、零语义变更。解析尾巴原样提成 `parse*` 函数只为可测：新增 `IntentClientTest` 七条 JVM fixture 单测，覆盖带逗号的事件、leds 块与 pack 电量不串、情绪时钟、8×8 ToF 热条、麦克风摘要、分支数、技巧书。`PadSender` 的 UDP 与 `AIBrain` 的用户端点按会议决议不动。Shell.kt 内 `URL(`/`HttpURLConnection` 计数归零（B8 验收 grep），文件 4110→3879 行，棘轮同提交重定基线。
+
+**施工留痕（B8）**：JVM 夹具第一次跑红在 org.json——android.jar 的桩会抛「not mocked」，测试类路径补上真 org.json（`cac81ef`）；随后行为摘要夹具又抓出一个搬迁前就存在的真 bug：`elapsed_s`/`duration_s` 与 `takeover` 的正则用四引号收尾，模式里多带一个引号，Android 的行为行永远显示 `0/0s` 且空闲张望永不出现。修的是产品解析器（两处各去掉一个多余引号，`f44aa82`/`52c2c68`），不是把测试放宽；行为断言的期望值改走 `skillLabel`，语言不再是本测试的变量；单测失败详情已开 `testLogging`（`771fb55`）。
+
+### 四之二十三、IA 4×4 搬入口（`51b3f4c` + `5706eb1`/`b0c5ae9` 修复）
+
+老板拍板的 IA 重排，按「契约先红、再搬入口」落地：
+
+- **首层 16 行（两端同构）**：玩＝画路走/积木规则/编舞铺/玩一玩；一起＝邻居/合唱/互送礼物/双人接机；记录＝每日任务/鸭子日记/明信片/情绪图鉴；这只鸭子＝AI 伙伴/晚安/鸭子的脸/工具。
+- **三个新目的页（每页 ≤6 控件）**：玩一玩＝操控方式/AB 试穿/推把对比/HUD；鸭子的脸＝心跳/手电筒/语言/大字/罗盘/倾斜看；工具＝家长时长/房间灯/备份/ToF。倒放归时间栏（§5:116 唯一先例）；定时器留在积木规则页、LED 留在编舞铺、开口说话留在日记页。
+- **入口搬家不搬账**：iOS 抽屉 25 行压到 16；Android 抽屉 14→16（补合唱/礼物/双人接机行，大字移入鸭子的脸页），仪表墙上被搬走的芯片从仪表删除，一项功能只有一个家。每日任务/成长手册的数据链一字未动（B4 §7）。
+- **门禁转绿**：`check-ui-features.py` 由红转绿（16 行、每页 ≤6、台账完整、两端一一对应），并挂进 contracts/ios/android 三条工作流；`check-ui-entries.py` 的 86 个锚点随入口改写更新后仍全绿；棘轮零增长（新页用共享 48 pt `SheetCloseButton`、语义字号，不新增手抄关闭钮与固定字号）。Copy 新键 `playMore/tools/gifts/duckFace` 两端同推（键集 268=268）。
+- **⑤ iOS 横屏菜单**：顶栏 ⋯ 菜单改成与竖屏抽屉完全同序的四组，所有行消费同一张 `DuckRoute` 表；菜单连同 `stickIcon` 抽成 `LandscapeMenu.swift`，ContentView 不再为横屏维护第二套条目顺序。倾斜看补进鸭子的脸页（第 6 个控件，仍 ≤6）。
+- **测试**：Android 冒烟的语言切换改为「更多 → 鸭子的脸 → Language」两跳，抽屉清单断言换成新的 16 行；iOS 既有抽屉断言（记录四行）不变。
+
+**施工留痕（IA）**：Android 首推红在 `heartBpm` 的类型（核心发布 Double，新页本地变量写成 Float，`5706eb1`）；冒烟红在成长区块内嵌 Python 的 `\n` 被补丁写成真换行（`b0c5ae9`）。最终 Android 冒烟全绿（含两跳语言切换、新抽屉清单与成长手册断言）。
+
+### 四之二十四、Android 成长手册/成就墙（老板拍板④，`ee610f2`）
+
+老板 2026-11-16 拍板单独立项：Android 补成长手册/成就墙，同源语义、零编造。小满先出验收标准（`docs/PROGRESS_ANDROID.md`），小鹿施工：
+
+- **事件账**：`ProgressStore.kt` 与 iOS `ProgressFile` 逐字段同构（schemaVersion 1、近 30 天明细 + 终身累计、bestWalk/bestStreak、单向解锁）。六个事件各一条真实规则：pet/feed/photo 挂真实意图点；walk 走里程计增量、停走一条 poll 后结一次；trick 只认 roulade 计数首次读取后的新增（每次最多 10，同 iOS）；peer 只认 `gift_event.ok == true`（核心自己说吃到了/演了），且启动后第一次发布只点提示不记账——礼物会持续发布最后一份，不能把上次的礼物算进今天。首次读 /state 只建基线，功能上线前的历史就是空的。
+- **面板**：记录组「每日任务」页新增成长手册区块：连续天数、最近 7 天、10 枚成就（同 id 同条件）、核心的日子行；无记录时只说一句「还没有记录」，不摆 0 天连击、不显示编造日期。成就名/说明走 Copy（两端同推新键，键集 268→304 仍相等）。
+- **验证**：JVM 13 条单测（空账诚实、真实事件解锁、连续 3 天跨「今天未活跃」不断、31 天裁剪到 30 且累计/成就不掉、walk 最值与累计、100 次抚摸、peer 按核心裁决、深夜、坏文件/异版本归零、重载不回锁）；Android smoke 打开每日任务页断言成长区块与「空态或连续」二选一真实态 + 成就行。
+- **边界**：不迁移/伪造 iOS 历史、不同步云端、不改核心；数据链仍各端本机（B4 §7）。
+
+### 四之二十五、不做清单（老板拍板，记录在案）
+
+① Android 正式签名——不做，继续 unsigned 自签路线，文档照旧写「未签名」；② AI 内置模型服务——不做，维持用户自填端点；③ 中文圆体——不随包放字体，字体档位收敛继续搁置。
+
 ---
 
 ## 八、仓库与复现

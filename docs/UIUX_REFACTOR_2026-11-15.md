@@ -231,8 +231,8 @@
 
 ---
 
-## 九、待老板/下次会议拍板
+## 九、回拍板（2026-11-16 老板已拍，三项全部落定）
 
-1. **IA 4×4 重排**：11 项新功能（心跳/家长时长/房间灯/罗盘/备份/ToF/AB/推把/倒放/HUD/双人接机）+ 定时器/大字/日子行进哪组？每目的页控件上限多少？（三个备选分组方案在工作流存档）
-2. **平台事实差三键**：`roomLampNote`（iOS 无照度 API vs Android 手动/照度驱动）、`rewindPlay`（Rewind play vs Rewind）、`netPad`（port 4210 vs 4210）——各端说各的真话（进 exceptions），还是统一措辞？
-3. **中文圆体许可**：SF Rounded/Roboto 无中文字形，「圆润」人格在中文界面不可见——要不要随包放思源黑体圆体/HarmonyOS Sans SC（许可+包体+两端字形匹配三件事）？
+1. **IA 4×4 重排 —— 已拍板：开工，已实现。** 分组取小满版骨架（三套方案里唯一引用 §5:116「时间类控制定在时间栏」的一版），按老板新约束「每目的页控件上限 ≤6」重算：首层 4 组 × 4 行 = 16 行；玩/一起/记录/这只鸭子四组；新设「玩一玩 / 鸭子的脸 / 工具」三个目的页，每页 ≤6 控件；倒放归时间栏；定时器留在积木规则页内。`contracts/features.yaml` 是唯一事实源，`scripts/check-ui-features.py` 守 4×4、≤6、台账、enabled-when 与两端一一对应——按「契约先红、再搬入口」执行（首跑红在 iOS 抽屉 25 行，搬运后转绿）。iOS 横屏 ⋯ 菜单改为与竖屏抽屉完全同序的四组，消费同一张路由表。
+2. **平台事实差三键 —— 已拍板：各端说各的真话，进 exceptions，不许统一措辞。** `roomLampNote`（iOS 无照度 API）、`rewindPlay`（Rewind play vs Rewind）、`netPad`（UDP pad (port 4210) vs UDP pad (4210)）恢复各端真值；`contracts/copy-exceptions.json` 的 `platform_facts` 冻结为这三键，`check-copy-values.py` 断言集合相等——长要开会、缩要改值。
+3. **中文圆体许可 —— 已拍板：暂不放包。** 字体档位收敛批继续搁置，等许可核实后再议；本轮不做任何字形替换。
