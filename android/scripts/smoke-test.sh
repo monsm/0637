@@ -1384,8 +1384,7 @@ with open('/tmp/duck-growth-seen.txt', 'a', encoding='utf-8') as handle:
     for node in root.iter('node'):
         value = (node.get('text') or '') + (node.get('content-desc') or '')
         if value:
-            handle.write(value + "
-")
+            handle.write(value + "\n")
 PY
   if python3 - <<'PY'
 try:
