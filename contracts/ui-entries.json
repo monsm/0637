@@ -358,7 +358,7 @@
       "id": "progress-book",
       "zh": "成长手册/成就墙",
       "conform_b4": "extension",
-      "note": "iOS 独有（本机 ProgressStore + 7 日瓦片 + 成就墙）；Android 无对应页——是新产品不是重排，另立产品批次（会议决议）",
+      "note": "iOS 独有（本机 ProgressStore + 7 日瓦片 + 成就墙）；Android 2026-11-16 立项补齐（同 id 同条件、真实事件账、零回填，见 docs/PROGRESS_ANDROID.md）",
       "ios": {
         "implemented": true,
         "anchor": [
@@ -367,8 +367,11 @@
         ]
       },
       "android": {
-        "implemented": false,
-        "note": "Android 无 ProgressStore 事件账，无对应页；照会议决议不并入重排"
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "growth-book"
+        ]
       }
     },
     {
@@ -443,8 +446,8 @@
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Companion.kt",
-          "life.days"
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "day-rows"
         ]
       }
     },

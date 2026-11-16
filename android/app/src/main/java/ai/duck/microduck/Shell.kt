@@ -348,6 +348,10 @@ fun Shell(
         // how long the quiet lasted.
         var lastNightActive = false
         var lastNightQuiet = 0.0
+        // Growth ledger baselines: the first read only sets them.
+        var walkBaseline: Double? = null
+        var walkSession = 0.0
+        var lastRolls: Int? = null
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.
@@ -385,8 +389,52 @@ fun Shell(
             // the same gift from raising its pill on every poll.
             val giftEvent = stateText?.let(::parseGiftEvent)
             if (giftEvent != null && giftEvent.tick != lastGiftTick) {
+                // The first publish after launch may still carry the last
+                // gift from a previous session: it raises the pill (the user
+                // may not have seen it), but it must not enter today's
+                // ledger - that would be inventing history (docs/
+                // PROGRESS_ANDROID.md). Later ticks are new gifts.
+                val firstObservation = lastGiftTick == -1
                 lastGiftTick = giftEvent.tick
                 soundLine = giftEvent.text
+                // The wall credits a gift only on the core's own verdict
+                // (gift_event.ok: it ate, it played the mood). A refused or
+                // busy gift is not an achievement.
+                if (giftEvent.ok && !firstObservation) DuckProgress.record(ProgressEvent.Peer)
+            }
+            // Growth ledger: metres count as sessions (increment, settle on a
+            // quiet poll); rolls count only new executions since the first
+            // read. The first read sets the baselines and credits nothing -
+            // history before this feature existed is honestly empty.
+            val lifeNow = stateText?.let(::parseLifeFromState)
+            if (lifeNow != null) {
+                val base = walkBaseline
+                if (base == null) {
+                    walkBaseline = lifeNow.metres
+                } else {
+                    val delta = lifeNow.metres - base
+                    if (delta > 0.05) {
+                        walkSession += delta
+                        walkBaseline = lifeNow.metres
+                    } else if (walkSession > 0.0) {
+                        DuckProgress.record(ProgressEvent.Walk, walkSession.roundToInt())
+                        walkSession = 0.0
+                        walkBaseline = lifeNow.metres
+                    } else {
+                        walkBaseline = lifeNow.metres
+                    }
+                }
+                val last = lastRolls
+                if (last == null) {
+                    lastRolls = lifeNow.rolls
+                } else {
+                    if (lifeNow.rolls > last) {
+                        repeat(minOf(lifeNow.rolls - last, 10)) {
+                            DuckProgress.record(ProgressEvent.Trick)
+                        }
+                    }
+                    lastRolls = lifeNow.rolls
+                }
             }
             // The night: a chosen sleep, ended by the morning verb or by a
             // real hand. Its end is the active->inactive edge, and the pill
@@ -652,7 +700,10 @@ fun Shell(
                             Modifier.padding(end = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            ButtonChip(Copy.bigButtonAction(0), "p2-pet") { postDuckCommand("/pet") }
+                            ButtonChip(Copy.bigButtonAction(0), "p2-pet") {
+                            DuckProgress.record(ProgressEvent.Pet)
+                            postDuckCommand("/pet")
+                        }
                             ButtonChip(Copy.bigButtonAction(2), "p2-quack") { quack?.invoke() }
                             ButtonChip(Copy.bigButtonAction(3), "p2-sit") { core.sit() }
                         }
@@ -1146,7 +1197,10 @@ fun Shell(
 
     if (route == DuckRoute.Big && core != null) {
         BigButtonsSheet(
-            onPet = { postDuckCommand("/pet") },
+            onPet = {
+                DuckProgress.record(ProgressEvent.Pet)
+                postDuckCommand("/pet")
+            },
             onFeed = { onFeed?.invoke() },
             onQuack = { quack?.invoke() },
             onSit = { core.sit() },
@@ -2439,6 +2493,7 @@ private fun Modifier.portraitStageGesture(
                     val insideDuck = x > width * 0.25f && x < width * 0.75f &&
                         y > height * 0.33f && y < height * 0.68f
                     if (insideDuck) {
+                        DuckProgress.record(ProgressEvent.Pet)
                         postDuckCommand("/pet")
                     } else if (stick == "drive") {
                         val dx = x - width * 0.5f

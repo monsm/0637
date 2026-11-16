@@ -304,11 +304,10 @@ features:
     page: quests
     hops: 2
     conform_b4: extension
-    note: iOS 独有（本机 ProgressStore + 7 日瓦片 + 成就墙）；Android 无对应页
+    note: 两端同页同条件；Android 2026-11-16 立项补齐（真实事件账、零回填、空就是空，docs/PROGRESS_ANDROID.md）
     ios: implemented
-    android: not-implemented
-    reason: "Android 无 ProgressStore 事件账，是新产品不是重排；另立产品批次（会议决议）"
-    data_chain: ios=ProgressStore；android=无
+    android: implemented
+    data_chain: 各端本机事件账（iOS ProgressStore / Android ProgressStore），语义同源；不迁移、不互抄历史
   - id: day-rows
     zh: 日子行
     group: record

@@ -15,7 +15,7 @@ struct LandscapeMenu: View {
                 // Same four groups, same order as the portrait drawer
                 // (boss ruling 2026-11-16): landscape consumes the one route
                 // table instead of keeping a second menu of its own.
-                Section(Copy.groupPlay) {
+                Section(header: Text(Copy.groupPlay)) {
                     ForEach(StickMode.allCases, id: \.self) { option in
                         Button {
                             stickMode = option
@@ -41,7 +41,7 @@ struct LandscapeMenu: View {
                     }
                     .accessibilityIdentifier("open-playmore")
                 }
-                Section(Copy.groupTogether) {
+                Section(header: Text(Copy.groupTogether)) {
                     Button { onOpen(.peers) } label: {
                         Label(Copy.peers, systemImage: "dot.radiowaves.left.and.right")
                     }
@@ -59,7 +59,7 @@ struct LandscapeMenu: View {
                     }
                     .accessibilityIdentifier("open-p2")
                 }
-                Section(Copy.groupRecord) {
+                Section(header: Text(Copy.groupRecord)) {
                     Button { onOpen(.progress) } label: {
                         Label(Copy.dailyQuests, systemImage: Icons.quests)
                     }
@@ -77,7 +77,7 @@ struct LandscapeMenu: View {
                     }
                     .accessibilityIdentifier("open-dex")
                 }
-                Section(Copy.thisDuck) {
+                Section(header: Text(Copy.thisDuck)) {
                     Button { onOpen(.ai) } label: {
                         Label(Copy.ai, systemImage: "brain.head.profile")
                     }

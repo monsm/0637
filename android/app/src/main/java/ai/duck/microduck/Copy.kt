@@ -441,6 +441,46 @@ val quack get() = pick("Quack", "叫一声")
     // The room's chorus: every duck performs the same moves together.
     val chorus get() = pick("Chorus", "合唱")
     val gifts get() = pick("Gifts", "互送礼物")
+
+    // 成长手册（Android 立项，2026-11-16）：与 iOS ProgressKit 的成就同 id
+    // 同条件；名称/说明走 Copy，语言切换即时生效。
+    val achFirstTrickName get() = pick("First trick", "第一次翻滚")
+    val achFirstTrickDetail get() = pick("Make it perform a trick", "让它做一个技能动作")
+    val achFirstFeedName get() = pick("First meal", "第一次喂食")
+    val achFirstFeedDetail get() = pick("Feed it a meal", "喂它吃一顿饭")
+    val achFirstPostcardName get() = pick("First postcard", "第一张明信片")
+    val achFirstPostcardDetail get() = pick("Take a photo postcard", "拍一张照片明信片")
+    val achFirstGiftName get() = pick("Neighbour gift", "邻居礼物")
+    val achFirstGiftDetail get() = pick("A gift from a neighbour arrives", "和邻居互送一次礼物")
+    val achStreak3Name get() = pick("3-day streak", "连续 3 天")
+    val achStreak3Detail get() = pick("Come back 3 days in a row", "连续 3 天回来看它")
+    val achStreak7Name get() = pick("7-day streak", "连续 7 天")
+    val achStreak7Detail get() = pick("Come back 7 days in a row", "连续 7 天回来看它")
+    val achWalk100Name get() = pick("100 m walked", "累计散步 100 米")
+    val achWalk100Detail get() = pick("Walk 100 metres in total", "散步加起来走满 100 米")
+    val achPet100Name get() = pick("100 pets", "累计摸 100 次")
+    val achPet100Detail get() = pick("Pet it 100 times in total", "摸它加起来满 100 次")
+    val achLateNightName get() = pick("Late-night company", "深夜陪伴")
+    val achLateNightDetail get() = pick("Keep it company between midnight and 5 am", "在凌晨 0–5 点陪陪它")
+    val achWalk30Name get() = pick("30 m in one walk", "一次散步 30 米")
+    val achWalk30Detail get() = pick("Walk 30 metres in one go", "一口气散步走满 30 米")
+    val growthBook get() = pick("Growth book", "成长手册")
+    val growthWeek get() = pick("Last 7 days", "最近 7 天")
+    val growthEmpty get() = pick("No records yet - pet, feed or walk to start", "还没有记录——摸摸、喂喂或走一走就开始")
+    val growthAchievements get() = pick("Achievements", "成就墙")
+    fun growthStreak(n: Int) = pick("%d-day streak", "连续 %d 天").format(n)
+    fun growthBest(n: Int) = pick("%d best", "最长 %d 天").format(n)
+    fun growthTasks(done: Int, total: Int) = pick("Today %d/%d", "今日任务 %d/%d").format(done, total)
+    fun growthUnlockedOn(day: String) = pick("Unlocked %s", "%s 解锁").format(day)
+    fun weekday(index: Int): String = when (index) {
+        0 -> pick("Sun", "日")
+        1 -> pick("Mon", "一")
+        2 -> pick("Tue", "二")
+        3 -> pick("Wed", "三")
+        4 -> pick("Thu", "四")
+        5 -> pick("Fri", "五")
+        else -> pick("Sat", "六")
+    }
     fun chorusLine(peers: Int) = pick(
         "Singing together with $peers duck(s)",
         "和 $peers 只鸭子一起唱",

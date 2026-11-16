@@ -613,6 +613,48 @@ enum Copy {
     // same moods 1.5 s later.
     static var chorus: String { pick("Chorus", "合唱") }
     static var gifts: String { pick("Gifts", "互送礼物") }
+
+    // 成长手册（Android 立项，2026-11-16）：与 iOS ProgressKit 的成就同 id
+    // 同条件；名称/说明走 Copy，语言切换即时生效。
+    static var achFirstTrickName: String { pick("First trick", "第一次翻滚") }
+    static var achFirstTrickDetail: String { pick("Make it perform a trick", "让它做一个技能动作") }
+    static var achFirstFeedName: String { pick("First meal", "第一次喂食") }
+    static var achFirstFeedDetail: String { pick("Feed it a meal", "喂它吃一顿饭") }
+    static var achFirstPostcardName: String { pick("First postcard", "第一张明信片") }
+    static var achFirstPostcardDetail: String { pick("Take a photo postcard", "拍一张照片明信片") }
+    static var achFirstGiftName: String { pick("Neighbour gift", "邻居礼物") }
+    static var achFirstGiftDetail: String { pick("A gift from a neighbour arrives", "和邻居互送一次礼物") }
+    static var achStreak3Name: String { pick("3-day streak", "连续 3 天") }
+    static var achStreak3Detail: String { pick("Come back 3 days in a row", "连续 3 天回来看它") }
+    static var achStreak7Name: String { pick("7-day streak", "连续 7 天") }
+    static var achStreak7Detail: String { pick("Come back 7 days in a row", "连续 7 天回来看它") }
+    static var achWalk100Name: String { pick("100 m walked", "累计散步 100 米") }
+    static var achWalk100Detail: String { pick("Walk 100 metres in total", "散步加起来走满 100 米") }
+    static var achPet100Name: String { pick("100 pets", "累计摸 100 次") }
+    static var achPet100Detail: String { pick("Pet it 100 times in total", "摸它加起来满 100 次") }
+    static var achLateNightName: String { pick("Late-night company", "深夜陪伴") }
+    static var achLateNightDetail: String { pick("Keep it company between midnight and 5 am", "在凌晨 0–5 点陪陪它") }
+    static var achWalk30Name: String { pick("30 m in one walk", "一次散步 30 米") }
+    static var achWalk30Detail: String { pick("Walk 30 metres in one go", "一口气散步走满 30 米") }
+    static var growthBook: String { pick("Growth book", "成长手册") }
+    static var growthWeek: String { pick("Last 7 days", "最近 7 天") }
+    static var growthEmpty: String { pick("No records yet - pet, feed or walk to start", "还没有记录——摸摸、喂喂或走一走就开始") }
+    static var growthAchievements: String { pick("Achievements", "成就墙") }
+    static func growthStreak(_ n: Int) -> String { String(format: pick("%d-day streak", "连续 %d 天"), n) }
+    static func growthBest(_ n: Int) -> String { String(format: pick("%d best", "最长 %d 天"), n) }
+    static func growthTasks(_ done: Int, _ total: Int) -> String { String(format: pick("Today %d/%d", "今日任务 %d/%d"), done, total) }
+    static func growthUnlockedOn(_ day: String) -> String { String(format: pick("Unlocked %s", "%s 解锁"), day) }
+    static func weekday(_ index: Int) -> String {
+        switch index {
+        case 0: return pick("Sun", "日")
+        case 1: return pick("Mon", "一")
+        case 2: return pick("Tue", "二")
+        case 3: return pick("Wed", "三")
+        case 4: return pick("Thu", "四")
+        case 5: return pick("Fri", "五")
+        default: return pick("Sat", "六")
+        }
+    }
     static func chorusLine(_ peers: Int) -> String {
         String(format: pick("Singing together with %d duck(s)", "和 %d 只鸭子一起唱"), peers)
     }

@@ -1351,6 +1351,67 @@ PY
 adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
 sleep 1
 
+# The growth book (Android 立项, 2026-11-16): the Record group's daily page
+# carries the streak, the last seven days and ten achievements. The ledger
+# is real-event-only, so on a run where nothing happened yet the page says
+# so in one honest line; where something did happen it shows the streak
+# line. Both are valid - silence dressed up as an achievement is not.
+tap_text "更多" > /dev/null 2>&1 || {
+  echo "::error::the thumb deck lost the More button (growth book)"
+  exit 1
+}
+QUESTS_TAP=0
+for _ in $(seq 1 15); do
+  if tap_text "每日任务" > /dev/null 2>&1; then QUESTS_TAP=1; break; fi
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
+[ "$QUESTS_TAP" = "1" ] || { echo "::error::the drawer never showed the quests row"; exit 1; }
+GROWTH_OK=0
+echo -n "" > /tmp/duck-growth-seen.txt
+for _ in $(seq 1 20); do
+  sleep 0.3
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  [ -s ui.xml ] || continue
+  python3 - <<'PY' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(0)
+with open('/tmp/duck-growth-seen.txt', 'a', encoding='utf-8') as handle:
+    for node in root.iter('node'):
+        value = (node.get('text') or '') + (node.get('content-desc') or '')
+        if value:
+            handle.write(value + "
+")
+PY
+  if python3 - <<'PY'
+try:
+    seen = open('/tmp/duck-growth-seen.txt', encoding='utf-8').read()
+except Exception:
+    raise SystemExit(1)
+has_book = '成长手册' in seen and '成就墙' in seen
+has_state = ('还没有记录' in seen) or ('连续' in seen)
+has_achievement = '第一次翻滚' in seen
+raise SystemExit(0 if has_book and has_state and has_achievement else 1)
+PY
+  then
+    GROWTH_OK=1
+    break
+  fi
+  # The achievement wall runs below the fold: swipe it into view.
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
+[ "$GROWTH_OK" = "1" ] || {
+  echo "::error::the daily page has no honest growth book"
+  cat /tmp/duck-growth-seen.txt 2>/dev/null | sort -u | head -40 || true
+  exit 1
+}
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+
 # The diary's speak channel: the system voice reading the real facts aloud,
 # honestly labelled as the phone speaking FOR the duck (not the duck's own
 # synth). A fresh install has no facts yet, so the button may not exist; the
