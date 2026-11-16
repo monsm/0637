@@ -151,9 +151,12 @@ final class ProgressStore: ObservableObject {
     /// 只允许在 queue 上读写（init 除外）。
     private var file: ProgressFile
 
-    private init() {
-        if let url = Self.directory()?.appendingPathComponent("progress.json"),
-           let data = try? Data(contentsOf: url),
+    /// Injectable for the unit tests: they pass a throwaway directory so
+    /// one test's facts never leak into another's wall.
+    init(directory: URL? = nil) {
+        let url = (directory ?? Self.directory())?
+            .appendingPathComponent("progress.json")
+        if let url, let data = try? Data(contentsOf: url),
            let decoded = try? JSONDecoder().decode(ProgressFile.self, from: data),
            decoded.schemaVersion == Self.schemaVersion {
             file = decoded
@@ -162,6 +165,15 @@ final class ProgressStore: ObservableObject {
             file = ProgressFile()
         }
         apply(makeSnapshot())
+    }
+
+    /// A neighbour gift reaches the wall only when the core itself said
+    /// ok — the duck actually ate the treat or played the mood. A refused,
+    /// busy or throttled delivery (the tap happened, the gift did not)
+    /// never becomes an achievement; that would be inventing a fact.
+    func recordPeerGift(ok: Bool) {
+        guard ok else { return }
+        record(.peer)
     }
 
     /// 记一次真实事件。任意线程可调；metric 为本次累计量（散步传米数）。
