@@ -3,8 +3,8 @@
    Compiling kinematics v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/kinematics)
    Compiling duck-mobile-core v0.1.0 (/Users/runner/work/0637/0637/core/duck-mobile-core)
    Compiling odometry v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/odometry)
-   Compiling robotd-params v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/robotd-params)
    Compiling duck-control v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-control)
+   Compiling robotd-params v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/robotd-params)
 warning: unused import: `crate::control::Tuning`
   --> duck-mobile-core/src/ffi.rs:19:5
    |
@@ -76,4 +76,4 @@ warning: function `duck_mj_timestep` is never used
    |        ^^^^^^^^^^^^^^^^
 
 warning: `duck-mobile-core` (lib) generated 8 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 5 suggestions)
-    Finished `release` profile [optimized] target(s) in 38.48s
+    Finished `release` profile [optimized] target(s) in 56.84s
