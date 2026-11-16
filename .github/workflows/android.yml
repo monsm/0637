@@ -43,6 +43,7 @@ jobs:
           python3 scripts/check-copy-values.py .
           python3 scripts/check-ui-baseline.py .
           python3 scripts/check-ui-entries.py .
+          python3 scripts/check-routes.py .
 
       - uses: actions/setup-java@v4
         id: java

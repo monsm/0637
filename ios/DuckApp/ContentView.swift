@@ -17,7 +17,6 @@ import UIKit
 struct ContentView: View {
     @StateObject private var controller = DuckController()
     @State private var surface = Surface.live
-    @State private var showRing = false
     /// The pad's stick modes, reduced to the four a phone can express:
     /// walk/turn, look, crouch/lean the standing body, and drawing a route
     /// for the duck to walk.
@@ -29,46 +28,19 @@ struct ContentView: View {
     @AppStorage("first_launch_hint_shown") private var hintShown = false
     @State private var showHint = false
 
-    @State private var showInstrument = false
     /// The time button's long press: the quick freeze. The button's own
     /// action fires on the same lift, so the hold has to be able to say
     /// "that was me".
     @State private var timeHolding = false
     @State private var timeHoldEndedAt = Date.distantPast
-    /// The child's block program, edited over the live duck.
-    @State private var showRules = false
-    /// Other ducks on the Wi-Fi.
-    @State private var showPeers = false
-    /// The user's own model.
-    @State private var showAI = false
-    /// The child's choreography recorder.
-    @State private var showDance = false
-    /// One sheet at a time. SwiftUI's multiple `.sheet` modifiers on one view
-    /// are not reliable; a single item sheet cannot disagree with itself.
-    enum Modal: Identifiable {
-        case instrument
-        case photo(DuckController.CapturedPhoto)
-        case rules
-        case peers
-        case ai
-        case dance
-        case progress
-        case more
-
-        var id: String {
-            switch self {
-            case .instrument: return "instrument"
-            case .photo(let photo): return "photo-\(photo.id)"
-            case .rules: return "rules"
-            case .peers: return "peers"
-            case .ai: return "ai"
-            case .dance: return "dance"
-            case .progress: return "progress"
-            case .more: return "more"
-            }
-        }
-    }
-    @State private var modal: Modal?
+    /// One route table (B7): every sheet is a DuckRoute, the skill ring is
+    /// the overlay field. Rows inside a presented sheet nest their own
+    /// destination (DuckRouteSheets), so this field only ever owns the
+    /// top-level sheet and a reduce can never stack two of them.
+    @State private var routeState = ShellRouteState()
+    /// The Director photo behind the `photo` route. Kept out of the route so
+    /// a restored destination can never show a stale image.
+    @State private var photoPreview: DuckController.CapturedPhoto?
     @State private var tapTarget: CGPoint?
     @State private var lastTap = Date.distantPast
     /// Where the hand was when the grab engaged: a carry measures from the
@@ -130,7 +102,7 @@ struct ContentView: View {
                     )
                     .onLongPressGesture(minimumDuration: 0.35) {
                         if controller.ready && controller.renderError == nil {
-                            showRing = true
+                            setRing(true)
                         }
                     }
                 // The route being drawn, in the same screen space as the
@@ -146,15 +118,15 @@ struct ContentView: View {
                     chrome(in: geometry.size)
                         .zIndex(2)
                 }
-                if showRing {
+                if routeState.overlay == .ring {
                     SkillRing(
                         names: controller.skillNames(),
                         bottomAnchored: portrait
                     ) { name in
                         controller.trigger(name)
-                        showRing = false
+                        setRing(false)
                     } onClose: {
-                        showRing = false
+                        setRing(false)
                     }
                     // Above the chrome: the portrait deck and the landscape
                     // bar carry zIndex(2), and the bottom-anchored picker sat
@@ -204,34 +176,20 @@ struct ContentView: View {
             // the old full-screen ignore put the buttons under the home bar.
             // One modal sheet for every surface: instrument, Director photo,
             // blocks, neighbours and the user's model.
-            .sheet(item: $modal) { sheet in
+            .sheet(item: $routeState.sheet) { sheet in
                 modalSheet(sheet, portrait: portrait)
-            }
-            .onChange(of: showInstrument) { _, show in
-                if show { showInstrument = false; modal = .instrument }
             }
             // The renderer cannot see a SwiftUI sheet: tell it when the
             // instrument is up so the stage becomes the cold lab (look 2).
-            .onChange(of: modal?.id) { _, id in
-                controller.instrumentOpen = (id == "instrument")
+            .onChange(of: routeState.sheet) { _, sheet in
+                controller.instrumentOpen = (sheet == .instrument)
             }
             .onReceive(controller.$capturedPhoto) { photo in
                 if let photo {
                     controller.capturedPhoto = nil
-                    modal = .photo(photo)
+                    photoPreview = photo
+                    open(.photo)
                 }
-            }
-            .onChange(of: showRules) { _, show in
-                if show { showRules = false; modal = .rules }
-            }
-            .onChange(of: showPeers) { _, show in
-                if show { showPeers = false; modal = .peers }
-            }
-            .onChange(of: showAI) { _, show in
-                if show { showAI = false; modal = .ai }
-            }
-            .onChange(of: showDance) { _, show in
-                if show { showDance = false; modal = .dance }
             }
         }
         // The hint teaches gestures, so it must wait until gestures work:
@@ -248,7 +206,7 @@ struct ContentView: View {
                 // strings, so the value is read as text.
                 if let open = UserDefaults.standard.string(forKey: "duck.openMore"),
                    open.lowercased() == "yes" || open == "1" {
-                    modal = .more
+                    open(.more)
                 }
             }
         }
@@ -470,7 +428,7 @@ struct ContentView: View {
             .onChanged { gesture in
                 // Portrait's own guard, for its landscape twin: a ring open
                 // on top means no driving underneath it.
-                guard controller.ready, !showRing else { return }
+                guard controller.ready, routeState.overlay != .ring else { return }
                 if controller.carrying {
                     // Measure from the grab, not from a drag that started
                     // while the duck was still on the floor.
@@ -683,7 +641,18 @@ struct ContentView: View {
     /// lift, so the two have to tell each other apart.
     private func openInstrument() {
         if timeHolding || Date().timeIntervalSince(timeHoldEndedAt) < 0.6 { return }
-        showInstrument = true
+        open(.instrument)
+    }
+
+    /// Open a top-level destination. Rows inside a presented sheet do not
+    /// come through here - the sheet host nests them - so this is a plain
+    /// "replace the sheet" reduce, same as Android.
+    private func open(_ route: DuckRoute) {
+        routeState = ShellOverlayReducer.reduce(routeState, .open(route))
+    }
+
+    private func setRing(_ on: Bool) {
+        routeState = ShellOverlayReducer.reduce(routeState, on ? .openRing : .closeRing)
     }
 
     /// Long press the time button = freeze at once. `LongPressGesture.sequenced`
@@ -710,65 +679,16 @@ struct ContentView: View {
     /// body expression — every modifier on the scene — was more than the
     /// type checker could solve once the drawer joined it.
     @ViewBuilder
-    private func modalSheet(_ sheet: Modal, portrait: Bool) -> some View {
-        switch sheet {
-        case .instrument:
-            InstrumentSheet(controller: controller)
-                .presentationDetents(portrait ? [.medium, .large] : [.large])
-                .presentationDragIndicator(.visible)
-        case .photo(let photo):
-            PhotoPreviewSheet(
-                photo: photo,
-                shelf: controller.postcards
-            )
-        case .rules:
-            RulesSheet(controller: controller)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        case .peers:
-            PeersSheet(controller: controller)
-                .presentationDetents(portrait ? [.medium, .large] : [.large])
-                .presentationDragIndicator(.visible)
-        case .ai:
-            AISheet(controller: controller)
-                .presentationDetents(portrait ? [.medium, .large] : [.large])
-                .presentationDragIndicator(.visible)
-        case .dance:
-            DanceSheet(
-                studio: controller.dance,
-                execute: playDanceStep,
-                tryStep: { kind, value in
-                    let label = kind == "sound"
-                        ? Copy.danceStepSound
-                        : SkillLabel.of(value)
-                    controller.dance.record(
-                        kind,
-                        value: value,
-                        label: label
-                    )
-                    playDanceStep(DanceStep(
-                        kind: kind,
-                        value: value,
-                        label: label
-                    ))
-                }
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        case .progress:
-            ProgressSheet()
-                .presentationDetents(portrait ? [.medium, .large] : [.large])
-                .presentationDragIndicator(.visible)
-        case .more:
-            MoreSheet(
-                controller: controller,
-                stickMode: $stickMode,
-                languageTick: $languageTick,
-                onDanceStep: playDanceStep
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        }
+    private func modalSheet(_ sheet: DuckRoute, portrait: Bool) -> some View {
+        DuckRouteSheets(
+            route: sheet,
+            portrait: portrait,
+            controller: controller,
+            stickMode: $stickMode,
+            languageTick: $languageTick,
+            photo: photoPreview,
+            onDanceStep: playDanceStep
+        )
     }
 
     /// The share of retained history, not of the whole run: the bar fills as
@@ -791,7 +711,7 @@ struct ContentView: View {
     private var thumbDeck: some View {
         HStack(spacing: 8) {
             primaryButton("duck-feed", Copy.feed, Icons.feed) { controller.feed() }
-            primaryButton("duck-skills", Copy.skills, Icons.skills) { showRing = true }
+            primaryButton("duck-skills", Copy.skills, Icons.skills) { setRing(true) }
             primaryButton("duck-quack", Copy.quack, Icons.quack) { quackTapped() }
                 .simultaneousGesture(wheeeGesture)
             primaryButton(
@@ -806,7 +726,7 @@ struct ContentView: View {
                     controller.grab()
                 }
             }
-            primaryButton("duck-more", Copy.more, Icons.more) { modal = .more }
+            primaryButton("duck-more", Copy.more, Icons.more) { open(.more) }
         }
         .frame(height: 82)
         .padding(.horizontal, 10)
@@ -913,7 +833,7 @@ struct ContentView: View {
     private func portraitDriveGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { gesture in
-                guard controller.ready, !showRing else { return }
+                guard controller.ready, routeState.overlay != .ring else { return }
                 pulseToken += 1
                 if controller.carrying {
                     // First change after the grab is the anchor: the drag
@@ -970,7 +890,7 @@ struct ContentView: View {
                 }
                 let distance = hypot(gesture.translation.width, gesture.translation.height)
                 let wasTap = distance < 8
-                if wasTap && !showRing {
+                if wasTap && routeState.overlay != .ring {
                     // A touch on the duck strokes it; a touch on the floor
                     // ahead sends a short step or turn, not a dead no-op.
                     let insideDuck = gesture.location.x > size.width * 0.25
@@ -1277,7 +1197,7 @@ struct ContentView: View {
                 // 每日任务与成就墙：竖屏主力形态的入口。放在顶栏而不是时间
                 // 栏：时间栏的进度条不能被第五个钮挤成一条缝。
                 Button {
-                    modal = .progress
+                    open(.progress)
                 } label: {
                     Image(systemName: "flame")
                         .font(.body)
@@ -1340,25 +1260,25 @@ struct ContentView: View {
                     Label(Copy.language.rawValue, systemImage: "globe")
                 }
                 Button {
-                    showRules = true
+                    open(.rules)
                 } label: {
                     Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
                 }
                 .accessibilityIdentifier("open-rules")
                 Button {
-                    showPeers = true
+                    open(.peers)
                 } label: {
                     Label(Copy.peers, systemImage: "dot.radiowaves.left.and.right")
                 }
                 .accessibilityIdentifier("open-peers")
                 Button {
-                    showAI = true
+                    open(.ai)
                 } label: {
                     Label(Copy.ai, systemImage: "brain.head.profile")
                 }
                 .accessibilityIdentifier("open-ai")
                 Button {
-                    showDance = true
+                    open(.dance)
                 } label: {
                     Label(Copy.dance, systemImage: "music.note.list")
                 }
@@ -1384,7 +1304,7 @@ struct ContentView: View {
         HStack(spacing: 10) {
             // The time machine lives one pull away, not on the screen.
             Button {
-                showInstrument = true
+                open(.instrument)
             } label: {
                 Label(Copy.time, systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
@@ -1398,7 +1318,7 @@ struct ContentView: View {
             .accessibilityIdentifier("duck-time")
 
             Button {
-                showRing = true
+                setRing(true)
             } label: {
                 Label(Copy.skills, systemImage: "sparkles")
                     .labelStyle(.iconOnly)
@@ -1432,7 +1352,7 @@ struct ContentView: View {
 
             // 今日任务与成就墙：每天回来的理由。
             Button {
-                modal = .progress
+                open(.progress)
             } label: {
                 Label(Copy.progress, systemImage: "flame")
                     .labelStyle(.iconOnly)
@@ -1510,7 +1430,7 @@ struct ContentView: View {
             // The block program, one tap from the stage: a child should not
             // have to find it in a menu.
             Button {
-                showRules = true
+                open(.rules)
             } label: {
                 Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
                     .labelStyle(.iconOnly)

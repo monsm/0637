@@ -50,6 +50,8 @@ jobs:
         run: python3 scripts/check-ui-baseline.py .
       - name: UI entry ledger
         run: python3 scripts/check-ui-entries.py .
+      - name: One route table (B7)
+        run: python3 scripts/check-routes.py .
       - name: Protected paths (warning)
         if: github.event_name == 'push'
         run: python3 scripts/check-protected-paths.py . ${{ github.event.before }}
