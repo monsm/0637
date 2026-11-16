@@ -193,7 +193,7 @@ internal fun DuckPanelSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val prefs = remember(context) { context.getSharedPreferences("duck", android.content.Context.MODE_PRIVATE) }
     var heartOn by remember { mutableStateOf(prefs.getBoolean("duck_heart_on", false)) }
-    var bpm by remember { mutableStateOf(0f) }
+    var bpm by remember { mutableStateOf(0.0) }
     val heart = remember(context) { Heart(context) }
     LaunchedEffect(heartOn) {
         heart.setEnabled(heartOn)
