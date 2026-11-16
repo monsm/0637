@@ -139,8 +139,8 @@ struct ContentView: View {
                 // takes the acceptance screenshot of it without a hand on the
                 // phone (`-duck.openMore YES`). The argument domain stores
                 // strings, so the value is read as text.
-                if let open = UserDefaults.standard.string(forKey: "duck.openMore"),
-                   open.lowercased() == "yes" || open == "1" {
+                if let launchArg = UserDefaults.standard.string(forKey: "duck.openMore"),
+                   launchArg.lowercased() == "yes" || launchArg == "1" {
                     open(.more)
                 }
             }
