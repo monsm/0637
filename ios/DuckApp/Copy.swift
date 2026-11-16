@@ -451,7 +451,7 @@ enum Copy {
     static var formation: String { pick("Dance together", "家庭舞团") }
     static var roleDance: String { pick("Role dance", "角色编舞") }
     static var voiceChoir: String { pick("Voice choir", "多鸭合奏") }
-    static var netPad: String { pick("UDP pad (4210)", "网控手柄 (4210)") }
+    static var netPad: String { pick("UDP pad (port 4210)", "网控手柄 (4210)") }
     static var netPadNote: String {
         pick(
             "Set the pair code first; the official DKPD pad then drives this duck.",
@@ -490,7 +490,7 @@ enum Copy {
     static var backupReady: String { pick("Backup written - share it", "备份已生成——分享它") }
     static var backupDone: String { pick("Restored", "已恢复") }
     static var backupFailed: String { pick("The duck refused that file", "鸭子没有收下那个文件") }
-    static var rewindPlay: String { pick("Rewind", "倒放") }
+    static var rewindPlay: String { pick("Rewind play", "倒放") }
     /// A toggle's state, usable by ANY switch: the words "on/off" alone made
     /// eight different toggles sound identical to TalkBack (B5, audit #4-8).
     /// The screen reader hears "Heartbeat, on", "Compass, off" — object and
