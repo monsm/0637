@@ -598,6 +598,10 @@ iOS 真机 IPA 仍等签名凭据，Android arm64 真机仍没跑，真实双手
 
 读码单揭出并已入台账的三个实 bug（B2/B3/B4 批修）：iOS pad-send chip 嵌在 gift-emotion action 闭包内从未渲染（FE-1）；first_gift 因 `record(.peer)` 零调用永不解锁（FE-2，只能挂 `gift_event` 成功分支，点击处记账=编造）；Android ensemble 无邻居时整个消失（IA-4）。
 
+**B2 Android 导航热修（`4900c22`，Android 工作流绿）**——现状布尔上约 30 行：`BackHandler` 按「技能环→最内层 sheet→壳层 sheet」逐层关闭（环开着按返回不再退出应用，NV-4）；仪表三 chip 先关 sheet 再交接（两层 ModalBottomSheet 叠影绝迹，P1-20）；ensemble/合唱移出空邻居分支改禁用常显（IA-4）；时间栏 Time 图标补 `contentDescription`（TalkBack 与冒烟此前都看不见它）；冒烟新增三条断言实证：邻居页返回回 Live、环返回不退应用、交接后同刻仅一层浮层。
+
+**B3 iOS 止血（`e966146`，iOS 工作流绿）**——pad-send chip 移出 gift-emotion action 闭包（FE-1；此前它在闭包里只构造不渲染——源码级 tag 断言对死链永远绿的活例）；日子行补视图消费（FE-3，生命卡显示与 Android 同款最近 7 天，语义字体 caption2 不破棘轮）；`-duck.peerFixture` / `-duck.dayFixture` 两个 launch-arg fixture（TEST-NET 地址、两行合成日子，演示性注入不记任何真账）；两条新 XCUITest 验收（三条 gift/pad chip 可见可点、日子行逐字上屏）。施工中立的两个教训留痕：fixture 断言红了五轮才定位——二分断言（抽屉徽标+空态）与树 dump（`app.debugDescription`）缺一不可；**行容器上的 accessibilityIdentifier 会下渗覆盖全部子元素**——chip 的 id 曾在树里全部变成 `peer-row-0`，行级 identifier 已删（Android 冒烟保留该锚点）。
+
 ---
 
 ## 八、仓库与复现
