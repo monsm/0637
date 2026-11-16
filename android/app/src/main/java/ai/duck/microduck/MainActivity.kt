@@ -70,6 +70,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         Copy.load(this)
+        // The growth ledger lives beside the app's other local facts; the
+        // first read only sets the walk/roll baselines (no back-filled
+        // history, docs/PROGRESS_ANDROID.md).
+        DuckProgress.init(java.io.File(filesDir, "progress.json"))
         // The stage's daylight is a function of the local hour. A launch
         // extra pins it, so screenshots and frame checks do not change with
         // the clock of whoever runs CI (`--ef daylight_hour 12`).
@@ -183,7 +187,10 @@ class MainActivity : ComponentActivity() {
                     input = input,
                     onQuack = { voice?.play("chirp") },
                     onWheee = { held -> core?.wheee(held) },
-                    onFeed = { postDuckCommand("/feed") },
+                    onFeed = {
+                        DuckProgress.record(ProgressEvent.Feed)
+                        postDuckCommand("/feed")
+                    },
                 )
             }
         }
@@ -353,10 +360,12 @@ private fun DuckScreen(
                                 if (cameraActive) {
                                     cameraCapture.take(context) { room ->
                                         photo = compositePhoto(room, duck)
+                                        DuckProgress.record(ProgressEvent.Photo)
                                         photoInFlight = false
                                     }
                                 } else {
                                     photo = duck
+                                    DuckProgress.record(ProgressEvent.Photo)
                                     photoInFlight = false
                                 }
                             }

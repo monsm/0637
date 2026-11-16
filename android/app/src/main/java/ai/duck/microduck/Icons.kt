@@ -14,6 +14,11 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Height
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.CardGiftcard
+import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.MusicNote
@@ -60,6 +65,11 @@ internal object Icons {
     val morning: ImageVector = MaterialIcons.Outlined.WbSunny
     val flashlight: ImageVector = MaterialIcons.Outlined.FlashlightOn
     val language: ImageVector = MaterialIcons.Outlined.Language
+    val chorus: ImageVector = MaterialIcons.Outlined.Groups
+    val gift: ImageVector = MaterialIcons.Outlined.CardGiftcard
+    val twoPlayer: ImageVector = MaterialIcons.Outlined.People
+    val preferences: ImageVector = MaterialIcons.Outlined.Tune
+    val tools: ImageVector = MaterialIcons.Outlined.Build
     val time: ImageVector = MaterialIcons.Outlined.History
     val director: ImageVector = MaterialIcons.Outlined.Videocam
     val live: ImageVector = MaterialIcons.Outlined.RadioButtonUnchecked

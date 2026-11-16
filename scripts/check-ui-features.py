@@ -44,7 +44,7 @@ IOS_MORE = "ios/DuckApp/MoreSheet.swift"
 DRAWER_BUDGET = 16
 PAGE_CAP = 6
 GROUP_COUNT = 4
-LEDGER_TOTAL = 32  # 22 grouped + rewind-play/progress-book/tilt-look + 定时器/大字/日子行 + 2 no-ui
+LEDGER_TOTAL = 42  # 22 + extensions + 2 no-ui
 TIME_BAR_ID = "rewind-play"
 NEIGHBOUR_GATED = {"ensemble", "chorus", "gifts"}
 
@@ -65,26 +65,27 @@ def check_yaml_consistency(cfg):
     if len(groups) != GROUP_COUNT:
         fail(f"exactly {GROUP_COUNT} groups expected, got {len(groups)}")
     groups_used = []
+    declared = 0
     for g in groups:
         gid = g.get("id")
         groups_used.append(gid)
-        rc = g.get("rows")
-        if rc is None:
-            fail(f"group '{gid}' missing rows count")
-        elif rc > 4:
-            fail(f"group '{gid}' has {rc} first-layer rows, budget is <=4")
+        rows = g.get("rows")
+        if not isinstance(rows, list):
+            fail(f"group '{gid}' rows must be a list of row ids")
+            continue
+        declared += len(rows)
+        if len(rows) > 4:
+            fail(f"group '{gid}' has {len(rows)} first-layer rows, budget is <=4")
         if not g.get("destination"):
             fail(f"group '{gid}' missing destination page")
-    if rows_budget is not None:
-        declared = sum(g.get("rows", 0) for g in groups)
-        if declared > rows_budget:
-            fail(f"first-layer rows {declared} exceed budget {rows_budget}")
+    if rows_budget is not None and declared > rows_budget:
+        fail(f"first-layer rows {declared} exceed budget {rows_budget}")
 
     pages = cfg.get("pages", [])
     page_ids = {p.get("id") for p in pages}
     for p in pages:
         pid = p.get("id")
-        if p.get("group") not in groups_used:
+        if p.get("group") not in groups_used and p.get("group") != "none":
             fail(f"page '{pid}' references unknown group '{p.get('group')}'")
         ctrl = p.get("controls")
         cap = p.get("max_controls", PAGE_CAP)
@@ -166,7 +167,7 @@ def check_ui_matches(cfg, root):
 
     for f in cfg.get("features", []):
         fid = f["id"]
-        if f.get("page") in (None, "none"):
+        if f.get("page") in (None, "none") or f.get("door"):
             continue
         rows = [entries[i] for i in ([fid] + f.get("ledger_ids", [])) if i in entries]
         if not rows:

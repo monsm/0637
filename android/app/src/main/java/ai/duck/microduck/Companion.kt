@@ -225,8 +225,11 @@ data class LifeUi(
     val days: List<String> = emptyList(),
 )
 
-fun fetchLifeRecord(): LifeUi? = try {
-    val life = JSONObject(getJson("/state")).optJSONObject("life") ?: return null
+fun fetchLifeRecord(): LifeUi? = fetchRawState()?.let(::parseLifeFromState)
+
+/** The life block of an already-fetched /state (the shell's 1 Hz loop). */
+fun parseLifeFromState(text: String): LifeUi? = try {
+    val life = JSONObject(text).optJSONObject("life") ?: return null
     LifeUi(
         metres = life.optDouble("metres", 0.0),
         rolls = life.optJSONObject("skills")?.optInt("roulade", 0) ?: 0,
@@ -485,7 +488,7 @@ fun parsePeerEvent(text: String): PeerEventUi? = try {
 }
 
 /** The last gift a neighbour sent, formatted for the pill. */
-data class GiftEventUi(val tick: Int, val text: String)
+data class GiftEventUi(val tick: Int, val text: String, val ok: Boolean)
 
 fun parseGiftEvent(text: String): GiftEventUi? = try {
     val event = JSONObject(text).optJSONObject("gift_event") ?: return null
@@ -503,7 +506,7 @@ fun parseGiftEvent(text: String): GiftEventUi? = try {
         }
         else -> return null
     }
-    GiftEventUi(event.optInt("tick", -1), line)
+    GiftEventUi(event.optInt("tick", -1), line, event.optBoolean("ok", false))
 } catch (_: Throwable) {
     null
 }

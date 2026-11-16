@@ -199,7 +199,7 @@ internal fun parseBehaviorSummary(text: String): String {
         return "${skillLabel(name)} $elapsed/${duration}s"
     }
     val gain = Regex(""""idle"\s*:\s*\{[^}]*\}""").find(text)?.value
-        ?.let { Regex(""""takeover"\s*:\s*([0-9.]+)"""").find(it)?.groupValues?.get(1)?.toDoubleOrNull() }
+        ?.let { Regex(""""takeover"\s*:\s*([0-9.]+)""").find(it)?.groupValues?.get(1)?.toDoubleOrNull() }
     if (gain != null && gain > 0.1) return Copy.lookingAround((gain * 100).toInt())
     return "—"
 }

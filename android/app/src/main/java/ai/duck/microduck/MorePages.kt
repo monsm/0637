@@ -1,0 +1,371 @@
+package ai.duck.microduck
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
+
+/**
+ * The three destination pages the IA reorder added (boss ruling 2026-11-16):
+ * the drawer keeps four groups x four rows, and the rows that used to cram
+ * the duck group and the instrument wall move into these pages. Each page
+ * carries at most six controls - the boss's cap - and the grouping lives in
+ * contracts/features.yaml, the single source of truth.
+ */
+
+@Composable
+private fun PageHeader(title: String, closeTag: String, onClose: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            title,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 20.sp,
+            modifier = Modifier.weight(1f).testTag("$closeTag-title"),
+        )
+        CloseChip(closeTag, onClose)
+    }
+}
+
+/** One row: title, optional note, optional state word, 48 dp tall. */
+@Composable
+private fun ControlRow(
+    title: String,
+    note: String? = null,
+    state: String? = null,
+    tag: String,
+    onTap: () -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+            .clickable { onTap() }
+            .padding(horizontal = 12.dp)
+            .testTag(tag),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            if (note != null) {
+                Text(
+                    note,
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    maxLines = 2,
+                )
+            }
+        }
+        if (state != null) {
+            Text(
+                state,
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** 玩一玩: stick mode, A/B, push-and-compare, HUD - four controls. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PlayMoreSheet(
+    core: DuckCore?,
+    input: DuckInput,
+    stick: String,
+    onMode: (String) -> Unit,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var abFolder by remember { mutableStateOf("") }
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = ShellSurface,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            PageHeader(Copy.playMore, "play-more-close", onClose)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("drive", "head", "body").forEach { mode ->
+                    ButtonChip(
+                        Copy.stick(mode),
+                        testTag = "play-more-mode-$mode",
+                    ) { onMode(mode) }
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                    OutlinedTextField(
+                        value = abFolder,
+                        onValueChange = { abFolder = it.take(64) },
+                        singleLine = true,
+                        modifier = Modifier.testTag("play-more-ab-folder"),
+                    )
+                }
+                ButtonChip(Copy.stateOn, "play-more-ab-load") {
+                    core?.fork()
+                    core?.reload(abFolder)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ButtonChip(Copy.pushCompare, "play-more-push") {
+                    core?.fork()
+                    postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
+                    android.widget.Toast.makeText(
+                        context, Copy.pushCompareDone, android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+                ButtonChip(
+                    if (input.hudOn) Copy.stateOn else Copy.hud,
+                    "play-more-hud",
+                ) { input.hudOn = !input.hudOn }
+            }
+            Text(Copy.abNote, color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
+            if (stick.isNotBlank()) {
+                Text(
+                    Copy.stick(stick),
+                    color = Color.White.copy(alpha = 0.55f),
+                    fontSize = 10.sp,
+                )
+            }
+        }
+    }
+}
+
+/** 这只鸭子: heart, flashlight, language, big buttons, compass - five. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DuckPanelSheet(
+    flashlightState: Int,
+    onFlashlight: () -> Unit,
+    onLanguage: () -> Unit,
+    onOpen: (DuckRoute) -> Unit,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val prefs = remember(context) { context.getSharedPreferences("duck", android.content.Context.MODE_PRIVATE) }
+    var heartOn by remember { mutableStateOf(prefs.getBoolean("duck_heart_on", false)) }
+    var bpm by remember { mutableStateOf(0f) }
+    val heart = remember(context) { Heart(context) }
+    LaunchedEffect(heartOn) {
+        heart.setEnabled(heartOn)
+        prefs.edit().putBoolean("duck_heart_on", heartOn).apply()
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            fetchCare()?.let {
+                bpm = it.heartBpm
+                heart.tick(it.heartBpm, System.currentTimeMillis())
+            }
+            delay(1000)
+        }
+    }
+    var compassOn by remember { mutableStateOf(prefs.getBoolean("duck_compass_on", false)) }
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = ShellSurface,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PageHeader(Copy.thisDuck, "duck-panel-close", onClose)
+            ControlRow(
+                Copy.heart,
+                note = if (heartOn && bpm > 0) "%.0f bpm".format(bpm) else Copy.heartRowNote,
+                state = if (heartOn) Copy.stateOn else Copy.stateOff,
+                tag = "duck-panel-heart",
+            ) { heartOn = !heartOn }
+            ControlRow(
+                Copy.flashlight,
+                note = if (flashlightState > 0) Copy.flashlightOn else Copy.flashlightOff,
+                state = if (flashlightState > 0) Copy.stateOn else Copy.stateOff,
+                tag = "duck-panel-flashlight",
+            ) { onFlashlight() }
+            ControlRow(
+                Copy.languageRow,
+                note = Copy.language.label,
+                tag = "duck-panel-language",
+            ) { onLanguage() }
+            ControlRow(
+                Copy.bigButtons,
+                note = Copy.bigButtonsNote,
+                tag = "duck-panel-big",
+            ) { onOpen(DuckRoute.Big) }
+            ControlRow(
+                Copy.compass,
+                note = Copy.compassNote,
+                state = if (compassOn) Copy.stateOn else Copy.stateOff,
+                tag = "duck-panel-compass",
+            ) {
+                compassOn = !compassOn
+                prefs.edit().putBoolean("duck_compass_on", compassOn).apply()
+            }
+        }
+    }
+}
+
+/** 工具: parent time, room lamp, backup, ToF - four controls. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ToolsSheet(
+    input: DuckInput,
+    onOpen: (DuckRoute) -> Unit,
+    onClose: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var care by remember { mutableStateOf(CareUi()) }
+    var tofStrip by remember { mutableStateOf("—") }
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+    val backupPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            backupStatus = Copy.backupWorking
+            Thread {
+                val ok = restoreBackup(context, uri)
+                scope.launch { backupStatus = if (ok) Copy.backupDone else Copy.backupFailed }
+            }.start()
+        }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            care = fetchCare() ?: care
+            tofStrip = withContext(Dispatchers.IO) { fetchTofStrip() }
+            delay(1000)
+        }
+    }
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = ShellSurface,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            PageHeader(Copy.tools, "tools-close", onClose)
+            ControlRow(
+                Copy.parentTime,
+                note = care.parentMinutes?.let { minutes ->
+                    Copy.parentLeft(minutes, (care.parentLeftS / 60.0).toInt())
+                } ?: Copy.parentOff,
+                tag = "tools-parent",
+            ) {
+                val next = when (care.parentMinutes) {
+                    null, 0 -> 15
+                    15 -> 30
+                    30 -> 60
+                    else -> 0
+                }
+                postDuckCommand("/parent", """{"minutes":$next}""")
+            }
+            ControlRow(
+                Copy.roomLamp,
+                note = if (input.ambientLux >= 0f) "${input.ambientLux.roundToInt()} lx"
+                else "${(input.ambientScale * 100).roundToInt()}%",
+                tag = "tools-lamp",
+            ) {
+                if (input.ambientLux < 0f) {
+                    val stops = listOf(0.55f, 0.7f, 0.85f, 1.0f, 1.15f)
+                    input.ambientScale =
+                        stops[(stops.indexOf(input.ambientScale.coerceIn(0.55f, 1.15f)) + 1) % stops.size]
+                }
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(Copy.backup, color = Color.White, fontSize = 15.sp)
+                    Text(
+                        backupStatus ?: Copy.backupNote,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 10.sp,
+                        maxLines = 2,
+                    )
+                }
+                ButtonChip(Copy.backupExport, "tools-backup-export") {
+                    backupStatus = Copy.backupWorking
+                    exportBackup(context)
+                }
+                ButtonChip(Copy.backupImport, "tools-backup-import") {
+                    backupPicker.launch(arrayOf("application/json", "text/plain"))
+                }
+            }
+            ControlRow(
+                Copy.tof,
+                note = tofStrip,
+                tag = "tools-tof",
+            ) {
+                scope.launch {
+                    tofStrip = withContext(Dispatchers.IO) { fetchTofStrip() }
+                }
+            }
+        }
+    }
+}

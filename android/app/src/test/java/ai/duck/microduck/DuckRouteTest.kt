@@ -93,6 +93,7 @@ class DuckRouteTest {
         val expected = setOf(
             "instrument", "rules", "peers", "ai", "dance", "progress",
             "more", "diary", "postcards", "dex", "modes", "big",
+            "play-more", "duck-panel", "tools",
         )
         assertEquals(expected, DuckRoute.entries.map { it.id }.toSet())
     }

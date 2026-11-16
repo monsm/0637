@@ -29,7 +29,10 @@ enum class DuckRoute(val id: String) {
     Postcards("postcards"),
     Dex("dex"),
     Modes("modes"),
-    Big("big");
+    Big("big"),
+    PlayMore("play-more"),
+    DuckPanel("duck-panel"),
+    Tools("tools");
 
     /** The tag a per-route test looks for on the destination surface. */
     val tag: String get() = "route-$id"

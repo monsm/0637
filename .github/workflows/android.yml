@@ -44,6 +44,8 @@ jobs:
           python3 scripts/check-ui-baseline.py .
           python3 scripts/check-ui-entries.py .
           python3 scripts/check-routes.py .
+          python3 -m pip install --quiet pyyaml || true
+          python3 scripts/check-ui-features.py .
 
       - uses: actions/setup-java@v4
         id: java

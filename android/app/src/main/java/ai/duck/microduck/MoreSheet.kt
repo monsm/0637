@@ -21,10 +21,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,13 +66,12 @@ internal fun MoreSheet(
     peers: PeersUi,
     aiConfig: AIConfig,
     nightActive: Boolean,
-    flashlightOn: Boolean,
+    twoPlayerOn: Boolean,
     stick: String,
     onPath: () -> Unit,
     onOpen: (DuckRoute) -> Unit,
     onNight: () -> Unit,
-    onFlashlight: () -> Unit,
-    onLanguage: () -> Unit,
+    onTwoPlayer: () -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -120,10 +121,10 @@ internal fun MoreSheet(
                     onOpen(DuckRoute.Dance)
                 }
                 MoreRow(
-                    Icons.controls, Copy.stickModes,
+                    Icons.controls, Copy.playMore,
                     note = Copy.stick(stick),
-                    tag = "more-controls",
-                ) { onOpen(DuckRoute.Modes) }
+                    tag = "more-playmore",
+                ) { onOpen(DuckRoute.PlayMore) }
             }
             Group(Copy.groupTogether, "together") {
                 MoreRow(
@@ -132,6 +133,18 @@ internal fun MoreSheet(
                     badge = "${peers.peers.size}/3",
                     tag = "more-peers",
                 ) { onOpen(DuckRoute.Peers) }
+                MoreRow(Icons.chorus, Copy.chorus, tag = "more-chorus") {
+                    onOpen(DuckRoute.Peers)
+                }
+                MoreRow(Icons.gift, Copy.gifts, tag = "more-gifts") {
+                    onOpen(DuckRoute.Peers)
+                }
+                MoreRow(
+                    Icons.twoPlayer, Copy.twoPlayer,
+                    check = twoPlayerOn,
+                    showsChevron = false,
+                    tag = "more-p2",
+                ) { onTwoPlayer() }
             }
             Group(Copy.groupRecord, "record") {
                 MoreRow(
@@ -140,10 +153,9 @@ internal fun MoreSheet(
                     badge = if (board.quests.isEmpty()) null else "$unfinished",
                     tag = "more-quests",
                 ) { onOpen(DuckRoute.Progress) }
-                MoreRow(Icons.big, Copy.bigButtons, note = Copy.bigButtonsNote, tag = "more-big") {
-                    onOpen(DuckRoute.Big)
+                MoreRow(Icons.diary, Copy.diary, tag = "more-diary") {
+                    onOpen(DuckRoute.Diary)
                 }
-                MoreRow(Icons.diary, Copy.diary, tag = "more-diary") { onOpen(DuckRoute.Diary) }
                 MoreRow(
                     Icons.postcards, Copy.postcardShelf,
                     badge = "$postcardCount",
@@ -168,28 +180,36 @@ internal fun MoreSheet(
                     tag = "more-night",
                 ) { onNight() }
                 MoreRow(
-                    Icons.flashlight, Copy.flashlight,
-                    note = if (flashlightOn) Copy.flashlightOn else Copy.flashlightOff,
-                    check = flashlightOn,
-                    showsChevron = false,
-                    tag = "more-flashlight",
-                ) { onFlashlight() }
+                    Icons.preferences, Copy.duckFace,
+                    note = Copy.heartRowNote,
+                    tag = "more-duckpanel",
+                ) { onOpen(DuckRoute.DuckPanel) }
                 MoreRow(
-                    Icons.language, Copy.languageRow,
-                    note = Copy.language.label,
-                    showsChevron = false,
-                    tag = "more-language",
-                ) { onLanguage() }
+                    Icons.tools, Copy.tools,
+                    note = Copy.roomLampNote,
+                    tag = "more-tools",
+                ) { onOpen(DuckRoute.Tools) }
             }
         }
     }
 }
 
-/** One quest board in its own sheet: the daily entry from the Record group. */
+/**
+ * The Record group's daily page: today's quests, the honest growth book
+ * (streak, last seven days, ten achievements) and the core's day rows -
+ * the IA table's quests page, at three controls.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun QuestsSheet(board: QuestBoardUi, onClose: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val growth by DuckProgress.snapshot.collectAsState()
+    var dayRows by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(Unit) {
+        // Crossing midnight while the app slept: recompute, never rewrite.
+        DuckProgress.refresh()
+        dayRows = withContext(Dispatchers.IO) { fetchLifeRecord()?.days ?: emptyList() }
+    }
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
@@ -198,6 +218,7 @@ internal fun QuestsSheet(board: QuestBoardUi, onClose: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -215,6 +236,125 @@ internal fun QuestsSheet(board: QuestBoardUi, onClose: () -> Unit) {
                 CloseChip("quests-close", onClose)
             }
             QuestCard(board)
+            GrowthCard(growth, dayRows)
+        }
+    }
+}
+
+/**
+ * The growth book: real counts only. With no history it says so in one
+ * line and shows no zeros dressed as achievements; every number below is
+ * the ledger's own record (docs/PROGRESS_ANDROID.md).
+ */
+@Composable
+private fun GrowthCard(growth: ProgressSnapshot, dayRows: List<String>) {
+    Column(
+        Modifier.fillMaxWidth().testTag("growth-book"),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            Copy.growthBook,
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        if (!growth.hasAnyRecord) {
+            Text(
+                Copy.growthEmpty,
+                color = Color.White.copy(alpha = 0.6f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("growth-empty"),
+            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    Copy.growthStreak(growth.streak),
+                    color = ActionAccent,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("growth-streak"),
+                )
+                Text(
+                    Copy.growthBest(growth.bestStreak),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    Copy.growthTasks(growth.tasksDoneToday, GrowthTasks.catalog.size),
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Text(
+                Copy.growthWeek,
+                color = Color.White.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.labelSmall,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                growth.week.forEach { tile ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            Copy.weekday(tile.weekday),
+                            color = Color.White.copy(alpha = 0.55f),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Box(
+                            Modifier
+                                .size(20.dp)
+                                .background(
+                                    if (tile.active) ActionAccent.copy(alpha = 0.55f)
+                                    else Color.White.copy(alpha = 0.08f),
+                                    CircleShape,
+                                )
+                                .testTag("growth-day-${tile.id}"),
+                        )
+                    }
+                }
+            }
+        }
+        if (dayRows.isNotEmpty()) {
+            Text(
+                dayRows.takeLast(7).joinToString(" | "),
+                color = Color.White.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.testTag("day-rows"),
+            )
+        }
+        Text(
+            Copy.growthAchievements,
+            color = Color.White.copy(alpha = 0.55f),
+            style = MaterialTheme.typography.labelSmall,
+        )
+        GrowthAchievements.catalog.forEach { entry ->
+            val unlockedOn = growth.unlocked[entry.id]
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .testTag("growth-achievement-${entry.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(10.dp)
+                        .background(
+                            if (unlockedOn != null) ActionAccent
+                            else Color.White.copy(alpha = 0.18f),
+                            CircleShape,
+                        ),
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        GrowthAchievements.name(entry.id),
+                        color = if (unlockedOn != null) Color.White else Color.White.copy(alpha = 0.5f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        if (unlockedOn != null) Copy.growthUnlockedOn(unlockedOn)
+                        else GrowthAchievements.detail(entry.id),
+                        color = Color.White.copy(alpha = 0.45f),
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
         }
     }
 }

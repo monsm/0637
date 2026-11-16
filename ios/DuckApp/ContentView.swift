@@ -1230,89 +1230,12 @@ struct ContentView: View {
                 .accessibilityLabel(Copy.progress)
                 .accessibilityIdentifier("duck-progress")
             }
-            Menu {
-                ForEach(StickMode.allCases, id: \.self) { option in
-                    Button {
-                        stickMode = option
-                        controller.setHead(yaw: 0, pitch: 0)
-                        controller.releaseBody()
-                    } label: {
-                        Label(Copy.stick(option.rawValue), systemImage: stickIcon(option))
-                    }
-                    // One id per mode, path included: the UI test opens the
-                    // Path Painter through this menu entry.
-                    .accessibilityIdentifier("mode-\(option.rawValue)")
-                }
-                Divider()
-                Button {
-                    withAnimation(.snappy(duration: 0.2)) { surface = .live }
-                } label: {
-                    Label(Copy.live, systemImage: "circle.dashed")
-                }
-                .accessibilityIdentifier("surface-live")
-                Button {
-                    withAnimation(.snappy(duration: 0.2)) { surface = .director }
-                } label: {
-                    Label(Copy.director, systemImage: "viewfinder")
-                }
-                .accessibilityIdentifier("surface-director")
-                Divider()
-                Button {
-                    controller.toggleFlashlight()
-                } label: {
-                    Label(
-                        controller.flashlightColor == nil ? Copy.flashlight : Copy.flashlightOn,
-                        systemImage: "flashlight.on.fill"
-                    )
-                }
-                // Tilt-to-look: the phone is the head, as the pad's IMU is.
-                Button {
-                    controller.tiltLook.toggle()
-                } label: {
-                    Label(
-                        controller.tiltLook ? Copy.tiltLookOn : Copy.tiltLook,
-                        systemImage: controller.tiltLook ? "iphone.and.arrow.left.and.right" : "iphone.gen3"
-                    )
-                }
-                Button {
-                    Copy.language = Copy.language == .english ? .chinese : .english
-                    languageTick &+= 1
-                } label: {
-                    Label(Copy.language.rawValue, systemImage: "globe")
-                }
-                Button {
-                    open(.rules)
-                } label: {
-                    Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
-                }
-                .accessibilityIdentifier("open-rules")
-                Button {
-                    open(.peers)
-                } label: {
-                    Label(Copy.peers, systemImage: "dot.radiowaves.left.and.right")
-                }
-                .accessibilityIdentifier("open-peers")
-                Button {
-                    open(.ai)
-                } label: {
-                    Label(Copy.ai, systemImage: "brain.head.profile")
-                }
-                .accessibilityIdentifier("open-ai")
-                Button {
-                    open(.dance)
-                } label: {
-                    Label(Copy.dance, systemImage: "music.note.list")
-                }
-                .accessibilityIdentifier("open-dance")
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
-                    .frame(width: 48, height: 48)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .contentShape(Circle())
-            }
-            .accessibilityLabel(Copy.menu)
-            .accessibilityIdentifier("duck-menu")
+            LandscapeMenu(
+                controller: controller,
+                stickMode: $stickMode,
+                surface: $surface,
+                onOpen: { open($0) }
+            )
         }
         .padding(10)
         // No full-width material panel: it painted a light band across the
@@ -1501,17 +1424,6 @@ struct ContentView: View {
                     controller.setWheee(false)
                 }
             }
-    }
-
-    /// One icon per stick mode, so the menu reads at a glance instead of
-    /// being a row of identical words.
-    private func stickIcon(_ mode: StickMode) -> String {
-        switch mode {
-        case .drive: return "figure.walk"
-        case .head: return "eye"
-        case .body: return "arrow.up.and.down"
-        case .path: return "scribble"
-        }
     }
 
     /// 唯一的失败出口，横竖屏共用。诊断信息要翻成人话：一个人对

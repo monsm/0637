@@ -1049,23 +1049,58 @@ if height <= width:
 print(f"portrait screenshot: {width}x{height}")
 PY
 
-# Switch the shell to Chinese through the More drawer (B4 removed the top-bar
-# menu): More -> Language. The row shows the language it is IN, so only tap
-# it when the drawer is still English.
-#
-# Poll instead of one fixed dump: a Compose sheet animates in, and a single
-# read after 1 s caught it half-drawn. The old code then skipped the tap in
-# silence (`|| true`) and the Chinese assertion below failed on an app that
-# was never asked to switch. A missing row is now a failure that prints what
-# the drawer actually held.
+# Switch the shell to Chinese through the More drawer -> 鸭子的脸 (the duck
+# panel) -> Language. The IA reorder (2026-11-16) moved the language switch
+# out of the drawer into the duck panel, so the smoke walks two sheets.
 tap_text "More" > /dev/null 2>&1 || tap_text "更多" > /dev/null 2>&1 || true
-# The Language row is the LAST row of the drawer. On the smoke emulator's
-# 320x640 screen the sheet needs one scroll to reach it: uiautomator only
+# The duck-panel row sits near the bottom of the drawer. On the smoke
+# emulator's 320x640 screen the sheet needs scrolling: uiautomator only
 # reports on-screen nodes, so poll for the row and swipe up between tries.
-# A slide-in sheet reports its final bounds while still off-screen, so a
-# found row must also be fully inside the display before it is tappable.
 HEIGHT=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -dx -f2)
 [ -n "$HEIGHT" ] || HEIGHT=640
+DUCK_FACE_FOUND=0
+for _ in $(seq 1 25); do
+  sleep 0.2
+  rm -f language-ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
+  adb exec-out cat /sdcard/ui.xml > language-ui.xml 2>/dev/null || true
+  [ -s language-ui.xml ] || continue
+  if python3 - "$HEIGHT" <<'PY'
+import sys, xml.etree.ElementTree as ET
+height = int(sys.argv[1])
+try:
+    root = ET.parse('language-ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+for node in root.iter('node'):
+    if "Duck's face" in ((node.get('text') or ''), (node.get('content-desc') or '')):
+        parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4 and int(parts[1]) >= 0 and int(parts[3]) <= height:
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+  then
+    DUCK_FACE_FOUND=1
+    break
+  fi
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
+if [ "$DUCK_FACE_FOUND" -ne 1 ]; then
+  echo "::error::the More drawer never showed the duck-panel row"
+  python3 - <<'PY' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('language-ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"cannot read the drawer dump: {exc}")
+print("drawer held:", [n.get('text') or n.get('content-desc') for n in root.iter('node')][:24])
+PY
+  exit 1
+fi
+tap_text "Duck's face" > /dev/null 2>&1 || true
+# The panel slides in: poll for the Language row, swiping inside it between
+# tries. A slide-in sheet reports its final bounds while still off-screen,
+# so a found row must also be fully inside the display before it is tappable.
 LANGUAGE_FOUND=0
 for _ in $(seq 1 25); do
   sleep 0.2
@@ -1091,26 +1126,15 @@ PY
     LANGUAGE_FOUND=1
     break
   fi
-  # Not visible yet: the sheet may still be sliding in, or the row sits
-  # below the fold. Scroll the sheet's content up and look again.
   adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
 done
 if [ "$LANGUAGE_FOUND" -ne 1 ]; then
-  echo "::error::the More drawer never showed the Language row"
-  python3 - <<'PY' || true
-import xml.etree.ElementTree as ET
-try:
-    root = ET.parse('language-ui.xml').getroot()
-except Exception as exc:
-    raise SystemExit(f"cannot read the drawer dump: {exc}")
-print("drawer held:", [n.get('text') or n.get('content-desc') for n in root.iter('node')][:20])
-PY
+  echo "::error::the duck panel never showed the Language row"
   exit 1
 fi
 # The switch is a recomposition: wait for a Chinese control before pressing
 # BACK, so the first-screen assertion below cannot race the redraw. The tap
-# itself is retried with a re-scroll between tries: the row can still be
-# sliding, and one silent miss left the shell English for every check after.
+# itself is retried with a re-scroll between tries.
 TAP_OK=0
 for _ in $(seq 1 10); do
   if tap_text "Language" > /dev/null 2>&1; then TAP_OK=1; break; fi
@@ -1267,9 +1291,10 @@ with open('/tmp/duck-drawer-seen.txt', 'a', encoding='utf-8') as handle:
         handle.write(text + "\n")
 needed = (
     '玩', '一起', '记录', '这只鸭子',
-    '画路走', '积木规则', '编舞铺', '操控方式',
-    '邻居', '每日任务', '鸭子日记', '明信片', '情绪图鉴',
-    'AI 伙伴', '晚安', '手电筒', '语言',
+    '画路走', '积木规则', '编舞铺', '玩一玩',
+    '邻居', '合唱', '互送礼物', '双人接机',
+    '每日任务', '鸭子日记', '明信片', '情绪图鉴',
+    'AI 伙伴', '晚安', '鸭子的脸', '工具',
 )
 raise SystemExit(0 if all(word in texts for word in needed) else 1)
 PY
@@ -1298,9 +1323,10 @@ with open('/tmp/duck-drawer-seen.txt', encoding='utf-8') as handle:
     seen = [line.rstrip("\n") for line in handle if line.strip()]
 needed = (
     '玩', '一起', '记录', '这只鸭子',
-    '画路走', '积木规则', '编舞铺', '操控方式',
-    '邻居', '每日任务', '鸭子日记', '明信片', '情绪图鉴',
-    'AI 伙伴', '晚安', '手电筒', '语言',
+    '画路走', '积木规则', '编舞铺', '玩一玩',
+    '邻居', '合唱', '互送礼物', '双人接机',
+    '每日任务', '鸭子日记', '明信片', '情绪图鉴',
+    'AI 伙伴', '晚安', '鸭子的脸', '工具',
 )
 missing = [word for word in needed if word not in seen]
 if missing:
@@ -1322,6 +1348,67 @@ if height <= width:
     raise SystemExit(f"::error::the drawer screenshot is not portrait: {width}x{height}")
 print(f"drawer screenshot: {width}x{height}")
 PY
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+
+# The growth book (Android 立项, 2026-11-16): the Record group's daily page
+# carries the streak, the last seven days and ten achievements. The ledger
+# is real-event-only, so on a run where nothing happened yet the page says
+# so in one honest line; where something did happen it shows the streak
+# line. Both are valid - silence dressed up as an achievement is not.
+tap_text "更多" > /dev/null 2>&1 || {
+  echo "::error::the thumb deck lost the More button (growth book)"
+  exit 1
+}
+QUESTS_TAP=0
+for _ in $(seq 1 15); do
+  if tap_text "每日任务" > /dev/null 2>&1; then QUESTS_TAP=1; break; fi
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
+[ "$QUESTS_TAP" = "1" ] || { echo "::error::the drawer never showed the quests row"; exit 1; }
+GROWTH_OK=0
+echo -n "" > /tmp/duck-growth-seen.txt
+for _ in $(seq 1 20); do
+  sleep 0.3
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || continue
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  [ -s ui.xml ] || continue
+  python3 - <<'PY' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(0)
+with open('/tmp/duck-growth-seen.txt', 'a', encoding='utf-8') as handle:
+    for node in root.iter('node'):
+        value = (node.get('text') or '') + (node.get('content-desc') or '')
+        if value:
+            handle.write(value + "
+")
+PY
+  if python3 - <<'PY'
+try:
+    seen = open('/tmp/duck-growth-seen.txt', encoding='utf-8').read()
+except Exception:
+    raise SystemExit(1)
+has_book = '成长手册' in seen and '成就墙' in seen
+has_state = ('还没有记录' in seen) or ('连续' in seen)
+has_achievement = '第一次翻滚' in seen
+raise SystemExit(0 if has_book and has_state and has_achievement else 1)
+PY
+  then
+    GROWTH_OK=1
+    break
+  fi
+  # The achievement wall runs below the fold: swipe it into view.
+  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+done
+[ "$GROWTH_OK" = "1" ] || {
+  echo "::error::the daily page has no honest growth book"
+  cat /tmp/duck-growth-seen.txt 2>/dev/null | sort -u | head -40 || true
+  exit 1
+}
 adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
 sleep 1
 

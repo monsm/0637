@@ -184,15 +184,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-controls"
+          "ios/DuckApp/MorePages.swift",
+          "play-more-mode-"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
-          "more-controls"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "play-more-mode-"
         ]
       }
     },
@@ -358,7 +358,7 @@
       "id": "progress-book",
       "zh": "成长手册/成就墙",
       "conform_b4": "extension",
-      "note": "iOS 独有（本机 ProgressStore + 7 日瓦片 + 成就墙）；Android 无对应页——是新产品不是重排，另立产品批次（会议决议）",
+      "note": "iOS 独有（本机 ProgressStore + 7 日瓦片 + 成就墙）；Android 2026-11-16 立项补齐（同 id 同条件、真实事件账、零回填，见 docs/PROGRESS_ANDROID.md）",
       "ios": {
         "implemented": true,
         "anchor": [
@@ -367,8 +367,11 @@
         ]
       },
       "android": {
-        "implemented": false,
-        "note": "Android 无 ProgressStore 事件账，无对应页；照会议决议不并入重排"
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "growth-book"
+        ]
       }
     },
     {
@@ -443,8 +446,8 @@
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Companion.kt",
-          "life.days"
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "day-rows"
         ]
       }
     },
@@ -493,15 +496,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-flashlight"
+          "ios/DuckApp/MorePages.swift",
+          "duck-panel-flashlight"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
-          "more-flashlight"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "duck-panel-flashlight"
         ]
       }
     },
@@ -512,15 +515,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-language"
+          "ios/DuckApp/MorePages.swift",
+          "duck-panel-language"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
-          "more-language"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "duck-panel-language"
         ]
       }
     },
@@ -532,15 +535,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-big"
+          "ios/DuckApp/MorePages.swift",
+          "duck-panel-big"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
-          "more-big"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "duck-panel-big"
         ]
       }
     },
@@ -552,15 +555,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-heart"
+          "ios/DuckApp/MorePages.swift",
+          "duck-panel-heart"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "heart-toggle"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "duck-panel-heart"
         ]
       }
     },
@@ -592,15 +595,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-parent"
+          "ios/DuckApp/MorePages.swift",
+          "tools-parent"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.parentTime"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "tools-parent"
         ]
       }
     },
@@ -612,15 +615,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-lamp"
+          "ios/DuckApp/MorePages.swift",
+          "tools-lamp"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.roomLamp"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "tools-lamp"
         ]
       }
     },
@@ -632,15 +635,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-compass"
+          "ios/DuckApp/MorePages.swift",
+          "duck-panel-compass"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.compass"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "duck-panel-compass"
         ]
       }
     },
@@ -652,15 +655,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-backup"
+          "ios/DuckApp/MorePages.swift",
+          "tools-backup"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.backup"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "tools-backup"
         ]
       }
     },
@@ -672,15 +675,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-tof"
+          "ios/DuckApp/MorePages.swift",
+          "tools-tof"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.tof"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "tools-tof"
         ]
       }
     },
@@ -692,15 +695,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-ab"
+          "ios/DuckApp/MorePages.swift",
+          "play-more-ab"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.abTry"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "play-more-ab-"
         ]
       }
     },
@@ -712,15 +715,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-pushcompare"
+          "ios/DuckApp/MorePages.swift",
+          "play-more-push"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.pushCompare"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "play-more-push"
         ]
       }
     },
@@ -732,8 +735,8 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-rewindplay"
+          "ios/DuckApp/InstrumentSheet.swift",
+          "arrow.uturn.backward.circle"
         ]
       },
       "android": {
@@ -752,15 +755,15 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/MoreSheet.swift",
-          "more-hud"
+          "ios/DuckApp/MorePages.swift",
+          "play-more-hud"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.hud"
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "play-more-hud"
         ]
       }
     },
@@ -779,8 +782,8 @@
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
-          "Copy.twoPlayer"
+          "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
+          "more-p2"
         ]
       }
     },

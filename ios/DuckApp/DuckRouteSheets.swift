@@ -88,7 +88,7 @@ struct DuckRouteSheets: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         case .progress:
-            ProgressSheet()
+            ProgressSheet(controller: controller)
                 .presentationDetents(portrait ? [.medium, .large] : [.large])
                 .presentationDragIndicator(.visible)
         case .more:
@@ -120,6 +120,26 @@ struct DuckRouteSheets: View {
         case .big:
             BigButtonsSheet(controller: controller)
                 .presentationDetents([.height(400)])
+                .presentationDragIndicator(.visible)
+        case .playMore:
+            PlayMoreSheet(
+                controller: controller,
+                stickMode: $stickMode,
+                onOpen: { child = $0 }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        case .duckPanel:
+            DuckPanelSheet(
+                controller: controller,
+                languageTick: $languageTick,
+                onOpen: { child = $0 }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        case .tools:
+            ToolsSheet(controller: controller, onOpen: { child = $0 })
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         case .backup:
             BackupSheet(controller: controller)
