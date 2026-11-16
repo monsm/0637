@@ -1,14 +1,14 @@
 Performing Streamed Install
 Success
 Starting: Intent { cmp=ai.duck.microduck/.MainActivity (has extras) }
-app alive with pid 2198
+app alive with pid 2287
 8765
-{"bringup":2,"care":{"asleep":false,"bond":0.0998354166666656,"budget_s":null,"heart_bpm":77.7,"hunger":0.1552666666666617,"idle_s":8.68,"last_touch":277,"mood":0.35978531799813224,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":13.7}},"care_time_scale":1.0,"carrying":false,"chorus":{"active":false,"moves":[],"peers":0,"role":"","started_tick":0},"emotion":null,"fallen":false,"gain":200,"gift_event":null,"gravity":[0.008213711380346973,0.0017629735227528169,-0.9999647128122655],"idle":{"head":[0.005396104863353421,0.11882112952606416,-0.2637541469777379,0.023736533498456884],"takeover":1.0},"label":"walk","last_emotion_sound":"emotion:angry","last_heard":null,"last_ride_segment":null,"last_sound":"emotion:angry","leds":{"bars":2,"battery_percent":56.21631399525806,"color":null,"flashlight":0,"gauge":"Two","status":"Healthy"},"life":{"boots":1,"claps":0,"days":[],"emotions":{"angry":1},"events":["emotion:angry","idle_ritual"],"falls":0,"fed":0,"ground_picks":0,"held_s":0.0,"metres":0.0638433923770484,"pets":0,"pickups":0,"power_offs":0,"powered_s":13.719999999999796,"sit_downs":0,"sitting_s":0.0,"skills":{},"soft_landings":0,"stand_ups":0,"standing_s":13.719999999999796,"torqued_s":13.719999999999796,"wake_ups":0,"walking_s":0.0,"whistles":0},"mode":"walk","night":{"active":false,"quiet_s":0.0,"started_tick":0},"notice":null,"pad":{"on":false,"port":4210},"path":{"active":false,"points":[],"reached":0,"total":0},"paused":false,"peer_event":null,"peers":{"peers":[]},"performance":{"fps":7.868573305254264,"ticks_per_second":50.16215482099594},"pose":{"anchor_foot":1,"anchor_xy":[-0.011488160846332687,-0.036049534294605626],"position":[-0.01062771069868486,-0.00033221411921437183,0.11601387967975553],"yaw":0.013524529077310438},"powered_off":false,"proprioception":{"battery_percent":46.82447099288712,"currents_ma":[11.825361563071446,86.43030980760285,48.63917707977751,230.05003549429154,50.2392165047429,167.68459829026514,151.93780120991374,14.777651233213065,0.9333283974902493,0.0,2.64527988622591,90.55005771224515,98.25676257758991,317.2330119424386,117.06241540375002],"has_mouth":false,"imu":{"gravity":[0.008192213407060825,0.0018424805215962363,-0.9999647458310813],"gyro":[-0.02715228778343878,-0.00678780462243591,-0.009418432012555714],"quat":[0.9999682970713255,-0.0009489417406926482,0.004089815892152104,0.006765926973707261]},"imu_ready":true,"mouth":0.35763529279029477,"names":["left_hip_yaw","left_hip_roll","left_hip_pitch","left_knee","left_ankle","neck_pitch","head_pitch","head_yaw","head_roll","mouth","right_hip_yaw","right_hip_roll","right_hip_pitch","right_knee","right_ankle"],"p_held":0.0032238662242889404,"picked_up":false,"positions":[0.03361865211363491,-0.07781736687577555,-0.45751543787531235,0.05204620275102256,0.5000817099884807,0.1055844850613274,0.45020780945554656,-0.2675414656433689,-0.01138474386345669,0.0,-0.006954629110750796,0.08196241918012064,0.4449860422841131,-0.041639649673141044,-0.4798972909106064],"targets":[0.039473298460796696,-0.15321851798101965,-0.406877893519034,-0.11812287827275465,0.5503921627919807,0.23416118683959625,0.328679816381246,-0.2920093076030138,-0.028978581522780787,0.1312005057186439,0.009390623555367197,0.15908374735293165,0.363558478756415,0.18649375211682379,-0.5736072341410456],"velocities":[-0.009235371145104386,0.0006100776541989315,0.001463579586767998,-0.0005642583091891131,0.0008917604757934774,0.0004641544669818518,-0.00003858709336830068,-0.0001728467923732388,0.00002766160256975509,0.0,0.00010712478840758141,-0.00048775135202529935,0.00291570062331572,-0.00099154511914114,0.00039890180974235727],"volts":7.3491915358861934},"quests":{"best_streak":0,"completed_today":0,"day":"2026-11-16","last_completed_day":"","quests":[{"done":false,"id":"hold","progress":0.0,"target":1.0,"title_en":"Pick the duck up","title_zh":"把鸭子抱起来"},{"done":false,"id":"feed","progress":0.0,"target":1.0,"title_en":"Give one treat","title_zh":"喂一次零食"},{"done":false,"id":"clap","progress":0.0,"target":2.0,"title_en":"Clap twice","title_zh":"拍手两次"}],"streak":0},"rule_event":null,"sound_event":null,"speed":1.0,"tick":711,"trunk":[-0.0015215639377376645,0.0027174917304365305,0.11556279404558972]}
+{"bringup":2,"care":{"asleep":false,"bond":0.09983726851851746,"budget_s":null,"heart_bpm":77.7,"hunger":0.1552074074074025,"idle_s":8.5,"last_touch":278,"mood":0.35968463300035625,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":13.6}},"care_time_scale":1.0,"carrying":false,"chorus":{"active":false,"moves":[],"peers":0,"role":"","started_tick":0},"emotion":null,"fallen":false,"gain":200,"gift_event":null,"gravity":[0.00783171765709832,0.001493249605540282,-0.9999682166969895],"idle":{"head":[0.0010671230349140193,0.134029588281586,-0.27584833838636025,0.02950233478962506],"takeover":1.0},"label":"walk","last_emotion_sound":"emotion:angry","last_heard":null,"last_ride_segment":null,"last_sound":"emotion:angry","leds":{"bars":2,"battery_percent":56.19856028055818,"color":null,"flashlight":0,"gauge":"Two","status":"Healthy"},"life":{"boots":1,"claps":0,"days":[],"emotions":{"angry":1},"events":["emotion:angry","idle_ritual"],"falls":0,"fed":0,"ground_picks":0,"held_s":0.0,"metres":0.06323630813141548,"pets":0,"pickups":0,"power_offs":0,"powered_s":13.5599999999998,"sit_downs":0,"sitting_s":0.0,"skills":{},"soft_landings":0,"stand_ups":0,"standing_s":13.5599999999998,"torqued_s":13.5599999999998,"wake_ups":0,"walking_s":0.0,"whistles":0},"mode":"walk","night":{"active":false,"quiet_s":0.0,"started_tick":0},"notice":null,"pad":{"on":false,"port":4210},"path":{"active":false,"points":[],"reached":0,"total":0},"paused":false,"peer_event":null,"peers":{"peers":[]},"performance":{"fps":8.923979722290749,"ticks_per_second":51.56077172879099},"pose":{"anchor_foot":1,"anchor_xy":[-0.011544733963420102,-0.0360940201046539],"position":[-0.010631150505130348,-0.0004140890527461541,0.11601863621064565],"yaw":0.011162728402950033},"powered_off":false,"proprioception":{"battery_percent":46.797840420837304,"currents_ma":[18.03162626982291,86.45036879995746,43.21938587569141,230.65906199414394,45.891306665452795,174.9976636302277,128.91569619773298,28.317921111692613,11.192378167934422,0.0,4.796551802678541,93.11171095957555,99.64311551778867,317.30737436342486,115.60324892559827],"has_mouth":false,"imu":{"gravity":[0.007872512468392347,0.0015340880595240652,-0.9999678345433233],"gyro":[-0.008895409539499645,-0.006627290731377914,-0.007361771191209903],"quat":[0.9999763660991694,-0.0007890198649596347,0.003931943030066903,0.0055843096943311325]},"imu_ready":true,"mouth":0.360242786323153,"names":["left_hip_yaw","left_hip_roll","left_hip_pitch","left_knee","left_ankle","neck_pitch","head_pitch","head_yaw","head_roll","mouth","right_hip_yaw","right_hip_roll","right_hip_pitch","right_knee","right_ankle"],"p_held":0.003305792808532715,"picked_up":false,"positions":[0.026622276097716755,-0.07751225063259842,-0.4570729256962903,0.0519683104323788,0.5004273291820655,0.10576686701536289,0.4499621822605075,-0.2709116967453437,-0.011351688393815243,0.0,-0.006718275820335712,0.08194340955726132,0.44490040214742294,-0.04193066207286597,-0.4803408530797],"targets":[0.043661013666483665,-0.1529099823644714,-0.41031630585495044,-0.11812421680748844,0.5467395713663439,0.24003539064948634,0.3453364299590404,-0.30605588176921505,-0.022183858819793442,0.1327933328766931,0.007850505719283776,0.1607005053314744,0.3632072775290048,0.1853737929625573,-0.5727952838543193],"velocities":[-0.000725757423082083,0.00035643800697163794,0.00026828146583545754,-0.0021144047867761957,0.0004315759905032176,-0.00039840812705454836,0.000837214776872916,-0.00006875971079480634,0.00009367351199105742,0.0,-0.00011844770976673647,-0.0011005180476586444,0.0024599219893769245,-0.0041284869077042674,0.00474934599043795],"volts":7.348765446733396},"quests":{"best_streak":0,"completed_today":0,"day":"2026-11-16","last_completed_day":"","quests":[{"done":false,"id":"hold","progress":0.0,"target":1.0,"title_en":"Pick the duck up","title_zh":"把鸭子抱起来"},{"done":false,"id":"feed","progress":0.0,"target":1.0,"title_en":"Give one treat","title_zh":"喂一次零食"},{"done":false,"id":"clap","progress":0.0,"target":2.0,"title_en":"Clap twice","title_zh":"拍手两次"}],"streak":0},"rule_event":null,"sound_event":null,"speed":1.0,"tick":703,"trunk":[-0.0015065129672057079,0.002647583836201361,0.11554847601019458]}
 emotions staged: 13
-performance: 49.50377240329358 ticks/s
-idle: takeover=0.8933333333333322 head=0.5270501799485133
-care doze state: {"care":{"asleep":true,"bond":0.398703703703703,"budget_s":null,"heart_bpm":46.0,"hunger":0.9414814814814828,"idle_s":16.12,"last_touch":453,"mood":-0.3408942063569665,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":24.7}},"care_time_scale":200.0}
-care: hunger 0.15845185185184388 -> 0.0003925925925925929, bond 0.1297224537037019 -> 0.1497168981481463, doze and wake ok
+performance: 49.99218517162179 ticks/s
+idle: takeover=0.8799999999999989 head=0.5194963209646
+care doze state: {"care":{"asleep":true,"bond":0.39879629629629565,"budget_s":null,"heart_bpm":46.0,"hunger":0.9385185185185198,"idle_s":16.14,"last_touch":448,"mood":-0.3159128226746943,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":24.6}},"care_time_scale":200.0}
+care: hunger 0.15842962962962168 -> 0.00038518518518518546, bond 0.12972314814814634 -> 0.1497168981481463, doze and wake ok
 --- night ---
 night: on -> asleep and quiet, pet -> woken_by_touch, off ok
 parent: 1 min -> bed at 200x, pet wakes, 0 -> unlimited
@@ -28,20 +28,20 @@ daily quests: progress stays honest after an action
 daily quests: a February streak survives March 1st (streak=3)
 daily quests: the shell's saved board restores with its progress (pet=0.5)
 fingerprint: "fingerprint":"69b4e43b681bead51f5736ff810c269316d5cb19903db6db3794b88c36bfe5c1"
-{"bringup":2,"care":{"asleep":false,"bond":0.21983148148148038,"budget_s":null,"heart_bpm":78.1,"hunger":0.1553925925925875,"idle_s":0.32,"last_touch":284,"mood":0.4698841847059378,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":12.2}},"care_time_scale":1.0,"carrying":false,"chorus":{"active":false,"moves":[],"peers":0,"role":"","started_tick":0},"emotion":null,"fallen":false,"gain":200,"gift_event":{"from":"peerci01","from_name":"Sunny","kind":"emotion","ok":true,"tick":1876,"value":"laugh"},"gravity":[0.028049733344173357,0.05228537794975266,-0.9982381738402764],"idle":{"head":[0.0,0.0,0.0,0.0],"takeover":0.0},"label":"walk","last_emotion_sound":null,"last_heard":{"text":"站起来","tick":853},"last_ride_segment":null,"last_sound":"chirp","leds":{"bars":2,"battery_percent":54.00320036416936,"color":null,"flashlight":0,"gauge":"Two","status":"Healthy"},"life":{"boots":1,"claps":2,"days":[{"day":"2026-11-16","metres":1.5,"powered_s":40.3,"rolls":2},{"day":"2026-03-01","metres":0.0,"powered_s":0.6,"rolls":0}],"emotions":{"angry":1,"curious":2,"laugh":4,"sad":1},"events":["emotion:angry","idle_ritual","emotion:curious","skill:roulade","fell","feed","ground_pick","pet","pet","pet","woken_by_touch","pet","clap","emotion:laugh","whistle","emotion:curious","emotion:sad","sad","clap","skill:roulade","fell","gift:emotion:laugh","emotion:laugh","chorus","pet","emotion:laugh","chorus"],"falls":2,"fed":1,"ground_picks":1,"held_s":0.0,"metres":1.9759183309831576,"pets":5,"pickups":0,"power_offs":0,"powered_s":53.14000000000271,"sit_downs":0,"sitting_s":0.0,"skills":{"roulade":2},"soft_landings":0,"stand_ups":0,"standing_s":50.48000000000229,"torqued_s":53.14000000000271,"wake_ups":0,"walking_s":2.660000000000002,"whistles":1},"mode":"walk","night":{"active":false,"quiet_s":0.0,"started_tick":0},"notice":"no such sound: bark","pad":{"on":false,"port":4210},"path":{"active":false,"points":[],"reached":0,"total":0},"paused":false,"peer_event":{"from":"peerci01","kind":"greeted","name":"Sunny","tick":1851},"peers":{"id":"e2873371","name":"CI Android","pair_code_set":true,"peers":[],"port":8766},"performance":{"fps":7.995099715438312,"ticks_per_second":49.96937322148945},"pose":{"anchor_foot":0,"anchor_xy":[0.3531882486843499,-0.038766410317745685],"position":[0.33471294660317863,-0.07784742509067993,0.11968250199404303],"yaw":-0.35196733236616007},"powered_off":false,"proprioception":{"battery_percent":43.50480054625406,"currents_ma":[119.43936605800036,207.57921250742842,250.83005725173734,765.1230254669497,216.6981336003626,208.35666282973764,75.5304839720226,233.90994817841695,95.55740126757003,0.0,136.37256592910572,183.00477186143434,179.50951899816297,37.579801403848116,129.83580072708494],"has_mouth":false,"imu":{"gravity":[0.026923533137701246,0.05824085558163682,-0.9979394400986965],"gyro":[0.260995158973079,0.06709486138785267,-0.010188880152548423],"quat":[0.9841161007008858,-0.02633458707431586,0.018351279908401064,-0.1746001729398673]},"imu_ready":true,"mouth":0.0,"names":["left_hip_yaw","left_hip_roll","left_hip_pitch","left_knee","left_ankle","neck_pitch","head_pitch","head_yaw","head_roll","mouth","right_hip_yaw","right_hip_roll","right_hip_pitch","right_knee","right_ankle"],"p_held":0.001235365867614746,"picked_up":false,"positions":[-0.05347303707632918,-0.06428474449394188,-0.39514513368041726,-0.05784084942026769,0.33838014548983314,0.13852616551411073,0.3965794067510594,0.04500120648341475,0.010698967273661623,0.0,0.08369900356496568,0.09100316723733243,0.19106939621926886,-0.2656128980974915,-0.3838704711771994],"targets":[-0.16890340601870607,0.22542705473143537,-0.08078527293780925,-0.7878967830049962,0.31756436819726275,0.32397240778660413,0.3102360267509062,-0.24598138705824124,-0.11052341887670981,-0.08726646259971647,-0.07587637035223721,-0.09720243711814064,0.4831640406275261,-0.414651657039407,-0.6667424328194689],"velocities":[0.20504515945018503,0.2093858241571802,1.2234421447339785,-1.4371271473467246,-2.767994173594422,0.04916224370705176,0.301729294270804,-1.360944137668035,0.36623552822301664,0.0,-0.4947139394769099,-0.012431036549746307,0.8553825080253243,-3.7942953643808863,-2.058068423712076],"volts":7.2960768087400645},"quests":{"best_streak":1,"completed_today":0,"day":"2026-11-16","last_completed_day":"2026-11-15","quests":[{"done":false,"id":"pet","progress":0.5,"target":3.0,"title_en":"Pet the duck 3 times","title_zh":"摸摸鸭子 3 次"},{"done":false,"id":"roll","progress":0.0,"target":2.0,"title_en":"Roll over twice","title_zh":"翻两个滚"},{"done":false,"id":"walk","progress":0.25746855554884807,"target":2.0,"title_en":"Walk 2 m together","title_zh":"一起走 2 米"}],"streak":1},"rule_event":{"action":"skill","tick":1824,"trigger":"clap","value":"roulade"},"sound_event":{"kind":"clap","tick":1824},"speed":1.0,"tick":300,"trunk":[0.3463371324161578,-0.073242105545435,0.11879730428454299]}walk counted: 1.9791617186190242 m
-android-screen.png: 320x640 lit=69.9966% colours=64
+{"bringup":2,"care":{"asleep":false,"bond":0.2198310185185174,"budget_s":null,"heart_bpm":78.1,"hunger":0.1554074074074023,"idle_s":0.32,"last_touch":284,"mood":0.46995061317480413,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":12.2}},"care_time_scale":1.0,"carrying":false,"chorus":{"active":false,"moves":[],"peers":0,"role":"","started_tick":0},"emotion":null,"fallen":false,"gain":200,"gift_event":{"from":"peerci01","from_name":"Sunny","kind":"emotion","ok":true,"tick":1900,"value":"laugh"},"gravity":[0.0031727160584879904,-0.011673865035696028,-0.999926824696658],"idle":{"head":[0.0,0.0,0.0,0.0],"takeover":0.0},"label":"walk","last_emotion_sound":null,"last_heard":{"text":"站起来","tick":848},"last_ride_segment":null,"last_sound":"chirp","leds":{"bars":2,"battery_percent":54.26658764982055,"color":null,"flashlight":0,"gauge":"Two","status":"Healthy"},"life":{"boots":1,"claps":2,"days":[{"day":"2026-11-16","metres":1.4,"powered_s":40.7,"rolls":2},{"day":"2026-03-01","metres":0.0,"powered_s":0.6,"rolls":0}],"emotions":{"angry":1,"curious":2,"laugh":4,"sad":1},"events":["emotion:angry","idle_ritual","emotion:curious","skill:roulade","fell","feed","ground_pick","pet","pet","pet","woken_by_touch","pet","clap","emotion:laugh","whistle","emotion:curious","emotion:sad","sad","clap","skill:roulade","fell","gift:emotion:laugh","emotion:laugh","chorus","pet","emotion:laugh","chorus"],"falls":2,"fed":1,"ground_picks":1,"held_s":0.0,"metres":1.895048727662822,"pets":5,"pickups":0,"power_offs":0,"powered_s":53.56000000000277,"sit_downs":0,"sitting_s":0.0,"skills":{"roulade":2},"soft_landings":0,"stand_ups":0,"standing_s":50.880000000002354,"torqued_s":53.56000000000277,"wake_ups":0,"walking_s":2.680000000000002,"whistles":1},"mode":"walk","night":{"active":false,"quiet_s":0.0,"started_tick":0},"notice":"no such sound: bark","pad":{"on":false,"port":4210},"path":{"active":false,"points":[],"reached":0,"total":0},"paused":false,"peer_event":{"from":"peerci01","kind":"greeted","name":"Sunny","tick":1872},"peers":{"id":"e2fddc06","name":"CI Android","pair_code_set":true,"peers":[],"port":8766},"performance":{"fps":7.835322780225682,"ticks_per_second":49.950182723938724},"pose":{"anchor_foot":0,"anchor_xy":[0.3400550687038456,-0.03563727357695905],"position":[0.3362280100667394,-0.07987365326309781,0.1151241620602415],"yaw":-0.26238316586978366},"powered_off":false,"proprioception":{"battery_percent":43.89988147473085,"currents_ma":[99.06197434379956,163.36498922409083,333.8531321264248,288.91454224729017,427.6136284847761,95.32844678010235,180.54259117728452,10.608121172776997,46.314856224610786,0.0,6.386281803593519,228.1678770933282,12.200908938928487,608.8568558359564,165.4059392593987],"has_mouth":false,"imu":{"gravity":[0.010318412007136358,0.015056511630145344,-0.9998334020381509],"gyro":[1.0329822254675305,-0.4598304045162117,0.5283037993626957],"quat":[0.991370508118261,-0.006789178596206114,0.006099674984248692,-0.1307716202102601]},"imu_ready":true,"mouth":0.0,"names":["left_hip_yaw","left_hip_roll","left_hip_pitch","left_knee","left_ankle","neck_pitch","head_pitch","head_yaw","head_roll","mouth","right_hip_yaw","right_hip_roll","right_hip_pitch","right_knee","right_ankle"],"p_held":0.003370046615600586,"picked_up":false,"positions":[-0.05543510948086985,0.027149967150642773,-0.269404719970897,-0.1258117136855753,0.219859582850617,0.15636872306967195,0.39449469598192,-0.07126686888809336,-0.019589263189690367,0.0,0.024875909141362527,0.08526723750519341,0.37970457980850914,-0.27412360357097887,-0.5261764639673998],"targets":[-0.011777607317820325,-0.18794565556215356,0.047997414664033046,0.05420292046755017,0.5098403990021758,0.22026864807519975,0.2644610700024415,-0.13010600285492438,-0.07969066951731035,-0.08726646259971647,0.016683099637422753,0.28949856217143166,0.4081965628560428,0.48714451313295914,-0.3513757953723219],"velocities":[0.24603023615569475,0.9095377464642891,2.308716678262583,0.1645080785834062,-0.00004810875582709367,0.00039582751073317967,-0.0007564380579765338,-1.2257494990137976,-0.33857002311008794,0.0,-0.5301417819018103,0.6180502097477154,3.107987469767919,3.224147252523661,-0.22294077660208944],"volts":7.302398103595693},"quests":{"best_streak":1,"completed_today":0,"day":"2026-11-16","last_completed_day":"2026-11-15","quests":[{"done":false,"id":"pet","progress":0.5,"target":3.0,"title_en":"Pet the duck 3 times","title_zh":"摸摸鸭子 3 次"},{"done":false,"id":"roll","progress":0.0,"target":2.0,"title_en":"Roll over twice","title_zh":"翻两个滚"},{"done":false,"id":"walk","progress":0.2570225971988107,"target":2.0,"title_en":"Walk 2 m together","title_zh":"一起走 2 米"}],"streak":1},"rule_event":{"action":"skill","tick":1831,"trigger":"clap","value":"roulade"},"sound_event":{"kind":"clap","tick":1831},"speed":1.0,"tick":300,"trunk":[0.34706554529843187,-0.07693954834945625,0.11343548906472341]}walk counted: 1.9002090847237527 m
+android-screen.png: 320x640 lit=69.6729% colours=64
 frame has content
-android-screen.png: region (0.3, 0.3, 0.7, 0.7) lit=74.5758% colours=64
-android-screen.png: colour (255,140,50) +/-110 -> 3061 px (want >= 150)
-android-screen.png: bright neutral shell (>= 120) -> 8216 px (want >= 600)
-android-screen.png: 320x640 lit=69.9966% colours=64
+android-screen.png: region (0.3, 0.3, 0.7, 0.7) lit=72.3907% colours=64
+android-screen.png: colour (255,140,50) +/-110 -> 2789 px (want >= 150)
+android-screen.png: bright neutral shell (>= 120) -> 7999 px (want >= 600)
+android-screen.png: 320x640 lit=69.6729% colours=64
 frame has content
-android-screen-2.png: 320x640 lit=70.0571% colours=64
+android-screen-2.png: 320x640 lit=69.5811% colours=64
 frame has content
-android-screen.png vs android-screen-2.png: 8949/204800 pixels differ (4.3696%)
+android-screen.png vs android-screen-2.png: 7459/204800 pixels differ (3.6421%)
 the frames differ - the scene is live
 --- companion survives a restart ---
-care before restart: 0.42297777777777495 0.32990694444444385 False
+care before restart: 0.42298518518518236 0.32990671296296237 False
 care survived restart: hunger/bond=0.424 0.330
 --- Director photo ---
 Director photo reached the preview with Save and Share
@@ -52,12 +52,84 @@ first screen: no raw tokens, ticks, percentages or engine names; fully Chinese
 Chinese portrait screenshot: 320x640
 drawer: four groups, all rows, Chinese
 drawer screenshot: 320x640
-diary speak: honest note on screen, sheet alive after the tap
-skill verdict is human: no underscores
---- layers: back key, one sheet, lone duck ---
-lone duck: ensemble and chorus affordances stay on the sheet
-back from a sheet returns to the first screen
-ring is open; pressing back next
-back closed the ring and the app survived
-handover: one sheet at a time (duck sheet closed, shelf open)
-smoke test passed
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+  File "<stdin>", line 10
+    handle.write(value + "
+                         ^
+SyntaxError: unterminated string literal (detected at line 10)
+::error::the daily page has no honest growth book
