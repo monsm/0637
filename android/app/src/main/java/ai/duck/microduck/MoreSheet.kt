@@ -67,16 +67,7 @@ internal fun MoreSheet(
     flashlightOn: Boolean,
     stick: String,
     onPath: () -> Unit,
-    onMode: (String) -> Unit,
-    onRules: () -> Unit,
-    onDance: () -> Unit,
-    onPeers: () -> Unit,
-    onQuests: () -> Unit,
-    onDiary: () -> Unit,
-    onBig: () -> Unit,
-    onPostcards: () -> Unit,
-    onDex: () -> Unit,
-    onAI: () -> Unit,
+    onOpen: (DuckRoute) -> Unit,
     onNight: () -> Unit,
     onFlashlight: () -> Unit,
     onLanguage: () -> Unit,
@@ -84,7 +75,6 @@ internal fun MoreSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val context = LocalContext.current
-    var showModes by remember { mutableStateOf(false) }
     var postcardCount by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
         postcardCount = withContext(Dispatchers.IO) { PostcardShelf.load(context).size }
@@ -133,7 +123,7 @@ internal fun MoreSheet(
                     Icons.controls, Copy.stickModes,
                     note = Copy.stick(stick),
                     tag = "more-controls",
-                ) { showModes = true }
+                ) { onOpen(DuckRoute.Modes) }
             }
             Group(Copy.groupTogether, "together") {
                 MoreRow(
@@ -141,7 +131,7 @@ internal fun MoreSheet(
                     note = Copy.peersRowNote,
                     badge = "${peers.peers.size}/3",
                     tag = "more-peers",
-                ) { onPeers() }
+                ) { onOpen(DuckRoute.Peers) }
             }
             Group(Copy.groupRecord, "record") {
                 MoreRow(
@@ -149,16 +139,16 @@ internal fun MoreSheet(
                     note = Copy.questsRowNote,
                     badge = if (board.quests.isEmpty()) null else "$unfinished",
                     tag = "more-quests",
-                ) { onQuests() }
+                ) { onOpen(DuckRoute.Progress) }
                 MoreRow(Icons.big, Copy.bigButtons, note = Copy.bigButtonsNote, tag = "more-big") {
                     onBig()
                 }
-                MoreRow(Icons.diary, Copy.diary, tag = "more-diary") { onDiary() }
+                MoreRow(Icons.diary, Copy.diary, tag = "more-diary") { onOpen(DuckRoute.Diary) }
                 MoreRow(
                     Icons.postcards, Copy.postcardShelf,
                     badge = "$postcardCount",
                     tag = "more-postcards",
-                ) { onPostcards() }
+                ) { onOpen(DuckRoute.Postcards) }
                 MoreRow(Icons.dex, Copy.dex, note = Copy.dexRowNote, tag = "more-dex") {
                     onDex()
                 }
@@ -169,7 +159,7 @@ internal fun MoreSheet(
                     note = if (aiReady) Copy.aiOn else Copy.aiNeedEndpoint,
                     dot = !aiReady,
                     tag = "more-ai",
-                ) { onAI() }
+                ) { onOpen(DuckRoute.AI) }
                 MoreRow(
                     if (nightActive) Icons.morning else Icons.night,
                     if (nightActive) Copy.goodMorning else Copy.goodNight,
@@ -192,13 +182,6 @@ internal fun MoreSheet(
                 ) { onLanguage() }
             }
         }
-    }
-    if (showModes) {
-        ModeDialog(
-            current = stick,
-            onPick = { onMode(it); showModes = false },
-            onClose = { showModes = false },
-        )
     }
 }
 
@@ -346,7 +329,7 @@ private fun MoreRow(
 
 /** The three stick modes, one tap each; path has its own row. */
 @Composable
-private fun ModeDialog(
+internal fun ModeDialog(
     current: String,
     onPick: (String) -> Unit,
     onClose: () -> Unit,

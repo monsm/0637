@@ -4,6 +4,9 @@ import SwiftUI
 /// from the live view rather than living on it.
 struct InstrumentSheet: View {
     @ObservedObject var controller: DuckController
+    /// The shell's route opener (B7): the instrument's second set of entries
+    /// no longer owns four booleans and four nested sheets.
+    let onOpen: (DuckRoute) -> Void
     /// Flipping the language re-renders the sheet's computed strings.
     @State private var languageTick = 0
     @Environment(\.dismiss) private var dismiss
@@ -17,14 +20,6 @@ struct InstrumentSheet: View {
     /// The vet book file the export button produced. Non-nil presents the
     /// system share sheet for exactly that file.
     @State private var shareURL: URL?
-    /// The user's own model.
-    @State private var showAI = false
-    /// The kept postcards.
-    @State private var showPostcards = false
-    /// The collection page.
-    @State private var showDex = false
-    /// The duck's diary.
-    @State private var showDiary = false
 
     var body: some View {
         ScrollView {
@@ -38,7 +33,7 @@ struct InstrumentSheet: View {
                 trickRow
                 lifeRecord
                 Button {
-                    showDex = true
+                    onOpen(.dex)
                 } label: {
                     Label(Copy.dex, systemImage: "square.grid.3x3.fill")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -46,13 +41,8 @@ struct InstrumentSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("dex-open")
-                .sheet(isPresented: $showDex) {
-                    DexSheet(controller: controller)
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.visible)
-                }
                 Button {
-                    showPostcards = true
+                    onOpen(.postcards)
                 } label: {
                     Label(
                         "\(Copy.postcardShelf) · \(controller.postcards.cards.count)",
@@ -63,13 +53,8 @@ struct InstrumentSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("postcards-open")
-                .sheet(isPresented: $showPostcards) {
-                    PostcardShelfView(shelf: controller.postcards)
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.visible)
-                }
                 Button {
-                    showDiary = true
+                    onOpen(.diary)
                 } label: {
                     Label(Copy.diary, systemImage: "book.closed.fill")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -77,15 +62,10 @@ struct InstrumentSheet: View {
                 }
                 .buttonStyle(.bordered)
                 .accessibilityIdentifier("diary-open")
-                .sheet(isPresented: $showDiary) {
-                    DiarySheet(controller: controller)
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.visible)
-                }
                 awayRow
                 voiceCommands
                 Button {
-                    showAI = true
+                    onOpen(.ai)
                 } label: {
                     Label(Copy.ai, systemImage: "brain.head.profile")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
@@ -96,11 +76,6 @@ struct InstrumentSheet: View {
                 // Attached to the button, not the scroll view: the sheet for
                 // the export file already lives on the scroll view, and
                 // SwiftUI is more reliable with one sheet per view.
-                .sheet(isPresented: $showAI) {
-                    AISheet(controller: controller)
-                        .presentationDetents([.large])
-                        .presentationDragIndicator(.visible)
-                }
                 Button {
                     withAnimation(.snappy(duration: 0.2)) { showDetails.toggle() }
                 } label: {

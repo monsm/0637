@@ -24,32 +24,11 @@ struct MoreSheet: View {
     @Binding var languageTick: Int
     /// The dance sheet replays through the shell's own step runner.
     let onDanceStep: (DanceStep) -> Void
+    /// Where a drawer row leads: the shell's one route table (B7). The
+    /// drawer no longer owns a second enum - the sheet host presents the
+    /// destination over the drawer, so closing it comes back here.
+    let onOpen: (DuckRoute) -> Void
     @Environment(\.dismiss) private var dismiss
-
-    /// Where a drawer row leads. One sheet, one destination: a view with
-    /// several `.sheet` modifiers is unreliable, and this codebase says so
-    /// about itself in ContentView.
-    private enum Destination: Identifiable {
-        case rules, dance, peers, quests, diary, postcards, dex, ai, modes, big, backup, ab
-
-        var id: String {
-            switch self {
-            case .rules: return "rules"
-            case .dance: return "dance"
-            case .peers: return "peers"
-            case .quests: return "quests"
-            case .diary: return "diary"
-            case .postcards: return "postcards"
-            case .dex: return "dex"
-            case .ai: return "ai"
-            case .modes: return "modes"
-            case .big: return "big"
-            case .backup: return "backup"
-            case .ab: return "ab"
-            }
-        }
-    }
-    @State private var destination: Destination?
 
     var body: some View {
         let _ = languageTick
@@ -69,17 +48,17 @@ struct MoreSheet: View {
                         dismiss()
                     }
                     row(Icons.blocks, Copy.blocks, note: Copy.blocksRowNote, id: "more-blocks") {
-                        destination = .rules
+                        onOpen(.rules)
                     }
                     row(Icons.dance, Copy.dance, note: Copy.danceRowNote, id: "more-dance") {
-                        destination = .dance
+                        onOpen(.dance)
                     }
                     row(
                         Icons.controls, Copy.stickModes,
                         note: Copy.stick(stickMode.rawValue),
                         id: "more-controls"
                     ) {
-                        destination = .modes
+                        onOpen(.modes)
                     }
                 }
                 group(Copy.groupTogether, id: "together") {
@@ -89,7 +68,7 @@ struct MoreSheet: View {
                         badge: "\(controller.peers.count)/3",
                         id: "more-peers"
                     ) {
-                        destination = .peers
+                        onOpen(.peers)
                     }
                 }
                 group(Copy.groupRecord, id: "record") {
@@ -99,20 +78,20 @@ struct MoreSheet: View {
                         badge: questsLeft,
                         id: "more-quests"
                     ) {
-                        destination = .quests
+                        onOpen(.progress)
                     }
                     row(Icons.diary, Copy.diary, id: "more-diary") {
-                        destination = .diary
+                        onOpen(.diary)
                     }
                     row(
                         Icons.postcards, Copy.postcardShelf,
                         badge: "\(controller.postcards.cards.count)",
                         id: "more-postcards"
                     ) {
-                        destination = .postcards
+                        onOpen(.postcards)
                     }
                     row(Icons.dex, Copy.dex, note: Copy.dexRowNote, id: "more-dex") {
-                        destination = .dex
+                        onOpen(.dex)
                     }
                 }
                 group(Copy.thisDuck, id: "duck") {
@@ -122,7 +101,7 @@ struct MoreSheet: View {
                         dot: !aiConfigured,
                         id: "more-ai"
                     ) {
-                        destination = .ai
+                        onOpen(.ai)
                     }
                     row(
                         controller.nightActive ? Icons.morning : Icons.night,
@@ -163,7 +142,7 @@ struct MoreSheet: View {
                         note: Copy.abNote,
                         id: "more-ab"
                     ) {
-                        destination = .ab
+                        onOpen(.ab)
                     }
                     row(
                         "waveform.path", Copy.hud,
@@ -186,7 +165,7 @@ struct MoreSheet: View {
                         note: Copy.backupRowNote,
                         id: "more-backup"
                     ) {
-                        destination = .backup
+                        onOpen(.backup)
                     }
                     row(
                         "location.north", Copy.compass,
@@ -235,7 +214,7 @@ struct MoreSheet: View {
                         note: Copy.bigButtonsNote,
                         id: "more-big"
                     ) {
-                        destination = .big
+                        onOpen(.big)
                     }
                     row(
                         Icons.heart, Copy.heart,
@@ -262,75 +241,6 @@ struct MoreSheet: View {
             .padding(.bottom, 28)
         }
         .background(Color.duckBgSurface)
-        .sheet(item: $destination) { destination in
-            sheet(for: destination)
-        }
-    }
-
-    /// The screen behind one drawer row. It lives in its own function so the
-    /// drawer's body stays small enough for the type checker.
-    @ViewBuilder
-    private func sheet(for destination: Destination) -> some View {
-        switch destination {
-        case .rules:
-            RulesSheet(controller: controller)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        case .dance:
-            DanceSheet(
-                studio: controller.dance,
-                execute: { step in onDanceStep(step) },
-                tryStep: { kind, value in
-                    let label = kind == "sound"
-                        ? Copy.danceStepSound
-                        : SkillLabel.of(value)
-                    controller.dance.record(kind, value: value, label: label)
-                    onDanceStep(DanceStep(kind: kind, value: value, label: label))
-                }
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        case .peers:
-            PeersSheet(controller: controller)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        case .quests:
-            ProgressSheet()
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        case .diary:
-            DiarySheet(controller: controller)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        case .postcards:
-            PostcardShelfView(shelf: controller.postcards)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        case .dex:
-            DexSheet(controller: controller)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        case .ai:
-            AISheet(controller: controller)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        case .modes:
-            ModeSheet(controller: controller, stickMode: $stickMode)
-                .presentationDetents([.height(320)])
-                .presentationDragIndicator(.visible)
-        case .big:
-            BigButtonsSheet(controller: controller)
-                .presentationDetents([.height(400)])
-                .presentationDragIndicator(.visible)
-        case .backup:
-            BackupSheet(controller: controller)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-        case .ab:
-            ABSheet(controller: controller)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-        }
     }
 
     // MARK: - Rows

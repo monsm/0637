@@ -4,15 +4,15 @@ Daemon will be stopped at the end of the build
 > Task :app:preDebugBuild UP-TO-DATE
 > Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
 > Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
-> Task :app:checkDebugAarMetadata
 > Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
 > Task :app:mapDebugSourceSetPaths
 > Task :app:generateDebugResources
 > Task :app:packageDebugResources
+> Task :app:mergeDebugResources
 > Task :app:createDebugCompatibleScreenManifests
 > Task :app:extractDeepLinksDebug
 > Task :app:parseDebugLocalResources
-> Task :app:mergeDebugResources
 > Task :app:processDebugMainManifest
 > Task :app:processDebugManifest
 > Task :app:processDebugManifestForPackage
@@ -25,8 +25,8 @@ Daemon will be stopped at the end of the build
 > Task :app:processDebugResources
 > Task :app:compressDebugAssets
 > Task :app:checkDebugDuplicateClasses
-> Task :app:mergeLibDexDebug
 > Task :app:mergeDebugJniLibFolders
+> Task :app:mergeLibDexDebug
 > Task :app:mergeDebugNativeLibs
 > Task :app:validateSigningDebug
 > Task :app:writeDebugAppMetadata
@@ -34,20 +34,12 @@ Daemon will be stopped at the end of the build
 > Task :app:stripDebugDebugSymbols
 > Task :app:mergeExtDexDebug
 
-> Task :app:compileDebugKotlin
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:43:51 Unresolved reference 'EventSeat'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3575:70 'val' cannot be reassigned.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3575:85 Assignment type mismatch: actual type is 'kotlin.Boolean', but 'androidx.activity.compose.ManagedActivityResultLauncher<kotlin.Array<kotlin.String>, android.net.Uri?>' was expected.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:3631:26 Unresolved reference 'checkpoint'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4052:28 Syntax error: Expecting '"'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4052:28 Syntax error: Expecting ','.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4052:28 Syntax error: Incorrect template entry: .
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:3 Syntax error: Expecting '"'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:3 Syntax error: Expecting ')'.
-e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Shell.kt:4053:3 Syntax error: Incorrect template entry: .
-
 > Task :app:compileDebugKotlin FAILED
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794707896806.json
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MoreSheet.kt:117:21 Unresolved reference 'onRules'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MoreSheet.kt:120:21 Unresolved reference 'onDance'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MoreSheet.kt:144:21 Unresolved reference 'onBig'.
+e: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/MoreSheet.kt:153:21 Unresolved reference 'onDex'.
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794801148001.json
 
 FAILURE: Build failed with an exception.
 
@@ -251,5 +243,5 @@ Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilat
 	... 2 more
 
 
-BUILD FAILED in 26s
+BUILD FAILED in 42s
 28 actionable tasks: 28 executed

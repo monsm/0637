@@ -7,6 +7,8 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -112,6 +114,12 @@ import kotlinx.coroutines.withContext
  *   sensors and the fingerprint.
  * - **Director**: a letterboxed viewfinder with the tick in the corner.
  */
+/** Persists only the destination id across process death (B7). */
+private val ShellRouteStateSaver = listSaver<ShellRouteState, String>(
+    save = { listOf(it.savedId()) },
+    restore = { ShellRouteState.fromSavedId(it.firstOrNull()) },
+)
+
 @Composable
 fun Shell(
     core: DuckCore?,
@@ -126,46 +134,38 @@ fun Shell(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var showRing by remember { mutableStateOf(false) }
+    // One route table (B7): every sheet is a DuckRoute, the skill ring is the
+    // overlay field. Opening replaces the sheet (one at a time, never
+    // stacked); back closes the ring first, then the sheet. Only the
+    // destination id survives process death - the photo and every controller
+    // value stay out of the Saver.
+    var routeState by rememberSaveable(stateSaver = ShellRouteStateSaver) {
+        mutableStateOf(ShellRouteState())
+    }
+    val route = routeState.sheet
+    fun open(route: DuckRoute) {
+        routeState = ShellOverlayReducer.reduce(routeState, ShellRouteAction.Open(route))
+    }
+    fun closeSheet() {
+        routeState = ShellOverlayReducer.reduce(routeState, ShellRouteAction.CloseSheet)
+    }
+    val ringOpen = routeState.overlay == ShellOverlay.Ring
+    fun setRing(open: Boolean) {
+        routeState = ShellOverlayReducer.reduce(
+            routeState,
+            if (open) ShellRouteAction.OpenRing else ShellRouteAction.CloseRing,
+        )
+    }
     // The phone as the official DKPD pad: 30 Hz at a PAIRED neighbour only.
     val padSender = remember { PadSender(input) }
     var padTargetName by remember { mutableStateOf("") }
-    var showSheet by remember { mutableStateOf(false) }
-    var showRules by remember { mutableStateOf(false) }
-    var showPeers by remember { mutableStateOf(false) }
     var peers by remember { mutableStateOf(PeersUi()) }
     var quests by remember { mutableStateOf(QuestBoardUi()) }
-    // The user's own model: config, last answer and the loop's guard.
-    var showAI by remember { mutableStateOf(false) }
-    var showDance by remember { mutableStateOf(false) }
-    var showPostcards by remember { mutableStateOf(false) }
-    var showDex by remember { mutableStateOf(false) }
-    var showDiary by remember { mutableStateOf(false) }
-    // The More drawer and its daily-goals sheet (B4a, portrait).
-    var showMore by remember { mutableStateOf(false) }
-    var showBig by remember { mutableStateOf(false) }
-    var showQuests by remember { mutableStateOf(false) }
     // The back key closes the topmost layer instead of leaving the app:
-    // the ring first, then the innermost sheet, then the shell's sheets.
-    // With nothing open the system default (leave) stands (B2, IA-4 companion).
-    val layersOpen = showRing || showSheet || showRules || showPeers ||
-        showAI || showDance || showPostcards || showDex || showDiary ||
-        showMore || showBig || showQuests
-    BackHandler(enabled = layersOpen) {
-        when {
-            showRing -> showRing = false
-            showDiary -> showDiary = false
-            showDex -> showDex = false
-            showPostcards -> showPostcards = false
-            showQuests -> showQuests = false
-            showBig -> showBig = false
-            showMore -> showMore = false
-            showSheet -> showSheet = false
-            showRules -> showRules = false
-            showPeers -> showPeers = false
-            showAI -> showAI = false
-            showDance -> showDance = false
-        }
+    // the ring first, then the sheet. With nothing open the system default
+    // (leave) stands (B2, IA-4 companion).
+    BackHandler(enabled = routeState.layerCount > 0) {
+        routeState = ShellOverlayReducer.reduce(routeState, ShellRouteAction.Back)
     }
     // The drawer's night row follows /state.night, so it can offer
     // good night or good morning honestly.
@@ -499,7 +499,7 @@ fun Shell(
     // The instrument is the lab, the live stage is the room. The renderer
     // cannot see a Compose sheet, so the shell tells it which surface is up
     // and the floor switches to the cold checkerboard there (STAGE_LOOK §3).
-    LaunchedEffect(showSheet) { input.instrumentOpen = showSheet }
+    LaunchedEffect(route) { input.instrumentOpen = route == DuckRoute.Instrument }
 
     val _unused = languageTick
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -562,8 +562,8 @@ fun Shell(
                                     stick = stick,
                                     pathActive = pathActive,
                                     onPathDraw = onPathDraw,
-                                    ringOpen = { showRing },
-                                    onLongPress = { showRing = true },
+                                    ringOpen = { ringOpen },
+                                    onLongPress = { setRing(true) },
                                 ),
                         )
                         // The stroke is scene, not chrome: it draws over the
@@ -662,7 +662,7 @@ fun Shell(
                         core = duck,
                         surface = surface,
                         onSurface = onSurface,
-                        onOpenSheet = { showSheet = true },
+                        onOpenSheet = { open(DuckRoute.Instrument) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp),
@@ -677,8 +677,8 @@ fun Shell(
                             onFeed?.invoke()
                         },
                         onWheee = onWheee,
-                        onSkills = { showRing = true },
-                        onMore = { showMore = true },
+                        onSkills = { setRing(true) },
+                        onMore = { open(DuckRoute.More) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp, vertical = 8.dp),
@@ -703,14 +703,14 @@ fun Shell(
                         detectDragGestures(
                             onDragStart = {
                                 start = it
-                                if (stick == "path" && !pathActive && !carrying && !showRing) {
+                                if (stick == "path" && !pathActive && !carrying && !ringOpen) {
                                     onPathDraw(it)
                                 }
                             },
                             onDrag = { change, _ ->
                                 // The skill ring is up: no carry, no drive
                                 // while it is.
-                                if (showRing) {
+                                if (ringOpen) {
                                     input.vx = 0.0
                                     input.wz = 0.0
                                     return@detectDragGestures
@@ -773,7 +773,7 @@ fun Shell(
                     // The same 0.35 s hold as portrait: hold still on the scene
                     // and the ring comes up. A drag cancels it (the drag
                     // detector consumes movement), so driving never opens it.
-                    .sceneLongPress(enabled = core != null) { showRing = true },
+                    .sceneLongPress(enabled = core != null) { setRing(true) },
             )
 
             // The stroke the wide layout draws, and the walk it becomes —
@@ -832,10 +832,10 @@ fun Shell(
                 onStick = { stick = it },
                 onSurface = onSurface,
                 onFlashlight = toggleFlashlight,
-                onRules = { showRules = true },
-                onDance = { showDance = true },
-                onPeers = { showPeers = true },
-                onAI = { showAI = true },
+                onRules = { open(DuckRoute.Rules) },
+                onDance = { open(DuckRoute.Dance) },
+                onPeers = { open(DuckRoute.Peers) },
+                onAI = { open(DuckRoute.AI) },
                 onLanguage = {
                     Copy.language = if (Copy.language == Copy.Language.English) {
                         Copy.Language.Chinese
@@ -862,8 +862,8 @@ fun Shell(
                 .padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            RoundChip(Copy.time, size = 48.dp, testTag = "duck-time") { showSheet = true }
-            RoundChip(Copy.skills, size = 48.dp, testTag = "duck-skills") { showRing = true }
+            RoundChip(Copy.time, size = 48.dp, testTag = "duck-time") { open(DuckRoute.Instrument) }
+            RoundChip(Copy.skills, size = 48.dp, testTag = "duck-skills") { setRing(true) }
             core?.let { duck ->
                 WheeeChip(
                     Copy.quack,
@@ -940,7 +940,7 @@ fun Shell(
 
         // The ring is shell-wide: portrait anchors it to the bottom (the duck
         // above it stays visible), landscape keeps the centred card.
-        if (showRing && core != null) {
+        if (ringOpen && core != null) {
             SkillRing(
                 skills = skills,
                 bottomAnchored = portrait,
@@ -952,14 +952,14 @@ fun Shell(
                         else -> core.skill(name)
                     }
                     lastSkill = name
-                    showRing = false
+                    setRing(false)
                 },
-                onClose = { showRing = false },
+                onClose = { setRing(false) },
             )
         }
     }
 
-    if (showSheet && core != null) {
+    if (route == DuckRoute.Instrument && core != null) {
         InstrumentSheet(
             core,
             input = input,
@@ -1010,31 +1010,31 @@ fun Shell(
             // One sheet at a time, like the More drawer: the instrument
             // closes itself before handing over, or two ModalBottomSheets
             // stack with two scrims and two back behaviors (P1-20).
-            onPostcards = { showSheet = false; showPostcards = true },
-            onDex = { showSheet = false; showDex = true },
-            onDiary = { showSheet = false; showDiary = true },
-        ) { showSheet = false }
+            onPostcards = { open(DuckRoute.Postcards) },
+            onDex = { open(DuckRoute.Dex) },
+            onDiary = { open(DuckRoute.Diary) },
+        ) { closeSheet() }
     }
 
-    if (showDiary) {
-        DiarySheet(onClose = { showDiary = false })
+    if (route == DuckRoute.Diary) {
+        DiarySheet(onClose = { closeSheet() })
     }
 
-    if (showDex) {
-        DexSheet(dex, onClose = { showDex = false })
+    if (route == DuckRoute.Dex) {
+        DexSheet(dex, onClose = { closeSheet() })
     }
 
-    if (showPostcards) {
-        PostcardsSheet(onClose = { showPostcards = false })
+    if (route == DuckRoute.Postcards) {
+        PostcardsSheet(onClose = { closeSheet() })
     }
 
-    if (showQuests) {
-        QuestsSheet(quests, onClose = { showQuests = false })
+    if (route == DuckRoute.Progress) {
+        QuestsSheet(quests, onClose = { closeSheet() })
     }
 
     // The More drawer: every row is one tap from Live. Rows that open a
     // sheet close the drawer first (one sheet at a time, like the shell).
-    if (showMore) {
+    if (route == DuckRoute.More) {
         MoreSheet(
             board = quests,
             peers = peers,
@@ -1046,22 +1046,9 @@ fun Shell(
                 stick = "path"
                 core?.setHead(0.0, 0.0, 0.0, 0.0)
                 core?.releaseBody()
-                showMore = false
+                closeSheet()
             },
-            onMode = { mode ->
-                stick = mode
-                core?.setHead(0.0, 0.0, 0.0, 0.0)
-                core?.releaseBody()
-            },
-            onRules = { showMore = false; showRules = true },
-            onDance = { showMore = false; showDance = true },
-            onPeers = { showMore = false; showPeers = true },
-            onQuests = { showMore = false; showQuests = true },
-            onDiary = { showMore = false; showDiary = true },
-            onBig = { showMore = false; showBig = true },
-            onPostcards = { showMore = false; showPostcards = true },
-            onDex = { showMore = false; showDex = true },
-            onAI = { showMore = false; showAI = true },
+            onOpen = { open(it) },
             onNight = {
                 postDuckCommand(
                     "/night",
@@ -1078,11 +1065,24 @@ fun Shell(
                 languageTick += 1
                 soundLine = null
             },
-            onClose = { showMore = false },
+            onClose = { closeSheet() },
         )
     }
 
-    if (showDance && core != null) {
+    if (route == DuckRoute.Modes) {
+        ModeDialog(
+            current = stick,
+            onPick = { mode ->
+                stick = mode
+                core?.setHead(0.0, 0.0, 0.0, 0.0)
+                core?.releaseBody()
+                closeSheet()
+            },
+            onClose = { closeSheet() },
+        )
+    }
+
+    if (route == DuckRoute.Dance && core != null) {
         DanceSheet(
             studio = dance,
             onSkill = { name ->
@@ -1109,25 +1109,25 @@ fun Shell(
                     """{"toggle":false,"on":${color != "off"},"color":"$color"}""",
                 )
             },
-            onClose = { showDance = false },
+            onClose = { closeSheet() },
         )
     }
 
-    if (showBig && core != null) {
+    if (route == DuckRoute.Big && core != null) {
         BigButtonsSheet(
             onPet = { postDuckCommand("/pet") },
             onFeed = { onFeed?.invoke() },
             onQuack = { quack?.invoke() },
             onSit = { core.sit() },
-            onClose = { showBig = false },
+            onClose = { closeSheet() },
         )
     }
 
-    if (showRules && core != null) {
-        RulesSheet(onClose = { showRules = false })
+    if (route == DuckRoute.Rules && core != null) {
+        RulesSheet(onClose = { closeSheet() })
     }
 
-    if (showPeers) {
+    if (route == DuckRoute.Peers) {
         PeersSheet(
             peers = peers,
             onStart = { startPeers(context, android.os.Build.MODEL) },
@@ -1153,11 +1153,11 @@ fun Shell(
                 }.start()
             },
             onNetPad = { on -> postDuckCommand("/pad", """{"on":$on}""") },
-            onClose = { showPeers = false },
+            onClose = { closeSheet() },
         )
     }
 
-    if (showAI) {
+    if (route == DuckRoute.AI) {
         AISheet(
             config = aiConfig,
             status = aiStatus,
@@ -1175,7 +1175,7 @@ fun Shell(
                 lastAIThink = System.currentTimeMillis()
                 thinkAI()
             },
-            onClose = { showAI = false },
+            onClose = { closeSheet() },
         )
     }
 }
@@ -3121,7 +3121,7 @@ private fun InstrumentSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var showDetails by remember { mutableStateOf(false) }
+    var detailsOpen by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(core.paused()) }
     var rewinding by remember { mutableStateOf(false) }
     LaunchedEffect(rewinding) {
@@ -3276,11 +3276,11 @@ private fun InstrumentSheet(
                 // otherwise make a swipe-down scroll the sheet instead.
                 CloseChip("sheet-close", onClose)
             }
-            ButtonChip(if (showDetails) Copy.showLess else Copy.showMore) { showDetails = !showDetails }
+            ButtonChip(if (detailsOpen) Copy.showLess else Copy.showMore) { detailsOpen = !detailsOpen }
             QuestCard(quests)
             CareCard(care)
             NightRow(night, setNight)
-            if (showDetails && status.size >= 14) {
+            if (detailsOpen && status.size >= 14) {
                 Text(
                     buildString {
                         append(Copy.bringupText(status[0].toInt()))

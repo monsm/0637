@@ -729,6 +729,50 @@ final class DuckUITests: XCTestCase {
         closeMore()
     }
 
+    /// B7: one route table, and a destination returns where it came from.
+    /// The drawer's rows nest over the drawer; the instrument's secondary
+    /// entries nest over the instrument. This pins the adapter behaviour the
+    /// meeting said must not be deleted as "zombies" - and it is what makes
+    /// "close the AI sheet and you are back in the instrument" true.
+    func testRouteTableReturnsToThePresentingSheet() throws {
+        openMore()
+        let dexRow = app.buttons["more-dex"]
+        XCTAssertTrue(dexRow.waitForExistence(timeout: 5), "the drawer has no Dex row")
+        dexRow.tap()
+        XCTAssertTrue(
+            app.staticTexts["dex-title"].waitForExistence(timeout: 10),
+            "the Dex sheet did not open from the drawer"
+        )
+        app.buttons["dex-close"].tap()
+        XCTAssertTrue(
+            app.staticTexts["more-title"].waitForExistence(timeout: 10),
+            "closing Dex did not return to the drawer"
+        )
+        closeMore()
+
+        let time = app.buttons["duck-time"]
+        XCTAssertTrue(time.waitForExistence(timeout: 10), "the time button is missing")
+        time.tap()
+        XCTAssertTrue(
+            app.staticTexts["sheet-title"].waitForExistence(timeout: 10),
+            "the instrument did not open"
+        )
+        let dexOpen = app.buttons["dex-open"]
+        bringIntoView(dexOpen, scroll: app.scrollViews.firstMatch)
+        XCTAssertTrue(dexOpen.exists, "the instrument has no Dex entry")
+        dexOpen.tap()
+        XCTAssertTrue(
+            app.staticTexts["dex-title"].waitForExistence(timeout: 10),
+            "the Dex sheet did not open from the instrument"
+        )
+        app.buttons["dex-close"].tap()
+        XCTAssertTrue(
+            app.staticTexts["sheet-title"].waitForExistence(timeout: 10),
+            "closing Dex did not return to the instrument"
+        )
+        app.buttons["sheet-close"].tap()
+    }
+
     /// Relaunch with the voice diagnostics open and the given argument-domain
     /// overrides. The overrides keep a persisted mic toggle from an earlier
     /// test out of this one.

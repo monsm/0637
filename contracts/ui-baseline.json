@@ -20,7 +20,7 @@
     "direction": "max"
   },
   "android_modal_bools": {
-    "count": 14,
+    "count": 0,
     "direction": "max"
   },
   "android_press_no_feedback": {
@@ -28,11 +28,11 @@
     "direction": "max"
   },
   "android_remember_saveable": {
-    "count": 0,
+    "count": 2,
     "direction": "min"
   },
   "content_view_lines": {
-    "count": 1918,
+    "count": 1838,
     "direction": "max"
   },
   "controller_published": {
