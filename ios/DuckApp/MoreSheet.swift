@@ -144,7 +144,7 @@ struct MoreSheet: View {
                     }
                     row(
                         "arrow.counterclockwise", Copy.rewindPlay,
-                        note: controller.rewinding ? Copy.flashlightOn : nil,
+                        note: controller.rewinding ? Copy.stateOn : nil,
                         check: controller.rewinding,
                         showsChevron: false,
                         id: "more-rewindplay"

@@ -602,11 +602,11 @@ struct InstrumentSheet: View {
                 .foregroundStyle(.secondary)
             Spacer()
             if let color = controller.flashlightColor {
-                Text("\(Copy.faceColor(color)) · \(Copy.flashlightOn)")
+                Text("\(Copy.faceColor(color)) · \(Copy.stateOn)")
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.white)
             } else {
-                Text(Copy.flashlightOff)
+                Text(Copy.stateOff)
                     .font(.system(size: 12, design: .monospaced))
                     .foregroundStyle(.secondary)
             }

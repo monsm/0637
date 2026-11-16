@@ -30,7 +30,7 @@ enum Copy {
     // Live view
     static var name: String { "MicroDuck" }
     static var fell: String { pick("it fell", "摔倒了") }
-    static var waking: String { pick("waking the duck…", "正在叫醒鸭子…") }
+    static var waking: String { pick("waking the duck…", "正在唤醒鸭子…") }
     /// 核没起来时状态行就显示这句；下面的卡片负责解释原因。
     static var wakeFailed: String { pick("did not wake up", "没能醒来") }
     static var tapHint: String {
@@ -125,7 +125,7 @@ enum Copy {
     static var face: String { pick("Face", "脸") }
     static var ledStatus: String { pick("status", "状态灯") }
     static var gauge: String { pick("gauge", "电量灯") }
-    static var flashlight: String { pick("flashlight", "手电筒") }
+    static var flashlight: String { pick("Flashlight", "手电筒") }
     static var flashlightOn: String { pick("on", "开") }
     static var flashlightOff: String { pick("off", "关") }
     /// The Director shutter's short name, mirrored by Android's photoShort.
@@ -160,10 +160,10 @@ enum Copy {
     /// way a user-manifest skill's name does.
     static func faceStatus(_ raw: String) -> String {
         switch raw {
-        case "Starting": return pick("starting", "启动中")
-        case "Healthy": return pick("healthy", "健康")
-        case "Degraded": return pick("degraded", "降级")
-        case "Fault": return pick("fault", "故障")
+        case "Starting": return pick("Starting", "启动中")
+        case "Healthy": return pick("Healthy", "正常")
+        case "Degraded": return pick("Degraded", "降级")
+        case "Fault": return pick("Fault", "故障")
         default: return raw
         }
     }
@@ -451,7 +451,7 @@ enum Copy {
     static var formation: String { pick("Dance together", "家庭舞团") }
     static var roleDance: String { pick("Role dance", "角色编舞") }
     static var voiceChoir: String { pick("Voice choir", "多鸭合奏") }
-    static var netPad: String { pick("UDP pad (port 4210)", "网控手柄 (4210)") }
+    static var netPad: String { pick("UDP pad (4210)", "网控手柄 (4210)") }
     static var netPadNote: String {
         pick(
             "Set the pair code first; the official DKPD pad then drives this duck.",
@@ -487,16 +487,22 @@ enum Copy {
     static var backupExport: String { pick("Export backup", "导出备份") }
     static var backupImport: String { pick("Import a backup", "导入备份") }
     static var backupWorking: String { pick("Working…", "进行中…") }
-    static var backupReady: String { pick("Backup written — share it", "备份已生成——分享它") }
+    static var backupReady: String { pick("Backup written - share it", "备份已生成——分享它") }
     static var backupDone: String { pick("Restored", "已恢复") }
     static var backupFailed: String { pick("The duck refused that file", "鸭子没有收下那个文件") }
-    static var rewindPlay: String { pick("Rewind play", "倒放") }
+    static var rewindPlay: String { pick("Rewind", "倒放") }
+    /// A toggle's state, usable by ANY switch: the words "on/off" alone made
+    /// eight different toggles sound identical to TalkBack (B5, audit #4-8).
+    /// The screen reader hears "Heartbeat, on", "Compass, off" — object and
+    /// state in one breath.
+    static var stateOn: String { pick("on", "开") }
+    static var stateOff: String { pick("off", "关") }
     static var pushCompare: String { pick("Push & compare", "推一把对比") }
     static var abTry: String { pick("Policy A/B", "策略 AB 试穿") }
     static var abNote: String {
         pick(
-            "Fork, load a policy folder on B, watch both.",
-            "开分支，B 载入另一套策略，两边看。"
+            "Fork, load a policy folder on B, watch both",
+            "开分支，B 载入另一套策略，两边看"
         )
     }
     static var abLoaded: String { pick("Loaded on branch B", "已载入分支 B") }
@@ -545,8 +551,8 @@ enum Copy {
     }
     static var heartRowNote: String {
         pick(
-            "Feel its heart in your palm — a reading of its mood.",
-            "在手心感受它的心——由心情推出来的读数。"
+            "feel its heart — a reading of its mood",
+            "感受它的心——由心情推出来的读数"
         )
     }
     static var rulesEmpty: String {
@@ -622,8 +628,8 @@ enum Copy {
     static var aiSave: String { pick("Save", "保存") }
     static var aiNote: String {
         pick(
-            "The duck's state and the last words it heard go to the endpoint you choose. Your key stays on this phone and is never sent anywhere else.",
-            "鸭子的状态和它最后听到的话会发给你填写的接口。密钥只保存在这台手机上，不会发往别处。"
+            "The duck's state and the last words it heard go to the endpoint you choose. Your key stays on this phone.",
+            "鸭子的状态和它最后听到的话会发给你填写的接口。密钥只保存在这台手机上。"
         )
     }
     static var aiHint: String {        pick(
