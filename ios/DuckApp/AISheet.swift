@@ -106,7 +106,6 @@ struct AISheet: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
         .onAppear {
             guard !loaded else { return }
             loaded = true

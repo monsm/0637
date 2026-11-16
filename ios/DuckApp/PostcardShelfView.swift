@@ -78,7 +78,6 @@ struct PostcardShelfView: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
         .sheet(
             isPresented: Binding(
                 get: { shareURL != nil },

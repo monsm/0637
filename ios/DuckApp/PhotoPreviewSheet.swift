@@ -105,7 +105,6 @@ struct PhotoPreviewSheet: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
         .onDisappear {
             // A preview is not a keepsake: an un-kept shot's raw PNG (a cache
             // file) goes with it. Keep has already copied the composed card
