@@ -82,83 +82,7 @@ struct ContentView: View {
             // already-tested landscape chrome.
             let portrait = geometry.size.height > geometry.size.width
                 && geometry.size.width < 600
-            ZStack {
-                // The drive gesture lives ON the scene rather than on a
-                // full-screen clear layer: a separate hit-testing layer above
-                // a UIView-backed Metal view is what swallowed the bars'
-                // presses on a device.
-                scene
-                    .contentShape(Rectangle())
-                    // Both gestures stay installed; the mask picks the one
-                    // for this composition. A ternary of AnyGesture erased
-                    // two different `some Gesture` types and failed to infer.
-                    .gesture(
-                        driveGesture(in: geometry.size),
-                        including: portrait ? .none : .all
-                    )
-                    .gesture(
-                        portraitDriveGesture(in: geometry.size),
-                        including: portrait ? .all : .none
-                    )
-                    .onLongPressGesture(minimumDuration: 0.35) {
-                        if controller.ready && controller.renderError == nil {
-                            setRing(true)
-                        }
-                    }
-                // The route being drawn, in the same screen space as the
-                // gesture that records it. It takes no touches, and it sits
-                // under the chrome and the skill ring.
-                if stickMode == .path && !pathDraft.isEmpty {
-                    PathDraftOverlay(points: pathDraft)
-                }
-                if portrait {
-                    portraitChrome(in: geometry.size)
-                        .zIndex(2)
-                } else {
-                    chrome(in: geometry.size)
-                        .zIndex(2)
-                }
-                if routeState.overlay == .ring {
-                    SkillRing(
-                        names: controller.skillNames(),
-                        bottomAnchored: portrait
-                    ) { name in
-                        controller.trigger(name)
-                        setRing(false)
-                    } onClose: {
-                        setRing(false)
-                    }
-                    // Above the chrome: the portrait deck and the landscape
-                    // bar carry zIndex(2), and the bottom-anchored picker sat
-                    // beneath them — its lower half was covered and taps
-                    // landed on the deck instead of the skill.
-                    .zIndex(5)
-                }
-                // 核要几秒钟才起得来；在那之前控件看着是活的，其实每一下
-                // 都是空操作。用一只鸭子说这件事，不用转圈：里面有个东西
-                // 正在醒。失败时例外——失败不能被这句承诺盖住。
-                if !controller.ready && failureMessage == nil {
-                    WakingView()
-                        .allowsHitTesting(false)
-                        .zIndex(3)
-                }
-                if Voice.diagnosticsEnabled {
-                    // A launch-argument-only probe for the voice regression
-                    // test: the session, the engine and the count of sounds
-                    // that really reached AVAudioEngine. It is absent from
-                    // the product UI and takes no touches.
-                    Text(controller.voiceLine)
-                        .font(.system(size: 6, weight: .regular, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.2)
-                        .allowsHitTesting(false)
-                        .accessibilityIdentifier("duck-voice-state")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .padding(2)
-                        .zIndex(4)
-                }
-            }
+            stage(geometry, portrait: portrait)
             // Halfway through a rotation the thumb's old translation means
             // something else; hand the duck back neutral, once.
             .onChange(of: portrait) { _, _ in
@@ -503,6 +427,90 @@ struct ContentView: View {
             .padding(.bottom, 6)
             .transition(.opacity)
             .accessibilityIdentifier("first-launch-hint")
+    }
+
+    /// The stage literal, split out of the body expression: once the route
+    /// table's sheet/onChange modifiers joined the ZStack, Xcode stopped
+    /// type-checking the body in reasonable time. The function's opaque
+    /// return type keeps the literal out of that inference.
+    private func stage(_ geometry: GeometryProxy, portrait: Bool) -> some View {
+            ZStack {
+                // The drive gesture lives ON the scene rather than on a
+                // full-screen clear layer: a separate hit-testing layer above
+                // a UIView-backed Metal view is what swallowed the bars'
+                // presses on a device.
+                scene
+                    .contentShape(Rectangle())
+                    // Both gestures stay installed; the mask picks the one
+                    // for this composition. A ternary of AnyGesture erased
+                    // two different `some Gesture` types and failed to infer.
+                    .gesture(
+                        driveGesture(in: geometry.size),
+                        including: portrait ? .none : .all
+                    )
+                    .gesture(
+                        portraitDriveGesture(in: geometry.size),
+                        including: portrait ? .all : .none
+                    )
+                    .onLongPressGesture(minimumDuration: 0.35) {
+                        if controller.ready && controller.renderError == nil {
+                            setRing(true)
+                        }
+                    }
+                // The route being drawn, in the same screen space as the
+                // gesture that records it. It takes no touches, and it sits
+                // under the chrome and the skill ring.
+                if stickMode == .path && !pathDraft.isEmpty {
+                    PathDraftOverlay(points: pathDraft)
+                }
+                if portrait {
+                    portraitChrome(in: geometry.size)
+                        .zIndex(2)
+                } else {
+                    chrome(in: geometry.size)
+                        .zIndex(2)
+                }
+                if routeState.overlay == .ring {
+                    SkillRing(
+                        names: controller.skillNames(),
+                        bottomAnchored: portrait
+                    ) { name in
+                        controller.trigger(name)
+                        setRing(false)
+                    } onClose: {
+                        setRing(false)
+                    }
+                    // Above the chrome: the portrait deck and the landscape
+                    // bar carry zIndex(2), and the bottom-anchored picker sat
+                    // beneath them — its lower half was covered and taps
+                    // landed on the deck instead of the skill.
+                    .zIndex(5)
+                }
+                // 核要几秒钟才起得来；在那之前控件看着是活的，其实每一下
+                // 都是空操作。用一只鸭子说这件事，不用转圈：里面有个东西
+                // 正在醒。失败时例外——失败不能被这句承诺盖住。
+                if !controller.ready && failureMessage == nil {
+                    WakingView()
+                        .allowsHitTesting(false)
+                        .zIndex(3)
+                }
+                if Voice.diagnosticsEnabled {
+                    // A launch-argument-only probe for the voice regression
+                    // test: the session, the engine and the count of sounds
+                    // that really reached AVAudioEngine. It is absent from
+                    // the product UI and takes no touches.
+                    Text(controller.voiceLine)
+                        .font(.system(size: 6, weight: .regular, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.2)
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("duck-voice-state")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                        .padding(2)
+                        .zIndex(4)
+                }
+            }
     }
 
     private func presentHint() {
