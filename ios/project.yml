@@ -144,6 +144,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck.tests
         GENERATE_INFOPLIST_FILE: YES
+        # The unit bundle scans the host app's bridging header (XcodeGen
+        # propagates it with TEST_HOST); without the core's include path
+        # the scan dies on 'duck_core.h' file not found.
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/../core/duck-mobile-core/include
 
 schemes:
   Duck:
