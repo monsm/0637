@@ -59,4 +59,7 @@ dependencies {
     // Pure-JVM assertions for the shell's colour maths (WCAG contrast) and
     // the injectable daylight curve. No emulator needed.
     testImplementation("junit:junit:4.13.2")
+    // A real org.json on the JVM test classpath: the mockable android.jar
+    // stubs throw "not mocked", and the parser/ledger fixtures need JSON.
+    testImplementation("org.json:json:20240303")
 }
