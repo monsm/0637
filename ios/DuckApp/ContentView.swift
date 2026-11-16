@@ -91,10 +91,11 @@ struct ContentView: View {
             // already-tested landscape chrome.
             let portrait = geometry.size.height > geometry.size.width
                 && geometry.size.width < 600
-            stage(geometry, portrait: portrait)
+            let stageView = stage(geometry, portrait: portrait)
             // Halfway through a rotation the thumb's old translation means
             // something else; hand the duck back neutral, once.
-            .onChange(of: portrait) { _, _ in
+            let rotated = stageView
+                .onChange(of: portrait) { _, _ in
                 controller.joystick = .zero
                 controller.setHead(yaw: 0, pitch: 0)
                 controller.releaseBody()
@@ -109,6 +110,7 @@ struct ContentView: View {
             // the old full-screen ignore put the buttons under the home bar.
             // One modal sheet for every surface: instrument, Director photo,
             // blocks, neighbours and the user's model.
+            rotated
             .sheet(item: $routeState.sheet) { sheet in
                 modalSheet(sheet, portrait: portrait)
             }
@@ -137,8 +139,8 @@ struct ContentView: View {
                 // takes the acceptance screenshot of it without a hand on the
                 // phone (`-duck.openMore YES`). The argument domain stores
                 // strings, so the value is read as text.
-                if let open = UserDefaults.standard.string(forKey: "duck.openMore"),
-                   open.lowercased() == "yes" || open == "1" {
+                if let launchArg = UserDefaults.standard.string(forKey: "duck.openMore"),
+                   launchArg.lowercased() == "yes" || launchArg == "1" {
                     open(.more)
                 }
             }

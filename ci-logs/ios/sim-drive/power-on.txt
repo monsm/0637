@@ -1,1 +1,1 @@
-after power-on: label=walk trunk=-0.0963 0.1356 0.0960
+after power-on: label=walk trunk=-0.0929 0.1541 0.1129
