@@ -2203,6 +2203,13 @@ final class DuckController: ObservableObject {
                                     : Copy.giftMissedEmotion(name))
                                 : Copy.giftReceivedTreat(name)
                             self.giftTick += 1
+                            // The wall credits a gift only on the core's own
+                            // verdict (ok=true: it ate, it played the mood);
+                            // giftPeer is fire-and-forget, so the tap proves
+                            // nothing and must never be the trigger (FE-2).
+                            ProgressStore.shared.recordPeerGift(
+                                ok: event["ok"] as? Bool == true
+                            )
                         }
                     }
                     // Sleep mode's nightly slice sits beside care in the

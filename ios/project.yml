@@ -130,6 +130,21 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_TARGET_NAME: Duck
 
+  # Unit tests for the parts that need no screen: the progress store's
+  # achievement chain. XcodeGen derives TEST_HOST from the Duck dependency,
+  # so @testable import Duck reaches the app's own classes.
+  DuckTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: DuckTests
+    dependencies:
+      - target: Duck
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck.tests
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   Duck:
     build:
@@ -140,4 +155,6 @@ schemes:
     test:
       config: Debug
       targets:
+        # Unit first: the store's chain fails faster than a UI round trip.
+        - DuckTests
         - DuckUITests
