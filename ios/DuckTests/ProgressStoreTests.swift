@@ -46,7 +46,9 @@ final class ProgressStoreTests: XCTestCase {
     func testRefusedOrThrottledGiftNeverCounts() {
         let store = freshStore()
         store.recordPeerGift(ok: false)
-        XCTAssertFalse(
+        // settle() reports "reached the expected state"; expecting false
+        // (not unlocked) is a true verdict, so the assert is positive.
+        XCTAssertTrue(
             settle(store, id: "first_gift", expect: false),
             "the core refused this delivery; the wall must stay grey"
         )
