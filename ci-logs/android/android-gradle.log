@@ -48,7 +48,7 @@ w: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduc
 > Task :app:packageDebug
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794807861619.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794808355946.json
 
-BUILD SUCCESSFUL in 1m 4s
+BUILD SUCCESSFUL in 52s
 35 actionable tasks: 35 executed
