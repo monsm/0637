@@ -176,7 +176,6 @@ struct PeersSheet: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(20)
-        .preferredColorScheme(.dark)
     }
 
     /// The sheet's one chip shape: the greeting's capsule, reused by gifts

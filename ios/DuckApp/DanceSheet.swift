@@ -117,7 +117,7 @@ struct DanceSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 50)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(studio.recording ? .red : .blue)
+                .tint(studio.recording ? .red : Color.duckData)
                 .accessibilityIdentifier("dance-record")
 
                 Button {
@@ -153,6 +153,5 @@ struct DanceSheet: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
     }
 }

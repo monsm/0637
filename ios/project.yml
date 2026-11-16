@@ -46,6 +46,11 @@ targets:
         ENABLE_DEBUG_DYLIB: NO
         ENABLE_PREVIEWS: NO
         GENERATE_INFOPLIST_FILE: YES
+        # Dark, once, for the whole app (UI_TOKENS §7): the room, the stage
+        # and the viewfinder are all dark; a light screen is not a variant
+        # this product has. The 16 per-view .preferredColorScheme(.dark)
+        # hardwrites went away with this key.
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         # Portrait is the product; landscape stays as the two-hand instrument
@@ -144,6 +149,11 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck.tests
         GENERATE_INFOPLIST_FILE: YES
+        # The unit bundle scans the host app's bridging header (XcodeGen
+        # propagates it with TEST_HOST); without the core's include path
+        # the scan dies on 'duck_core.h' file not found.
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/../core/duck-mobile-core/include
 
 schemes:
   Duck:

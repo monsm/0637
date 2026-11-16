@@ -12,7 +12,7 @@
     "direction": "min"
   },
   "android_color_literals": {
-    "count": 27,
+    "count": 10,
     "direction": "max"
   },
   "android_font_literals": {
@@ -32,7 +32,7 @@
     "direction": "min"
   },
   "content_view_lines": {
-    "count": 1919,
+    "count": 1918,
     "direction": "max"
   },
   "controller_published": {
@@ -44,11 +44,11 @@
     "direction": "max"
   },
   "ios_color_literals": {
-    "count": 23,
+    "count": 15,
     "direction": "max"
   },
   "ios_dark_hardwrites": {
-    "count": 16,
+    "count": 0,
     "direction": "max"
   },
   "ios_font_literals": {

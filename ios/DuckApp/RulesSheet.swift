@@ -76,14 +76,7 @@ struct RulesSheet: View {
                             .padding(.horizontal, 12)
                             .frame(minHeight: 48)
                             .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.20, green: 0.32, blue: 0.45),
-                                        Color(red: 0.16, green: 0.42, blue: 0.44),
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ),
+                                Color.duckBgSurface,
                                 in: RoundedRectangle(cornerRadius: 12)
                             )
                             .accessibilityIdentifier("rule-\(index)")
@@ -244,7 +237,6 @@ struct RulesSheet: View {
             }
         }
         .padding(20)
-        .preferredColorScheme(.dark)
         .onAppear { controller.loadRules() }
         .onChange(of: action) { _, _ in value = valueOptions.first ?? "" }
     }

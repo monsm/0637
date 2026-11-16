@@ -408,17 +408,8 @@ struct Achievement: Identifiable {
 
 // MARK: - 语义色（docs/UI_TOKENS.md §2.2；DuckTheme.swift 落地后改引用它）
 
-private extension Color {
-    static let duckBgRoot = Color(red: 0.086, green: 0.082, blue: 0.075)       // bg.root #161513
-    static let duckBgSurface = Color(red: 0.133, green: 0.122, blue: 0.114)    // bg.surface #221F1D
-    static let duckTextPrimary = Color(red: 0.965, green: 0.945, blue: 0.910)  // text.primary #F6F1E8
-    static let duckOnAccent = Color(red: 0.102, green: 0.071, blue: 0.031)     // text.onAccent #1A1208
-    static let duckAction = Color(red: 1.0, green: 0.541, blue: 0.239)         // accent.action #FF8A3D
-    static let duckData = Color(red: 0.498, green: 0.698, blue: 0.851)         // accent.data #7FB2D9
-    static let duckInfo = Color(red: 0.690, green: 0.561, blue: 0.851)         // accent.info #B08FD9
-    static let duckGood = Color(red: 0.525, green: 0.839, blue: 0.643)         // state.good #86D6A4
-    static let duckWarn = Color(red: 0.910, green: 0.706, blue: 0.369)         // state.warn #E8B45E
-}
+// 语义色已迁到 DuckTheme.swift（UI_TOKENS §7 的唯一落点）。
+
 
 // MARK: - 成长面板
 
@@ -446,7 +437,6 @@ struct ProgressSheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.duckBgSurface.ignoresSafeArea())
-        .preferredColorScheme(.dark)
         .presentationDetents([.medium, .large])
         .onAppear { store.refreshDayIfNeeded() }
         .onChange(of: scenePhase) { phase in

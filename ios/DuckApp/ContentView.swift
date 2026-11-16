@@ -234,7 +234,6 @@ struct ContentView: View {
                 if show { showDance = false; modal = .dance }
             }
         }
-        .preferredColorScheme(.dark)
         // The hint teaches gestures, so it must wait until gestures work:
         // the core takes seconds to load, and a hint spent over a dead screen
         // is spent forever. It is shown once the duck is ready, on both
@@ -443,7 +442,7 @@ struct ContentView: View {
                 controller.setDirector(newValue == .director)
             }
         } else {
-            Color(red: 0.055, green: 0.075, blue: 0.10)
+            Color.duckStageInstrument
                 .ignoresSafeArea()
         }
         if surface == .director {
@@ -650,7 +649,7 @@ struct ContentView: View {
                             Capsule()
                                 // accent.data #7FB2D9，实色：保留历史的
                                 // 进度条必须读得出来（原 60% 系统蓝 2.11:1）。
-                                .fill(Color(red: 0.498, green: 0.698, blue: 0.851))
+                                .fill(Color.duckData)
                                 .frame(width: barWidth * railFraction, height: 3)
                         }
                         .frame(maxHeight: .infinity, alignment: .center)
@@ -812,7 +811,7 @@ struct ContentView: View {
         .frame(height: 82)
         .padding(.horizontal, 10)
         .background(
-            Color(red: 0.078, green: 0.102, blue: 0.133).opacity(0.94),
+            Color.duckBgSurface.opacity(0.94),
             in: RoundedRectangle(cornerRadius: 28)
         )
         .overlay(
@@ -837,7 +836,7 @@ struct ContentView: View {
                     .frame(width: 52, height: 52)
                     .background(
                         selected
-                            ? AnyShapeStyle(Color.cyan.opacity(0.35))
+                            ? AnyShapeStyle(Color.duckAction.opacity(0.35))
                             : AnyShapeStyle(.ultraThinMaterial),
                         in: Circle()
                     )
@@ -1100,7 +1099,7 @@ struct ContentView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(
-            Color(red: 0.078, green: 0.102, blue: 0.133).opacity(0.94),
+            Color.duckBgSurface.opacity(0.94),
             in: RoundedRectangle(cornerRadius: 22)
         )
         .overlay(
@@ -1687,14 +1686,14 @@ struct PathDraftOverlay: View {
             }
             context.stroke(
                 line,
-                with: .color(Color.cyan.opacity(0.85)),
+                with: .color(Color.duckData.opacity(0.85)),
                 style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
             )
             // The origin: the duck stands here when the route starts.
             let dot = CGRect(x: first.x - 4, y: first.y - 4, width: 8, height: 8)
             context.fill(
                 Path(ellipseIn: dot),
-                with: .color(Color.cyan.opacity(0.85))
+                with: .color(Color.duckData.opacity(0.85))
             )
         }
         .allowsHitTesting(false)

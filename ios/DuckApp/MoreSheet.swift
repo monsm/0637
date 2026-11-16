@@ -261,8 +261,7 @@ struct MoreSheet: View {
             .padding(.top, 14)
             .padding(.bottom, 28)
         }
-        .background(Color.sheetSurface)
-        .preferredColorScheme(.dark)
+        .background(Color.duckBgSurface)
         .sheet(item: $destination) { destination in
             sheet(for: destination)
         }
@@ -409,11 +408,11 @@ struct MoreSheet: View {
                 if check {
                     Image(systemName: "checkmark")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.actionAccent)
+                        .foregroundStyle(Color.duckAction)
                 }
                 if dot {
                     Circle()
-                        .fill(Color.actionAccent)
+                        .fill(Color.duckAction)
                         .frame(width: 8, height: 8)
                 }
                 if let badge {
@@ -486,7 +485,7 @@ struct ModeSheet: View {
                         if stickMode == mode {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.actionAccent)
+                                .foregroundStyle(Color.duckAction)
                         }
                     }
                     .frame(minHeight: 48)
@@ -498,16 +497,8 @@ struct ModeSheet: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.sheetSurface)
-        .preferredColorScheme(.dark)
+        .background(Color.duckBgSurface)
     }
 }
-/// UI_TOKENS v1 literals until B2 grows `DuckTheme.swift`: a new component
-/// must not invent another surface or accent (design review 2026-11-13).
-private extension Color {
-    /// bg.surface #221F1D — the opaque sheet surface, warm like the room
-    /// (UI_TOKENS §4).
-    static let sheetSurface = Color(red: 0.133, green: 0.122, blue: 0.114)
-    /// accent.action #FF8A3D — selection, checks and attention dots.
-    static let actionAccent = Color(red: 1.0, green: 0.541, blue: 0.239)
-}
+// 语义色已迁到 DuckTheme.swift（UI_TOKENS §7 的唯一落点）。
+

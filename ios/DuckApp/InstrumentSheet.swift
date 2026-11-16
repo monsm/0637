@@ -120,9 +120,8 @@ struct InstrumentSheet: View {
             }
             .padding(20)
         }
-        .background(Color(red: 0.055, green: 0.075, blue: 0.10))
+        .background(Color.duckStageInstrument)
         .id(languageTick)
-        .preferredColorScheme(.dark)
         .sheet(
             isPresented: Binding(
                 get: { shareURL != nil },
@@ -580,7 +579,7 @@ struct InstrumentSheet: View {
             Spacer()
             Toggle("", isOn: $controller.tiltLook)
                 .labelsHidden()
-                .tint(Color(red: 0.498, green: 0.698, blue: 0.851))
+                .tint(Color.duckData)
                 .accessibilityLabel(Copy.tiltLook)
                 .accessibilityIdentifier("sheet-tilt-look")
         }
