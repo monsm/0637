@@ -141,6 +141,7 @@ struct MoreSheet: View {
                         onOpen(.tools)
                     }
                 }
+            }
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 28)
