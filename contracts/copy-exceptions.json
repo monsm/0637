@@ -2,20 +2,11 @@
   "_readme": [
     "check-copy-values.py skips these keys when comparing the two phones' wording.",
     "platform_facts: the two phones genuinely say different TRUE things (hardware/API differences). May only shrink; a meeting must bless any change.",
-    "pending: real drift queued for the copy batch (docs/UIUX_REFACTOR_2026-11-15.md B5). Entries leave this list only by fixing the value, not by editing this file to silence the gate."
+    "pending: real drift queued for the copy batch. Entries leave this list only by fixing the value, not by editing this file to silence the gate.",
+    "2026-11-16: the boss ruled roomLampNote stays a platform fact (iOS has no ambient-light API; Android can drive from the sensor). The seven pending keys were unified in the B5 copy batch and removed from this list - the gate now guards them for real."
   ],
   "platform_facts": [
-    "roomLampNote",
-    "netPad",
-    "rewindPlay"
+    "roomLampNote"
   ],
-  "pending": [
-    "waking",
-    "faceStatus",
-    "flashlight",
-    "heartRowNote",
-    "aiNote",
-    "abNote",
-    "backupReady"
-  ]
+  "pending": []
 }

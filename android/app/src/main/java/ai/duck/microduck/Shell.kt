@@ -1411,7 +1411,7 @@ private fun PeersSheet(
         Text(Copy.netPad, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
         Spacer(Modifier.size(8.dp))
         ButtonChip(
-            if (netPadOn) Copy.flashlightOff else Copy.flashlightOn,
+            if (netPadOn) Copy.stateOn else Copy.stateOff,
             "peers-netpad",
         ) {
             netPadOn = !netPadOn
@@ -3506,7 +3506,7 @@ private fun InstrumentSheet(
                     )
                     Spacer(Modifier.size(8.dp))
                     ButtonChip(
-                        if (heartOn) Copy.flashlightOff else Copy.flashlightOn,
+                        if (heartOn) Copy.stateOn else Copy.stateOff,
                         testTag = "heart-toggle",
                     ) { heartOn = !heartOn }
                 }
@@ -3545,7 +3545,9 @@ private fun InstrumentSheet(
                     )
                     Spacer(Modifier.size(8.dp))
                     ButtonChip(
-                        if (input.ambientLux >= 0f) Copy.flashlightOff else Copy.roomLamp,
+                        // Sensor-driven: the lamp runs itself, manual is off.
+                        // Sensor-less: the chip names the manual mode itself.
+                        if (input.ambientLux >= 0f) Copy.stateOff else Copy.roomLamp,
                         "lamp-toggle",
                     ) {
                         // Manual stops, only when there is no sensor to trust.
@@ -3571,7 +3573,7 @@ private fun InstrumentSheet(
             ) {
                 Text(Copy.compass, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
                 ButtonChip(
-                    if (compassOn) Copy.flashlightOff else Copy.flashlightOn,
+                    if (compassOn) Copy.stateOn else Copy.stateOff,
                     "compass-toggle",
                 ) {
                     compassOn = !compassOn
@@ -3654,7 +3656,7 @@ private fun InstrumentSheet(
                 // backwards, 200 ticks a pop - the same /seek the rewind
                 // chip uses, just continuously.
                 ButtonChip(
-                    if (rewinding) Copy.flashlightOff else Copy.rewindPlay,
+                    if (rewinding) Copy.stateOn else Copy.rewindPlay,
                     "rewind-play",
                 ) { rewinding = !rewinding }
                 // Push & compare: checkpoint, fork, and push branch B -
@@ -3693,18 +3695,18 @@ private fun InstrumentSheet(
                     modifier = Modifier.weight(1f).testTag("ab-folder"),
                 )
                 Spacer(Modifier.size(8.dp))
-                ButtonChip(Copy.flashlightOn, "ab-load") {
+                ButtonChip(Copy.stateOn, "ab-load") {
                     core.fork()
                     core.reload(abFolder)
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(
-                    if (input.hudOn) Copy.flashlightOff else Copy.hud,
+                    if (input.hudOn) Copy.stateOn else Copy.hud,
                     "hud-toggle",
                 ) { input.hudOn = !input.hudOn }
                 ButtonChip(
-                    if (input.p2On) Copy.flashlightOff else Copy.twoPlayer,
+                    if (input.p2On) Copy.stateOn else Copy.twoPlayer,
                     "p2-toggle",
                 ) { input.p2On = !input.p2On }
             }

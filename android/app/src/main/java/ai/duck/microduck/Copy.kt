@@ -491,6 +491,12 @@ val quack get() = pick("Quack", "叫一声")
         else -> pick("Sit down", "坐下")
     }
     val rewindPlay get() = pick("Rewind", "倒放")
+    // A toggle's state, usable by ANY switch: the words "on/off" alone made
+    // eight different toggles sound identical to TalkBack (B5, audit #4-8).
+    // The screen reader hears "Heartbeat, on", "Compass, off" — object and
+    // state in one breath.
+    val stateOn get() = pick("on", "开")
+    val stateOff get() = pick("off", "关")
     val pushCompare get() = pick("Push & compare", "推一把对比")
     val pushCompareDone get() = pick("B got the push - switch branches", "B 路挨了推——切分支看差异")
     val hud get() = pick("Observation HUD", "观测摘录")
