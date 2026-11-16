@@ -74,8 +74,17 @@ struct ContentView: View {
     }
 
     var body: some View {
+        choreographed()
+    }
+
+    /// The stage and its lifecycle modifiers, in three separately checked
+    /// pieces: one chain of them exceeded Xcode's type-checker budget once
+    /// the route table joined the shell (the error moved from the ZStack to
+    /// .task when only the stage was split out). A plain function, not a
+    /// ViewBuilder, so the pieces can be bound and returned.
+    private func choreographed() -> some View {
         let _ = languageTick
-        GeometryReader { geometry in
+        let base = GeometryReader { geometry in
             // Portrait is the product; landscape is the two-hand instrument
             // and demo layout. A width under 600 keeps phones (and a narrow
             // split view) in the one-thumb shell; wider surfaces keep the
@@ -191,6 +200,7 @@ struct ContentView: View {
                 withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
             }
         }
+        let withRoom = base
         // A chorus starting on the Wi-Fi: the same pill, naming the ducks in
         // the room. The tick only fires on the inactive -> active edge, so a
         // long song does not re-announce itself on every publish.
@@ -243,6 +253,7 @@ struct ContentView: View {
                 pathDraft.removeAll()
             }
         }
+        return withRoom
         .task {
             if controller.ready {
                 presentHint()
