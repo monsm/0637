@@ -1,0 +1,409 @@
+# features.yaml — IA 4×4 重排唯一事实源（老板 2026-11-16 拍板）
+#
+# 来源：docs/UIUX_REFACTOR_2026-11-15.md §9 回拍板项①。三套互斥分组方案取
+# 小满版骨架（唯一引用 §5:116 先例「时间类控制定在时间栏」），按老板新约束
+# 重算：每目的页控件 ≤6；首层 4 组 × ≤4 行（≤16 预算）；倒放归时间栏。
+#
+# 分组数学：22 项功能（含 iOS 独有成长手册/成就墙，Android 无对应页标
+# not-implemented）。四组 → 五个目的页：
+#   Play     玩          4 行  画路走/积木规则/编舞铺/定时器（在积木页内）
+#   Together 一起        4 行  配对码/DKPD/ensemble/合唱/礼物/双人接机
+#   Record   记录        4 行  每日任务/鸭子日记/明信片/情绪图鉴/日子行
+#   Duck     这只鸭子    4 行  语音/心跳/LED/家长时长/大字/罗盘
+#   Tools    家长工具    4 行  房间灯/备份/ToF/AB/推把/HUD
+# 倒放不占行（时间栏，§5:116 先例）。首层共 16 行，16 预算不破。
+#
+# 老板规矩：
+#   1. 本文件是重排唯一事实源。两端入口位置、分组、跳数、enabled-when 全部
+#      从本表读；改分组先改这里，再搬入口（「契约先红、再搬入口」）。
+#   2. 每目的页控件 ≤6。超了就拆页或调分组，不许堆墙。
+#   3. 做完两端入口必须一一对应（同名同组同跳数），check-ui-features.py 守。
+#   4. 只改入口不改账：每日任务/成长手册的数据链两端不动（B4 §7）。
+#   5. not-implemented 项必须写明原因，禁止渲染假数（FIDELITY §0.1）。
+#   6. 22+2 起账：地面高度/轨迹导出无 UI，标 not-implemented + 核心路由备注。
+
+meta:
+  ruling_date: "2026-11-16"
+  ruling_source: "老板拍板：docs/UIUX_REFACTOR_2026-11-15.md §9 三项回拍板①"
+  scheme: "小满版骨架 + ≤6 约束重算（三套方案取最稳）"
+  groups: 4
+  first_layer_budget_rows: 16
+  per_page_max_controls: 6
+  max_hops_from_live: 2
+
+# 首层四组，行序即抽屉里的顺序。行 = 一个可点入口，打开一个目的页。
+groups:
+  - id: play
+    zh: 玩
+    rows: 4
+    destination: play
+  - id: together
+    zh: 一起
+    rows: 4
+    destination: together
+  - id: record
+    zh: 记录
+    rows: 4
+    destination: record
+  - id: duck
+    zh: 这只鸭子
+    rows: 4
+    destination: duck
+
+# 目的页：组 → 页面。to 字段是首层行打开的页面。controls 是该页控件数
+# （含页内动作，不含只读遥测）。≤6 由 check-ui-features.py 守。
+pages:
+  - id: play
+    group: play
+    zh: 玩
+    max_controls: 6
+    controls: 4
+    entries: [path-draw, blocks, dance, timer]
+  - id: together
+    group: together
+    zh: 一起
+    max_controls: 6
+    controls: 6
+    entries: [pairing, dkpd, ensemble, chorus, gifts, two-player]
+  - id: record
+    group: record
+    zh: 记录
+    max_controls: 6
+    controls: 5
+    entries: [quests, diary, postcards, dex, day-rows]
+  - id: duck
+    group: duck
+    zh: 这只鸭子
+    max_controls: 6
+    controls: 6
+    entries: [voice-zh, heart, led, parent-time, big-buttons, compass]
+  - id: tools
+    group: record
+    zh: 家长工具
+    max_controls: 6
+    controls: 6
+    entries: [room-lamp, backup, tof, ab-try, push-compare, hud]
+
+# 功能台账：22 项 + 2 项 no-ui = 24。conform_b4 沿用 ui-entries.json 口径。
+# enabled_when: 门控（无邻居时 ensemble/合唱/礼物 可见但禁用，不是消失）。
+# data_chain: 只改入口不改账的边界声明。
+# implement: not-implemented 项必须给 reason。
+features:
+  - id: path-draw
+    zh: 画路走
+    group: play
+    page: play
+    hops: 2
+    conform_b4: ok
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: blocks
+    zh: 积木规则
+    group: play
+    page: play
+    hops: 2
+    conform_b4: ok
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: dance
+    zh: 编舞铺
+    group: play
+    page: play
+    hops: 2
+    conform_b4: ok
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: timer
+    zh: 定时器触发器
+    group: play
+    page: play
+    hops: 2
+    conform_b4: extension
+    note: 积木规则页内触发 chip 的一个档位，不占首层行
+    ios: implemented
+    android: implemented
+    data_chain: none
+
+  - id: pairing
+    zh: 邻居配对码
+    group: together
+    page: together
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: dkpd
+    zh: 网控手柄
+    group: together
+    page: together
+    hops: 2
+    conform_b4: extension
+    ledger_ids: [netpad-rx, netpad-tx]
+    note: 收发两端合并为一个目的页控件；发送端 iOS 经 -duck.peerFixture 验证可达（B3 已修 FE-1）
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: ensemble
+    zh: 舞团/合奏
+    group: together
+    page: together
+    hops: 2
+    conform_b4: extension
+    enabled_when: "peers.isEmpty() ? disabled : enabled"
+    note: 无邻居时可见但禁用，不消失（IA-4，B2 已修）
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: chorus
+    zh: 家庭合唱
+    group: together
+    page: together
+    hops: 2
+    conform_b4: extension
+    enabled_when: "peers.isEmpty() ? disabled : enabled"
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: gifts
+    zh: 互送礼物
+    group: together
+    page: together
+    hops: 2
+    conform_b4: extension
+    enabled_when: "peers.isEmpty() ? disabled : enabled"
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: two-player
+    zh: 双人接机
+    group: together
+    page: together
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+
+  - id: quests
+    zh: 每日任务
+    group: record
+    page: record
+    hops: 2
+    conform_b4: ok
+    data_chain: ios=ProgressStore+7日瓦片+成就墙；android=3任务+连续天数（只改入口不改账，B4 §7）
+    ios: implemented
+    android: implemented
+  - id: diary
+    zh: 鸭子日记
+    group: record
+    page: record
+    hops: 2
+    conform_b4: ok
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: postcards
+    zh: 明信片
+    group: record
+    page: record
+    hops: 2
+    conform_b4: ok
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: dex
+    zh: 情绪图鉴
+    group: record
+    page: record
+    hops: 2
+    conform_b4: ok
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: day-rows
+    zh: 日子行
+    group: record
+    page: record
+    hops: 2
+    conform_b4: extension
+    note: iOS 渲染缺失已修（B3，FE-3）；Android 仪表内渲染待搬进记录页
+    ios: implemented
+    android: implemented
+    data_chain: none
+
+  - id: voice-zh
+    zh: 语音指令
+    group: duck
+    page: duck
+    hops: 2
+    conform_b4: extension
+    note: 开关「听懂中文」；iOS 专项测试在，Android 无等价物（TQ-1）
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: heart
+    zh: 手心心跳
+    group: duck
+    page: duck
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: led
+    zh: LED 灯语
+    group: duck
+    page: duck
+    hops: 2
+    conform_b4: extension
+    note: 编舞铺灯光步内，无独立首层行
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: parent-time
+    zh: 家长时长
+    group: duck
+    page: duck
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: big-buttons
+    zh: 大字模式
+    group: duck
+    page: duck
+    hops: 2
+    conform_b4: extension
+    note: 两端同组（Android 原先在记录组，按老板拍板挪鸭子组）
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: compass
+    zh: 朝向罗盘
+    group: duck
+    page: duck
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+
+  - id: room-lamp
+    zh: 房间灯
+    group: record
+    page: tools
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: backup
+    zh: 存档搬家
+    group: record
+    page: tools
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: tof
+    zh: ToF 网格
+    group: record
+    page: tools
+    hops: 2
+    conform_b4: extension
+    note: 8×8 降采样进 /state.sensors，两端无深度数据源时标 not-implemented（FIDELITY §0.1）
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: ab-try
+    zh: AB 试穿
+    group: record
+    page: tools
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: push-compare
+    zh: 推一把对比
+    group: record
+    page: tools
+    hops: 2
+    conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: hud
+    zh: 观测摘录 HUD
+    group: record
+    page: tools
+    hops: 2
+    conform_b4: extension
+    note: opt-in 覆盖层默认关
+    ios: implemented
+    android: implemented
+    data_chain: none
+
+  # —— 不占首层行的功能 ——
+  - id: rewind-play
+    zh: 倒放
+    group: none
+    page: time-bar
+    hops: 1
+    conform_b4: extension
+    note: 时间类控制定在时间栏（UI_B4_PLAN.md §5:116 唯一可引先例，老板拍板采纳）
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: progress-book
+    zh: 成长手册/成就墙
+    group: record
+    page: record
+    hops: 2
+    conform_b4: extension
+    note: iOS 独有（本机 ProgressStore + 7 日瓦片 + 成就墙）；Android 无对应页
+    ios: implemented
+    android: not-implemented
+    reason: "Android 无 ProgressStore 事件账，是新产品不是重排；另立产品批次（会议决议）"
+    data_chain: ios=ProgressStore；android=无
+  - id: tilt-look
+    zh: 倾斜看
+    group: duck
+    page: duck
+    hops: 2
+    conform_b4: extension
+    note: iOS 独有（手机 IMU 当头部），Android 不提供是硬件差异不是设计债（COMPANION.md §1）
+    ios: implemented
+    android: not-implemented
+    reason: "平台事实：Android 无此能力，文档已声明"
+    data_chain: none
+
+  # —— 22+2 的 +2：核心有路由、UI 无入口 ——
+  - id: floor-height
+    zh: 地面高度
+    group: none
+    page: none
+    hops: null
+    conform_b4: extension
+    note: 核心 POST /floor 已有（intent.rs:1083），两端 UI 0 命中——22+2 起账标 no-ui
+    ios: not-implemented
+    android: not-implemented
+    reason: "无 UI；台账记 no-ui，ARKit/ARCore 接线待真机"
+    data_chain: none
+  - id: trajectory-export
+    zh: 轨迹导出
+    group: none
+    page: none
+    hops: null
+    conform_b4: extension
+    note: 核心 GET /export/trajectory 已有（intent.rs:1067），两端 UI 0 命中——22+2 起账标 no-ui
+    ios: not-implemented
+    android: not-implemented
+    reason: "无 UI；核心路由已备"
+    data_chain: none

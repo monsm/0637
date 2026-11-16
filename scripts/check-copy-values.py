@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Fail when the two shells' Copy dictionaries disagree on the *values* of a
-key, for keys whose wording must be identical across both phones.
-
-check-copy-keys.py guards the key *sets*; this guard adds the values. A key
-lands here as a failure when both platforms define it and its (en, zh) pair
-differs beyond interpolation syntax — unless the key is listed in
-contracts/copy-exceptions.json. Two exception classes exist:
+"""
+Exception classes:
 
   platform_facts — the two phones genuinely say different true things
       (iOS has no ambient-light API; the other does). These may differ
-      until a meeting decides otherwise; the list may only shrink.
-  pending        — real drift, queued for the copy batch (B5); listed here
+      until a meeting decides otherwise.
+  pending        — real drift, queued for the copy batch. Listed here
       so the gate is green today without pretending the drift away.
       Removing an entry requires actually fixing the value on one side.
+
+The platform_facts list is FROZEN by the 2026-11-16 boss ruling to exactly
+{roomLampNote, rewindPlay, netPad} — each side tells its own truth, no
+unified wording. The script asserts the list equals this set: growing or
+shrinking it needs a meeting, not an edit to silence the gate.
 
 Known parsing limits (documented, not hidden): String(format:) wrappers and
 switch/when-shaped functions are compared by scanning every pick("…","…")
@@ -235,13 +235,25 @@ def main(argv):
     exceptions = {"platform_facts": [], "pending": []}
     if exceptions_path.exists():
         exceptions = json.loads(exceptions_path.read_text(encoding="utf-8"))
-    exempt = set(exceptions["platform_facts"]) | set(exceptions["pending"])
+
+    # Frozen platform-fact set (boss ruling, 2026-11-16): each side tells its
+    # own truth for exactly these three keys. Growing or shrinking the list
+    # needs a meeting, not an edit to silence the gate.
+    FROZEN_PLATFORM_FACTS = {"roomLampNote", "rewindPlay", "netPad"}
+    frozen_list = set(exceptions["platform_facts"])
+    if frozen_list != FROZEN_PLATFORM_FACTS:
+        print(f"::error::copy-exceptions platform_facts is {sorted(frozen_list)}; "
+              f"the 2026-11-16 boss ruling froze it to {sorted(FROZEN_PLATFORM_FACTS)}. "
+              "A meeting must change it, not this file.")
+        return 1
+
+    exempt = frozen_list | set(exceptions["pending"])
 
     shared = sorted((set(ios_map) & set(kt_map)) - exempt)
     diffs = [name for name in shared if drifted(set(pairs(ios_map[name])), set(pairs(kt_map[name])))]
 
     print(f"compared keys: {len(shared)} shared members, "
-          f"{len(exceptions['platform_facts'])} platform-fact + "
+          f"{len(FROZEN_PLATFORM_FACTS)} frozen platform facts + "
           f"{len(exceptions['pending'])} pending exceptions")
     if diffs:
         for name in diffs:

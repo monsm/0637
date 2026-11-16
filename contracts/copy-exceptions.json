@@ -2,11 +2,17 @@
   "_readme": [
     "check-copy-values.py skips these keys when comparing the two phones' wording.",
     "platform_facts: the two phones genuinely say different TRUE things (hardware/API differences). May only shrink; a meeting must bless any change.",
-    "pending: real drift queued for the copy batch. Entries leave this list only by fixing the value, not by editing this file to silence the gate.",
-    "2026-11-16: the boss ruled roomLampNote stays a platform fact (iOS has no ambient-light API; Android can drive from the sensor). The seven pending keys were unified in the B5 copy batch and removed from this list - the gate now guards them for real."
+    "2026-11-16 boss ruling: the three platform-fact keys are frozen to exactly this set — roomLampNote, rewindPlay, netPad. Each side tells its own truth and no unified wording may be written for them:",
+    "  roomLampNote — iOS has no ambient-light API (says so); Android can be lux-driven.",
+    "  rewindPlay   — iOS 'Rewind play' (the playback is rewound) vs Android 'Rewind'.",
+    "  netPad       — iOS writes 'UDP pad (port 4210)' vs Android 'UDP pad (4210)'.",
+    "  The script asserts this list equals the frozen set: growing it needs a meeting, shrinking it needs a meeting and a value change, not an edit to this file to silence the gate.",
+    "2026-11-16: B5 had unified rewindPlay and netPad; the boss's ruling restored each side's own wording and added both keys here."
   ],
   "platform_facts": [
-    "roomLampNote"
+    "roomLampNote",
+    "rewindPlay",
+    "netPad"
   ],
   "pending": []
 }

@@ -14,11 +14,16 @@ use duck_mobile_core::intent::{start_listener, IntentQueue};
 use serde_json::json;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 struct Harness {
     port: u16,
     queue: Arc<IntentQueue>,
+    /// What the apply half drained, by Debug text. The positive-path probes
+    /// need it: the applier answers queued intents every 5 ms, so "the item
+    /// is not in the queue any more" must not be mistaken for "the duck
+    /// never saw it" (the chorus probe raced exactly that way in CI).
+    seen: Arc<Mutex<Vec<String>>>,
     // The server owns the accept thread; it has to outlive the probes.
     _server: duck_mobile_core::intent::IntentServer,
 }
@@ -32,20 +37,23 @@ impl Harness {
         let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
         let port = listener.local_addr().expect("addr").port();
         let server = start_listener(listener, queue.clone());
-        Self::start_applier(&queue);
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        Self::start_applier(&queue, seen.clone());
         Harness {
             port,
             queue,
+            seen,
             _server: server,
         }
     }
 
     /// The apply half: drains the queue in a background thread so a GET
     /// probe's synchronous request gets a real answer instead of a pending.
-    fn start_applier(queue: &Arc<IntentQueue>) {
+    fn start_applier(queue: &Arc<IntentQueue>, seen: Arc<Mutex<Vec<String>>>) {
         let queue = queue.clone();
         std::thread::spawn(move || loop {
             for item in queue.drain() {
+                seen.lock().unwrap().push(format!("{:?}", item.intent));
                 let answer = match &item.intent {
                     duck_mobile_core::intent::Intent::Backup => json!({
                         "format": "microduck-backup/1",
@@ -131,8 +139,33 @@ fn a_chorus_without_moves_sings_the_documented_pair() {
     let h = Harness::start();
     let response = h.post("/chorus", r#"{}"#);
     assert!(response.contains(r#""ok":true"#), "{response}");
-    let queued = h.queue.drain();
-    assert_eq!(queued.len(), 1, "the chorus was not queued");
+    // The apply half may drain the intent before this thread looks, so the
+    // assertion is "the duck received the chorus exactly once", not "which
+    // thread happened to see it". Poll instead of a single read (the same
+    // fixed-wait-to-polling fix as the smoke script's marginal checks).
+    let mut queued_total = 0;
+    let mut seen_count = 0;
+    for _ in 0..40 {
+        queued_total += h
+            .queue
+            .drain()
+            .iter()
+            .filter(|item| format!("{:?}", item.intent).contains("Chorus"))
+            .count();
+        let applied = h
+            .seen
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|name| name.contains("Chorus"))
+            .count();
+        seen_count = queued_total + applied;
+        if seen_count > 0 {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert_eq!(seen_count, 1, "the chorus was not queued");
 }
 
 #[test]
