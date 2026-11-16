@@ -36,10 +36,12 @@ IOS_TEST = "ios/DuckTests/DuckRouteTests.swift"
 REGISTERED_IOS = {
     "instrument", "photo", "rules", "peers", "ai", "dance", "progress",
     "more", "diary", "postcards", "dex", "modes", "big", "backup", "ab",
+    "playMore", "duckPanel", "tools",
 }
 REGISTERED_ANDROID = {
     "instrument", "rules", "peers", "ai", "dance", "progress", "more",
-    "diary", "postcards", "dex", "modes", "big",
+    "diary", "postcards", "dex", "modes", "big", "play-more", "duck-panel",
+    "tools",
 }
 
 FAILURES = []

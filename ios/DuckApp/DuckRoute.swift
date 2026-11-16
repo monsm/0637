@@ -27,6 +27,9 @@ enum DuckRoute: String, CaseIterable, Identifiable {
     case dex
     case modes
     case big
+    case playMore
+    case duckPanel
+    case tools
     case backup
     case ab
 

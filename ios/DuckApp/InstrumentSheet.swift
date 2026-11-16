@@ -429,6 +429,15 @@ struct InstrumentSheet: View {
                 timeButton("gobackward.5", Copy.rewind) {
                     controller.rewind()
                 }
+                // Rewind-play left the drawer for the time bar (the IA
+                // ruling cites UI_B4_PLAN §5:116: time-type controls live
+                // on the time rail). Same verb Android has always had here.
+                timeButton(
+                    controller.rewinding ? "stop.circle" : "arrow.uturn.backward.circle",
+                    Copy.rewindPlay
+                ) {
+                    controller.toggleRewindPlay()
+                }
                 timeButton("arrow.triangle.branch", Copy.fork) {
                     controller.fork()
                 }

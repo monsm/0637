@@ -92,6 +92,7 @@ enum Copy {
 
     // Instrument sheet
     static var thisDuck: String { pick("This duck", "这只鸭子") }
+    static var duckFace: String { pick("Duck's face", "鸭子的脸") }
     static var timeMachine: String { pick("Time machine", "时间机器") }
     static var freeze: String { pick("Freeze", "冻结") }
     static var resume: String { pick("Resume", "继续") }
@@ -291,6 +292,8 @@ enum Copy {
     static var menu: String { pick("Menu", "菜单") }
     // The one "More" drawer (B4): four groups, at most four rows each.
     static var more: String { pick("More", "更多") }
+    static var playMore: String { pick("Play more", "玩一玩") }
+    static var tools: String { pick("Tools", "工具") }
     static var groupPlay: String { pick("Play", "玩") }
     static var groupTogether: String { pick("Together", "一起") }
     static var groupRecord: String { pick("Record", "记录") }
@@ -609,6 +612,7 @@ enum Copy {
     // A chorus between neighbours: one duck starts it, the room joins the
     // same moods 1.5 s later.
     static var chorus: String { pick("Chorus", "合唱") }
+    static var gifts: String { pick("Gifts", "互送礼物") }
     static func chorusLine(_ peers: Int) -> String {
         String(format: pick("Singing together with %d duck(s)", "和 %d 只鸭子一起唱"), peers)
     }

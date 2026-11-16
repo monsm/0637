@@ -157,8 +157,11 @@ val quack get() = pick("Quack", "叫一声")
 
     // Instrument sheet
     val thisDuck get() = pick("This duck", "这只鸭子")
+    val duckFace get() = pick("Duck's face", "鸭子的脸")
     // The one More drawer (B4): four groups, at most four rows each.
     val more get() = pick("More", "更多")
+    val playMore get() = pick("Play more", "玩一玩")
+    val tools get() = pick("Tools", "工具")
     val groupPlay get() = pick("Play", "玩")
     val groupTogether get() = pick("Together", "一起")
     val groupRecord get() = pick("Record", "记录")
@@ -437,6 +440,7 @@ val quack get() = pick("Quack", "叫一声")
     fun giftMissedEmotion(name: String) = pick("$name sent a cheer", "$name 送来一份心意")
     // The room's chorus: every duck performs the same moves together.
     val chorus get() = pick("Chorus", "合唱")
+    val gifts get() = pick("Gifts", "互送礼物")
     fun chorusLine(peers: Int) = pick(
         "Singing together with $peers duck(s)",
         "和 $peers 只鸭子一起唱",

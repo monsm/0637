@@ -64,13 +64,12 @@ internal fun MoreSheet(
     peers: PeersUi,
     aiConfig: AIConfig,
     nightActive: Boolean,
-    flashlightOn: Boolean,
+    twoPlayerOn: Boolean,
     stick: String,
     onPath: () -> Unit,
     onOpen: (DuckRoute) -> Unit,
     onNight: () -> Unit,
-    onFlashlight: () -> Unit,
-    onLanguage: () -> Unit,
+    onTwoPlayer: () -> Unit,
     onClose: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -120,10 +119,10 @@ internal fun MoreSheet(
                     onOpen(DuckRoute.Dance)
                 }
                 MoreRow(
-                    Icons.controls, Copy.stickModes,
+                    Icons.controls, Copy.playMore,
                     note = Copy.stick(stick),
-                    tag = "more-controls",
-                ) { onOpen(DuckRoute.Modes) }
+                    tag = "more-playmore",
+                ) { onOpen(DuckRoute.PlayMore) }
             }
             Group(Copy.groupTogether, "together") {
                 MoreRow(
@@ -132,6 +131,18 @@ internal fun MoreSheet(
                     badge = "${peers.peers.size}/3",
                     tag = "more-peers",
                 ) { onOpen(DuckRoute.Peers) }
+                MoreRow(Icons.chorus, Copy.chorus, tag = "more-chorus") {
+                    onOpen(DuckRoute.Peers)
+                }
+                MoreRow(Icons.gift, Copy.gifts, tag = "more-gifts") {
+                    onOpen(DuckRoute.Peers)
+                }
+                MoreRow(
+                    Icons.twoPlayer, Copy.twoPlayer,
+                    check = twoPlayerOn,
+                    showsChevron = false,
+                    tag = "more-p2",
+                ) { onTwoPlayer() }
             }
             Group(Copy.groupRecord, "record") {
                 MoreRow(
@@ -140,10 +151,9 @@ internal fun MoreSheet(
                     badge = if (board.quests.isEmpty()) null else "$unfinished",
                     tag = "more-quests",
                 ) { onOpen(DuckRoute.Progress) }
-                MoreRow(Icons.big, Copy.bigButtons, note = Copy.bigButtonsNote, tag = "more-big") {
-                    onOpen(DuckRoute.Big)
+                MoreRow(Icons.diary, Copy.diary, tag = "more-diary") {
+                    onOpen(DuckRoute.Diary)
                 }
-                MoreRow(Icons.diary, Copy.diary, tag = "more-diary") { onOpen(DuckRoute.Diary) }
                 MoreRow(
                     Icons.postcards, Copy.postcardShelf,
                     badge = "$postcardCount",
@@ -168,18 +178,15 @@ internal fun MoreSheet(
                     tag = "more-night",
                 ) { onNight() }
                 MoreRow(
-                    Icons.flashlight, Copy.flashlight,
-                    note = if (flashlightOn) Copy.flashlightOn else Copy.flashlightOff,
-                    check = flashlightOn,
-                    showsChevron = false,
-                    tag = "more-flashlight",
-                ) { onFlashlight() }
+                    Icons.preferences, Copy.duckFace,
+                    note = Copy.heartRowNote,
+                    tag = "more-duckpanel",
+                ) { onOpen(DuckRoute.DuckPanel) }
                 MoreRow(
-                    Icons.language, Copy.languageRow,
-                    note = Copy.language.label,
-                    showsChevron = false,
-                    tag = "more-language",
-                ) { onLanguage() }
+                    Icons.tools, Copy.tools,
+                    note = Copy.roomLampNote,
+                    tag = "more-tools",
+                ) { onOpen(DuckRoute.Tools) }
             }
         }
     }

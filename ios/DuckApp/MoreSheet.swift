@@ -54,11 +54,11 @@ struct MoreSheet: View {
                         onOpen(.dance)
                     }
                     row(
-                        Icons.controls, Copy.stickModes,
+                        Icons.controls, Copy.playMore,
                         note: Copy.stick(stickMode.rawValue),
-                        id: "more-controls"
+                        id: "more-playmore"
                     ) {
-                        onOpen(.modes)
+                        onOpen(.playMore)
                     }
                 }
                 group(Copy.groupTogether, id: "together") {
@@ -69,6 +69,20 @@ struct MoreSheet: View {
                         id: "more-peers"
                     ) {
                         onOpen(.peers)
+                    }
+                    row(Icons.chorus, Copy.chorus, id: "more-chorus") {
+                        onOpen(.peers)
+                    }
+                    row(Icons.gift, Copy.gifts, id: "more-gifts") {
+                        onOpen(.peers)
+                    }
+                    row(
+                        "person.2", Copy.twoPlayer,
+                        check: controller.p2On,
+                        showsChevron: false,
+                        id: "more-p2"
+                    ) {
+                        controller.p2On.toggle()
                     }
                 }
                 group(Copy.groupRecord, id: "record") {
@@ -113,129 +127,20 @@ struct MoreSheet: View {
                         controller.postNight(on: !controller.nightActive)
                     }
                     row(
-                        Icons.flashlight, Copy.flashlight,
-                        note: controller.flashlightColor == nil ? Copy.flashlightOff : Copy.flashlightOn,
-                        check: controller.flashlightColor != nil,
-                        showsChevron: false,
-                        id: "more-flashlight"
+                        Icons.preferences, Copy.duckFace,
+                        note: Copy.heartRowNote,
+                        id: "more-duckpanel"
                     ) {
-                        controller.toggleFlashlight()
+                        onOpen(.duckPanel)
                     }
                     row(
-                        "arrow.counterclockwise", Copy.rewindPlay,
-                        note: controller.rewinding ? Copy.stateOn : nil,
-                        check: controller.rewinding,
-                        showsChevron: false,
-                        id: "more-rewindplay"
-                    ) {
-                        controller.toggleRewindPlay()
-                    }
-                    row(
-                        "hand.draw", Copy.pushCompare,
-                        showsChevron: false,
-                        id: "more-pushcompare"
-                    ) {
-                        controller.pushCompare()
-                    }
-                    row(
-                        "scale.3d", Copy.abTry,
-                        note: Copy.abNote,
-                        id: "more-ab"
-                    ) {
-                        onOpen(.ab)
-                    }
-                    row(
-                        "waveform.path", Copy.hud,
-                        check: controller.hudOn,
-                        showsChevron: false,
-                        id: "more-hud"
-                    ) {
-                        controller.hudOn.toggle()
-                    }
-                    row(
-                        "person.2", Copy.twoPlayer,
-                        check: controller.p2On,
-                        showsChevron: false,
-                        id: "more-p2"
-                    ) {
-                        controller.p2On.toggle()
-                    }
-                    row(
-                        "externaldrive", Copy.backup,
-                        note: Copy.backupRowNote,
-                        id: "more-backup"
-                    ) {
-                        onOpen(.backup)
-                    }
-                    row(
-                        "location.north", Copy.compass,
-                        note: Copy.compassNote,
-                        check: controller.compassOn,
-                        showsChevron: false,
-                        id: "more-compass"
-                    ) {
-                        controller.compassOn.toggle()
-                    }
-                    row(
-                        "square.grid.3x3", Copy.tof,
-                        note: controller.tofStrip,
-                        showsChevron: false,
-                        id: "more-tof"
-                    ) { controller.refreshTofStrip() }
-                    row(
-                        "lightbulb", Copy.roomLamp,
+                        "wrench.and.screwdriver", Copy.tools,
                         note: Copy.roomLampNote,
-                        badge: String(format: "%.0f%%", controller.ambientScale * 100),
-                        showsChevron: false,
-                        id: "more-lamp"
+                        id: "more-tools"
                     ) {
-                        // Five honest stops across the readable range.
-                        let stops: [Double] = [0.55, 0.7, 0.85, 1.0, 1.15]
-                        let index = stops.firstIndex(of: controller.ambientScale) ?? 3
-                        controller.ambientScale = stops[(index + 1) % stops.count]
-                    }
-                    row(
-                        "hourglass", Copy.parentTime,
-                        note: controller.parentMinutes.map { minutes in
-                            Copy.parentLeft(minutes, Int(controller.parentLeftS / 60.0))
-                        } ?? Copy.parentOff,
-                        showsChevron: false,
-                        id: "more-parent"
-                    ) {
-                        // Off -> 15 -> 30 -> 60 -> off: one tap, one honest
-                        // choice, no second-layer menu.
-                        let next = (controller.parentMinutes ?? 0) == 0 ? 15
-                            : (controller.parentMinutes == 15 ? 30
-                            : (controller.parentMinutes == 30 ? 60 : 0))
-                        controller.setParent(minutes: next)
-                    }
-                    row(
-                        "hand.tap", Copy.bigButtons,
-                        note: Copy.bigButtonsNote,
-                        id: "more-big"
-                    ) {
-                        onOpen(.big)
-                    }
-                    row(
-                        Icons.heart, Copy.heart,
-                        note: controller.heartOn ? String(format: "%.0f bpm", controller.heartBpm) : Copy.heartRowNote,
-                        check: controller.heartOn,
-                        showsChevron: false,
-                        id: "more-heart"
-                    ) {
-                        controller.heartOn.toggle()
-                    }
-                    row(
-                        "globe", Copy.languageRow,
-                        note: Copy.language.rawValue,
-                        showsChevron: false,
-                        id: "more-language"
-                    ) {
-                        Copy.language = Copy.language == .english ? .chinese : .english
-                        languageTick &+= 1
+                        onOpen(.tools)
                     }
                 }
-            }
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 28)
@@ -252,19 +157,7 @@ struct MoreSheet: View {
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("more-title")
             Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 48, height: 48)
-                    .background(Color.white.opacity(0.10), in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Copy.close)
-            .accessibilityIdentifier("more-close")
+            SheetCloseButton(identifier: "more-close")
         }
     }
 

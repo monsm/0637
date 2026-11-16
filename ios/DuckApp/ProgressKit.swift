@@ -414,8 +414,16 @@ struct Achievement: Identifiable {
 // MARK: - 成长面板
 
 struct ProgressSheet: View {
+    /// The record page shows the core's last seven days under the book
+    /// (IA reorder: the daily entry owns the day rows). Optional so the
+    /// previews and any store-only caller keep working.
+    var controller: DuckController? = nil
     @ObservedObject private var store = ProgressStore.shared
     @Environment(\.dismiss) private var dismiss
+
+    init(controller: DuckController? = nil) {
+        self.controller = controller
+    }
     @Environment(\.scenePhase) private var scenePhase
 
     /// 系统的跨天通知（rawValue 与 Foundation 的 NSCalendarDayChangedNotification 一致）。
@@ -427,6 +435,7 @@ struct ProgressSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     streakBanner
+                    dayRows
                     taskSection
                     weekSection
                     achievementSection
@@ -444,6 +453,19 @@ struct ProgressSheet: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: dayChanged)) { _ in
             store.refreshDayIfNeeded()
+        }
+    }
+
+    /// The core's own per-day rows, newest last - the same seven the
+    /// instrument's life card shows (FE-3's data, now on the record page).
+    @ViewBuilder
+    private var dayRows: some View {
+        if let controller, !controller.vetbookDays.isEmpty {
+            Text(controller.vetbookDays.suffix(7).joined(separator: " | "))
+                .font(.system(.caption2, design: .rounded))
+                .foregroundStyle(Color.duckTextSecondary)
+                .lineLimit(3)
+                .accessibilityIdentifier("day-rows")
         }
     }
 

@@ -1040,7 +1040,7 @@ fun Shell(
             peers = peers,
             aiConfig = aiConfig,
             nightActive = nightActive,
-            flashlightOn = flashlightState > 0,
+            twoPlayerOn = input.p2On,
             stick = stick,
             onPath = {
                 stick = "path"
@@ -1055,6 +1055,28 @@ fun Shell(
                     org.json.JSONObject().put("on", !nightActive).toString(),
                 )
             },
+            onTwoPlayer = { input.p2On = !input.p2On },
+            onClose = { closeSheet() },
+        )
+    }
+
+    if (route == DuckRoute.PlayMore) {
+        PlayMoreSheet(
+            core = core,
+            input = input,
+            stick = stick,
+            onMode = { mode ->
+                stick = mode
+                core?.setHead(0.0, 0.0, 0.0, 0.0)
+                core?.releaseBody()
+            },
+            onClose = { closeSheet() },
+        )
+    }
+
+    if (route == DuckRoute.DuckPanel) {
+        DuckPanelSheet(
+            flashlightState = flashlightState,
             onFlashlight = toggleFlashlight,
             onLanguage = {
                 Copy.language = if (Copy.language == Copy.Language.English) {
@@ -1065,6 +1087,15 @@ fun Shell(
                 languageTick += 1
                 soundLine = null
             },
+            onOpen = { open(it) },
+            onClose = { closeSheet() },
+        )
+    }
+
+    if (route == DuckRoute.Tools) {
+        ToolsSheet(
+            input = input,
+            onOpen = { open(it) },
             onClose = { closeSheet() },
         )
     }
@@ -3126,7 +3157,6 @@ private fun InstrumentSheet(
     // back. It lives here, in the sheet's own loop, so it costs nothing while
     // the sheet is closed.
     var micSummary by remember { mutableStateOf("—") }
-    var tofStrip by remember { mutableStateOf("—") }
     // The duck's own behaviour: an emotion timeline, or the idle look-around.
     // A static duck reads as switched off, so the sheet says what it is doing.
     var behaviorSummary by remember { mutableStateOf("—") }
@@ -3138,35 +3168,9 @@ private fun InstrumentSheet(
     var trickBook by remember { mutableStateOf("—") }
     // The companion layer, read from /state.care on the same 1 Hz loop.
     var care by remember { mutableStateOf(CareUi()) }
-    // The palm's heartbeat lives IN THIS SHEET: the row is here, so the
-    // state and the vibrator are here. A reading of the real care numbers,
-    // never a fact; silent until the row says on.
-    val heart = remember(context) { Heart(context) }
-    var heartOn by remember { mutableStateOf(
-        context.getSharedPreferences("duck", Context.MODE_PRIVATE).getBoolean("duck_heart_on", false)
-    ) }
-    LaunchedEffect(heartOn) {
-        heart.setEnabled(heartOn)
-        context.getSharedPreferences("duck", Context.MODE_PRIVATE)
-            .edit().putBoolean("duck_heart_on", heartOn).apply()
-    }
     // The chosen night, the top-level /state.night beside that care: the
     // row says whether the duck is down for the night and how quietly.
     var night by remember { mutableStateOf(NightUi()) }
-    // The vet book's three headline numbers, from the same /state.life.
-    // The move-out flow: the SAF picker's verdict lands as a status line.
-    var backupStatus by remember { mutableStateOf<String?>(null) }
-    val backupPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) {
-            backupStatus = Copy.backupWorking
-            Thread {
-                val ok = restoreBackup(context, uri)
-                scope.launch { backupStatus = if (ok) Copy.backupDone else Copy.backupFailed }
-            }.start()
-        }
-    }
     var lifeRecord by remember { mutableStateOf(LifeUi()) }
     // What the duck logged while the app was away; remembered across closes
     // by hoisting it to the activity's state via a remembered ref.
@@ -3198,14 +3202,11 @@ private fun InstrumentSheet(
     LaunchedEffect(core) {
         while (true) {
             micSummary = fetchMicSummary()
-            tofStrip = fetchTofStrip()
             behaviorSummary = fetchBehaviorSummary()
             face = fetchFace()
             trickBook = fetchTrickBook()
             fetchCare()?.let {
                 care = it
-                // The palm reads the same numbers this loop already fetched.
-                heart.tick(it.heartBpm, System.currentTimeMillis())
             }
             // The night rides the same /state: the row is only ever what the
             // core published, and a failed read keeps the last one.
@@ -3445,180 +3446,6 @@ private fun InstrumentSheet(
                     )
                 }
             }
-            // The flashlight: the face's own LED, the same seven colours the
-            // duck has. One tap flips it; the sheet shows which one is lit.
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(Copy.flashlight, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        face.color?.let { Copy.faceColor(it) }
-                            ?: if (flashlightState > 0) Copy.faceColor("white") else "—",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    ButtonChip(Copy.flashlight) { onFlashlight() }
-                }
-            }
-            // The palm's heartbeat: one tap flips it; the bpm is the core's
-            // own reading, and a device with no vibrator shows the number
-            // without pretending to pulse.
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(Copy.heart, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (heartOn && heart.bpm > 0) "%.0f bpm".format(heart.bpm) else Copy.heartRowNote,
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    ButtonChip(
-                        if (heartOn) Copy.stateOn else Copy.stateOff,
-                        testTag = "heart-toggle",
-                    ) { heartOn = !heartOn }
-                }
-            }
-            // What the duck's head would see: the official 8x8 grid the
-            // phone's depth was resampled into, as a heat strip.
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Text(Copy.tof, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Text(
-                    tofStrip,
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            // The room's lamp: real lux when the device has a sensor (the
-            // scale follows the room), or five manual stops. The duck cannot
-            // see it — render layer only.
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(Copy.roomLamp, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (input.ambientLux >= 0f) "${input.ambientLux.roundToInt()} lx"
-                        else "${(input.ambientScale * 100).roundToInt()}%",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    ButtonChip(
-                        // Sensor-driven: the lamp runs itself, manual is off.
-                        // Sensor-less: the chip names the manual mode itself.
-                        if (input.ambientLux >= 0f) Copy.stateOff else Copy.roomLamp,
-                        "lamp-toggle",
-                    ) {
-                        // Manual stops, only when there is no sensor to trust.
-                        if (input.ambientLux < 0f) {
-                            val stops = listOf(0.55f, 0.7f, 0.85f, 1.0f, 1.15f)
-                            input.ambientScale =
-                                stops[(stops.indexOf(input.ambientScale.coerceIn(0.55f, 1.15f)) + 1) % stops.size]
-                        }
-                    }
-                }
-            }
-            // The compass: the home keeps one real-world bearing when the
-            // device has a rotation vector. Off by default - a rotating
-            // room can confuse a driving child - and honest when absent.
-            var compassOn by remember { mutableStateOf(
-                context.getSharedPreferences("duck", Context.MODE_PRIVATE)
-                    .getBoolean("duck_compass_on", false)
-            ) }
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(Copy.compass, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                ButtonChip(
-                    if (compassOn) Copy.stateOn else Copy.stateOff,
-                    "compass-toggle",
-                ) {
-                    compassOn = !compassOn
-                    context.getSharedPreferences("duck", Context.MODE_PRIVATE)
-                        .edit().putBoolean("duck_compass_on", compassOn).apply()
-                }
-            }
-            // Back up & move: export the core's document, or import one the
-            // person carried here. The route refuses anything without its
-            // version at the door, and the sheet says what the duck said.
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(Copy.backup, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        backupStatus ?: Copy.backupNote,
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 10.sp,
-                        maxLines = 2,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    ButtonChip(Copy.backupExport, "backup-export") {
-                        backupStatus = Copy.backupWorking
-                        exportBackup(context)
-                    }
-                    Spacer(Modifier.size(8.dp))
-                    ButtonChip(Copy.backupImport, "backup-import") {
-                        backupPicker.launch(arrayOf("application/json", "text/plain"))
-                    }
-                }
-            }
-            // The parent's daily allowance: one chip cycles off -> 15 -> 30
-            // -> 60 minutes. The number shown is the core's own accounting.
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(Copy.parentTime, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        care.parentMinutes?.let { minutes ->
-                            Copy.parentLeft(minutes, (care.parentLeftS / 60.0).toInt())
-                        } ?: Copy.parentOff,
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.size(8.dp))
-                    ButtonChip(
-                        (listOf(0, 15, 30, 60).indexOf(care.parentMinutes ?: 0) + 1)
-                            .let { listOf(15, 30, 60, 0)[it % 4] }
-                            .let { if (it == 0) Copy.parentOff else "$it" },
-                        "parent-toggle",
-                    ) {
-                        val next = when (care.parentMinutes) {
-                            null, 0 -> 15
-                            15 -> 30
-                            30 -> 60
-                            else -> 0
-                        }
-                        postDuckCommand("/parent", """{"minutes":$next}""")
-                    }
-                }
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ButtonChip(
                     if (paused) Copy.resume else Copy.freeze,
@@ -3635,13 +3462,6 @@ private fun InstrumentSheet(
                     if (rewinding) Copy.stateOn else Copy.rewindPlay,
                     "rewind-play",
                 ) { rewinding = !rewinding }
-                // Push & compare: checkpoint, fork, and push branch B -
-                // the split the rewind machine already keeps, one tap.
-                ButtonChip(Copy.pushCompare, "push-compare") {
-                    core.fork()
-                    postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
-                    Toast.makeText(context, Copy.pushCompareDone, Toast.LENGTH_SHORT).show()
-                }
                 ButtonChip(Copy.rewind) { core.seek(200) }
                 ButtonChip(Copy.fork) {
                     core.fork()
@@ -3656,37 +3476,6 @@ private fun InstrumentSheet(
                     core.setMode(if (core.mode() == "roller") "walk" else "roller")
                 }
             }
-            // Policy A/B: fork, then load a policy DIRECTORY on branch B and
-            // switch to it. The directories live beside the bundled policies;
-            // a folder the manifest cannot read is the reload route's own
-            // honest refusal.
-            var abFolder by remember { mutableStateOf("") }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Spacer(Modifier.size(8.dp))
-                OutlinedTextField(
-                    value = abFolder,
-                    onValueChange = { abFolder = it.take(64) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f).testTag("ab-folder"),
-                )
-                Spacer(Modifier.size(8.dp))
-                ButtonChip(Copy.stateOn, "ab-load") {
-                    core.fork()
-                    core.reload(abFolder)
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ButtonChip(
-                    if (input.hudOn) Copy.stateOn else Copy.hud,
-                    "hud-toggle",
-                ) { input.hudOn = !input.hudOn }
-                ButtonChip(
-                    if (input.p2On) Copy.stateOn else Copy.twoPlayer,
-                    "p2-toggle",
-                ) { input.p2On = !input.p2On }
-            }
-            Text(Copy.abNote, color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(0.25, 0.5, 1.0, 2.0).forEach { option ->
                     ButtonChip(if (option == 1.0) "1×" else "${option}×") {
