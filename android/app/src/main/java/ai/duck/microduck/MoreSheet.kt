@@ -114,10 +114,10 @@ internal fun MoreSheet(
                     tag = "more-path",
                 ) { onPath() }
                 MoreRow(Icons.blocks, Copy.blocks, note = Copy.blocksRowNote, tag = "more-blocks") {
-                    onRules()
+                    onOpen(DuckRoute.Rules)
                 }
                 MoreRow(Icons.dance, Copy.dance, note = Copy.danceRowNote, tag = "more-dance") {
-                    onDance()
+                    onOpen(DuckRoute.Dance)
                 }
                 MoreRow(
                     Icons.controls, Copy.stickModes,
@@ -141,7 +141,7 @@ internal fun MoreSheet(
                     tag = "more-quests",
                 ) { onOpen(DuckRoute.Progress) }
                 MoreRow(Icons.big, Copy.bigButtons, note = Copy.bigButtonsNote, tag = "more-big") {
-                    onBig()
+                    onOpen(DuckRoute.Big)
                 }
                 MoreRow(Icons.diary, Copy.diary, tag = "more-diary") { onOpen(DuckRoute.Diary) }
                 MoreRow(
@@ -150,7 +150,7 @@ internal fun MoreSheet(
                     tag = "more-postcards",
                 ) { onOpen(DuckRoute.Postcards) }
                 MoreRow(Icons.dex, Copy.dex, note = Copy.dexRowNote, tag = "more-dex") {
-                    onDex()
+                    onOpen(DuckRoute.Dex)
                 }
             }
             Group(Copy.thisDuck, "duck") {
