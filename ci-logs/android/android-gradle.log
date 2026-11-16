@@ -21,11 +21,11 @@ Daemon will be stopped at the end of the build
 > Task :app:generateDebugAssets UP-TO-DATE
 > Task :app:mergeDebugAssets
 > Task :app:processDebugManifestForPackage
+> Task :app:compressDebugAssets
 > Task :app:desugarDebugFileDependencies
 > Task :app:checkDebugDuplicateClasses
-> Task :app:compressDebugAssets
-> Task :app:processDebugResources
 > Task :app:mergeDebugJniLibFolders
+> Task :app:processDebugResources
 > Task :app:mergeLibDexDebug
 > Task :app:mergeDebugNativeLibs
 > Task :app:validateSigningDebug
@@ -33,6 +33,7 @@ Daemon will be stopped at the end of the build
 > Task :app:writeDebugSigningConfigVersions
 > Task :app:stripDebugDebugSymbols
 > Task :app:mergeExtDexDebug
+
 > Task :app:compileDebugKotlin
 w: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:55:53 'val Icons.Outlined.MenuBook: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.MenuBook.
 w: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduck/Icons.kt:72:40 'val Icons.Outlined.DirectionsWalk: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.DirectionsWalk.
@@ -48,7 +49,7 @@ w: file:///home/runner/work/0637/0637/android/app/src/main/java/ai/duck/microduc
 > Task :app:packageDebug
 > Task :app:createDebugApkListingFileRedirect
 > Task :app:assembleDebug
-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794806990254.json
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apk-1794807446441.json
 
-BUILD SUCCESSFUL in 1m 5s
+BUILD SUCCESSFUL in 45s
 35 actionable tasks: 35 executed

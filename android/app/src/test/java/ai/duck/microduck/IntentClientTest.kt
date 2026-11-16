@@ -67,7 +67,15 @@ class IntentClientTest {
     @Test
     fun `behaviour summary prefers the playing emotion, then the idle takeover`() {
         val emotion = """{"emotion":{"name":"yes_fast","elapsed_s":1.5,"duration_s":2.0}}"""
-        assertEquals("yes fast 1.5/2.0s", parseBehaviorSummary(emotion))
+        // The label comes from skillLabel (locale-dependent by design); what
+        // this test pins is that the parser reads the wire name and the two
+        // clocks, not a hard-coded English word.
+        val actualEmotion = parseBehaviorSummary(emotion)
+        assertEquals(
+            "behaviour line was '$actualEmotion' (language ${Copy.language})",
+            "${skillLabel("yes_fast")} 1.5/2.0s",
+            actualEmotion,
+        )
         val idle = """{"idle":{"takeover":0.43}}"""
         assertEquals(Copy.lookingAround(43), parseBehaviorSummary(idle))
         assertEquals("—", parseBehaviorSummary("""{"tick":3}"""))
