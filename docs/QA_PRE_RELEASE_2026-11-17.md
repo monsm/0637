@@ -32,3 +32,9 @@ QA 超上限未验证、工单 S 逐条裁决后确认成立、低危(物理手�
 - core.yml 不编译 ffi.rs(无 mujoco feature)：IPC/pad/DKRB/ffi 接线在 core CI 是盲区,由 ios.yml/android.yml 的构建与模拟器冒烟间接覆盖。**后续立项**:core CI 增加 `cargo test --features mujoco` 步骤(需 MuJoCo 静态库构建步骤)。
 - Swift/Kotlin 本地不可编译：双端新文件(VetbookCard/PadSenderAxisTests 等)由 ios.yml、android.yml 裁决。
 - 本批未做真机/双手机/真实手柄验收(边界不变,见 AUDIT §五)。
+
+## 首推 CI 结果与修复(2026-11-17 夜)
+
+- Core ✅(51s)、Contracts ✅(14s)。
+- Android ❌(4m50s):`compileDebugKotlin` 7 错,全部出自工单 G 的两处 import——`SelectionContainer` 包路径写错(实为 `androidx.compose.foundation.text.selection`,写成了 `androidx.compose.ui.text.selection`)、`VetbookCard.kt` 用 material3 风格 `Text` 漏 import `androidx.compose.material3.Text`。本地 gradle 8.10.2 + SDK 复现并修复:`compileDebugKotlin` 与 `testDebugUnitTest` 全绿。这正是「Swift/Kotlin 由 CI 裁决」条款兑现——本地施工时一次没编译过 Kotlin,CI 抓的。
+- iOS:由 ios.yml 裁决(构建+XCUITest+模拟器会话断言)。
