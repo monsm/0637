@@ -389,6 +389,16 @@ enum Copy {
     static var pickups: String { pick("picked up", "被抱起") }
     static var exportVetbook: String { pick("Export vet book", "导出记录") }
     static var shareVetbook: String { pick("Share vet book", "分享记录") }
+    // The vet book card: one locally rendered image of the duck's real
+    // numbers (boss ruling 2026-11-17 — drawn here, never posted anywhere).
+    static var vetbookCardShare: String { pick("Share card", "分享卡片") }
+    static var vetbookCardNone: String { pick("No records yet", "还没有记录") }
+    static var vetbookCardPowered: String { pick("time together", "陪伴时长") }
+    static var vetbookFalls: String { pick("falls", "摔倒") }
+    static var vetbookPets: String { pick("petted", "被摸") }
+    static var vetbookFed: String { pick("fed", "被喂") }
+    static var vetbookClaps: String { pick("claps", "拍手") }
+    static var vetbookWhistles: String { pick("whistles", "口哨") }
     // The Director photo.
     static var photoTitle: String { pick("Your duck, in your room", "你的鸭子，在你房间") }
     static var photoTake: String { pick("Take photo", "拍照") }

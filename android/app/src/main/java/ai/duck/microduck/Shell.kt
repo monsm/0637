@@ -88,6 +88,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.selection.SelectionContainer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -3184,6 +3185,14 @@ private fun InstrumentSheet(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var detailsOpen by remember { mutableStateOf(false) }
+    // The vet book card dialog: a Dialog, not a second sheet, so the shell's
+    // one-sheet-at-a-time handover (the smoke test's pin) stays intact. The
+    // name keeps clear of the route gate's show* tree on purpose: this opens
+    // a preview dialog, the way the photo preview does, not a destination.
+    var vetbookCardOpen by remember { mutableStateOf(false) }
+    if (vetbookCardOpen) {
+        VetbookCardDialog { vetbookCardOpen = false }
+    }
     var paused by remember { mutableStateOf(core.paused()) }
     var rewinding by remember { mutableStateOf(false) }
     LaunchedEffect(rewinding) {
@@ -3452,6 +3461,37 @@ private fun InstrumentSheet(
                 }
             }
             LifeCard(lifeRecord) { shareVetbook(context) }
+            // The provenance: what this build is, the same string iOS shows
+            // under its instrument details. The hash never changes for the
+            // core's lifetime, so it is remembered, not re-read at 1 Hz.
+            if (detailsOpen) {
+                val fingerprint = remember(core) { core.fingerprint() }
+                if (fingerprint.isNotEmpty()) {
+                    Column {
+                        Text(
+                            Copy.provenance,
+                            color = Color.White.copy(alpha = 0.75f),
+                            fontSize = 12.sp,
+                        )
+                        // Selectable, like the iOS row: a parent copying the
+                        // hash for a bug report should not have to retype it.
+                        SelectionContainer {
+                            Text(
+                                fingerprint,
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 9.sp,
+                                fontFamily = FontFamily.Monospace,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.testTag("sheet-fingerprint"),
+                            )
+                        }
+                    }
+                }
+            }
+            ButtonChip(Copy.vetbookCardShare, "vetbook-card-open") {
+                vetbookCardOpen = true
+            }
             ButtonChip(Copy.postcardShelf, "postcards-open", onPostcards)
             ButtonChip(Copy.dex, "dex-open", onDex)
             ButtonChip(Copy.diary, "diary-open", onDiary)

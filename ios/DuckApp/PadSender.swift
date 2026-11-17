@@ -46,10 +46,15 @@ final class PadSender {
                 buffer[5] = 0 // flags
                 Self.putU32(&buffer, 6, self.seq)
                 Self.putU32(&buffer, 10, UInt32(truncatingIfNeeded: Int(Date().timeIntervalSince1970 * 1000)))
-                // lx is left (+yaw), ly is forward (+vx); raw values, the
-                // receiver owns the deadzone.
-                Self.putI16(&buffer, 14, Int16((max(-1.0, min(1.0, -self.stickY)) * 32767).rounded()))
-                Self.putI16(&buffer, 16, Int16((max(-1.0, min(1.0, self.stickX)) * 32767).rounded()))
+                // The official axes: lx = left_x at 14, ly = left_y at 16
+                // (audit drift #8: these writes used to be swapped). The
+                // receiver drives vx = ly*0.4 and wz = -lx — the same twist
+                // the shell's own tick applies to this stick — so stickX
+                // goes to lx and -stickY to ly. Raw values: the receiver
+                // owns the deadzone.
+                let axes = Self.axes(stickX: self.stickX, stickY: self.stickY)
+                Self.putI16(&buffer, 14, axes.lx)
+                Self.putI16(&buffer, 16, axes.ly)
                 // rx, ry, lt, rt and the button word stay zero: the sender
                 // keeps the verbs the receiving shell's own controls own.
                 var destination = self.target
@@ -87,6 +92,20 @@ final class PadSender {
     }
 
     var active: Bool { running }
+
+    /// One frame's stick, as the wire carries it: lx = left_x, ly = left_y,
+    /// each clamped to ±1 and scaled to ±32767. The parity this must hold is
+    /// receiver-vs-shell (audit drift #8): the core's pad receiver drives
+    /// `vx = deadzone(ly)*0.4, wz = -deadzone(lx)*1.0`, while this shell's
+    /// own tick drives `vx = -stickY*0.4, wz = -stickX*1.0` — so lx carries
+    /// stickX and ly carries -stickY, and a duck driven from a neighbour's
+    /// phone moves exactly like the duck on this screen. Pure so the axis
+    /// order can be unit-tested without a socket.
+    static func axes(stickX: Double, stickY: Double) -> (lx: Int16, ly: Int16) {
+        let lx = Int16((max(-1.0, min(1.0, stickX)) * 32767).rounded())
+        let ly = Int16((max(-1.0, min(1.0, -stickY)) * 32767).rounded())
+        return (lx: lx, ly: ly)
+    }
 
     private static func putU32(_ buffer: inout [UInt8], _ at: Int, _ value: UInt32) {
         let little = value.littleEndian

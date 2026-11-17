@@ -20,6 +20,11 @@ struct InstrumentSheet: View {
     /// The vet book file the export button produced. Non-nil presents the
     /// system share sheet for exactly that file.
     @State private var shareURL: URL?
+    /// The locally drawn vet book card (boss ruling 2026-11-17): its sheet
+    /// is attached to its own button, not the scroll view — the scroll view
+    /// already owns the export file's share sheet, and SwiftUI is more
+    /// reliable with one sheet per view.
+    @State private var vetbookCardOpen = false
 
     var body: some View {
         ScrollView {
@@ -138,6 +143,20 @@ struct InstrumentSheet: View {
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("export-vetbook")
+            // The card: the same numbers, drawn into one image a person can
+            // share or keep — generated on this phone, sent nowhere.
+            Button {
+                vetbookCardOpen = true
+            } label: {
+                Label(Copy.vetbookCardShare, systemImage: "square.and.arrow.up.on.square")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("vetbook-card-open")
+            .sheet(isPresented: $vetbookCardOpen) {
+                VetbookCardSheet()
+            }
         }
     }
 
