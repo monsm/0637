@@ -168,7 +168,7 @@
 | **时间机器** | 所有墙钟计时器改为**仿真时钟**（tick 计数）；快照含 MuJoCo `mjSTATE_INTEGRATION`、BAM 力矩历史、LSTM 记忆、技能相位、安全去抖、时钟本身；核心保留最近 3000 tick | `/time` `/timeline` `/step` `/checkpoint` `/restore` `/seek`；单元测试「倒带重放同一轨迹」；CI 断言暂停不前进、单步精确 +10、0.5× 约半速、倒回后仍 ready |
 | **分叉** | `mj_copyModel`+`mj_copyData` 深拷贝（BAM 每子步写摩擦进模型，必须各自持有）；策略重载独立会话；同一 checkpoint 恢复 | `/fork` `/branches` `/branch/select` `/branch/drop`；CI 断言分叉出现、可选中、可删除 |
 | **传感器** | 相机 / 麦克风 / 深度 / IMU，读数带 `mode` 与 `in_observation:false`；IMU 作为外力推挤；深度可降采样为鸭子 8×8 ToF | `/sensor` `/sensors`；单元测试「晃动变推挤、静止不推」「ToF 8×8 且限幅」；CI 逐项断言 |
-| **MCP** | `/mcp` JSON-RPC：initialize / tools/list / tools/call，12 个工具从 intent 表生成 | 单元测试 3 条（初始化、未知工具失败闭合、限幅）；CI 断言工具列表与 `duck_state` |
+| **MCP** | `/mcp` JSON-RPC：initialize / tools/list / tools/call；工具表手写维护（2026-11-17 时 25 个 `duck_*` 工具；HTTP 路由与 MCP 工具是两份清单，未程序化同源——注释里「不会漂移」的说法无机制保证，未知工具 fail-closed） | 单元测试 3 条（初始化、未知工具失败闭合、限幅）；CI 断言工具列表与 `duck_state` |
 | **PBR 渲染** | Cook-Torrance + 解析环境光 + 菲涅尔边缘 + 高光软限幅 + 接触阴影 | 颜色断言（橙色 313 px / 白壳 1814 px） |
 | **融合界面** | 全屏鸭子（拖动画布走/长按技能环）→ 仪器层（时间轴/传感器/指纹）→ Director 取景器 | XCUITest 开环选 roulade、开时间机器冻结/恢复 |
 
@@ -506,7 +506,7 @@ Stage Deck 竖屏基线（iOS `2e2ed95` 142/142、Android `01aba14`）通过后�
 
 ### 八、文档说实话
 
-FIDELITY.md 的状态表停了三天，说相机与麦克风「未开始」——其实 2026-11-11 就做完了；意图 API 从 11 条路由长到 54 条；LiDAR 的 8×8 ToF 降采样**只有单元测试在调**，两端都没有深度数据源。表里现在写的是真的，包括仍然没做的两件（Android 没接手机 IMU；没有 ARKit/ARCore 跟踪）。
+FIDELITY.md 的状态表停了三天，说相机与麦克风「未开始」——其实 2026-11-11 就做完了；意图 API 从 11 条路由长到 54 条（2026-11-17 复核实数：69 臂 / 62 唯一路径）；LiDAR 的 8×8 ToF 降采样**只有单元测试在调**，两端都没有深度数据源。表里现在写的是真的，包括仍然没做的两件（Android 没接手机 IMU；没有 ARKit/ARCore 跟踪）。
 
 ### 九、块程序：核心拒绝的导入不算导入
 
@@ -664,6 +664,18 @@ Core 在 `4477a89` 红了一次，失败项 `a_chorus_without_moves_sings_the_do
 ### 四之二十五、不做清单（老板拍板，记录在案）
 
 ① Android 正式签名——不做，继续 unsigned 自签路线，文档照旧写「未签名」；② AI 内置模型服务——不做，维持用户自填端点；③ 中文圆体——不随包放字体，字体档位收敛继续搁置。
+
+### 四之二十六、官方语义补齐 + 推送前 QA 把关（2026-11-17）
+
+对 `docs/AUDIT_OFFICIAL_PARITY_2026-11-16.md`（82 agent 地毯式对抗审核，13 gap + 10 drift）的修复批次。两个老板拍板：robot.* 协议面做完整版（含 50Hz 订阅推送）、vetbook.share 只做本地卡片。
+
+- **策略管理**：walk 槽支持 manifest 条目 + `POST /config {"walk_policy"}` 覆盖（官方 config 覆盖语义）；manifest 四项声明校验（model_api/robot.model/obs_len/action_len，官方 incompatibility 文案）；`/skills` 按加载状态条件列举；reload 失败原因经 `duck_core_last_error` 回传两端（顺带修掉 branch-B 加载 JSON 键全错、固定成功文案的预存 bug）。
+- **运行时语义**：voltage_adapt 电压缩放；接管前姿态分类/坐姿起立接线；移除跳 Homing 的捷径（官方 2s 爬升成为真实行为）；limp-fall twist 归零 + driving 沿 reset_on_resume；拾取分类器 mode==Walk 门控；tick 主干顺序对齐官方并用官方 `Safety::gate`（deadman 产生 Limit）；`limited_by` 上报 /state；battery 百分比统一官方 6.6–8.2V；嗓音种子由构建指纹派生；health degraded/unhealthy 分档 + 45Hz 地板（按慢放速度归一、暂停恢复不误报）；Checkpoint 补齐五个控制态（fork/rewind 轨迹一致）；**disturb 门控**：驱动中换驱动网络先回 home 再换（官方 change_disturbs 语义）。
+- **协议面**：官方 `robot.*` JSON-RPC 2.0 / NDJSON 服务（127.0.0.1:8768，api_version=51，robot.move/head/do/health/subscribe，按订阅者 hz 服务器端降频推送 robot.state）；UDP pad 三包协议（DKPD 解码 + DKST 回执 + DKRB 报告，官方位表/长按阈值/refused 30s 直接编译官方 pad-map 源）；pad 离散事件打到 active 分支（时间机器语义纯净）。
+- **双端**：Android 补 fingerprint/lastError JNI 与仪器页出处指纹；vetbook 本地分享卡片（复用明信片管线，零编造空态）；iOS DKPD 摇杆轴序修正（含接收端一致性测试）；Origin 改 scheme://host 精确匹配。
+- **推送前 QA**：5 维对抗审查 → 34 agent，拦下 7 项 major（租约不刷新 deadman 时钟、早退冻结帧、地板误伤慢放、Checkpoint 漏态、分支 health 来源、pad 打错鸭、disturb 假承诺）全部修复并逐条做「revert 必红」验证；遗留 5 项与 CI 盲区归档 `docs/QA_PRE_RELEASE_2026-11-17.md`。
+- **验证**：本地 `cargo test --workspace --include-ignored` 213+9 全绿；`--features mujoco` 226+9 全绿（ffi:: 12/12 及以上，覆盖 C ABI/pad/IPC）；六道静态契约门禁全绿。Swift/Kotlin 与真机由 CI 裁决。
+- **CI 盲区（记录在案）**：core.yml 不编译 ffi.rs（无 mujoco feature），IPC/pad/ffi 接线靠 ios.yml/android.yml 构建与冒烟间接覆盖；后续立项给 core CI 加 mujoco 测试步骤。
 
 ---
 

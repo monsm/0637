@@ -57,3 +57,29 @@ work/scratch/
 
 # MuJoCo writes this beside the model
 MUJOCO_LOG.TXT
+
+# Session drafts at the repo root (screenshots, scratch Swift/JSON dumps)
+/ddg*.html
+/gh_cv.*
+/gh_xcodebuild.log
+/lpg.json
+/o1.swift
+/o2.swift
+/old_cv.swift
+/old_quack.swift
+/osu_*.swift
+/runs_now.json
+
+# Toolchain and scratch dirs under work/ (portable rust, mingw, test scratch)
+work/.rustup/
+work/.cargo/
+work/mingw-binutils/
+work/dlltest/
+work/tmp/
+work/gnubin/
+work/duck-ipc-harness/
+work/*_msg.txt
+work/FRAGMENT_SHADER.glsl
+work/VERTEX_SHADER.glsl
+work/baseline_*.txt
+/regress.log

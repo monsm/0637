@@ -21,8 +21,9 @@
 |---|---|
 | 官方 MJCF / BAM M6 / ONNX / 61 维 / 50 Hz | ✅ 桌面 + 端内 MuJoCo 验证；BAM 与官方 Python 对拍 < 1e-9 |
 | 全技能调度（walk / sit / rise / roulade / kick / ground pick） | ✅ 模拟器实测逐项通过 |
-| manifest 解析 / 自定义策略热加载 | ✅ |
-| 本地 intent API（HTTP） | ✅ **54 条路由**：`/state /skills /twist /head /body /skill /sit /posture /ground_pick /push /reload /checkpoint /restore /fork /branches /branch/select /branch/drop /seek /step /care /feed /pet /night /rules /quests /life /export/vetbook.{json,md} /peers /peers/name /peers/start /peers/greet /peers/gift /chorus /path /path/cancel /heard /sound /mouth /look /wheee /flashlight /mode /power /fingerprint /sensor /sensors /timeline /config /time /carry /shutdown /mcp` |
+| manifest 解析 / 自定义策略热加载 | ✅（walk 槽支持 manifest 条目与配置覆盖；manifest 声明校验 model_api / robot.model / obs_len / action_len 于 2026-11-17 补齐） |
+| 本地 intent API（HTTP） | ✅ 69 个 (方法, 路径) 匹配臂 / 62 条唯一路径（同一路径 GET+POST 记两臂、按路径去重；`/time /life /mcp /backup /care /heard /rules` 双动词）：`/state /skills /twist /head /body /skill /sit /posture /ground_pick /push /reload /checkpoint /restore /fork /branches /branch/select /branch/drop /seek /step /care /feed /pet /night /rules /quests /quests/day /life /export/vetbook.{json,md} /export/trajectory /peers /peers/name /peers/start /peers/pair /peers/greet /peers/gift /chorus /path /path/cancel /heard /sound /mouth /look /wheee /flashlight /mode /power /fingerprint /sensor /sensors /timeline /config /time /carry /shutdown /backup /backup/restore /floor /parent /pad /ensemble /mcp` |
+| 官方 robot.* 协议面（JSON-RPC 2.0 + NDJSON，`robot.move /head /do /health /subscribe`，robot.subscribe 按订阅者 hz 服务器端降频的 50 Hz robot.state 推送） | ✅ 端内 TCP 兼容层（2026-11-17 补齐，回环监听；官方客户端可按 API_VERSION=51 语义驱动数字鸭） |
 | iOS SwiftUI + Metal + C ABI | ✅ CI 模拟器 **192/192** 会话断言 + XCUITest + 设备切片 + 未签名 IPA（详见 REPORT.md） |
 | 3D 外观 | ✅ 几何直接取 MuJoCo `mesh_vert`+`mesh_face`，颜色按 `mat_rgba` 解析；PBR + 接触阴影 + 两 tick 位姿插值；与官方渲染对照一致（白壳、橙嘴/橙脚） |
 | Android（Kotlin + GLES3） | ✅ CI 模拟器冒烟通过 + 16 KB 页对齐检查 + 可安装 debug APK |
@@ -65,9 +66,9 @@
 | 动力学 / 执行器 | **100%**（对官方模型） | MuJoCo + BAM M6（XL330 电压律、反电动势、Coulomb/Stribeck/负载摩擦）+ ±1° 齿隙 + 域随机化 |
 | 动力学 / 执行器 | ~90–95%（对某一台真机） | 制造差异、磨损、温度、线缆柔性、地板微观差异无法完整建模 |
 | 策略 / 步态 | **100%** | 直接运行官方 ONNX，不重训、不手写动画 |
-| 行为 / 状态机 / 安全 | **100%** | 同一优先级、同一常量：~26° 倾角、0.3 s 预测、3 tick 防抖、6.6 V 坐下关机、deadman |
+| 行为 / 状态机 / 安全 | 官方常量逐字对齐（~26° 倾角、0.3 s 预测、3 tick 防抖、6.6 V 坐下关机、deadman、HOME_RAMP 2 s 线性爬升）；tick 主干顺序按官方 robotd 排布（2026-11-17 对齐：gate→bring-up→shutdown→limp-fall→pickup→平滑→idle→step→apply）。**与真机逐帧一致性做不到**（见 §3.1）。 |
 | 交互映射 | 功能 **100%** | 手柄 → 触屏 / 蓝牙手柄；`duckctl` → 调试面板 |
-| 软件协议 | **100%** | JSON-RPC / manifest / 官方 App 协议可原样实现 |
+| 软件协议 | **100%** | JSON-RPC 2.0 + NDJSON `robot.*` 方法面（含 robot.subscribe 订阅推送）、policy manifest、官方手机 App 协议语义已实现（详见 §5） |
 | 手机传感器接入 | API 层 **100%** | 全部可读取；语义映射见 §4，只有一部分与鸭子传感器同构 |
 | AI 可配置 | **100%** | 策略槽 + manifest + intent API（详见 §5） |
 | 真实世界物体交互 | ~60–90%（视场景） | 相机/LiDAR 能给几何，给不了质量、摩擦、柔顺性 |
@@ -143,9 +144,9 @@
 
 ## 5. AI 可配置架构
 
-- **低层策略槽**：导入任意 ONNX + manifest；校验 `obs_len=61` / `action_len=14` / `model_api` / `robot.model`；热切换；失败回退官方策略。
-- **高层 intent API**：照搬官方"客户端只发 intent"的设计，暴露 `robot.move` / `robot.subscribe` / `robot.health` / 技能调用；用户可用本地或云端 LLM/脚本/agent 驱动。
-- **安全层始终权威**：自定义 AI 不能绕过关节限位、deadman、摔倒保护——这也是 1:1 的一部分。
+- **低层策略槽**：导入任意 ONNX + manifest；校验 `obs_len=61` / `action_len=14` / `model_api` / `robot.model`（manifest 声明层，2026-11-17 起；张量形状由官方 duck-control 加载路径兜底）；热切换（替换正在驱动的网络时先回 home 再换，官方 disturb 门控语义）；加载失败保留当前正在运行的集合。
+- **高层 intent API**：官方"客户端只发 intent"的设计——移动端暴露本地 HTTP intent API 与官方 `robot.move` / `robot.subscribe` / `robot.health`（JSON-RPC 2.0 + NDJSON，端内 TCP 兼容层）两条路；用户可用本地或云端 LLM/脚本/agent 驱动。
+- **安全层始终权威**：自定义 AI 不能绕过关节限位、deadman、摔倒保护——这也是 1:1 的一部分。每次 tick 被安全层钳制的原因（Deadman/Range/NotFinite）通过 `movement.limited_by` 语义上报。
 - **训练闭环**：`microduck_rl` 训练的自定义策略可直接导入。
 - **模式标识**：官方策略 = 「1:1 大脑」；自定义策略 = 「同身体，不同大脑」，UI 明确标注，避免混淆。
 
