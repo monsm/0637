@@ -357,6 +357,17 @@ val quack get() = pick("Quack", "叫一声")
     val walked get() = pick("walked", "走过")
     val rolls get() = pick("rolls", "翻滚")
     val pickups get() = pick("picked up", "被抱起")
+    // The record card's grid: the highlights the core's vetbook.json
+    // publishes, named as its own Markdown names them. Keys and values
+    // carried verbatim from the iOS ticket's set so the two cards agree.
+    val vetbookCardShare get() = pick("Share card", "分享卡片")
+    val vetbookCardNone get() = pick("No records yet", "还没有记录")
+    val vetbookCardPowered get() = pick("time together", "陪伴时长")
+    val vetbookFalls get() = pick("falls", "摔倒")
+    val vetbookPets get() = pick("petted", "被摸")
+    val vetbookFed get() = pick("fed", "被喂")
+    val vetbookClaps get() = pick("claps", "拍手")
+    val vetbookWhistles get() = pick("whistles", "口哨")
     val exportVetbook get() = pick("Export vet book", "导出记录")
     val shareVetbook get() = pick("Share vet book", "分享记录")
     // The Director photo.

@@ -5,7 +5,9 @@
 //! them that `robotd` itself cannot be reused for (it owns tokio, IPC and systemd):
 //!
 //! ```text
-//! read → observe (fall) → bring-up / limp-fall → controller.step → safety.apply → write
+//! read → observe (fall) → odometry → safety.gate (deadman) → bring-up → shutdown
+//!      → limp-fall → pickup → command smoothing → idle head → controller.step
+//!      → safety.apply → write
 //! ```
 //!
 //! The numbers are the robot's: 2 s homing ramp, 50 gain while limp, 0.5 s settle, then the
@@ -22,9 +24,10 @@ use duck_control::io::{IoError, RobotIo, Sensors};
 use duck_control::model::{DEFAULT_POSITION, NUM_JOINTS};
 use duck_control::obs::Command;
 use duck_control::policy::Policy;
-use duck_control::safety::{Safety, SafetyConfig};
+use duck_control::safety::{Limit, Safety, SafetyConfig};
 
 use crate::control::{Controller, SkillTuning, Tuning};
+use crate::control::posture;
 
 /// `robotd`'s bring-up ramp: torque on, joints glide to home over this.
 pub const HOME_RAMP: Duration = Duration::from_secs(2);
@@ -41,9 +44,39 @@ const GAIN_POSE: u16 = 160;
 /// 50 Hz tick, so the real duck's gate is half a second — and ours must be the
 /// same half second, not a perfect IMU from tick one.
 const IMU_WARMUP_SAMPLES: u64 = 25;
-/// After a limp-fall, drive zero command for this long so velstand can get up.
-/// `SafetyConfig::default().deadman`.
+/// How long the API twist lease keeps control — `SafetyConfig::default().deadman`.
+/// The deadman itself is official now: `Safety::gate` owns it, keyed on this
+/// same duration from the safety config the runtime is built with.
 const DEADMAN: Duration = Duration::from_millis(500);
+
+/// `robotd`'s `RESET_AFTER_PAUSE`: driving must have been interrupted this long
+/// before the controller reset on the next driving edge. A reset zeroes the
+/// action history the policy observes and drops the low-pass anchor — right
+/// after a real pause, and itself the discontinuity it exists to prevent after
+/// a 20 ms hiccup (robotd main.rs:168).
+const RESET_AFTER_PAUSE: Duration = Duration::from_millis(200);
+
+/// `robotd`'s `[update_gate] min_achieved_hz` at full speed (deploy/robotd.toml:
+/// 45 is 90% of the default 50 Hz). Below this the loop reports unhealthy.
+/// The floor is judged against the *expected* rate, not a bare 45: the shell
+/// drives the loop at 50 × `clock.speed` ticks per wall second (iOS
+/// `DuckController.ticksForThisFrame`), so a deliberately slowed duck is a
+/// product feature, not a broken control loop.
+const MIN_ACHIEVED_HZ: f64 = 45.0;
+/// `robotd`'s `[update_gate] stall_periods`: 25 × 20 ms = 500 ms without a tick
+/// at all is a wedged loop, distinct from a slow one.
+const STALL_PERIODS: u32 = 25;
+/// `robotd`'s `RATE_WINDOW`: the achieved rate is ticks over the wall clock in
+/// this window, stored when it closes.
+const RATE_WINDOW: Duration = Duration::from_secs(1);
+
+/// Voltage adaptation, robotd's: the servos' effective kP tracks their supply,
+/// so scaling the action by (nominal / measured) holds the robot's response
+/// steady as the pack sags. On by default since 2026-09-14, at the nominal
+/// 7.4 V the gains were identified at (robotd-params `voltage_adapt` /
+/// `nominal_voltage` defaults; the mobile loop has no per-policy config file,
+/// so the defaults are the values).
+const NOMINAL_VOLTAGE: f64 = 7.4;
 
 /// robotd's `[control] cmd_alpha` / `head_alpha`: the client's command is
 /// smoothed per tick (`cmd += alpha * (target - cmd)`), so a stick snap
@@ -131,6 +164,37 @@ fn array_of(values: Option<&[f64]>) -> [f64; NUM_JOINTS] {
         }
     }
     out
+}
+
+/// Stable wire names for the reasons a command was altered — robotd's own
+/// `limit_name`, spelled out rather than `Debug`-formatted because these go on
+/// the wire (`robot.state.movement.limited_by`).
+fn limit_name(limit: Limit) -> &'static str {
+    match limit {
+        Limit::Deadman => "deadman",
+        Limit::Range => "joint_range",
+        Limit::NotFinite => "not_finite",
+    }
+}
+
+/// The tick's action scale, robotd's voltage adaptation: `nominal / measured`,
+/// with the measurement clamped to a plausible band so a bad reading cannot
+/// become a wild scale. No reading yet, or a dead one, is no adaptation.
+fn voltage_scale(volts: Option<f64>) -> f64 {
+    match volts {
+        Some(volts) if volts > 0.0 => NOMINAL_VOLTAGE / volts.clamp(6.0, 9.5),
+        _ => 1.0,
+    }
+}
+
+/// Whether resuming from `stopped_at` warrants resetting the controller.
+///
+/// The reset zeroes the action history the policy observes and drops the
+/// low-pass anchor. After a real pause that is right — the robot may be
+/// somewhere else entirely. After a 20 ms hiccup it is itself the
+/// discontinuity the reset exists to prevent.
+fn reset_on_resume(stopped_at: Option<TickTime>, now: TickTime) -> bool {
+    stopped_at.is_none_or(|since| since.elapsed(now) >= RESET_AFTER_PAUSE)
 }
 
 /// A deadline on the simulation clock: "this tick, or later".
@@ -392,6 +456,55 @@ impl BringupState {
     }
 }
 
+/// Where a requested policy swap is going to land, as
+/// [`DuckRuntime::replace_policy_disturbing`] reports it.
+///
+/// The caller asked for a swap; this says what the loop did about it, which is
+/// the difference between a shell that can tell the user "the duck will change
+/// its gait when it has stood up" and one that promises something the safety
+/// rule will not deliver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PolicySwap {
+    /// The change lands in place, wherever the robot is standing: it does not
+    /// replace the network driving, or nothing was driving.
+    InPlace,
+    /// The change replaces the network driving a robot with a gait in motion:
+    /// the duck is going to the home pose and the change lands there, torque on
+    /// throughout.
+    GoingHome,
+    /// Refused outright — the robot is shutting down or already off, and the
+    /// path home would stand it back up under the sit. The policy it has is the
+    /// policy it keeps.
+    Refused,
+}
+
+/// The health gate's verdict, robotd's `health()` split: degraded and
+/// unhealthy are strictly apart. Unhealthy is what the update system would
+/// roll a release back over — the loop itself is broken. Degraded is a
+/// property of the *board* or of somebody's file — the robot walks, but says
+/// so. A flat battery, a fall verdict, or a limp duck is none of these: those
+/// are reports, not health.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HealthVerdict {
+    Healthy,
+    Degraded { reasons: Vec<String> },
+    Unhealthy { reasons: Vec<String> },
+}
+
+impl HealthVerdict {
+    /// Why the verdict is not healthy, empty when it is.
+    pub fn reasons(&self) -> &[String] {
+        match self {
+            Self::Healthy => &[],
+            Self::Degraded { reasons } | Self::Unhealthy { reasons } => reasons,
+        }
+    }
+
+    pub fn is_healthy(&self) -> bool {
+        matches!(self, Self::Healthy)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum Bringup {
     Limp,
@@ -413,7 +526,10 @@ impl Bringup {
     }
 
     /// Linear per-tick target, or `None` once the ramp is done — the same shape as
-    /// `robotd`'s `Bringup::homing_target`.
+    /// `robotd`'s `Bringup::homing_target`. There is no "static ramp" shortcut:
+    /// robotd always holds `HOME_RAMP` out, even when the ramp has nothing to
+    /// travel, because the two seconds are also the IMU's convergence window —
+    /// the ramp finishing is what makes the policy eligible to drive.
     fn homing_target(&self, now: TickTime) -> Option<[f64; NUM_JOINTS]> {
         let Self::Homing { from, since, to } = self else {
             return None;
@@ -427,20 +543,6 @@ impl Bringup {
             *value = from[slot] + (to[slot] - from[slot]) * t;
         }
         Some(target)
-    }
-
-    /// A homing ramp that starts and ends at the same pose (the duck boots at
-    /// home). It has nothing to travel, so it can finish the moment the IMU is
-    /// ready rather than holding home statically for two seconds — a biped
-    /// held on position actuators for that long falls.
-    fn homing_is_static(&self) -> bool {
-        match self {
-            Self::Homing { from, to, .. } => from
-                .iter()
-                .zip(to.iter())
-                .all(|(start, end)| (start - end).abs() < 0.1),
-            _ => false,
-        }
     }
 }
 
@@ -513,6 +615,34 @@ enum LimpFall {
     Limp { since: TickTime, landing: Landing },
     /// Ramping from where the robot landed back to the standing pose.
     Posing { from: [f64; NUM_JOINTS], since: TickTime },
+}
+
+/// A policy set waiting for a safe moment to land.
+///
+/// robotd's `PendingSwap`, reduced to what the mobile loop needs: the caller
+/// has already loaded the new set (the shell does that off the control
+/// thread), so there is nothing to poll. What is left is the *where*: a change
+/// that replaces the network driving must not be swapped under a moving gait —
+/// the next tick would be a different policy's idea of what the legs were
+/// doing — so the robot goes home first and the swap lands there. A change
+/// that leaves the driving network alone lands in place, carrying the running
+/// state across.
+///
+/// No `Debug`: it holds a `Policy`, and the ONNX sessions inside it are not
+/// printable.
+struct PendingSwap {
+    policy: Policy,
+    tuning: Tuning,
+    skills: SkillTuning,
+    /// Whether this change replaces the network that has the robot, as the
+    /// caller's manifest comparison decided (robotd's `change_disturbs`).
+    disturbs: bool,
+    /// The drive decision has been made and the duck is on its way home: the
+    /// change lands when the ramp completes, and the command channel stays
+    /// quiet while it travels. Remembered rather than re-derived, because the
+    /// stick the client is still holding would otherwise send the duck home
+    /// again on every tick.
+    seeking: bool,
 }
 
 /// Everything a rewind has to put back, as one value.
@@ -612,6 +742,28 @@ pub struct Checkpoint {
     /// rewind should not carry a clap from a future the duck no longer has.
     #[serde(default)]
     pub last_sound_event: Option<(String, u64)>,
+    /// The driving-edge bookkeeping, for the same reason as everything above:
+    /// a fork or rewind that missed these starts its first tick on a false
+    /// rising edge. `driving_prev = false` under a non-zero twist is that edge;
+    /// `stopped_driving_at = None` makes `reset_on_resume` believe the pause
+    /// was long, and the controller reset wipes the recurrent memory the
+    /// restore had just put back — while `posture_checked = false` re-runs the
+    /// pre-takeover posture check. The branch and its parent diverge on the
+    /// very first tick.
+    #[serde(default)]
+    pub driving_prev: bool,
+    /// Tick driving stopped at, as ticks (robotd's wall time, on this clock).
+    #[serde(default)]
+    pub stopped_driving_at: Option<u64>,
+    #[serde(default)]
+    pub posture_checked: bool,
+    #[serde(default)]
+    pub start_from_hold: bool,
+    /// The smoothed pack voltage: the empty-pack threshold and the action
+    /// scale both read it, and a branch that lost it adapts (or powers off)
+    /// on a different number than its parent.
+    #[serde(default)]
+    pub volts_ema: Option<f64>,
 }
 
 /// The last idle offset, as plain numbers: `IdleOffset` is upstream's type
@@ -637,6 +789,9 @@ pub struct DuckRuntime<T: RobotIo> {
     twist_fresh: bool,
     /// The twist from the intent API, and the lease it holds on the duck.
     api_lease: ApiLease,
+    /// A policy change that replaces the network driving, waiting for the home
+    /// pose. `None` when nothing is in flight.
+    pending_swap: Option<PendingSwap>,
     /// The painted route being walked, if any. It drives through the same
     /// command channel as the stick, so the real walk policy executes it and
     /// a fall is still possible — that is the point.
@@ -770,6 +925,40 @@ pub struct DuckRuntime<T: RobotIo> {
     /// The pack voltage, smoothed the way `robotd` smooths it: a step sag must
     /// not reach the empty threshold.
     volts_ema: Option<f64>,
+    /// The command-alteration reasons this tick produced, in the official wire
+    /// spelling: "deadman" from the gate, "joint_range"/"not_finite" from the
+    /// safety apply. Cleared at the top of every tick, filled by the gate and
+    /// every apply — what `robot.state.movement.limited_by` publishes.
+    limits: Vec<String>,
+    /// Whether the pre-takeover posture check has run this enable episode —
+    /// robotd's `posture_checked`. Reset when the policy is disabled, run once
+    /// the robot is Ready, warm and not driving.
+    posture_checked: bool,
+    /// Set when the posture check found a seat: the feedback state is seeded
+    /// from the held pose at the driving edge, not from zero.
+    start_from_hold: bool,
+    /// Whether the robot was driving last tick — robotd's `was_driving`. The
+    /// limp-fall eligibility, the idle still-check and the book all read the
+    /// previous tick's driving, not this one's.
+    driving_prev: bool,
+    /// When driving stopped, for the `RESET_AFTER_PAUSE` gate on the resume
+    /// reset. robotd's `stopped_driving_at`.
+    stopped_driving_at: Option<TickTime>,
+    /// Health-gate input: reasons a caller has marked (a reload that would not
+    /// build, an override that fell back). Degraded, not unhealthy — the robot
+    /// kept the policy it had.
+    degraded_reasons: Vec<String>,
+    /// The rate window, robotd's `RATE_WINDOW` over the wall clock.
+    hz_window_start: Option<Instant>,
+    hz_window_ticks: u64,
+    achieved_hz: f64,
+    /// Wall-clock instant of the last completed tick, for the stall check.
+    last_tick_at: Instant,
+    /// Ticks whose work overran the period, cumulative — robotd's `missed`.
+    missed_ticks: u64,
+    /// The `robot.state` frame this tick assembled, in the official wire shape.
+    /// Kept for the IPC layer: only a subscriber makes it bytes.
+    state_frame: Option<duck_ipc_proto::RobotState>,
     /// Where the duck believes it is, from its own legs and IMU. `robotd` ticks
     /// it inside the control loop on fresh samples once the IMU has warmed.
     odometry: odometry::Odometry,
@@ -814,6 +1003,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_twist: TickTime::default(),
             twist_fresh: false,
             api_lease: ApiLease::default(),
+            pending_swap: None,
             path_task: None,
             chorus: None,
             last_chorus_id: None,
@@ -872,6 +1062,18 @@ impl<T: RobotIo> DuckRuntime<T> {
             shutdown_requested: false,
             odometry: odometry::Odometry::alpha(),
             volts_ema: None,
+            limits: Vec::new(),
+            posture_checked: false,
+            start_from_hold: false,
+            driving_prev: false,
+            stopped_driving_at: None,
+            degraded_reasons: Vec::new(),
+            hz_window_start: Some(Instant::now()),
+            hz_window_ticks: 0,
+            achieved_hz: 0.0,
+            last_tick_at: Instant::now(),
+            missed_ticks: 0,
+            state_frame: None,
             voice: crate::voice::Voice::new(0xD0C),
             sounds: std::collections::VecDeque::new(),
             volts: None,
@@ -947,7 +1149,8 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     /// The companion layer follows the animal, not the body: a drive-mode
     /// switch replaces the MuJoCo scene and the policies but must not reset
-    /// hunger, the vet book or the child's block program.
+    /// hunger, the vet book or the child's block program. The voice travels
+    /// too: it is the same duck, and a mode switch must not hand it a new one.
     pub fn carry_companion(&mut self, from: &Self) {
         self.care = from.care;
         self.book = from.book.clone();
@@ -957,6 +1160,7 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.last_sound_event = from.last_sound_event.clone();
         self.last_peer_event = from.last_peer_event.clone();
         self.last_heard = from.last_heard.clone();
+        self.voice = from.voice.clone();
         self.book_position = None;
     }
 
@@ -1008,6 +1212,16 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn voice_seed(&self) -> u32 {
         self.voice.seed()
+    }
+
+    /// Give the duck its own voice: the seed the shell derives per duck (the
+    /// official loop falls back to `sounds::hardware_seed()`, reading the SoC
+    /// efuse — a phone has no such number, so the shell supplies one). Must be
+    /// called before any sound renders; it replaces the personality whole, so
+    /// every later render comes from the new seed. The constructor default is
+    /// the fixed 0xD0C, which existing callers and tests keep working on.
+    pub fn set_voice_seed(&mut self, seed: u32) {
+        self.voice = crate::voice::Voice::new(seed);
     }
 
     /// The voice's personality traits, for a client that wants to know whose
@@ -1087,6 +1301,42 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
     }
 
+    /// Whether the pickup watch may score this tick: the walk (or stand)
+    /// policy has the robot and nothing else owns it. Roller mode is never
+    /// watched — the model has never seen wheels, and scoring it there would
+    /// pause a wheeled gait on its own joints.
+    fn pickup_watching(&self, ready: bool, settled: bool, warm: bool, free: bool) -> bool {
+        self.mode == robotd_params::Mode::Walk && ready && settled && warm && free
+    }
+
+    /// Torque has just come on: where should the ramp take the robot?
+    ///
+    /// robotd's `ramp_target`, verbatim in shape. A robot that reads seated
+    /// goes to [`crate::SEAT_POSITION`] — ramping it straight-legged to the
+    /// standing home pose drags it out of the seat and over backwards — and
+    /// the seat is marked on the controller; the next Start rises it. Only on
+    /// a clear seated verdict, with a converged IMU and a network to rise
+    /// with. Anything else goes home, as it always has.
+    fn ramp_target(&mut self, sensors: &Sensors) -> [f64; NUM_JOINTS] {
+        if !self.controller.has_sitstand() {
+            return DEFAULT_POSITION;
+        }
+        if !self.imu_ready() {
+            tracing::warn!("posture: the IMU has not converged — ramping to home without a check");
+            return DEFAULT_POSITION;
+        }
+        let reading = posture::classify(&sensors.positions, sensors.imu.quat);
+        let height = format!("{:.0}%", 100.0 * reading.height_ratio);
+        let tilt = format!("{:.0}°", reading.tilt_deg);
+        if reading.posture != posture::Posture::Seated {
+            tracing::info!(%height, %tilt, posture = ?reading.posture, "posture at torque on");
+            return DEFAULT_POSITION;
+        }
+        tracing::warn!(%height, %tilt, "posture: seated at torque on — ramping to the seat");
+        self.controller.enter_seat();
+        crate::SEAT_POSITION
+    }
+
     pub fn mode(&self) -> robotd_params::Mode {
         self.mode
     }
@@ -1126,39 +1376,22 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.pickup.as_ref().and_then(|watch| watch.p_held())
     }
 
-    /// Torque on and ramp to home, exactly as `robotd init` does. Reads the pose first, so
-    /// the ramp starts where the robot is rather than snapping.
+    /// Ask for the policy to drive, exactly as `robotd`'s enable intent does:
+    /// set the flag, clear the command state, queue the greet. Torque and the
+    /// ramp happen in the tick's bring-up transition — after the gate, with a
+    /// fresh sensor sample to start the ramp from and a posture check to pick
+    /// the ramp's target. There is no "already at home" shortcut: robotd always
+    /// enters `Homing` and lets the ramp finish (the ramp doubles as the IMU's
+    /// convergence window), so the mobile duck does too.
     pub fn enable(&mut self) -> Result<(), RuntimeError> {
         if self.enabled {
             return Ok(());
         }
-        let sensors = self.safety.read()?;
-        self.safety.set_torque(true)?;
-        // The virtual duck starts at HOME, so the 2 s ramp has nothing to do —
-        // and a biped held statically on position actuators falls during it.
-        // From any other pose (a real robot's folded boot) the ramp is kept.
-        let at_home = sensors
-            .positions
-            .iter()
-            .zip(DEFAULT_POSITION.iter())
-            .all(|(current, home)| (current - home).abs() < 0.1);
-        if at_home && self.imu_ready() {
-            self.bringup = Bringup::Ready;
-            self.controller.reset();
-            tracing::info!("bring-up: already at home; the policy has the robot");
-        } else {
-            // The IMU's own gate: the real duck ramps for two seconds while the
-            // filter converges, so by the time the policy could drive it is
-            // warm. The app's duck is already at home and has no ramp to spend
-            // that time on, so it holds the home pose until the sampler has the
-            // same 25 fused readings.
-            self.bringup = Bringup::Homing {
-                from: sensors.positions,
-                since: TickTime::of(&self.clock),
-                to: DEFAULT_POSITION,
-            };
-        }
         self.enabled = true;
+        // The pre-takeover posture check is per episode: a robot that sat
+        // disabled and is re-enabled is measured again.
+        self.posture_checked = false;
+        self.start_from_hold = false;
         // `robotd`'s greet: one quack as the loop comes up. On a headless board
         // it is the audible "robotd is running"; here it is the duck waking.
         self.queue_sound("greet");
@@ -1227,7 +1460,20 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// on-screen joystick for [API_LEASE], so an external agent can drive it
     /// while it keeps sending twists.
     pub fn set_api_twist(&mut self, twist: [f64; 3]) {
-        self.api_lease.take(twist, TickTime::of(&self.clock));
+        let now = TickTime::of(&self.clock);
+        self.api_lease.take(twist, now);
+        // The lease also feeds the duck's twist when the stick is silent, and
+        // the deadman ages the loop's one twist clock — so an API driver has
+        // to stamp that same clock, or `Safety::gate` would zero the leased
+        // twist 500 ms later and a robot with no shell keepalive could never
+        // be driven from the API at all. robotd's `robot.move` writes and
+        // stamps the one intents channel (main.rs `apply_intent` →
+        // `Intents::set_twist`); the deadman punishes a client that stopped
+        // talking, not a door the twist came through. The lease still owns
+        // the command channel while it is live — its override in the tick is
+        // unchanged.
+        self.last_twist = now;
+        self.twist_fresh = true;
         if steers(twist) {
             // An external agent with a direction on the stick is a driver,
             // not a keepalive: it takes over from a painted route too.
@@ -2043,6 +2289,143 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.bringup.state()
     }
 
+    /// The achieved control-loop rate over the last closed window, in Hz.
+    /// Zero until the first window closes — unknown, not stopped.
+    pub fn achieved_hz(&self) -> f64 {
+        self.achieved_hz
+    }
+
+    /// Mark a degraded reason against the health gate: something a caller
+    /// knows that the loop itself cannot see — a reload that would not build,
+    /// an override that fell back to its default. Degraded, never unhealthy:
+    /// the duck kept the policy it had, so there is nothing to roll back.
+    pub fn mark_degraded(&mut self, reason: String) {
+        if !self.degraded_reasons.contains(&reason) {
+            self.degraded_reasons.push(reason);
+        }
+    }
+
+    /// The marked degraded reasons all cleared — the override that would not
+    /// load loaded, or was reset.
+    pub fn clear_degraded(&mut self) {
+        self.degraded_reasons.clear();
+    }
+
+    /// The health gate, robotd's `health()` with its two verdicts strictly
+    /// apart: unhealthy is a broken control loop (stalled, under rate, never
+    /// ticked), degraded is a property of the board or of somebody's file.
+    /// A fall, a limp or a flat pack never reach this gate — those are
+    /// reports, and a release must never be judged by them.
+    pub fn health(&self) -> HealthVerdict {
+        // "Starting" is not "started". The gate polls, so it will see the
+        // transition.
+        if self.clock.tick == 0 {
+            return HealthVerdict::Unhealthy {
+                reasons: vec!["control loop has not completed a cycle yet".to_owned()],
+            };
+        }
+        // A caller-marked degraded reason, robotd's order: before the rate and
+        // stall checks, so it never hides behind them.
+        if !self.degraded_reasons.is_empty() {
+            return HealthVerdict::Degraded {
+                reasons: self.degraded_reasons.clone(),
+            };
+        }
+        // The stall and rate floors judge the loop only while it is supposed
+        // to be running. A paused duck is stopped on purpose — the shell does
+        // not call tick — and is not a wedged loop.
+        if !self.clock.paused {
+            let stale = self.last_tick_at.elapsed();
+            if stale > self.stall_limit() {
+                return HealthVerdict::Unhealthy {
+                    reasons: vec![format!(
+                        "control loop stalled for {} ms",
+                        stale.as_millis()
+                    )],
+                };
+            }
+            // The floor moves with the shell's speed dial: the loop is driven
+            // at 50 × speed ticks per wall second (iOS
+            // `DuckController.ticksForThisFrame`), so a duck deliberately in
+            // slow-motion is a feature, not a wedged loop. At 1× this is the
+            // official 45 Hz exactly.
+            let floor = MIN_ACHIEVED_HZ * self.effective_speed();
+            let hz = self.achieved_hz;
+            if hz > 0.0 && hz < floor {
+                return HealthVerdict::Unhealthy {
+                    reasons: vec![format!(
+                        "control loop at {hz:.1} Hz, below the {floor:.1} Hz floor"
+                    )],
+                };
+            }
+        }
+        HealthVerdict::Healthy
+    }
+
+    /// The loop's speed for rate judgements: the shell's slow-motion dial,
+    /// with a nonsense clock (zero or a NaN from a hand-written checkpoint)
+    /// read as full speed rather than dividing by it.
+    fn effective_speed(&self) -> f64 {
+        if self.clock.speed.is_finite() && self.clock.speed > 0.0 {
+            self.clock.speed
+        } else {
+            1.0
+        }
+    }
+
+    /// `robotd`'s stall window — 25 periods with no tick at all is a wedged
+    /// loop, distinct from a slow one — in wall-clock terms. The shell's
+    /// period at the current speed is `dt / speed`, so a 0.25× duck is
+    /// entitled to 2 s between ticks before that reads as wedged.
+    fn stall_limit(&self) -> Duration {
+        let periods = self.dt.as_secs_f64() * f64::from(STALL_PERIODS) / self.effective_speed();
+        Duration::from_millis((periods * 1000.0).round().max(1.0) as u64)
+    }
+
+    /// What a safety gate or apply did to this tick's command, in the official
+    /// wire spelling — `robot.state.movement.limited_by`.
+    pub fn limited_by(&self) -> &[String] {
+        &self.limits
+    }
+
+    /// The `robot.state` frame this tick assembled, in the official wire
+    /// shape (duck-ipc-proto). `None` before the first tick. Cloned so the
+    /// IPC layer can serialise it off the control thread.
+    pub fn robot_state(&self) -> Option<duck_ipc_proto::RobotState> {
+        self.state_frame.clone()
+    }
+
+    /// `robot.health`, in the official wire shape: the verdict, plus the
+    /// reported-but-never-judged facts that ride on the same answer.
+    pub fn health_result(&self) -> duck_ipc_proto::HealthResult {
+        let (healthy, degraded, reason) = match self.health() {
+            HealthVerdict::Healthy => (true, false, None),
+            HealthVerdict::Degraded { reasons } => (
+                false,
+                true,
+                Some(reasons.join("; ")),
+            ),
+            HealthVerdict::Unhealthy { reasons } => (
+                false,
+                false,
+                Some(reasons.join("; ")),
+            ),
+        };
+        duck_ipc_proto::HealthResult {
+            healthy,
+            degraded,
+            reason,
+            // Reported, never judged: a flat pack is a fact about the robot,
+            // and a release rolled back over one would be replaced by a
+            // release judged on the same flat pack.
+            battery: self.volts_ema.map(|volts| duck_ipc_proto::Battery {
+                volts,
+                percent: duck_control::battery_percent(volts),
+            }),
+            ..duck_ipc_proto::HealthResult::default()
+        }
+    }
+
     /// Read-only access to the body backend, for rendering and diagnostics.
     pub fn io(&self) -> &T {
         self.safety.io()
@@ -2052,11 +2435,39 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.safety.fallen()
     }
 
+    /// Which file the walking slot resolved to, so a reload can tell whether
+    /// the locomotion network itself changes (`robotd`'s `change_disturbs`
+    /// question — see [`Self::replace_policy_disturbing`]).
+    ///
+    /// `Net::Walk` is the one mandatory slot of a loaded [`Policy`], so this is
+    /// `Some` for any runtime this crate built: `path_of` returns `None` only
+    /// for the optional slots (`stand`, `sitstand`, `ground_pick`, the skills),
+    /// never for the walk network.
+    pub fn walking_slot_path(&self) -> Option<std::path::PathBuf> {
+        self.controller
+            .policy_ref()
+            .path_of(duck_control::policy::Net::Walk)
+    }
+
     /// Swap the policy set, keeping the robot's state: the same body, the
     /// same seat, the same skill, the same filter anchor — robotd's
     /// `Controller::carry_over`. Networks whose digest is unchanged keep
     /// their recurrent memory; a genuinely different file starts fresh.
+    ///
+    /// This is the in-place swap, applied now, whatever the robot is doing.
+    /// A change that replaces the network driving the robot wants
+    /// [`Self::replace_policy_disturbing`] instead, which honours robotd's
+    /// disturb gate and walks the duck home first.
     pub fn replace_policy(&mut self, policy: Policy, tuning: Tuning, skills: SkillTuning) {
+        // An explicit immediate swap supersedes a queued one: letting the
+        // stale change land later would undo the set installed right here.
+        self.pending_swap = None;
+        self.land_swap(policy, tuning, skills);
+    }
+
+    /// The swap itself: what [`Self::replace_policy`] does and what the tick
+    /// does when a queued change lands.
+    fn land_swap(&mut self, policy: Policy, tuning: Tuning, skills: SkillTuning) {
         let old = std::mem::replace(&mut self.controller, Controller::new(policy, tuning, skills));
         self.controller.carry_over(&old);
         // A reload during a fall must not cancel the reflex: robotd refuses
@@ -2065,6 +2476,87 @@ impl<T: RobotIo> DuckRuntime<T> {
         if matches!(self.limp_fall, LimpFall::Idle) {
             self.controller.reset();
         }
+    }
+
+    /// Ask for the policy set to be swapped, honouring robotd's
+    /// `change_disturbs` gate (main.rs:3015-3106): a change that replaces the
+    /// network the robot is driving is not swapped under a moving gait — the
+    /// duck is sent to the home pose first and the change lands there, torque
+    /// on throughout. A change that leaves the driving network alone lands
+    /// wherever the robot is.
+    ///
+    /// `disturbs` is the caller's verdict, because the mobile core has no file
+    /// digests to compare: the shell that picked the new set knows whether it
+    /// replaces the network in the driving slot (`Policy` exposes paths, not
+    /// digests — see `duck-control::policy::Policy::path_of`). Pass `false` to
+    /// request the in-place landing without the gate.
+    ///
+    /// The change is applied by the control loop, not by this call, so it can
+    /// wait for the pose; the returned verdict says which path it took and is
+    /// what the caller should report. A duck that is off or shutting down
+    /// refuses the change outright, as the official loop does.
+    pub fn replace_policy_disturbing(
+        &mut self,
+        policy: Policy,
+        tuning: Tuning,
+        skills: SkillTuning,
+        disturbs: bool,
+    ) -> PolicySwap {
+        if self.shutting_down() || self.shutdown_requested {
+            tracing::warn!("policy change refused: the robot is shutting down");
+            return PolicySwap::Refused;
+        }
+        // Not driving, or a change that leaves the driving network alone: the
+        // loop lands it on the next tick without moving the robot. Asked while
+        // the limp-fall owns the robot, it waits for the sequence to hand back.
+        let driving = self.driving_for_swap();
+        let verdict = if disturbs && driving {
+            PolicySwap::GoingHome
+        } else {
+            PolicySwap::InPlace
+        };
+        self.pending_swap = Some(PendingSwap {
+            policy,
+            tuning,
+            skills,
+            disturbs,
+            seeking: false,
+        });
+        verdict
+    }
+
+    /// Whether a policy change would take the network out from under a robot
+    /// with a gait in motion — robotd's `driving` at the moment the change is
+    /// taken (main.rs:3040-3046: the loop only asks what stepped last tick): a
+    /// robot that is disabled, limp or mid-ramp has nothing running that a swap
+    /// could interrupt, and a parked seat is not a moving gait —
+    /// `change_disturbs` lands a change to a seated robot in place, because
+    /// standing it up to change a file it is not using is a surprise of its own
+    /// (robotd main.rs:2040-2057).
+    fn driving_for_swap(&self) -> bool {
+        self.driving_prev
+            && self
+                .controller
+                .driving()
+                .is_some_and(|d| !matches!(d, crate::control::Driving::Seated))
+    }
+
+    /// A queued policy change, if one is waiting for a safe pose.
+    pub fn swap_pending(&self) -> bool {
+        self.pending_swap.is_some()
+    }
+
+    /// Where a queued policy change is in its approach, for the shell to
+    /// report: standing by for the robot to be free, walking home, or landed.
+    pub fn swap_state(&self) -> Option<PolicySwap> {
+        let swap = self.pending_swap.as_ref()?;
+        Some(if swap.seeking {
+            PolicySwap::GoingHome
+        } else if swap.disturbs && self.driving_for_swap() {
+            PolicySwap::GoingHome
+        } else {
+            PolicySwap::InPlace
+        })
     }
 
     /// A second duck at this exact instant: its own body (a deep copy of the
@@ -2090,6 +2582,9 @@ impl<T: RobotIo> DuckRuntime<T> {
         // The emotions are data, not hardware: a fork must keep its own copy
         // or `robot.do curious` silently vanishes on every branch.
         fork.emotions = self.emotions.clone();
+        // The voice is the duck's, not the build's: a branch speaks with the
+        // same personality its parent was given.
+        fork.voice = self.voice.clone();
         let checkpoint = self.checkpoint()?;
         if !fork.restore(&checkpoint) {
             return None;
@@ -2211,6 +2706,11 @@ impl<T: RobotIo> DuckRuntime<T> {
             care: Some(self.care),
             last_sad: self.last_sad,
             last_sound_event: self.last_sound_event.clone(),
+            driving_prev: self.driving_prev,
+            stopped_driving_at: self.stopped_driving_at.map(|stopped| stopped.0),
+            posture_checked: self.posture_checked,
+            start_from_hold: self.start_from_hold,
+            volts_ema: self.volts_ema,
         })
     }
 
@@ -2317,6 +2817,24 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
         self.last_sad = checkpoint.last_sad;
         self.last_sound_event = checkpoint.last_sound_event.clone();
+        // A policy change queued in the future this duck just left goes with
+        // it: the `Policy` inside it cannot ride a checkpoint (ONNX sessions
+        // are not serialised), and landing a change the rewound timeline never
+        // asked for would be a swap from a past that no longer exists. The
+        // caller re-asks if it still wants it.
+        self.pending_swap = None;
+        // The driving-edge bookkeeping comes back with everything else. Left
+        // out, the restored duck's first tick sees `driving_prev = false`
+        // under the restored non-zero twist: a false rising edge, which
+        // `reset_on_resume` (with no `stopped_driving_at`) answers by wiping
+        // the controller state the restore had just put back, and the re-run
+        // posture check picks the branch's start pose from a future the
+        // branch does not have.
+        self.driving_prev = checkpoint.driving_prev;
+        self.stopped_driving_at = checkpoint.stopped_driving_at.map(TickTime);
+        self.posture_checked = checkpoint.posture_checked;
+        self.start_from_hold = checkpoint.start_from_hold;
+        self.volts_ema = checkpoint.volts_ema;
         self.shutdown = match checkpoint.shutdown.as_str() {
             "sitting" => Shutdown::Sitting {
                 since: TickTime(checkpoint.shutdown_since),
@@ -2347,14 +2865,57 @@ impl<T: RobotIo> DuckRuntime<T> {
 
     pub fn set_speed(&mut self, speed: f64) {
         self.clock.speed = speed.clamp(0.05, 4.0);
+        // The expected rate just changed; a window opened under the old speed
+        // measures a loop that no longer exists, and closing it would judge
+        // the new rate against a stale count.
+        self.hz_window_start = Some(Instant::now());
+        self.hz_window_ticks = 0;
     }
 
-    /// One 50 Hz tick. The order is `robotd`'s: read, observe, gate, policy, safety.
+    /// One 50 Hz tick. The order is `robotd`'s: read, observe, gate, bring-up,
+    /// shutdown, limp-fall, pickup, smoothing, policy, safety.
     ///
     /// Simulated time advances by exactly 20 ms per tick, whatever the wall
     /// clock did, so a paused or slowed duck keeps its own timers.
     pub fn tick(&mut self) -> Result<TickReport, RuntimeError> {
-        let report = self.tick_inner()?;
+        let tick_started_at = Instant::now();
+        // A gap longer than the stall window is frozen time (a pause the
+        // shell routed around `tick`) or a wedged caller, not a slow loop:
+        // the wall-clock window would dilute the rate with the gap and the
+        // resume beat would report a second of false slowness. Restart the
+        // window; this tick is its first sample. The floor `health()` judges
+        // against moves with `clock.speed` for the other half of the same
+        // problem — a deliberately slowed duck is a product feature.
+        if self.last_tick_at.elapsed() > self.stall_limit() {
+            self.hz_window_start = Some(tick_started_at);
+            self.hz_window_ticks = 0;
+        }
+        let report = self.tick_inner();
+        // The rate window and the stall clock run on every tick, whatever the
+        // tick's state — a limp duck is still a looping duck, and the health
+        // gate judges the loop, not the state machine (robotd counts the same
+        // way, at the very end of the tick, whatever the tick decided).
+        self.hz_window_ticks += 1;
+        if self
+            .hz_window_start
+            .is_none_or(|start| start.elapsed() >= RATE_WINDOW)
+        {
+            let window = self
+                .hz_window_start
+                .map_or(RATE_WINDOW, |start| start.elapsed());
+            let window = window.as_secs_f64().max(f64::EPSILON);
+            self.achieved_hz = self.hz_window_ticks as f64 / window;
+            self.hz_window_start = Some(Instant::now());
+            self.hz_window_ticks = 0;
+        }
+        self.last_tick_at = Instant::now();
+        if tick_started_at.elapsed() > self.dt {
+            // Ticks whose work overran the period, cumulative — robotd's
+            // `missed`, distinct from a rate shortfall: this is the loop doing
+            // too much, a low rate is the loop being woken late.
+            self.missed_ticks += 1;
+        }
+        let report = report?;
         self.last = Some(report.clone());
         Ok(report)
     }
@@ -2441,23 +3002,34 @@ impl<T: RobotIo> DuckRuntime<T> {
             }
             if let Ok(slow) = self.safety.slow_sensors() {
                 self.volts = Some(slow.volts);
-                // The BAM model reports the motor-bus voltage. robotd's soc.rs
-                // maps a 2S Li-ion pack to a percentage; a linear 6.0..8.4 V
-                // window is the same shape and honest about being an estimate.
-                let percent = ((slow.volts - 6.0) / 2.4 * 100.0).clamp(0.0, 100.0);
+                // `robotd`'s battery_v: the slow read EMA'd with
+                // `BATTERY_EMA_ALPHA` (0.1), seeded from the first reading
+                // rather than blending up from zero. The empty-pack threshold
+                // reads the same EMA below.
+                self.volts_ema = Some(match self.volts_ema {
+                    Some(previous) if previous > 0.0 => {
+                        0.1 * slow.volts + 0.9 * previous
+                    }
+                    _ => slow.volts,
+                });
+                let volts = self.volts_ema.unwrap_or(slow.volts);
+                // One mapping, robotd's: `duck_control::battery_percent`
+                // (6.6..8.2 V, BATTERY_EMPTY_V..BATTERY_FULL_V). The same
+                // number `robot.health` shows and the gauge colours by — a
+                // second window here is how two screens end up disagreeing
+                // about the same pack.
+                let percent = duck_control::battery_percent(volts);
                 self.face.gauge = self.face.gauge.next(Some(percent));
                 self.face.battery_percent = Some(percent);
-                let healthy = self.imu_ready() && !self.safety.fallen() && self.enabled;
-                self.face.status = crate::leds::Status::of(
-                    healthy,
-                    !self.imu_ready(),
-                    self.clock.tick < 50,
-                );
-                // `BATTERY_EMA_ALPHA`: a step sag recovers between steps and
-                // must not count as a spent pack.
-                self.volts_ema = Some(
-                    0.1 * slow.volts + 0.9 * self.volts_ema.unwrap_or(slow.volts),
-                );
+                // The status LED reads the health gate, robotd's leds do: the
+                // verdict, and "starting" for a loop that has not ticked yet.
+                let (healthy, degraded) = match self.health() {
+                    HealthVerdict::Healthy => (true, false),
+                    HealthVerdict::Degraded { .. } => (false, true),
+                    HealthVerdict::Unhealthy { .. } => (false, false),
+                };
+                self.face.status =
+                    crate::leds::Status::of(healthy, degraded, self.clock.tick == 0);
             }
         }
 
@@ -2487,19 +3059,146 @@ impl<T: RobotIo> DuckRuntime<T> {
             mouth: 0.0,
         };
 
+        // Command assembly — the mobile analogue of reading intents, which
+        // robotd does before the gate: the painted route feeds its twist into
+        // the same channel the stick uses, and the API lease takes the channel
+        // while it is live.
+        //
+        // A painted path drives through the same command channel as the
+        // stick; feeding it here gives it the same smoothing, deadman and
+        // emotion overrides the joystick's twist gets.
+        if self.path_task.is_some() {
+            self.step_path(now);
+        }
+        let mut command = self.command;
+        // An API twist owns the duck while its lease is live; the on-screen
+        // joystick gets it back when the API goes quiet.
+        if let Some(twist) = self.api_lease.active(now) {
+            command.twist = twist;
+        }
+        // A change already walking the robot home stops the duck on the way:
+        // the point of going home first is that the new network takes over a
+        // robot that is not mid-stride, so a held stick or a live lease must
+        // not keep it moving while it travels.
+        let seeking_home = self.pending_swap.as_ref().is_some_and(|swap| swap.seeking);
+
+        // The gate, robotd's: `Safety::gate` owns the deadman — intents older
+        // than `SafetyConfig::deadman` have their twist zeroed, and the reason
+        // comes back as a `Limit::Deadman` for `limited_by`. A twist that has
+        // never arrived reads as maximally stale, exactly like the official
+        // loop's stamped-at-zero intents.
+        let intent_age = if self.twist_fresh {
+            self.last_twist.elapsed(now)
+        } else {
+            Duration::MAX
+        };
+        // What the client asked, before the gate: the wire's `requested` is
+        // the ask, `applied` is what the robot got, and the deadman is
+        // visible in the difference plus `limited_by`.
+        let requested_twist = command.twist;
+        if seeking_home {
+            command.twist = [0.0; 3];
+        }
+        let (gated, deadman) = self.safety.gate(command, intent_age);
+        command = gated;
+        // Collected per tick and published: `robot.state.movement.limited_by`.
+        self.limits = deadman.map(limit_name).map(str::to_owned).into_iter().collect();
+
+        // The disturb gate: robotd's `change_disturbs` and the home-first swap
+        // it drives (main.rs:3015-3106, :3511-3575). The caller has decided
+        // *whether* the change replaces the network driving — the mobile core
+        // has no file digests to compare, only what the shell's manifest
+        // comparison says — and the loop decides *where* it lands.
+        //
+        // Never mid-ramp: that is the one state where the joints are moving
+        // somewhere they have not arrived, which is exactly what a swap under a
+        // gait must not do. A change that takes the driving network out from
+        // under a robot with a gait in motion is sent home first and lands once
+        // the ramp is complete. A change that leaves the driving network alone
+        // lands wherever the robot is parked — a seated or limp duck is not a
+        // moving gait, and standing one up to change a file it is not using
+        // would be a surprise of its own.
+        if self.pending_swap.is_some() {
+            let (disturbing, seeking) = self
+                .pending_swap
+                .as_ref()
+                .map_or((false, false), |swap| (swap.disturbs, swap.seeking));
+            // Mid-ramp by the bring-up's own test — the same predicate that
+            // flips `Homing` to `Ready` below, so a change whose ramp has just
+            // finished lands on the tick it arrives, not one later.
+            let mid_ramp = matches!(self.bringup, Bringup::Homing { .. })
+                && self.bringup.homing_target(now).is_some();
+            // Driving as robotd sees it at the change (main.rs:3040-3046): the
+            // network that stepped last tick, and not a parked seat. Decided
+            // once and remembered — a change that is already walking the robot
+            // home must not be re-decided from a stick the client is still
+            // holding, or the duck would go home again every tick.
+            let driving_now = self.driving_for_swap();
+            if self.shutting_down() || self.shutdown_requested {
+                // The runtime's half of the official refusal (the shell's
+                // caller refuses too): from inside a shutdown the path home
+                // stands the robot up at gain until the sit cuts the torque out
+                // from under it. Nothing about a shutdown wants a new network.
+                tracing::warn!("policy change refused: the robot is shutting down");
+                self.pending_swap = None;
+            } else if !matches!(self.limp_fall, LimpFall::Idle) {
+                // The limp-fall sequence owns the robot; the change waits for
+                // it to hand back.
+            } else if disturbing && !seeking && driving_now {
+                tracing::warn!(
+                    "policy change replaces the network driving: going home before swapping"
+                );
+                self.bringup = Bringup::Homing {
+                    from: report.sensors.positions,
+                    since: now,
+                    to: DEFAULT_POSITION,
+                };
+                if let Some(swap) = self.pending_swap.as_mut() {
+                    swap.seeking = true;
+                }
+                // A route walked into the swap is over: the duck is going home,
+                // not to the child's waypoint.
+                self.cancel_path();
+            } else if !mid_ramp {
+                let swap = self.pending_swap.take().expect("checked above");
+                if swap.seeking {
+                    tracing::warn!("at the home pose; the policy change lands");
+                } else {
+                    tracing::warn!(
+                        in_place = !swap.disturbs,
+                        "policy change lands where the robot stands"
+                    );
+                }
+                self.land_swap(swap.policy, swap.tuning, swap.skills);
+            }
+        }
+
         // Off is a state of the duck, not a single tick: after the shutdown's
         // torque cut the body is limp, and reporting "limp" would hide that the
         // duck was deliberately powered down.
         if self.powered_off {
-            self.safety.apply(hold, hold, 0)?;
+            let applied = self.safety.apply(hold, hold, 0)?;
+            self.limits.extend(applied.limits.iter().map(|l| limit_name(*l).to_owned()));
+            self.driving_prev = false;
             report.label = "off".to_owned();
             report.gain = 0;
             report.targets = hold;
+            // Off is reported, not frozen: a subscriber must see the duck off
+            // rather than the standing frame from before the torque cut.
+            self.state_frame = Some(self.compose_state_frame(
+                &sensors,
+                requested_twist,
+                command.twist,
+                command.head,
+                &report.label,
+                report.picked_up,
+                &hold,
+            ));
             return Ok(report);
         }
 
         // The shutdown request and the empty pack are checked before the
-        // bring-up early returns: a duck that is limp or still homing must
+        // bring-up transition: a duck that is limp or still homing must
         // still be able to power off (robotd cuts torque immediately when it
         // cannot sit).
         if !self.powered_off && matches!(self.shutdown, Shutdown::Idle) {
@@ -2512,42 +3211,93 @@ impl<T: RobotIo> DuckRuntime<T> {
             }
         }
 
+        // Bring the robot up when someone asks it to drive and it has no torque
+        // yet — robotd's enable-driven bring-up, in its own place in the tick:
+        // after the gate, before everything that owns the robot.
+        //
+        // Not gated on the fall: a fallen robot ramps like any other, as the
+        // prototype does. Being down is a report, and the humans stay in charge.
+        //
+        // The ramp target is where the robot actually is: a robot that reads
+        // seated ramps to the seat (and the controller marks the seat), never
+        // straight-legged to a standing home pose.
+        if !self.powered_off
+            && self.enabled
+            && matches!(self.bringup, Bringup::Limp)
+        {
+            match self.safety.set_torque(true) {
+                Ok(()) => {
+                    let to = self.ramp_target(&sensors);
+                    tracing::warn!(
+                        ?HOME_RAMP,
+                        "enabling the policy: torque on, ramping to the {}",
+                        if to == crate::SEAT_POSITION { "seat" } else { "home pose" }
+                    );
+                    self.bringup = Bringup::Homing {
+                        from: sensors.positions,
+                        since: now,
+                        to,
+                    };
+                }
+                // Reported, not fatal, and it stays `Limp` so the next tick
+                // tries again: a bus that dropped one transaction is ordinary,
+                // and a robot that refused to ever come up because of it would
+                // be worse than one that keeps asking.
+                Err(e) => tracing::warn!(error = %e, "cannot enable torque; the duck stays limp"),
+            }
+        }
+
+        // The ramp finishing is what makes the policy eligible to drive. No
+        // shortcut: `homing_target` returns None only after the full
+        // `HOME_RAMP`, which is also the IMU's convergence window.
+        if let Bringup::Homing { to, .. } = self.bringup {
+            if self.bringup.homing_target(now).is_none() {
+                if to == crate::SEAT_POSITION {
+                    tracing::warn!("at the seat pose, holding it; Start again rises");
+                } else {
+                    tracing::warn!("at the home pose; the policy has the robot");
+                }
+                self.bringup = Bringup::Ready;
+                // No controller reset here — robotd resets through the driving
+                // rising edge below, gated on `RESET_AFTER_PAUSE`.
+            }
+        }
+
         match self.bringup {
             Bringup::Limp => {
                 // Torque off, but still write and step: a limp duck has to
                 // fall, not freeze in the pose it was standing in.
-                self.safety.apply(hold, hold, 0)?;
+                let applied = self.safety.apply(hold, hold, 0)?;
+                self.limits.extend(applied.limits.iter().map(|l| limit_name(*l).to_owned()));
+                // The edge bookkeeping the early return skips: the robot is
+                // not driving here, and driving stopped when this started.
+                if self.driving_prev {
+                    self.stopped_driving_at = Some(now);
+                }
+                self.driving_prev = false;
                 report.label = "limp".to_owned();
                 report.gain = 0;
                 report.targets = hold;
                 if let Some(watch) = self.pickup.as_mut() {
                     watch.commanded(&hold);
                 }
+                // A limp duck is a state the wire has to show, not the last
+                // standing frame replayed.
+                self.state_frame = Some(self.compose_state_frame(
+                    &sensors,
+                    requested_twist,
+                    command.twist,
+                    command.head,
+                    &report.label,
+                    report.picked_up,
+                    &hold,
+                ));
                 return Ok(report);
             }
-            Bringup::Homing { to, .. } => {
-                let target = self.bringup.homing_target(now).unwrap_or(to);
-                // The ramp is over when it reaches home *and* the filter has
-                // converged. Homing from home (the app's boot) has no travel,
-                // so it finishes as soon as the IMU is warm.
-                let done = warm
-                    && (self.bringup.homing_target(now).is_none()
-                        || self.bringup.homing_is_static());
-                self.safety.apply(target, hold, 200)?;
-                report.label = if done { "ready" } else { "homing" }.to_owned();
-                report.targets = target;
-                report.gain = 200;
-                if done {
-                    self.bringup = Bringup::Ready;
-                    self.controller.reset();
-                    tracing::info!("bring-up: at home pose; the policy has the robot");
-                }
-                if let Some(watch) = self.pickup.as_mut() {
-                    watch.commanded(&target);
-                }
-                return Ok(report);
-            }
-            Bringup::Ready => {}
+            // Homing falls through: the sequence below still runs on a homing
+            // tick (limp-fall, pickup, the command smoothing), and the ramp's
+            // own target comes out of the final target match.
+            Bringup::Homing { .. } | Bringup::Ready => {}
         }
 
         // The shutdown owns the robot from the moment it starts: sit, rest,
@@ -2558,25 +3308,39 @@ impl<T: RobotIo> DuckRuntime<T> {
             Shutdown::Sitting { since } => {
                 // Named apart from `hold`, which is the measured pose.
                 let hold_s = self.controller.shutdown_sit_secs();
+                // The sitstand network drives the seat through the same
+                // controller.step the walk uses, so the same voltage
+                // adaptation scales it — robotd's one step call covers the
+                // sit exactly because `driving` stays true while the
+                // shutdown sit runs.
+                let scale = voltage_scale(self.volts_ema);
                 let target = self.controller.step(
                     &sensors,
                     &self.command,
                     false,
                     self.dt.as_secs_f64(),
-                    1.0,
+                    scale,
                 );
                 match target {
                     Ok(step) => {
-                        self.safety.apply(step.targets, hold, step.gain)?;
+                        let applied = self.safety.apply(step.targets, hold, step.gain)?;
+                        self.limits.extend(applied.limits.iter().map(|l| limit_name(*l).to_owned()));
                         report.label = "shutdown".to_owned();
                         report.targets = step.targets;
                         report.gain = step.gain;
                     }
                     Err(_) => {
-                        self.safety.apply(hold, hold, 200)?;
+                        let applied = self.safety.apply(hold, hold, 200)?;
+                        self.limits.extend(applied.limits.iter().map(|l| limit_name(*l).to_owned()));
                         report.targets = hold;
                     }
                 }
+                // The sit owns the robot: not driving, and driving stopped
+                // when the sit started — the resume reset measures from here.
+                if self.driving_prev {
+                    self.stopped_driving_at = Some(now);
+                }
+                self.driving_prev = false;
                 if since.elapsed(now).as_secs_f64() >= hold_s {
                     tracing::warn!("shutdown: sit complete, easing into the rest pose");
                     self.shutdown = Shutdown::Resting {
@@ -2585,6 +3349,17 @@ impl<T: RobotIo> DuckRuntime<T> {
                     };
                 }
                 report.fallen = self.safety.fallen();
+                // The sit owns the robot: publish it as it is, not as the
+                // frame from before the shutdown started.
+                self.state_frame = Some(self.compose_state_frame(
+                    &sensors,
+                    requested_twist,
+                    command.twist,
+                    command.head,
+                    &report.label,
+                    report.picked_up,
+                    &report.targets,
+                ));
                 return Ok(report);
             }
             Shutdown::Resting { from, since } => {
@@ -2599,7 +3374,8 @@ impl<T: RobotIo> DuckRuntime<T> {
                     // The rest is the last pose the servos see: cutting torque
                     // from the seat let the duck sag forward; from here there
                     // is nowhere left to sag.
-                    self.safety.apply(target, target, 200)?;
+                    let applied = self.safety.apply(target, target, 200)?;
+                    self.limits.extend(applied.limits.iter().map(|l| limit_name(*l).to_owned()));
                     self.safety.set_torque(false)?;
                     self.enabled = false;
                     self.powered_off = true;
@@ -2611,31 +3387,48 @@ impl<T: RobotIo> DuckRuntime<T> {
                     report.targets = target;
                     tracing::warn!("shutdown: at rest, torque off");
                 } else {
-                    self.safety.apply(target, target, report.gain.max(200))?;
+                    let applied = self.safety.apply(target, target, report.gain.max(200))?;
+                    self.limits.extend(applied.limits.iter().map(|l| limit_name(*l).to_owned()));
                     report.label = "rest".to_owned();
                     report.targets = target;
                 }
+                self.driving_prev = false;
                 report.fallen = self.safety.fallen();
+                // The rest pose, the torque cut and the off latch are all
+                // decided above: the frame the subscriber sees must be the one
+                // this tick ended in (label, gain and powered state included),
+                // never the pre-shutdown frame.
+                self.state_frame = Some(self.compose_state_frame(
+                    &sensors,
+                    requested_twist,
+                    command.twist,
+                    command.head,
+                    &report.label,
+                    report.picked_up,
+                    &target,
+                ));
                 return Ok(report);
             }
-        }
-
-        // Deadman: a command stream that stops leaves the robot standing, not walking off.
-        if self.twist_fresh && self.last_twist.elapsed(now) > DEADMAN {
-            self.command.twist = [0.0; 3];
-            self.twist_fresh = false;
-            tracing::warn!("deadman: no twist for {DEADMAN:?}; standing still");
         }
 
         // Limp-fall, robotd's sequence: go soft before the landing, let the
         // robot arrive limp, put it back into the standing pose, and only then
         // hand it to the policy. Read from the fall predictor, not the `fallen`
         // verdict: a verdict that waits for the robot to be down cannot make
-        // it soft before it lands.
-        let was_driving = self.enabled && matches!(self.bringup, Bringup::Ready) && warm;
+        // it soft before it lands. Eligibility is robotd's: the robot was
+        // driving last tick (`was_driving`), so the sequence never fires out
+        // of a state that did not have the policy driving.
+        let was_driving = self.driving_prev;
 
-        // Abandoned mid-sequence: something else took the robot.
-        if !matches!(self.limp_fall, LimpFall::Idle) && !was_driving {
+        // Abandoned mid-sequence: something else took the robot — disabled, a
+        // shutdown started, the power went. robotd's own condition.
+        if !matches!(self.limp_fall, LimpFall::Idle)
+            && !(self.enabled
+                && matches!(self.bringup, Bringup::Ready)
+                && matches!(self.shutdown, Shutdown::Idle)
+                && !self.powered_off)
+        {
+            tracing::warn!("limp-fall abandoned — something else took the robot");
             self.limp_fall = LimpFall::Idle;
             self.fall.reset();
         }
@@ -2644,6 +3437,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             LimpFall::Idle => {
                 let eligible = was_driving
                     && !self.safety.fallen()
+                    && matches!(self.shutdown, Shutdown::Idle)
+                    && !self.powered_off
                     && !self.controller.busy()
                     && !self.controller.is_sitting();
                 if eligible && self.safety.imu_ready() {
@@ -2686,7 +3481,9 @@ impl<T: RobotIo> DuckRuntime<T> {
                     tracing::warn!("posed - handing back to the standing policy");
                     self.limp_fall = LimpFall::Idle;
                     self.fall.reset();
-                    self.controller.reset();
+                    // No controller reset here — robotd resets through the
+                    // driving rising edge below, gated on `RESET_AFTER_PAUSE`
+                    // against when driving actually stopped.
                 }
             }
         }
@@ -2698,17 +3495,19 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
 
         // Pick-up detection, robotd's: pause the walking networks while somebody
-        // holds the robot and hand it back when it is on the floor. Only the
-        // policy's own ticks are watched — a skill, a sit, the limp-fall or a
-        // disable owns the robot outright, and the watch lets go of any pause.
+        // holds the robot and hand it back when it is on the floor. Watches only
+        // while those two networks have the robot — everything that owns it
+        // outright (a skill, a sit, the limp-fall, a disable, the shutdown sit)
+        // ends a pause and resets the watch. **Roller mode is not watched: the
+        // model has never seen wheels.**
         let mut pickup_paused = false;
         // Read the loop's own facts before the watch borrows itself mutably.
         let dt = self.dt;
         let ready = self.enabled && matches!(self.bringup, Bringup::Ready);
         let settled = matches!(self.limp_fall, LimpFall::Idle);
         let free = !self.controller.busy() && !self.controller.is_sitting();
+        let watching = self.pickup_watching(ready, settled, warm, free);
         if let Some(watch) = self.pickup.as_mut() {
-            let watching = ready && settled && warm && free;
             match watch.tick(watching, Some(&sensors), dt) {
                 Some(crate::pickup::Edge::Pause) => {
                     tracing::warn!(p_held = ?watch.p_held(), "picked up - pausing the policy")
@@ -2724,64 +3523,107 @@ impl<T: RobotIo> DuckRuntime<T> {
             pickup_paused = watch.paused();
         }
 
-        // The whole sequence owns the targets: the controller is not stepped.
-        match self.limp_fall {
-            LimpFall::Idle => {}
-            LimpFall::Limp { .. } => {
-                // Command the joints to wherever they are: the softest thing
-                // the servos can do short of cutting torque.
-                self.safety.apply(hold, hold, GAIN_LIMP)?;
-                report.label = "limp_fall".to_owned();
-                report.targets = hold;
-                report.gain = GAIN_LIMP;
-                return Ok(report);
-            }
-            LimpFall::Posing { from, since } => {
-                let t = (since.elapsed(now).as_secs_f64() / LIMP_FALL_POSE.as_secs_f64())
-                    .min(1.0);
-                let mut target = [0.0; NUM_JOINTS];
-                for (index, slot) in target.iter_mut().enumerate() {
-                    *slot = from[index] + (DEFAULT_POSITION[index] - from[index]) * t;
+        // Before the policy takes over a robot at its home pose, look at it:
+        // the ramp there is open-loop, and a robot that started folded can end
+        // it standing, sat back on its seat or on its back (robotd's
+        // `posture::classify`, run once per enable episode). Seated, the
+        // sitstand network settles into the seat and rises first. Anything else,
+        // the gait takes over as it always has: this only picks how the policy
+        // starts, never whether.
+        //
+        // Measured even when the seat is known — held in it since the first
+        // Start, or stopped while sitting: the robot is where the sensors say,
+        // not where it was put.
+        if !self.enabled {
+            self.posture_checked = false;
+        }
+        if self.enabled
+            && !self.posture_checked
+            && !self.driving_prev
+            && matches!(self.bringup, Bringup::Ready)
+            && matches!(self.limp_fall, LimpFall::Idle)
+            && warm
+            && !self.powered_off
+            && !self.controller.busy()
+        {
+            self.posture_checked = true;
+            let reading = posture::classify(&sensors.positions, sensors.imu.quat);
+            let height = format!("{:.0}%", 100.0 * reading.height_ratio);
+            let tilt = format!("{:.0}°", reading.tilt_deg);
+            match reading.posture {
+                posture::Posture::Seated if self.controller.has_sitstand() => {
+                    tracing::warn!(
+                        %height,
+                        %tilt,
+                        "posture: seated — settling into the seat, then rising via the sitstand policy"
+                    );
+                    self.controller.settle_then_rise();
+                    self.start_from_hold = true;
                 }
-                self.safety.apply(target, hold, GAIN_POSE)?;
-                report.label = "pose".to_owned();
-                report.targets = target;
-                report.gain = GAIN_POSE;
-                return Ok(report);
+                verdict => {
+                    let what = match verdict {
+                        posture::Posture::Standing => "standing",
+                        posture::Posture::Lying => "lying down",
+                        posture::Posture::Seated => {
+                            "seated, with no sitstand policy to rise with"
+                        }
+                        posture::Posture::Unsure => {
+                            "neither clearly standing nor clearly seated"
+                        }
+                    };
+                    // Whatever the controller believed about a seat, the robot
+                    // is not in one now: the gait takes it from where it is.
+                    self.controller.leave_seat();
+                    tracing::warn!(%height, %tilt, "posture: {what} — the policy takes over");
+                }
             }
         }
 
-        // The orientation is still a default, not a measurement: hold the pose,
-        // do not drive. `robotd` gates its whole driving branch on this.
-        if !warm {
-            self.safety.apply(hold, hold, 200)?;
-            report.label = "held".to_owned();
-            report.targets = hold;
-            report.gain = 200;
-            if let Some(watch) = self.pickup.as_mut() {
-                watch.commanded(&hold);
+        // Driving, robotd's definition: the policy has the robot, warm, with
+        // nothing else owning it — no limp-fall, no hand, no shutdown.
+        let driving = self.enabled
+            && matches!(self.bringup, Bringup::Ready)
+            && warm
+            && matches!(self.limp_fall, LimpFall::Idle)
+            && !pickup_paused
+            && matches!(self.shutdown, Shutdown::Idle)
+            && !self.powered_off;
+
+        if driving && !self.driving_prev {
+            // Starting fresh: a stale previous action in the observation, or a
+            // filter anchored to where the robot was a minute ago, would both
+            // show up as a lurch. Only after a real pause, though — a reset
+            // across a 20 ms hiccup re-introduces exactly the discontinuity the
+            // reset is for.
+            if reset_on_resume(self.stopped_driving_at, now) {
+                self.controller.reset();
             }
-            return Ok(report);
+            // A seated robot is held in its seat, not at home: start the
+            // network from there. Consumed with the edge, like robotd's
+            // per-tick local — a later pause does not seed from whatever pose
+            // the duck happens to be holding.
+            if self.start_from_hold {
+                self.controller.seed_from_pose(&hold);
+                self.start_from_hold = false;
+            }
         }
-
-        // A painted path drives through the same command channel as the
-        // stick; feeding it here gives it the same smoothing, deadman and
-        // emotion overrides the joystick's twist gets.
-        if self.path_task.is_some() {
-            self.step_path(now);
+        if self.driving_prev && !driving {
+            self.stopped_driving_at = Some(now);
         }
+        self.driving_prev = driving;
 
-        let mut command = self.command;
-        // An API twist owns the duck while its lease is live; the on-screen
-        // joystick gets it back when the API goes quiet.
-        if let Some(twist) = self.api_lease.active(now) {
-            command.twist = twist;
+        // Smooth the command the way robotd does, so the policy sees a ramp
+        // rather than a step. The limp-fall sequence holds the twist at zero
+        // outright, and zeroes the EMA with it: the robot is not handed back
+        // mid-command, so a fall in the middle of a stride does not restart
+        // the walk from the pre-fall twist.
+        let in_limp_fall = !matches!(self.limp_fall, LimpFall::Idle);
+        let twist_target = if in_limp_fall { [0.0; 3] } else { command.twist };
+        if in_limp_fall {
+            self.twist_ema = [0.0; 3];
         }
-
-        // Smooth the client's command the way robotd does, so the policy sees
-        // a ramp rather than a step.
         for axis in 0..3 {
-            self.twist_ema[axis] += CMD_ALPHA * (command.twist[axis] - self.twist_ema[axis]);
+            self.twist_ema[axis] += CMD_ALPHA * (twist_target[axis] - self.twist_ema[axis]);
             command.twist[axis] = self.twist_ema[axis];
         }
         for axis in 0..4 {
@@ -2857,10 +3699,13 @@ impl<T: RobotIo> DuckRuntime<T> {
 
         // The idle look-around, robotd's: a still duck glances, tilts its head
         // and breathes, and the head command it feeds is an observation input
-        // (the policy's head block), exactly as on the real robot.
+        // (the policy's head block), exactly as on the real robot. The mode is
+        // asked every tick because a mode switch changes it under the loop —
+        // and the roller has it off by default, its network folding under a
+        // head command it was not trained with.
         let still = self.idle_params.enabled_in(self.mode)
             && emotion_frame.is_none()
-            && was_driving
+            && self.driving_prev
             && !pickup_paused
             && matches!(self.limp_fall, LimpFall::Idle)
             && command.twist.iter().all(|value| value.abs() < 1e-3)
@@ -3059,51 +3904,99 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.last_fallen = self.safety.fallen();
         self.last_moving = moving;
 
+        // The targets, robotd's match shape: the limp-fall sequence first (it
+        // owns the robot and the controller is not stepped under it), then the
+        // held hand, then the cold IMU, then the driving policy, then the
+        // homing ramp, then the hold. Emitted here — after pickup and after
+        // the command smoothing — exactly where the official loop decides
+        // them, so the limp-fall pose rides the smoothed command and the
+        // pickup ramp instead of pre-empting both.
+        let limp_target = match self.limp_fall {
+            LimpFall::Idle => None,
+            // Command the joints to wherever they are: the softest thing the
+            // servos can do short of cutting torque.
+            LimpFall::Limp { .. } => Some((hold, GAIN_LIMP)),
+            LimpFall::Posing { from, since } => {
+                let t = (since.elapsed(now).as_secs_f64() / LIMP_FALL_POSE.as_secs_f64())
+                    .min(1.0);
+                let mut target = [0.0; NUM_JOINTS];
+                for (index, slot) in target.iter_mut().enumerate() {
+                    *slot = from[index] + (DEFAULT_POSITION[index] - from[index]) * t;
+                }
+                Some((target, GAIN_POSE))
+            }
+        };
+        let scale = voltage_scale(self.volts_ema);
+        let step = if limp_target.is_none() && !pickup_paused && warm && driving {
+            match self.controller.step(
+                &sensors,
+                &command,
+                // An emotion's Frame::apply sets PoseIntent.active for
+                // this tick only; the client's own body hold is restored
+                // untouched when the timeline ends.
+                self.body_active || emotion_frame.is_some(),
+                self.dt.as_secs_f64(),
+                scale,
+            ) {
+                Ok(step) => Some(Ok(step)),
+                Err(error) => {
+                    tracing::warn!(%error, "inference failed; holding the pose");
+                    Some(Err(()))
+                }
+            }
+        } else {
+            None
+        };
         let mut targets = hold;
         let mut gain = 200;
-        if pickup_paused {
+        if let Some((target, limp_gain)) = limp_target {
+            targets = target;
+            gain = limp_gain;
+            report.label = if matches!(self.limp_fall, LimpFall::Limp { .. }) {
+                "limp_fall".to_owned()
+            } else {
+                "pose".to_owned()
+            };
+        } else if pickup_paused {
             // Held in a hand: ramp from the policy's last target to the pause
             // pose and stay there. The ramp start is the policy's own target,
             // so letting go does not snap.
             targets = self.pickup.as_ref().map(|watch| watch.target()).unwrap_or(hold);
             report.label = "held".to_owned();
+        } else if !warm {
+            // The orientation is still a default, not a measurement: hold the
+            // pose, do not drive. `robotd` gates its whole driving branch on
+            // this.
+            report.label = "held".to_owned();
+        } else if let Some(Ok(step)) = step {
+            targets = step.targets;
+            gain = step.gain;
+            report.label = step.label.to_string();
+        } else if let Some(Err(_)) = step {
+            report.label = "held".to_owned();
+        } else if let Some(target) = self.bringup.homing_target(now) {
+            // Ramping to the home pose (or the seat): moving by definition,
+            // the joints are travelling somewhere they have not arrived.
+            targets = target;
+            gain = 200;
+            report.label = "homing".to_owned();
         } else {
-            match self
-                .controller
-                .step(
-                    &sensors,
-                    &command,
-                    // An emotion's Frame::apply sets PoseIntent.active for
-                    // this tick only; the client's own body hold is restored
-                    // untouched when the timeline ends.
-                    self.body_active || emotion_frame.is_some(),
-                    self.dt.as_secs_f64(),
-                    1.0,
-                )
-            {
-                Ok(step) => {
-                    targets = step.targets;
-                    gain = step.gain;
-                    report.label = step.label.to_string();
-                }
-                Err(error) => {
-                    report.label = "held".to_owned();
-                    tracing::warn!(%error, "inference failed; holding the pose");
-                }
-            }
-            // The mouth is not part of any policy — every alpha network skips
-            // it — so the idle yawn is the whole of mouth control, exactly as
-            // it is on the robot. Only while driving: a held or homing duck
-            // keeps the mouth its hold pose gave it.
-            let mouth = emotion_frame.map_or(self.mouth.max(idle.mouth), |frame| frame.mouth);
+            report.label = "held".to_owned();
+        }
+        // The mouth is not part of any policy — every alpha network skips it —
+        // so the idle yawn is the whole of mouth control, exactly as it is on
+        // the robot. Only while driving: a held or homing duck keeps the mouth
+        // its hold pose gave it.
+        if driving && emotion_frame.is_none() {
             // A sleeping duck's beak is shut, even if the idle yawn was due.
-            let mouth = if self.care.asleep { 0.0 } else { mouth };
+            let mouth = if self.care.asleep { 0.0 } else { self.mouth.max(idle.mouth) };
             targets[duck_control::model::MOUTH_INDEX] =
                 duck_control::model::mouth_target(mouth);
         }
         // One write per tick: the body steps inside `apply`, so a second call
         // would advance the physics twice as fast.
-        self.safety.apply(targets, hold, gain)?;
+        let applied = self.safety.apply(targets, hold, gain)?;
+        self.limits.extend(applied.limits.iter().map(|l| limit_name(*l).to_owned()));
         report.targets = targets;
         report.gain = gain;
         report.mouth = if pickup_paused {
@@ -3137,9 +4030,9 @@ impl<T: RobotIo> DuckRuntime<T> {
             }
         }
         self.book_position = Some(position);
-        let walking = was_driving
+        let walking = driving
             && command.twist.iter().any(|value| value.abs() > 1e-3);
-        let standing = was_driving && !walking && !pickup_paused;
+        let standing = driving && !walking && !pickup_paused;
         let sitting = matches!(self.shutdown, Shutdown::Sitting { .. })
             || (self.controller.is_sitting() && !pickup_paused);
         self.book.tick(crate::vetbook::Facts {
@@ -3159,7 +4052,95 @@ impl<T: RobotIo> DuckRuntime<T> {
             self.book.note("ground_pick".to_owned());
         }
         self.last_ground_pick = picking;
+
+        // The robot.state frame, in the official wire shape — the same struct
+        // `robotd` publishes, filled from what this tick actually was. Kept
+        // for the IPC layer, which serialises it only when someone is
+        // subscribed (a per-tick allocation on the thread that should not be
+        // visiting the allocator would be the official loop's reason not to).
+        self.state_frame = Some(self.compose_state_frame(
+            &sensors,
+            requested_twist,
+            command.twist,
+            command.head,
+            &report.label,
+            report.picked_up,
+            &targets,
+        ));
         Ok(report)
+    }
+
+    /// Assemble the `robot.state` frame from what this tick actually was.
+    ///
+    /// `robotd` composes it unconditionally at the end of every tick
+    /// (main.rs:4103-4140) — including the ticks where the robot is off, limp
+    /// or shutting down, which is precisely why the early-return paths here
+    /// must compose it too. A subscriber to a powered-down duck must see the
+    /// duck powered down: a frame left over from the last standing tick is a
+    /// ghost robot, frozen mid-stride on the wire while the real one lies limp.
+    ///
+    /// On the early paths the twist and head are the gated ones rather than
+    /// the EMA-smoothed ones — the smoothing is part of the driving branch
+    /// these paths returned out of — and `picked_up` is the entry state, since
+    /// the pickup watch only runs under the policy.
+    fn compose_state_frame(
+        &self,
+        sensors: &Sensors,
+        requested: [f64; 3],
+        applied: [f64; 3],
+        head: [f64; 4],
+        label: &str,
+        picked_up: bool,
+        targets: &[f64; NUM_JOINTS],
+    ) -> duck_ipc_proto::RobotState {
+        duck_ipc_proto::RobotState {
+            t: (self.clock.tick as f64) * self.dt.as_secs_f64(),
+            movement: duck_ipc_proto::MoveState {
+                requested,
+                applied,
+                limited_by: self.limits.clone(),
+            },
+            head,
+            policy: label.to_owned(),
+            safety: duck_ipc_proto::SafetyState {
+                fallen: self.safety.fallen(),
+                // Limp means "the robot is actually at limp gain" — which
+                // happens in exactly one place, the limp-fall sequence.
+                limp: matches!(self.limp_fall, LimpFall::Limp { .. }),
+                gravity: sensors.imu.gravity,
+                gain: self.safety.gain(),
+                picked_up,
+            },
+            control_loop: duck_ipc_proto::LoopState {
+                hz: self.achieved_hz,
+                missed: self.missed_ticks,
+            },
+            joints: sensors.positions.to_vec(),
+            targets: targets.to_vec(),
+            velocities: if self.safety.measures_velocity() {
+                sensors.velocities.to_vec()
+            } else {
+                Vec::new()
+            },
+            currents_ma: if self.safety.measures_load() {
+                sensors.currents_ma.to_vec()
+            } else {
+                Vec::new()
+            },
+            odom: duck_ipc_proto::OdomState {
+                position: self.odometry.position(),
+                yaw: self.odometry.yaw(),
+            },
+            theremin: None,
+            chorale: None,
+            t_ns: 0,
+            imu: Some(duck_ipc_proto::ImuState {
+                gyro: sensors.imu.gyro,
+                quat: sensors.imu.quat,
+            }),
+            frames: None,
+            skeleton: Vec::new(),
+        }
     }
 }
 
@@ -3223,6 +4204,14 @@ mod tests {
             self.targets
                 .copy_from_slice(&state[1 + NUM_JOINTS..]);
             true
+        }
+        /// The probe is a value, so a branch's body is a copy of it — the same
+        /// independence `MujocoIo::fork` gives a real branch.
+        fn fork(&self) -> Option<Self>
+        where
+            Self: Sized,
+        {
+            Some(self.clone())
         }
     }
 
@@ -3548,4 +4537,852 @@ mod tests {
             "a due idle ritual must not speak over the wake coo"
         );
     }
+
+    // ── Official-parity workorder A: runtime semantics ──────────────────────
+
+    /// Voltage adaptation, numeric: nominal over the clamped measurement, no
+    /// adaptation with no reading or a dead one. The clamp keeps a bad reading
+    /// from becoming a wild scale.
+    #[test]
+    fn voltage_scale_is_nominal_over_the_clamped_pack() {
+        let full = 7.4;
+        assert_eq!(voltage_scale(Some(full)), 1.0, "at nominal there is nothing to scale");
+        assert_eq!(voltage_scale(None), 1.0, "no reading yet, no adaptation");
+        assert_eq!(voltage_scale(Some(0.0)), 1.0, "a dead reading is no adaptation");
+        let low = voltage_scale(Some(5.0));
+        assert!((low - 7.4 / 6.0).abs() < 1e-12, "5 V clamps to the 6 V floor: {low}");
+        let high = voltage_scale(Some(11.0));
+        assert!((high - 7.4 / 9.5).abs() < 1e-12, "11 V clamps to the 9.5 V ceiling: {high}");
+        // A sagging pack scales the action UP: the same stick gives the same
+        // stride at 6.6 V that it gave at 7.4 V.
+        assert!(voltage_scale(Some(6.6)) > 1.0);
+    }
+
+    /// One battery mapping, robotd's: `duck_control::battery_percent` over the
+    /// 6.6..8.2 V window, feeding the gauge and `/state` alike. The old
+    /// 6.0..8.4 window read 25% at the empty threshold — two gauges disagreeing
+    /// about the same pack.
+    #[test]
+    fn the_battery_reads_the_official_window_end_to_end() {
+        assert_eq!(duck_control::battery_percent(6.6), 0.0, "the empty threshold is 0%");
+        assert!((duck_control::battery_percent(8.2) - 100.0).abs() < 1e-9);
+        assert!((duck_control::battery_percent(7.4) - 50.0).abs() < 1e-9);
+
+        // The runtime's slow read feeds the same mapping through the EMA the
+        // empty-pack check uses, so the gauge and the shutdown threshold can
+        // never disagree.
+        let mut runtime = test_runtime();
+        for _ in 0..50 {
+            let _ = runtime.tick();
+        }
+        // The Probe's slow read reports 7.4 V every window: half the pack.
+        let percent = runtime.face.battery_percent.expect("the slow read has landed");
+        assert!((percent - 50.0).abs() < 1e-6, "7.4 V is half of 6.6..8.2, got {percent}");
+    }
+
+    /// Enable enters Homing and the full two seconds pass before the policy
+    /// drives — no "already at home" shortcut, because the ramp doubles as the
+    /// IMU's convergence window.
+    #[test]
+    fn enable_ramps_the_full_two_seconds_before_the_policy_drives() {
+        let mut runtime = test_runtime();
+        runtime.enable().expect("enable");
+        let _ = runtime.tick().expect("the bring-up tick");
+        assert_eq!(runtime.bringup(), BringupState::Homing, "enable never lands straight in Ready");
+        for _ in 0..99 {
+            let _ = runtime.tick().expect("homing ticks");
+        }
+        assert_eq!(runtime.bringup(), BringupState::Homing, "2 s minus a tick is still homing");
+        for _ in 0..3 {
+            let _ = runtime.tick().expect("the ramp finishing");
+        }
+        assert_eq!(runtime.bringup(), BringupState::Ready);
+    }
+
+    /// The gate runs before the bring-up, on every tick, and its verdict is
+    /// collected: a duck that has never been driven reads as maximally stale,
+    /// exactly like the official loop's stamped-at-zero intents, and the
+    /// reason lands in `limited_by` from the very first tick.
+    #[test]
+    fn the_gate_runs_before_bring_up_and_names_the_deadman() {
+        let mut runtime = test_runtime();
+        runtime.enable().expect("enable");
+        let _ = runtime.tick().expect("first tick");
+        assert!(
+            runtime.limited_by().contains(&"deadman".to_owned()),
+            "an intent that never arrived is maximally stale: {:?}",
+            runtime.limited_by()
+        );
+    }
+
+    /// A command stream that stops leaves the robot standing, with the reason
+    /// on the wire: past the deadman the twist is zeroed and `limited_by`
+    /// says so.
+    #[test]
+    fn a_stopped_stream_trips_the_deadman_into_limited_by() {
+        let mut runtime = test_runtime();
+        runtime.enable().expect("enable");
+        for _ in 0..110 {
+            let _ = runtime.tick().expect("warm-up ticks");
+        }
+        assert_eq!(runtime.bringup(), BringupState::Ready);
+        runtime.set_twist([0.4, 0.0, 0.0]);
+        let _ = runtime.tick().expect("the driven tick");
+        assert!(
+            !runtime.limited_by().contains(&"deadman".to_owned()),
+            "a fresh twist is not stale: {:?}",
+            runtime.limited_by()
+        );
+        // Twenty-five ticks is 500 ms: the lease is out, the gate fires. The
+        // applied twist is the smoothed EMA, which glides to the zeroed
+        // target rather than snapping — the smoothing is the point — so the
+        // zero is asserted after it has had the ticks to arrive.
+        for _ in 0..60 {
+            let _ = runtime.tick().expect("stale ticks");
+        }
+        assert!(runtime.limited_by().contains(&"deadman".to_owned()));
+        let state = runtime.robot_state().expect("a state frame");
+        assert!(
+            state.movement.applied.iter().all(|v| v.abs() < 1e-3),
+            "the gated command glided to zero: {:?}",
+            state.movement.applied
+        );
+        assert_eq!(state.movement.limited_by, runtime.limited_by().to_vec());
+    }
+
+    /// The limp-fall sequence holds the twist at zero outright and zeroes the
+    /// EMA with it: a fall mid-stride must not restart the walk from the
+    /// pre-fall command.
+    #[test]
+    fn limp_fall_holds_the_twist_at_zero() {
+        let mut runtime = test_runtime();
+        runtime.enable().expect("enable");
+        runtime.set_twist([0.5, 0.0, 0.1]);
+        for _ in 0..110 {
+            let _ = runtime.tick().expect("warm-up ticks");
+        }
+        // Force the sequence the way a fall would have, and keep the twist on.
+        runtime.limp_fall = LimpFall::Limp {
+            since: TickTime::of(&runtime.clock),
+            landing: Landing::default(),
+        };
+        let report = runtime.tick().expect("the limp tick");
+        assert_eq!(report.label, "limp_fall");
+        assert_eq!(report.gain, GAIN_LIMP);
+        assert!(
+            runtime.twist_ema.iter().all(|v| v.abs() < 1e-9),
+            "the EMA is zeroed with the twist: {:?}",
+            runtime.twist_ema
+        );
+        // And the pose phase rides the same zeroed twist.
+        runtime.limp_fall = LimpFall::Posing {
+            from: hold_of(&report),
+            since: TickTime::of(&runtime.clock),
+        };
+        let report = runtime.tick().expect("the pose tick");
+        assert_eq!(report.label, "pose");
+        assert_eq!(report.gain, GAIN_POSE);
+        assert!(runtime.twist_ema.iter().all(|v| v.abs() < 1e-9));
+    }
+
+    /// The controller reset on resume waits for a real pause: `RESET_AFTER_PAUSE`
+    /// (200 ms) of stopped driving before the reset, and none across a hiccup.
+    #[test]
+    fn reset_on_resume_waits_for_a_real_pause() {
+        let now = TickTime(100);
+        assert!(reset_on_resume(None, now), "never driven resets freely");
+        assert!(
+            !reset_on_resume(Some(TickTime(91)), now),
+            "180 ms of pause is a hiccup, not a pause"
+        );
+        assert!(
+            reset_on_resume(Some(TickTime(90)), now),
+            "exactly 200 ms is the boundary robotd draws (>= pauses)"
+        );
+        assert!(
+            reset_on_resume(Some(TickTime(89)), now),
+            "220 ms of pause resets"
+        );
+    }
+
+    /// Driving stopping is recorded where the resume reset measures from —
+    /// including the early-return paths the disabled and shutdown ticks take,
+    /// or a power-on after a shutdown would skip the reset.
+    #[test]
+    fn the_disabled_tick_records_where_driving_stopped() {
+        let mut runtime = test_runtime();
+        runtime.enable().expect("enable");
+        for _ in 0..110 {
+            let _ = runtime.tick().expect("warm-up ticks");
+        }
+        assert!(runtime.driving_prev, "the duck is driving at Ready");
+        runtime.disable().expect("disable");
+        let _ = runtime.tick().expect("the limp tick");
+        assert!(!runtime.driving_prev);
+        assert!(
+            runtime.stopped_driving_at.is_some(),
+            "the falling edge was recorded on the disabled tick"
+        );
+    }
+
+    /// Roller mode is not watched for pickup: the model has never seen wheels,
+    /// and scoring it there would pause a wheeled gait on its own joints.
+    #[test]
+    fn roller_mode_is_never_watched_for_pickup() {
+        let mut runtime = test_runtime();
+        let (ready, settled, warm, free) = (true, true, true, true);
+        assert!(runtime.pickup_watching(ready, settled, warm, free));
+        runtime.set_mode(robotd_params::Mode::Roller);
+        assert!(
+            !runtime.pickup_watching(ready, settled, warm, free),
+            "wheels are not a held duck"
+        );
+        // The gate is the first term: no combination of ready/settled/warm/free
+        // rescues a roller tick.
+        assert!(!runtime.pickup_watching(false, true, true, true));
+    }
+
+    /// The health gate keeps degraded and unhealthy strictly apart, and floors
+    /// the achieved rate at 45 Hz with the stall check beside it.
+    #[test]
+    fn health_splits_degraded_from_unhealthy_and_floors_the_rate() {
+        let mut runtime = test_runtime();
+        match runtime.health() {
+            HealthVerdict::Unhealthy { reasons } => {
+                assert!(reasons[0].contains("has not completed a cycle"));
+            }
+            other => panic!("a loop that never ticked is not {:?}", other),
+        }
+        for _ in 0..10 {
+            let _ = runtime.tick().expect("ticks");
+        }
+        assert!(runtime.health().is_healthy(), "a ticking loop is healthy");
+        // Force a slow window: 3 ticks over a 5 s window is 0.6 Hz, below the
+        // 45 Hz floor.
+        runtime.hz_window_start = Some(Instant::now() - Duration::from_secs(5));
+        runtime.hz_window_ticks = 3;
+        let _ = runtime.tick().expect("the window-closing tick");
+        match runtime.health() {
+            HealthVerdict::Unhealthy { reasons } => {
+                assert!(reasons[0].contains("below the 45.0 Hz floor"), "{:?}", reasons);
+            }
+            other => panic!("0.6 Hz is not {:?}", other),
+        }
+        // A marked degraded reason wins over the rate floor — official order —
+        // and stays degraded, because the robot walks on the policy it had.
+        runtime.mark_degraded("the last policy change did not take".to_owned());
+        match runtime.health() {
+            HealthVerdict::Degraded { reasons } => {
+                assert_eq!(reasons, vec!["the last policy change did not take".to_owned()]);
+            }
+            other => panic!("a marked reason is not {:?}", other),
+        }
+        runtime.clear_degraded();
+        assert!(
+            matches!(runtime.health(), HealthVerdict::Unhealthy { .. }),
+            "clearing restores the rate verdict"
+        );
+        // Marking twice is one reason, not a growing list.
+        runtime.mark_degraded("x".to_owned());
+        runtime.mark_degraded("x".to_owned());
+        runtime.clear_degraded();
+        // And a healthy rate recovers the verdict.
+        runtime.achieved_hz = 50.0;
+        assert!(runtime.health().is_healthy());
+    }
+
+    /// The duck's voice is given, not baked: the constructor default stays the
+    /// fixed 0xD0C, and a seed handed in before the first render replaces the
+    /// personality whole.
+    #[test]
+    fn the_voice_seed_is_given_before_any_render() {
+        let mut runtime = test_runtime();
+        assert_eq!(runtime.voice_seed(), 0xD0C, "the default keeps existing callers working");
+        let before = runtime.render_tag("greet").expect("the default voice renders");
+        runtime.set_voice_seed(0x5EED);
+        assert_eq!(runtime.voice_seed(), 0x5EED);
+        let after = runtime.render_tag("greet").expect("the new voice renders");
+        assert_ne!(before, after, "two seeds must sound like two ducks");
+    }
+
+    /// The per-tick `robot.state` frame is the official wire shape: the same
+    /// field names duck-ipc-proto publishes, filled from what the tick was.
+    #[test]
+    fn the_state_frame_is_the_official_robot_state() {
+        let mut runtime = test_runtime();
+        runtime.enable().expect("enable");
+        for _ in 0..110 {
+            let _ = runtime.tick().expect("warm-up ticks");
+        }
+        runtime.set_twist([0.4, 0.0, 0.0]);
+        let report = runtime.tick().expect("the driven tick");
+        let state = runtime.robot_state().expect("a frame after a tick");
+        assert_eq!(state.joints.len(), NUM_JOINTS);
+        assert_eq!(state.targets.len(), NUM_JOINTS);
+        assert_eq!(state.policy, report.label, "the frame names the same policy the report does");
+        assert_eq!(state.movement.requested, [0.4, 0.0, 0.0], "requested is the raw twist");
+        assert!(
+            state.movement.applied[0] > 0.0 && state.movement.applied[0] < 0.4,
+            "applied is the smoothed twist mid-ramp: {:?}",
+            state.movement.applied
+        );
+        assert_eq!(state.movement.limited_by, runtime.limited_by().to_vec());
+        assert_eq!(state.safety.gain, Some(report.gain));
+        assert_eq!(state.safety.fallen, report.fallen);
+        assert_eq!(state.control_loop.hz, runtime.achieved_hz());
+        // `robot.health` rides the same verdict, and the battery — once the
+        // slow read has landed — is reported, never judged.
+        let health = runtime.health_result();
+        assert!(health.healthy, "{:?}", health.reason);
+        for _ in 0..50 {
+            let _ = runtime.tick().expect("ticks to the slow read");
+        }
+        let health = runtime.health_result();
+        let battery = health.battery.expect("the slow read has landed");
+        assert!((battery.percent - 50.0).abs() < 1e-9, "7.4 V is half of 6.6..8.2");
+        assert!((battery.volts - 7.4).abs() < 1e-9);
+    }
+
+    /// A robot the IMU reads seated comes up to the seat, not to a standing
+    /// home pose — torque-on posture, robotd's `ramp_target`, with a sitstand
+    /// network to rise with. The first episode ramps home (the IMU is still
+    /// converging); a re-enable after it has converged goes to the seat.
+    #[test]
+    fn a_seated_robot_ramps_to_the_seat_once_the_imu_is_warm() {
+        let dir = crate::fixtures::policies_dir().expect("the official policy bundle");
+        let paths = duck_control::policy::PolicyPaths {
+            walk: dir.join("velstand.onnx"),
+            stand: None,
+            sitstand: Some(dir.join("alpha_sitstand.onnx")),
+            ground_pick: None,
+            skills: Vec::new(),
+        };
+        let policy = Policy::load(&paths, 0.05).expect("the bundle with a sitstand network");
+        let probe = Probe {
+            sensors: Sensors {
+                positions: crate::SEAT_POSITION,
+                ..Sensors::default()
+            },
+            targets: [0.0; NUM_JOINTS],
+        };
+        let mut runtime = DuckRuntime::new(
+            probe,
+            policy,
+            Tuning::default(),
+            SkillTuning::default(),
+            SafetyConfig::default(),
+        );
+        runtime.enable().expect("enable");
+        for _ in 0..110 {
+            let _ = runtime.tick().expect("the first episode");
+        }
+        assert_eq!(runtime.bringup(), BringupState::Ready);
+        assert!(runtime.imu_ready(), "the filter converged across the ramp");
+        // A disable/enable cycle brings the torque back on with a warm IMU and
+        // the robot still sitting where it was.
+        runtime.disable().expect("disable");
+        runtime.enable().expect("enable");
+        let _ = runtime.tick().expect("the re-enable tick");
+        match runtime.bringup {
+            Bringup::Homing { to, .. } => {
+                assert_eq!(to, crate::SEAT_POSITION, "a seated robot ramps to the seat");
+            }
+            other => panic!("the second bring-up is {:?}, not Homing", other.state()),
+        }
+    }
+
+/// The measured pose of the last tick, for tests that need the limp-fall's
+/// landing point.
+fn hold_of(report: &TickReport) -> [f64; NUM_JOINTS] {
+    report.sensors.positions
+}
+
+/// A runtime over the stub body, with the official policy bundle loaded the
+/// way every behaviour test here builds one.
+fn test_runtime() -> DuckRuntime<Probe> {
+    let probe = Probe {
+        sensors: Sensors::default(),
+        targets: [0.0; NUM_JOINTS],
+    };
+    DuckRuntime::new(
+        probe,
+        test_policy(),
+        Tuning::default(),
+        SkillTuning::default(),
+        SafetyConfig::default(),
+    )
+}
+
+// ── Workorder R: the five QA-confirmed defects ─────────────────────────────
+
+/// A walk network that is not the one `test_policy` loads, for a swap a
+/// caller marks as replacing the driving slot.
+fn other_walk_policy() -> Policy {
+    let dir = crate::fixtures::policies_dir().expect("the official policy bundle");
+    let paths = duck_control::policy::PolicyPaths {
+        walk: dir.join("alpha_walking.onnx"),
+        stand: None,
+        sitstand: None,
+        ground_pick: None,
+        skills: Vec::new(),
+    };
+    Policy::load(&paths, 0.05).expect("the other walk network")
+}
+
+/// Which walk file the controller is actually running.
+fn walk_file<T: RobotIo>(runtime: &DuckRuntime<T>) -> String {
+    runtime
+        .controller
+        .policy_ref()
+        .path_of(duck_control::policy::Net::Walk)
+        .expect("a walk network is loaded")
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Raise the duck to Ready and hand it to the walk network, driven.
+fn drive_to_ready(runtime: &mut DuckRuntime<Probe>) {
+    runtime.enable().expect("enable");
+    for _ in 0..110 {
+        runtime.tick().expect("warm-up ticks");
+    }
+    assert_eq!(runtime.bringup(), BringupState::Ready);
+    runtime.set_twist([0.4, 0.0, 0.0]);
+    runtime.tick().expect("the driven tick");
+    assert!(runtime.driving_prev, "the gait has the robot");
+}
+
+/// Defect 1: an API-driven duck is a duck with no shell keepalive, and the
+/// deadman punishes a client that stopped talking, not a door the twist came
+/// through (robotd's `robot.move` feeds the one intents channel and stamps it).
+/// A `robot.move` cadence must keep the duck moving, and only a client that
+/// falls silent may trip the gate.
+#[test]
+fn an_api_twist_keeps_the_deadman_off_while_it_keeps_talking() {
+    let mut runtime = test_runtime();
+    runtime.enable().expect("enable");
+    for _ in 0..110 {
+        runtime.tick().expect("warm-up ticks");
+    }
+    assert_eq!(runtime.bringup(), BringupState::Ready);
+
+    // Twenty lease-refreshing beats, each 20 ms of simulated time: far inside
+    // the 500 ms deadman, and every one a reason the clock had better be fed.
+    for beat in 0..20 {
+        runtime.set_api_twist([0.4, 0.0, 0.0]);
+        runtime.tick().expect("a leased tick");
+        assert!(
+            !runtime.limited_by().contains(&"deadman".to_owned()),
+            "beat {beat}: a driving API client is gated: {:?}",
+            runtime.limited_by()
+        );
+    }
+    let state = runtime.robot_state().expect("a frame");
+    assert!(
+        state.movement.applied[0] > 0.05,
+        "the leased twist reaches the robot: {:?}",
+        state.movement.applied
+    );
+
+    // Now the agent goes quiet: exactly like a stopped joystick stream, the
+    // lease lapses and the gate does its job.
+    for _ in 0..60 {
+        runtime.tick().expect("post-lease ticks");
+    }
+    assert!(
+        runtime.limited_by().contains(&"deadman".to_owned()),
+        "a silent API client trips the deadman: {:?}",
+        runtime.limited_by()
+    );
+    let state = runtime.robot_state().expect("a frame");
+    assert!(
+        state.movement.applied.iter().all(|v| v.abs() < 1e-3),
+        "the gated twist glided to zero: {:?}",
+        state.movement.applied
+    );
+}
+
+/// Defect 2: `robot.state` must be composed on every path out of the tick —
+/// robotd assembles it unconditionally at the end of the loop. A duck that is
+/// off, limp or shutting down used to keep broadcasting the last standing
+/// frame: a ghost robot frozen mid-stride while the real one lay limp.
+#[test]
+fn every_early_path_publishes_a_fresh_state_frame() {
+    let mut runtime = test_runtime();
+    runtime.enable().expect("enable");
+    for _ in 0..110 {
+        runtime.tick().expect("warm-up ticks");
+    }
+    runtime.set_twist([0.4, 0.0, 0.0]);
+    runtime.tick().expect("a driven tick");
+    let standing = runtime.robot_state().expect("a standing frame");
+
+    // The shutdown has no sitstand network here, so the request cuts torque on
+    // the spot: this tick leaves through the limp early return, the next
+    // through the powered-off one. Both must publish their own frame.
+    runtime.request_shutdown();
+    runtime.tick().expect("the shutdown tick");
+    let limp = runtime.robot_state().expect("a frame on the limp path");
+    assert!(limp.t > standing.t, "the clock moved on: {} vs {}", limp.t, standing.t);
+    assert_eq!(limp.policy, "limp", "the frame says what the duck is: {:?}", limp.policy);
+    assert_ne!(limp.targets, standing.targets, "not the standing frame replayed");
+
+    runtime.tick().expect("the off tick");
+    let off = runtime.robot_state().expect("a frame on the off path");
+    assert!(off.t > limp.t);
+    assert_eq!(off.policy, "off");
+    assert_eq!(off.safety.gain, Some(0), "the off frame carries the off gain");
+
+    // Power back on and watch the shutdown sequence's own early path: with a
+    // sitstand network the duck sits, and the sit tick used to freeze the
+    // frame too.
+    let mut seated = {
+        let dir = crate::fixtures::policies_dir().expect("the official policy bundle");
+        let paths = duck_control::policy::PolicyPaths {
+            walk: dir.join("velstand.onnx"),
+            stand: None,
+            sitstand: Some(dir.join("alpha_sitstand.onnx")),
+            ground_pick: None,
+            skills: Vec::new(),
+        };
+        let probe = Probe {
+            sensors: Sensors::default(),
+            targets: [0.0; NUM_JOINTS],
+        };
+        DuckRuntime::new(
+            probe,
+            Policy::load(&paths, 0.05).expect("the bundle with a sitstand network"),
+            Tuning::default(),
+            SkillTuning::default(),
+            SafetyConfig::default(),
+        )
+    };
+    seated.enable().expect("enable");
+    for _ in 0..110 {
+        seated.tick().expect("warm-up ticks");
+    }
+    let before = seated.robot_state().expect("a frame");
+    seated.request_shutdown();
+    seated.tick().expect("the sit begins");
+    for _ in 0..3 {
+        seated.tick().expect("sitting ticks");
+    }
+    let sitting = seated.robot_state().expect("a frame on the sit path");
+    assert!(sitting.t > before.t, "the sit publishes, not the pre-shutdown frame");
+    assert_eq!(sitting.policy, "shutdown");
+}
+
+/// Defect 3: the 45 Hz floor is robotd's floor at robotd's rate — the mobile
+/// loop is driven at 50 × `clock.speed` ticks per wall second (iOS
+/// `ticksForThisFrame`), so slow-motion is a product feature, not a wedged
+/// control loop. And a gap longer than the stall window is frozen time (a
+/// pause the shell routed around `tick`), not a slow loop: its first beat
+/// must not report a diluted rate for a second.
+#[test]
+fn the_rate_floor_follows_the_speed_dial() {
+    let mut runtime = test_runtime();
+    runtime.set_speed(0.25);
+    runtime.enable().expect("enable");
+    let _ = runtime.tick().expect("a tick");
+    // A window measured at the slowed rate: 12 Hz is a healthy 0.25× loop
+    // (its floor is 45 × 0.25 = 11.25 Hz) and an unhealthy 1× one.
+    runtime.achieved_hz = 12.0;
+    assert!(
+        runtime.health().is_healthy(),
+        "a deliberately slowed duck is a feature: {:?}",
+        runtime.health()
+    );
+    runtime.achieved_hz = 11.0;
+    match runtime.health() {
+        HealthVerdict::Unhealthy { reasons } => {
+            assert!(reasons[0].contains("Hz floor"), "{reasons:?}")
+        }
+        other => panic!("11 Hz at 0.25× is {other:?}, not unhealthy"),
+    }
+    runtime.set_speed(1.0);
+    match runtime.health() {
+        HealthVerdict::Unhealthy { reasons } => {
+            assert!(reasons[0].contains("below the 45.0 Hz floor"), "{reasons:?}")
+        }
+        other => panic!("11 Hz at 1× is {other:?}, not unhealthy"),
+    }
+    // The stall window moves the same way: 25 periods of the *shell's* cadence.
+    runtime.set_speed(0.25);
+    assert_eq!(runtime.stall_limit(), Duration::from_millis(2000));
+    runtime.set_speed(1.0);
+    assert_eq!(runtime.stall_limit(), Duration::from_millis(500));
+}
+
+/// The pause-resume half of defect 3: the first beat after a wall-clock gap
+/// longer than the stall window restarts the rate window instead of charging
+/// the gap to the loop.
+#[test]
+fn resuming_after_a_pause_does_not_report_a_second_of_false_slowness() {
+    let mut runtime = test_runtime();
+    runtime.enable().expect("enable");
+    for _ in 0..10 {
+        runtime.tick().expect("ticks");
+    }
+    assert!(runtime.health().is_healthy());
+    // A window that closed at full rate, and a two-second gap — longer than
+    // the 500 ms stall window, which is what a pause routed around `tick`
+    // (the shell keeps firing, the core freezes) or a wedged caller looks
+    // like from inside the loop.
+    runtime.achieved_hz = 50.0;
+    runtime.hz_window_start = Some(Instant::now() - Duration::from_secs(2));
+    runtime.hz_window_ticks = 3;
+    runtime.last_tick_at = Instant::now() - Duration::from_secs(2);
+    runtime.tick().expect("the resume beat");
+    assert_eq!(
+        runtime.achieved_hz(),
+        50.0,
+        "the stale window was dropped, not closed and reported as 1.5 Hz"
+    );
+    assert!(runtime.health().is_healthy(), "{:?}", runtime.health());
+}
+
+/// Defect 4: the driving-edge bookkeeping (`driving_prev`,
+/// `stopped_driving_at`, `posture_checked`, `start_from_hold`) and the
+/// smoothed pack are part of what a fork is. Left out, the branch's first
+/// tick saw a false rising edge under the restored twist, and
+/// `reset_on_resume` — with no `stopped_driving_at` to measure against —
+/// wiped the controller state the restore had just put back, re-running the
+/// posture check and diverging from the parent on the very first beat.
+#[test]
+fn a_fork_replays_the_parents_control_state_and_trajectory() {
+    let mut parent = test_runtime();
+    drive_to_ready(&mut parent);
+    assert!(parent.posture_checked, "the enable episode ran its check");
+    assert!(parent.volts_ema.is_some(), "the slow read has landed");
+    assert_eq!(parent.stopped_driving_at, None, "never stopped driving");
+
+    let mut branch = parent.fork().expect("the probe body forks");
+    // The five states come across exactly.
+    assert_eq!(branch.driving_prev, parent.driving_prev);
+    assert_eq!(branch.stopped_driving_at, parent.stopped_driving_at);
+    assert_eq!(branch.posture_checked, parent.posture_checked);
+    assert_eq!(branch.start_from_hold, parent.start_from_hold);
+    assert_eq!(branch.volts_ema, parent.volts_ema);
+
+    // Twenty ticks with the stick held: the branch must not notice it is a
+    // branch. With the edge bookkeeping missing this diverged on the first
+    // tick (false rising edge → reset → re-seeded posture pass).
+    let mut parent_trace = Vec::new();
+    let mut branch_trace = Vec::new();
+    for tick in 0..20 {
+        parent.set_twist([0.4, 0.0, 0.0]);
+        branch.set_twist([0.4, 0.0, 0.0]);
+        let p = parent.tick().unwrap_or_else(|e| panic!("parent tick {tick}: {e:?}"));
+        let b = branch.tick().unwrap_or_else(|e| panic!("branch tick {tick}: {e:?}"));
+        parent_trace.push((p.label.clone(), p.targets));
+        branch_trace.push((b.label.clone(), b.targets));
+    }
+    for (tick, ((pl, pt), (bl, bt))) in parent_trace.iter().zip(&branch_trace).enumerate() {
+        assert_eq!(pl, bl, "tick {tick} took a different path");
+        for joint in 0..NUM_JOINTS {
+            assert!(
+                (pt[joint] - bt[joint]).abs() < 1e-9,
+                "tick {tick} joint {joint} diverged: {} vs {}",
+                pt[joint],
+                bt[joint]
+            );
+        }
+    }
+    // The inference ran (a held pose would compare equal by construction and
+    // prove nothing): the parent's targets moved away from the zeroed probe.
+    assert!(
+        parent_trace.iter().any(|(_, t)| t.iter().any(|v| v.abs() > 1e-6)),
+        "the driven policy produced targets to compare"
+    );
+
+    // And the same five states ride a plain checkpoint/restore, not just a
+    // fork — the /rewind and /restore doors.
+    let saved = parent.checkpoint().expect("a checkpoint");
+    let mut restored = test_runtime();
+    restored.enable().expect("enable");
+    for _ in 0..110 {
+        restored.tick().expect("warm-up ticks");
+    }
+    assert!(restored.restore(&saved), "the checkpoint restores");
+    assert_eq!(restored.driving_prev, parent.driving_prev);
+    assert_eq!(restored.stopped_driving_at, parent.stopped_driving_at);
+    assert_eq!(restored.posture_checked, parent.posture_checked);
+    assert_eq!(restored.start_from_hold, parent.start_from_hold);
+    assert_eq!(restored.volts_ema, parent.volts_ema);
+}
+
+/// A checkpoint written before these fields existed must still load — the
+/// timeline holds them on the ffi side across a session.
+#[test]
+fn an_older_checkpoint_still_loads() {
+    let runtime = test_runtime();
+    let saved = runtime.checkpoint().expect("a checkpoint");
+    let mut json = serde_json::to_value(&saved).expect("a checkpoint serialises");
+    for field in [
+        "driving_prev",
+        "stopped_driving_at",
+        "posture_checked",
+        "start_from_hold",
+        "volts_ema",
+    ] {
+        json.as_object_mut().expect("an object").remove(field);
+    }
+    let text = serde_json::to_string(&json).expect("the trimmed checkpoint serialises");
+    let back: Checkpoint = serde_json::from_str(&text).expect("it loads with the new fields defaulted");
+    assert!(!back.driving_prev);
+    assert_eq!(back.stopped_driving_at, None);
+    assert!(!back.posture_checked);
+    assert!(!back.start_from_hold);
+    assert_eq!(back.volts_ema, None);
+}
+
+/// Defect 5, the headline: a policy change that replaces the network driving a
+/// robot mid-gait does not swap bytes under a moving gait — robotd sends the
+/// duck to the home pose and lands the change there, torque on throughout
+/// (main.rs:3015-3106, :3546-3575).
+#[test]
+fn a_disturbing_swap_under_a_gait_walks_home_before_landing() {
+    let mut runtime = test_runtime();
+    assert_eq!(walk_file(&runtime), "velstand.onnx");
+    drive_to_ready(&mut runtime);
+
+    let verdict = runtime.replace_policy_disturbing(
+        other_walk_policy(),
+        Tuning::default(),
+        SkillTuning::default(),
+        true,
+    );
+    assert_eq!(verdict, PolicySwap::GoingHome);
+    assert_eq!(
+        runtime.swap_state(),
+        Some(PolicySwap::GoingHome),
+        "the shell can read the approach it was promised"
+    );
+
+    // The tick the change is taken on sends the duck home rather than
+    // swapping: the old network still drives.
+    runtime.tick().expect("the sent-home tick");
+    assert_eq!(runtime.bringup(), BringupState::Homing);
+    assert_eq!(walk_file(&runtime), "velstand.onnx", "nothing landed yet");
+    assert!(runtime.swap_pending());
+    assert_eq!(runtime.swap_state(), Some(PolicySwap::GoingHome));
+
+    // The client keeps steering on the way; the loop holds the twist at zero
+    // regardless, and nothing swaps while the joints are travelling.
+    let mut ticks = 1;
+    while runtime.bringup() != BringupState::Ready && ticks < 200 {
+        runtime.set_twist([0.4, 0.0, 0.0]);
+        runtime.tick().expect("a seeking tick");
+        ticks += 1;
+        if runtime.bringup() == BringupState::Homing {
+            assert_eq!(walk_file(&runtime), "velstand.onnx", "swapped mid-ramp");
+        }
+    }
+    // The 2 s ramp is honoured (the duck was already at the probe's pose, but
+    // robotd holds HOME_RAMP out regardless), and the change lands on the
+    // tick the ramp completes — not before.
+    assert!(
+        ticks >= 99,
+        "the home ramp takes HOME_RAMP: landed after {ticks} ticks"
+    );
+    assert!(!runtime.swap_pending(), "the change landed");
+    assert_eq!(walk_file(&runtime), "alpha_walking.onnx", "the new set is what runs");
+
+    // And it drove from there: a tick with the new network at the helm.
+    runtime.set_twist([0.4, 0.0, 0.0]);
+    runtime.tick().expect("driving on the new network");
+}
+
+/// The other side of the gate: a change that does not replace the driving
+/// network — or arrives at a duck nothing drives — lands in place without
+/// moving the robot. This is also the existing `replace_policy` contract:
+/// the unmarked in-place swap stays the default.
+#[test]
+fn a_quiet_change_lands_in_place() {
+    // (a) Not disturbing, under a moving gait: in place, immediately.
+    let mut runtime = test_runtime();
+    drive_to_ready(&mut runtime);
+    let verdict = runtime.replace_policy_disturbing(
+        other_walk_policy(),
+        Tuning::default(),
+        SkillTuning::default(),
+        false,
+    );
+    assert_eq!(verdict, PolicySwap::InPlace);
+    runtime.tick().expect("the landing tick");
+    assert_eq!(runtime.bringup(), BringupState::Ready, "the duck never left home");
+    assert_eq!(walk_file(&runtime), "alpha_walking.onnx");
+
+    // (b) Disturbing, but nothing is driving: a limp duck has no gait to
+    // protect — the swap waits one tick and lands where the robot is.
+    let mut limp = test_runtime();
+    limp.enable().expect("enable");
+    limp.disable().expect("disable");
+    let verdict = limp.replace_policy_disturbing(
+        other_walk_policy(),
+        Tuning::default(),
+        SkillTuning::default(),
+        true,
+    );
+    assert_eq!(verdict, PolicySwap::InPlace);
+    limp.tick().expect("the landing tick");
+    assert_eq!(limp.bringup(), BringupState::Limp, "still limp");
+    assert_eq!(walk_file(&limp), "alpha_walking.onnx");
+
+    // (c) The legacy in-place entry point keeps working unchanged.
+    let mut legacy = test_runtime();
+    drive_to_ready(&mut legacy);
+    legacy.replace_policy(other_walk_policy(), Tuning::default(), SkillTuning::default());
+    assert_eq!(walk_file(&legacy), "alpha_walking.onnx");
+}
+
+/// A change asked for while the robot is going down is refused outright
+/// (robotd's refusal — from inside a shutdown the path home stands the robot
+/// up at gain until the sit cuts the torque out from under it), and one that
+/// arrives while the limp-fall owns the robot waits for it to hand back
+/// rather than restarting the reflex.
+#[test]
+fn a_change_yields_to_the_shutdown_and_the_limp_fall() {
+    // Refused once off: the shutdown here has no sitstand to sit with, so the
+    // request powers the duck off on the spot.
+    let mut runtime = test_runtime();
+    drive_to_ready(&mut runtime);
+    runtime.request_shutdown();
+    runtime.tick().expect("the shutdown tick");
+    runtime.tick().expect("the off tick");
+    assert!(runtime.powered_off());
+    let verdict = runtime.replace_policy_disturbing(
+        other_walk_policy(),
+        Tuning::default(),
+        SkillTuning::default(),
+        true,
+    );
+    assert_eq!(verdict, PolicySwap::Refused);
+    assert!(!runtime.swap_pending());
+    assert_eq!(walk_file(&runtime), "velstand.onnx", "the refusal kept the set");
+
+    // Deferred through a limp-fall: the sequence keeps its robot, and the
+    // change lands after it hands back.
+    let mut falling = test_runtime();
+    drive_to_ready(&mut falling);
+    falling.limp_fall = LimpFall::Limp {
+        since: TickTime::of(&falling.clock),
+        landing: Landing::default(),
+    };
+    let verdict = falling.replace_policy_disturbing(
+        other_walk_policy(),
+        Tuning::default(),
+        SkillTuning::default(),
+        true,
+    );
+    assert_eq!(verdict, PolicySwap::GoingHome);
+    falling.tick().expect("a limp-fall tick");
+    assert!(falling.swap_pending(), "the change waits for the reflex");
+    assert_eq!(walk_file(&falling), "velstand.onnx", "no swap under the fall");
+    assert!(
+        matches!(falling.limp_fall, LimpFall::Limp { .. }),
+        "the reflex was not cancelled by the queued change"
+    );
+}
 }

@@ -43,9 +43,12 @@ struct ABSheet: View {
             Button {
                 guard !folder.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                 status = Copy.backupWorking
-                controller.loadPolicyOnBranchB(directory: folder)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                    status = Copy.abLoaded
+                // The reload route's own verdict decides the line: a refusal
+                // shows the core's reason, a load shows loaded. A fixed
+                // "loaded" told the person a policy had been installed when
+                // the core had refused the folder.
+                controller.loadPolicyOnBranchB(directory: folder) { verdict in
+                    status = verdict ?? Copy.abLoaded
                 }
             } label: {
                 Label(Copy.backupImport, systemImage: "arrow.triangle.branch")

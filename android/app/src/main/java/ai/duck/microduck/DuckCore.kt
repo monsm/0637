@@ -124,6 +124,24 @@ class DuckCore(
         if (handle != 0L) nativeIntentToken(handle) ?: "" else ""
     }
 
+    /**
+     * What this build is: one hash over the scene, meshes, policies and
+     * manifest — the same provenance string iOS shows on its instrument
+     * sheet. Constant for this core's lifetime, so callers may cache it.
+     */
+    fun fingerprint(): String = synchronized(lock) {
+        if (handle != 0L) nativeFingerprint(handle) ?: "" else ""
+    }
+
+    /**
+     * Why the last failed call on THIS thread failed, or null when the last
+     * call succeeded. The reason lives in native thread-local storage, so
+     * the same thread that made the failing call must read it — right after
+     * the non-zero return, before that thread makes another core call.
+     * Never gate on [handle]: the reason is the thread's, not the core's.
+     */
+    fun lastError(): String? = nativeLastError()
+
     /** Bumped when the body model changed (a mode switch). */
     fun modelGeneration(): Long = synchronized(lock) {
         if (handle != 0L) nativeModelGeneration(handle) else 0L
@@ -270,6 +288,8 @@ class DuckCore(
         @JvmStatic private external fun nativeSetPerformance(handle: Long, fps: Double, tps: Double)
         @JvmStatic private external fun nativeMode(handle: Long): String?
         @JvmStatic private external fun nativeIntentToken(handle: Long): String?
+        @JvmStatic private external fun nativeFingerprint(handle: Long): String?
+        @JvmStatic private external fun nativeLastError(): String?
         @JvmStatic private external fun nativeSetMode(handle: Long, mode: String): Int
         @JvmStatic private external fun nativeModelGeneration(handle: Long): Long
         @JvmStatic private external fun nativeQueueSound(handle: Long, tag: String): Int

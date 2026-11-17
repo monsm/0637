@@ -115,6 +115,7 @@ internal fun PlayMoreSheet(
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var abFolder by remember { mutableStateOf("") }
     ModalBottomSheet(
@@ -151,7 +152,18 @@ internal fun PlayMoreSheet(
                 }
                 ButtonChip(Copy.stateOn, "play-more-ab-load") {
                     core?.fork()
-                    core?.reload(abFolder)
+                    // The reload is seconds of ONNX work and its verdict is
+                    // the honest answer for a folder the core refuses: the
+                    // route returns the reason, and the reason is what shows.
+                    scope.launch {
+                        val verdict = withContext(Dispatchers.IO) { loadBranchB(abFolder) }
+                        android.widget.Toast.makeText(
+                            context,
+                            verdict ?: Copy.abLoaded,
+                            if (verdict == null) android.widget.Toast.LENGTH_SHORT
+                            else android.widget.Toast.LENGTH_LONG,
+                        ).show()
+                    }
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -176,6 +188,38 @@ internal fun PlayMoreSheet(
                 )
             }
         }
+    }
+}
+
+/**
+ * Load a policy folder on the forked branch, through the core's own /reload
+ * route: the verdict comes back with the reason, so a folder the core refuses
+ * names why instead of the old silence-then-toast-nothing. Null means loaded.
+ * The old JNI reload's int said only "failed"; the route carries the reason
+ * with the same verdict, so the sheet shows the core's own words. A lastError
+ * JNI binding (native side) would let the direct call do this too - a wiring
+ * point left for the ticket that owns jni.rs and DuckCore.kt.
+ */
+private fun loadBranchB(folder: String): String? {
+    return try {
+        val connection = java.net.URL("http://127.0.0.1:8765/reload")
+            .openConnection() as java.net.HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.connectTimeout = 2000
+        // Loading a policy set is seconds of ONNX work; the route allows it
+        // 30 s.
+        connection.readTimeout = 35000
+        connection.doOutput = true
+        connection.setRequestProperty("Content-Type", "application/json")
+        val body = org.json.JSONObject(mapOf("dir" to folder)).toString()
+        connection.outputStream.use { it.write(body.toByteArray()) }
+        val text = connection.inputStream.bufferedReader().use { it.readText() }
+        connection.disconnect()
+        val json = org.json.JSONObject(text)
+        if (json.optBoolean("ok", false)) null
+        else json.optString("error", "reload failed")
+    } catch (_: Exception) {
+        "reload failed"
     }
 }
 

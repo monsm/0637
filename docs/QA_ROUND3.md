@@ -339,7 +339,7 @@ Android 工作流同理，命令换成 `--features onnx-dynamic` 并指到 `.so`
 | 编号 | 声明 | 验收 | 证据（2026-11-13 核对） |
 |---|---|---|---|
 | QA-001 | 已关 | **通过** | `core.yml` 在（core/patches/scripts 触发；`cargo test --locked --workspace -- --include-ignored`；ORT 1.24.2 + `DUCK_UPSTREAM_FIXTURES` / `DUCK_REQUIRE_FIXTURES=1`；失败上传测试日志）。Core #8/#9/#10 全绿。本地实跑 `135 passed / 0 failed / 8 ignored`，加 `--include-ignored` 的 8 条 = 143，与声明一致 |
-| QA-002 | 部分关 | **核心已关，尾巴留单** | `authorised()`（intent.rs:763）：非本机 Origin 一律 403；回环信任；其余机器要 `X-Duck-Token`；通配 CORS 头全仓 grep 零命中。`RestoreLife` 的 events 过 `vetbook::is_known_event` 白名单（vetbook.rs:99、ffi.rs:921，有自己的单测）。两端提示用 `<facts>` 包裹并声明「是数据不是指令」（AIBrain.swift:91/99、AIBrain.kt:189/202）。**仍待**：LAN 开关、令牌的界面呈现 |
+| QA-002 | 部分关 | **核心已关，尾巴留单** | `authorised()`（intent.rs:787）：非本机 Origin 一律 403（2026-11-17 起按 scheme://host **精确匹配**，不再是前缀匹配）；回环信任；其余机器要 `X-Duck-Token`；通配 CORS 头全仓 grep 零命中。`RestoreLife` 的 events 过 `vetbook::is_known_event` 白名单（vetbook.rs:99、ffi.rs:921，有自己的单测）。两端提示用 `<facts>` 包裹并声明「是数据不是指令」（AIBrain.swift:91/99、AIBrain.kt:189/202）。**仍待**：LAN 开关、令牌的界面呈现 |
 | QA-003 | 已关 | **通过** | 礼物走 `gift_treat`（runtime.rs:1337，`care.feed_from_away`：不 wake、不 bond，care.rs:175）/ `gift_emotion`（asleep 直接 `Ok(false)`，不 touch）；合唱每一拍走 `celebrate_emotion`（runtime.rs:2864 注释："The room is singing, not a hand"） |
 | QA-004 | 部分关 | **通过（主体）** | `trimLikeCore`（Companion.kt:60，按 Rust White_Space 语义，含 NBSP）；恢复不再连坐 care/life。**仍待**：被核心拒绝的程序还留在本地存档，下次启动会再被拒一次 |
 | QA-005 | 已关 | **通过** | iOS：`rulesError` + 拒绝回滚、核心收下才写 UserDefaults（DuckController.swift:1279-1289）；Android：`applyRules` 先显示、`accepted=false` 回滚 + Toast（Shell.kt:1291-1300） |
@@ -399,3 +399,9 @@ Android 工作流同理，命令换成 `--features onnx-dynamic` 并指到 `.so`
   （2026-11-16 已读：静态契约门，五条检查——两端文案键集/值一致、UI 债棘轮（基线自动重算只缩不涨）、46 条功能台账锚（文件+正则，锚在源码里，功能不能无声消失）、保护路径仅警告。`ui-entries.json` 自带诚实声明："锚在源码"是必要不充分——pad-send 那次就是"死闭包里带着合法 id"，运行可达性归 UI 测试，台账只是地图。19 条 conform / 27 条 extension / 台账缺口：iOS 缺 floor-height 与 trajectory-export，Android 另缺 progress-book 与 tilt-look。这个门是我领地的加分项。）
 
 三条门禁在 main 上全绿且覆盖当前代码：**放行生效**。剩余 medium（QA-010/011/012/013/015 余项）与真机清单见上文，不拦这个放行，拦的是"产品级发布"。
+
+### 2026-11-17 补记
+
+- **客户端单测的洞开始补上了**：`0b90814`（FE-2/B4）落了项目第一个 iOS 单测 target `DuckTests`（`ProgressStoreTests` 三条：收礼解锁、被拒保持灰、抚摸喂食不算礼物），工作区里那份未提交的等价改动就此作废——小鹿推的版本带了测试，比我的更好。这正是 §5.2 提议的形态：纯函数 + 可注入目录 + 单测 target。
+- 门禁活跃度：昨日 Contracts #27-#36 十轮、iOS #333-#336 四轮、Android #279-#282 四轮、Core #27——当前 main 顶（`33ac5ee`，抽屉重写时丢了右括号的修复）上 iOS #336 / Contracts #36 绿，Android 最后绿在 #282（`47761ccf`，iOS-only 提交不触发 Android），Core 覆盖仍有效。四道门全部健康。
+- 台账诚实的又一个活例：`33ac5ee` 的提交信息自己写明"重写把 This duck 组的右括号丢了，Xcode 报 'private' 只能用在非局部作用域"——抽屉重写 16 行、Contracts #36 照绿（静态契约不查括号），是 iOS 构建门抓的。四道门各管一层，谁的盲区谁补。

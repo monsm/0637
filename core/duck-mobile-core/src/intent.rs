@@ -781,7 +781,9 @@ pub fn new_token() -> String {
 /// **The origin.** A browser sends an `Origin` header, and a web page is
 /// not the owner of the duck, whatever address it reaches the duck from —
 /// including a page open on the phone itself. Only a page served from this
-/// machine may talk to it.
+/// machine may talk to it: the origin's host must be exactly localhost or
+/// 127.0.0.1, not merely start with those names (`localhost.attacker.tld`
+/// is a different machine's page).
 fn authorised(
     peer: std::net::IpAddr,
     origin: Option<&str>,
@@ -789,9 +791,25 @@ fn authorised(
     token: &str,
 ) -> bool {
     if let Some(origin) = origin {
-        let local = ["http://localhost", "http://127.0.0.1", "https://localhost", "https://127.0.0.1"]
-            .iter()
-            .any(|prefix| origin.starts_with(prefix));
+        // Exact-host match on scheme://host — anything after (port aside,
+        // kept only when written) means the page is served elsewhere.
+        let local = (|| {
+            let (scheme, rest) = origin.split_once("://")?;
+            if scheme != "http" && scheme != "https" {
+                return None;
+            }
+            // Bracketed IPv6 comes as one token: `[::1]:9000` splits at the
+            // closing bracket, not at the colons inside the address.
+            let host = if let Some(stripped) = rest.strip_prefix('[') {
+                let (inside, _) = stripped.split_once("]")?;
+                inside
+            } else {
+                rest.split(':').next().unwrap_or(rest)
+            };
+            let host = host.trim_end_matches('.').to_ascii_lowercase();
+            (host == "localhost" || host == "127.0.0.1" || host == "::1").then_some(())
+        })()
+        .is_some();
         if !local {
             return false;
         }
@@ -1270,6 +1288,19 @@ fn handle(
             if let Some(scale) = care {
                 queue.push(Intent::CareScale(scale));
             }
+            // Which file the walk slot resolves to, the official `[policy]
+            // walk` config key's mobile shape. "none" (or empty) clears the
+            // override; a name pins the walk slot to that file for the next
+            // reload. Same global semantics as the robot's config: it is a
+            // machine-level setting, not a per-branch one.
+            let walk = value.get("walk_policy").and_then(Value::as_str);
+            if let Some(name) = walk {
+                if name.is_empty() || name.eq_ignore_ascii_case("none") {
+                    crate::manifest::set_walk_override(None);
+                } else {
+                    crate::manifest::set_walk_override(Some(name.to_owned()));
+                }
+            }
             Ok(queue
                 .request(Intent::IdleRitual(idle.unwrap_or(30.0)))
                 .to_string())
@@ -1384,6 +1415,12 @@ mod tests {
         assert!(!authorised(loopback, Some("https://example.com"), None, "t0ken"));
         assert!(authorised(loopback, Some("http://localhost:8000"), None, "t0ken"));
         assert!(authorised(remote, Some("http://127.0.0.1"), Some("t0ken"), "t0ken"));
+        // The origin match is on the exact host, not a prefix: a page served
+        // from a machine merely *named* like ours is not ours.
+        assert!(!authorised(loopback, Some("http://localhost.attacker.tld"), None, "t0ken"));
+        assert!(!authorised(loopback, Some("http://127.0.0.1.evil.example"), None, "t0ken"));
+        assert!(authorised(loopback, Some("http://[::1]:9000"), None, "t0ken"));
+        assert!(authorised(loopback, Some("http://LOCALHOST."), None, "t0ken"));
     }
 
     /// The token is not a constant, and two cores do not share one.

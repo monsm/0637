@@ -1463,13 +1463,64 @@ final class DuckController: ObservableObject {
         postJSON("/push", ["vx": 0.6, "vy": 0.0, "vz": 0.0])
     }
 
-    /// Policy A/B: fork, then load a policy DIRECTORY on the new branch and
-    /// switch to it. The reload route's own refusal is the honest answer for
-    /// a folder the manifest cannot read.
-    func loadPolicyOnBranchB(directory: String) {
-        postJSON("/fork", [:])
-        postJSON("/branch/select", ["branch": 2])
-        postJSON("/reload", ["directory": directory])
+    /// Policy A/B: drop the last B, fork a fresh one, select it, and load the
+    /// policy DIRECTORY there. The reload route's own verdict comes back —
+    /// nil when the folder loaded, otherwise the core's reason — so the sheet
+    /// shows what actually happened instead of a fixed "loaded". The posts
+    /// are chained, not fired together: a reload that lands before the fork
+    /// would dress branch A in the new set. (The routes read {"label": …} and
+    /// {"dir": …}; the old keys here matched neither, so nothing ever reached
+    /// branch B.)
+    func loadPolicyOnBranchB(directory: String, completion: @escaping (String?) -> Void) {
+        postForVerdict("/branch/drop", ["label": "branch-b"]) { _ in
+            self.postForVerdict("/fork", ["label": "branch-b"]) { forkVerdict in
+                if let forkVerdict {
+                    completion(forkVerdict)
+                    return
+                }
+                self.postForVerdict("/branch/select", ["label": "branch-b"]) { selectVerdict in
+                    if let selectVerdict {
+                        completion(selectVerdict)
+                        return
+                    }
+                    // Loading a policy set is seconds of ONNX work; the route
+                    // allows the reload 30 s.
+                    self.postForVerdict("/reload", ["dir": directory], timeout: 35) { verdict in
+                        completion(verdict)
+                    }
+                }
+            }
+        }
+    }
+
+    /// One POST that reads the answer: the intent routes return
+    /// {"ok":true,…} or {"ok":false,"error":…} — nil on ok, the error text
+    /// otherwise. (The fire-and-forget `postJSON` cannot carry a verdict.)
+    private func postForVerdict(
+        _ path: String,
+        _ object: [String: Any],
+        timeout: TimeInterval = 20,
+        completion: @escaping (String?) -> Void
+    ) {
+        guard let data = try? JSONSerialization.data(withJSONObject: object),
+              let url = URL(string: "http://127.0.0.1:8765\(path)") else {
+            completion("no local server")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = timeout
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = data
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            let verdict: String? = data
+                .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                .flatMap { json in
+                    if json["ok"] as? Bool == true { return nil }
+                    return (json["error"] as? String) ?? "request failed"
+                }
+            DispatchQueue.main.async { completion(verdict) }
+        }.resume()
     }
 
     /// The observation HUD's toggles, persisted like the mic.
@@ -2816,7 +2867,10 @@ final class DuckController: ObservableObject {
 
     /// Reload a user-supplied policy set from Documents/policies when it has a
     /// manifest, otherwise the bundled official set. Custom ONNX runs under the
-    /// same 61-D observation contract as the robot.
+    /// same 61-D observation contract as the robot. The core validates the set
+    /// at load and refuses with a reason — which comes back here and is shown,
+    /// because "loaded" for a load that never happened is a lie the next
+    /// stride discredits.
     func reloadPolicies() {
         guard let core else { return }
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
@@ -2828,7 +2882,14 @@ final class DuckController: ObservableObject {
         } else {
             directory = policyDirectory
         }
-        directory.withCString { _ = duck_core_reload_policies(core, $0) }
+        let loaded = directory.withCString { duck_core_reload_policies(core, $0) }
+        if loaded != 0 {
+            if let reason = duck_core_last_error() {
+                label = String(cString: reason)
+            } else {
+                label = "reload failed"
+            }
+        }
     }
 
     func skillNames() -> [String] {
