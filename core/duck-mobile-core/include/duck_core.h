@@ -32,6 +32,18 @@ DuckCore* duck_core_new(const char* scene_path, const char* policies_dir,
                         char* error, int error_size);
 void duck_core_free(DuckCore* core);
 int duck_core_reload_policies(DuckCore* core, const char* policies_dir);
+/* The reason the last failed call on this thread failed, or NULL when the
+   last call succeeded. The reason lives in thread-local storage: call this
+   on the SAME thread that made the failed call, right after the non-zero
+   return. The pointer is valid until the next failed call on that thread. */
+const char* duck_core_last_error(void);
+/* Point the walk slot at one file in the policies directory - the phone's
+   `robotctl policy load walk <file>`. The name is relative to the directory
+   the core loads its sets from; NULL, empty or "none" clears the override so
+   the next reload resolves the set's own walk slot again. The change lands on
+   the next duck_core_reload_policies. 0 on success; -1 with
+   duck_core_last_error set when the name is not a file in the directory. */
+int duck_core_set_walk_policy(DuckCore* core, const char* name);
 int duck_core_start_intent_server(DuckCore* core, int port);
 
 /* The token a client that is not this phone has to send in the

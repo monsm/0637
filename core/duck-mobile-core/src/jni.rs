@@ -14,7 +14,8 @@ use jni::sys::{jboolean, jdouble, jdoubleArray, jfloatArray, jint, jlong, jstrin
 use jni::JNIEnv;
 
 use crate::ffi::{
-    duck_core_body_count, duck_core_mode, duck_core_model_generation, duck_core_next_sound,
+    duck_core_body_count, duck_core_fingerprint, duck_core_last_error, duck_core_mode,
+    duck_core_model_generation, duck_core_next_sound,
     duck_core_release_body, duck_core_set_performance,
     duck_core_queue_sound, duck_core_render_sound, duck_core_set_mode,
     duck_core_voice_rate, duck_core_wheee, duck_core_body_pose, duck_core_carry, duck_core_free,
@@ -817,5 +818,45 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeFork(
             Err(_) => -1,
         },
         None => unsafe { duck_core_fork(handle as *mut DuckCore, std::ptr::null()) },
+    }
+}
+
+/// What this build is: one hash over the scene, meshes, policies and
+/// manifest — the same provenance string iOS shows on its instrument
+/// sheet. Constant for the core's lifetime, so the shell may cache it.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeFingerprint(
+    mut env: JNIEnv,
+    _class: JClass,
+    handle: jlong,
+) -> jstring {
+    let pointer = unsafe { duck_core_fingerprint(handle as *mut DuckCore) };
+    if pointer.is_null() {
+        return std::ptr::null_mut();
+    }
+    let fingerprint = unsafe { CStr::from_ptr(pointer) };
+    match env.new_string(fingerprint.to_string_lossy()) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Why the last failed call on THIS thread failed, or null when the last
+/// call succeeded. The reason lives in thread-local storage on the C side:
+/// the JNI call runs on the caller's thread, so read it right after a
+/// non-zero return from the same thread.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeLastError(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    let pointer = unsafe { duck_core_last_error() };
+    if pointer.is_null() {
+        return std::ptr::null_mut();
+    }
+    let reason = unsafe { CStr::from_ptr(pointer) };
+    match env.new_string(reason.to_string_lossy()) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
     }
 }

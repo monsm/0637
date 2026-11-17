@@ -20,6 +20,7 @@ pub mod emotion;
 pub mod export;
 pub mod fixtures;
 pub mod intent;
+pub mod ipc;
 pub mod lan;
 pub mod pad;
 pub mod leds;

@@ -29,11 +29,15 @@ fn recipe(tag: &str) -> Option<fn(&Personality, u32) -> Vec<f32>> {
 
 /// The duck's voice: one personality, derived once from a stable seed.
 ///
-/// The robot seeds from the SoC's efuse serial — a per-chip identity. A phone
-/// has no such number, so the seed is the build's provenance fingerprint
-/// instead: stable across launches, and different between builds that are
-/// different robots. It is not the same duck as a particular physical unit,
-/// which is the one thing a digital twin cannot be (FIDELITY.md, L4).
+/// The robot seeds from the SoC's efuse serial — a per-chip identity, which is
+/// why "two seeds sound like two different creatures". A phone has no such
+/// number, so the seed is *given*: the shell derives one per duck and hands it
+/// in through the runtime (`DuckRuntime::set_voice_seed`), before any sound
+/// renders. The constructor default 0xD0C is what callers that have not picked
+/// a seed yet get — one fixed voice, not a pretend identity. It is not the
+/// same duck as a particular physical unit, which is the one thing a digital
+/// twin cannot be (FIDELITY.md, L4).
+#[derive(Clone)]
 pub struct Voice {
     personality: Personality,
     /// The held joy-ride: `wheee_held` while a client keeps it up. The ride
