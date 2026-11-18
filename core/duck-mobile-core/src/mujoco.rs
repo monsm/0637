@@ -1072,9 +1072,8 @@ mod tests {
         // The scene lives in the fetched upstream checkout; resolve it the way
         // every fixture test does, and let CI's DUCK_REQUIRE_FIXTURES=1 turn a
         // missing asset into a failure rather than a silent skip.
-        let scene = crate::fixtures::workspace_root().join(
-            "upstream/microduck_rl/src/mjlab_microduck/robot/microduck/scene_rollers.xml",
-        );
+        let scene = crate::fixtures::workspace_root()
+            .join("upstream/microduck_rl/src/mjlab_microduck/robot/microduck/scene_rollers.xml");
         if !scene.is_file() {
             if crate::fixtures::required() {
                 panic!("the roller scene is missing at {}", scene.display());
