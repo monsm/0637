@@ -154,6 +154,13 @@ fn main() {
             println!("cargo:rustc-link-lib=framework=CoreGraphics");
         }
         _ => {
+            // A source-built directory in CI holds the shared MuJoCo; the
+            // test binary needs an rpath to find it at run time. Local
+            // dynamic setups already arrange their own loader path, so the
+            // plain `-lmujoco` route stays for them.
+            if std::path::Path::new(&libdir).join("libmujoco.so").exists() {
+                println!("cargo:rustc-link-arg=-Wl,-rpath,{libdir}");
+            }
             println!("cargo:rustc-link-lib=mujoco");
         }
     }
