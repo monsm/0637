@@ -60,13 +60,68 @@ jobs:
 
       - name: Toolchain
         run: |
-          rustup toolchain install 1.99.1 --profile minimal
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
           rustup target list --toolchain 1.99.1 --installed
 
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: core
           prefix-key: duck-core-tests
+
+      - name: Format the crate (blocking)
+        run: |
+          set -euo pipefail
+          cd core
+          # Package-scoped rather than `--all`: cargo fmt --all also formats
+          # the upstream path dependencies, and `duck-control/src/policy.rs`
+          # currently has two pre-existing rustfmt hunks. That file is not
+          # ours — CI compiles a clean upstream clone plus the patch — so it
+          # stays in the advisory step below. Everything this repository owns
+          # (duck-mobile-core's src, tests and build.rs) is covered here.
+          cargo fmt -p duck-mobile-core --check
+
+      - name: Format the full workspace (advisory)
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cd core
+          # Advisory until the pre-existing formatting debt is paid down. It
+          # is deliberately visible in the log rather than silently skipped.
+          cargo fmt --all --check
+
+      - name: Clippy (blocking, pre-existing debt allowlisted)
+        run: |
+          set -euo pipefail
+          cd core
+          # `-D warnings` is the official gate. The allowlist below is the
+          # pre-existing warning inventory in files outside this work order
+          # (runtime.rs, lan.rs, pad.rs, care.rs, the upstream idle_head.rs
+          # compiled in via #[path], and build.rs). Allowing exactly those
+          # lint classes is the documented downgrade; any other warning —
+          # including any new warning class in sensors.rs — still fails.
+          cargo clippy --locked --workspace --all-targets -- \
+            -D warnings \
+            -A clippy::bind_instead_of_map \
+            -A clippy::chunks_exact_to_as_chunks \
+            -A clippy::cloned_ref_to_slice_refs \
+            -A clippy::collapsible_if \
+            -A clippy::derivable_impls \
+            -A clippy::field_reassign_with_default \
+            -A clippy::if_same_then_else \
+            -A clippy::items_after_test_module \
+            -A clippy::large_enum_variant \
+            -A clippy::let_unit_value \
+            -A clippy::manual_contains \
+            -A clippy::manual_is_multiple_of \
+            -A clippy::manual_ok_err \
+            -A clippy::needless_range_loop \
+            -A clippy::question_mark \
+            -A clippy::too_many_arguments \
+            -A clippy::type_complexity \
+            -A clippy::unnecessary_cast \
+            -A clippy::while_let_loop \
+            -A unused_imports \
+            -A unused_mut
 
       - name: Core unit tests
         env:
@@ -96,4 +151,151 @@ jobs:
         with:
           name: Duck-core-test-logs
           path: ${{ runner.temp }}/cargo-test.log
+          if-no-files-found: ignore
+
+  mujoco:
+    # Deviation #26: the Core job compiles no MuJoCo, so ffi.rs and mujoco.rs
+    # are behind `#[cfg(feature = "mujoco")]` and never built. This job
+    # builds MuJoCo 3.10.0 (the version the iOS/Android libraries pin), points
+    # build.rs at it, and runs the ignored MuJoCo tests as well.
+    #
+    # The Ubuntu half of this job could not be run on the development
+    # machine; the first CI run adjudicates it.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fetch upstream sources
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
+          git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
+          git -C upstream/microduck checkout da34a22
+          git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
+
+      - name: Fetch the official policies
+        run: bash scripts/fetch-policies.sh
+
+      - name: ONNX Runtime (linux-x64)
+        id: ort
+        run: |
+          set -euo pipefail
+          LIB="$(bash scripts/fetch-ort-linux.sh)"
+          echo "lib=$LIB" >> "$GITHUB_OUTPUT"
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target list --toolchain 1.99.1 --installed
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-mujoco
+
+      - name: Build MuJoCo 3.10.0 (static)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+          SRC="$RUNNER_TEMP/mujoco-src"
+          BUILD="$RUNNER_TEMP/mujoco-build"
+          LIBDIR="$RUNNER_TEMP/mujoco-lib"
+          git clone --depth 1 --branch 3.10.0 https://github.com/google-deepmind/mujoco.git "$SRC"
+
+          # MuJoCo hardcodes `add_library(mujoco SHARED ...)`; the mobile core
+          # links the archive in. Same patch the Android build applies.
+          python3 -c 'import sys; p = sys.argv[1]; t = open(p).read(); n = "add_library(mujoco SHARED ${MUJOCO_RESOURCE_FILES})"; r = "# DUCK_STATIC_MUJOCO: link into the mobile core instead of a .so\nadd_library(mujoco STATIC ${MUJOCO_RESOURCE_FILES})"; sys.exit("static-library patch point not found in " + p) if n not in t else open(p, "w").write(t.replace(n, r, 1))' "$SRC/CMakeLists.txt"
+
+          # The Android script's cmake flags, minus the NDK toolchain. PIC is
+          # explicit: the host test binary is a PIE, while the NDK defaults to
+          # PIC and the host compiler does not.
+          cmake -S "$SRC" -B "$BUILD" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_SKIP_INSTALL_RULES=ON \
+            -DMUJOCO_BUILD_EXAMPLES=OFF \
+            -DMUJOCO_BUILD_TESTS=OFF \
+            -DMUJOCO_BUILD_SIMULATE=OFF \
+            -DMUJOCO_BUILD_PYTHON=OFF \
+            -DMUJOCO_BUILD_CSHARP=OFF
+          cmake --build "$BUILD" --target mujoco -j"$(nproc)"
+
+          mkdir -p "$LIBDIR"
+          MUJOCO_ARCHIVE="$(find "$BUILD" -maxdepth 2 -name libmujoco.a -print -quit)"
+          if [ -z "$MUJOCO_ARCHIVE" ]; then
+            echo "::error::libmujoco.a not found under $BUILD" >&2
+            exit 1
+          fi
+          cp "$MUJOCO_ARCHIVE" "$LIBDIR/"
+          echo "mujoco" > "$LIBDIR/libs.txt"
+
+          # A static archive does not absorb its dependencies. Copy each one
+          # and record the link order, using the same candidate names as
+          # android/scripts/build-mujoco-android.sh.
+          dependency_archives=()
+          collect_dep() {
+            local logical="$1"
+            shift
+            for name in "$@"; do
+              local found
+              found="$(find "$BUILD" -name "lib$name.a" -print -quit)"
+              if [ -n "$found" ]; then
+                cp "$found" "$LIBDIR/"
+                echo "$name" >> "$LIBDIR/libs.txt"
+                dependency_archives+=("$LIBDIR/lib$name.a")
+                return 0
+              fi
+            done
+            echo "::warning::no archive for $logical (tried: lib${*}.a)" >&2
+          }
+          collect_dep lodepng lodepng
+          collect_dep miniz miniz
+          collect_dep tinyxml2 tinyxml2
+          collect_dep qhull qhullstatic_r qhull_r
+          collect_dep ccd ccd ccd_static
+
+          # build.rs's non-Apple/non-Android branch emits only `-lmujoco`: it
+          # does not read libs.txt, and a bare archive would leave the
+          # dependency archives unresolved and drop MuJoCo's self-registering
+          # STL/OBJ decoders. Fold everything into one relocatable object
+          # named libmujoco.a — GNU ld includes a relocatable object found
+          # through `-l` unconditionally. Only MuJoCo itself is whole-archived
+          # (the Android/iOS branch does the same); dependencies stay
+          # on-demand so nothing is pulled twice.
+          ld -r -o "$LIBDIR/libmujoco_combined.a" \
+            --whole-archive "$LIBDIR/libmujoco.a" --no-whole-archive \
+            "${dependency_archives[@]}"
+          mv "$LIBDIR/libmujoco_combined.a" "$LIBDIR/libmujoco.a"
+
+          {
+            echo "MUJOCO_INCLUDE_DIR=$SRC/include"
+            echo "MUJOCO_LIB_DIR=$LIBDIR"
+          } >> "$GITHUB_ENV"
+          echo "MuJoCo 3.10.0 static library: $LIBDIR"
+          cat "$LIBDIR/libs.txt"
+
+      - name: Core MuJoCo tests
+        env:
+          ORT_DYLIB_PATH: ${{ steps.ort.outputs.lib }}
+          DUCK_REQUIRE_FIXTURES: "1"
+          DUCK_UPSTREAM_FIXTURES: ${{ github.workspace }}/upstream/microduck/duck-control/tests/fixtures
+        run: |
+          set -euo pipefail
+          cd core
+          # --features mujoco compiles ffi.rs and mujoco.rs. This closes the
+          # ffi half of #26; jni.rs is Android-only and stays out on ubuntu.
+          cargo test --locked -p duck-mobile-core --features mujoco -- --include-ignored 2>&1 | tee "$RUNNER_TEMP/cargo-test-mujoco.log"
+
+      - name: Publish the test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Duck-core-mujoco-test-logs
+          path: ${{ runner.temp }}/cargo-test-mujoco.log
           if-no-files-found: ignore

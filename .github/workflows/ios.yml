@@ -53,14 +53,8 @@ jobs:
           git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
           git -C upstream/microduck checkout da34a22
           git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
-          mkdir -p policies
-          for f in velstand.onnx alpha_walking.onnx alpha_stand.onnx \
-                   roller.onnx alpha_sitstand.onnx alpha_ground_pick.onnx \
-                   roller_crouch.onnx roulade.onnx \
-                   ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
-            curl -L --fail -o "policies/$f" \
-              "https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/$f"
-          done
+          # The manifest is the download list; DUCK_POLICY_BASE pins a ref.
+          bash scripts/fetch-policies.sh
       - name: Toolchain
         run: |
           brew install xcodegen cmake ninja
@@ -181,17 +175,9 @@ jobs:
           git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
           git -C upstream/microduck checkout da34a22
           git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
-          mkdir -p policies
-          # The complete official set: a missing file silently removes a
-          # feature (crouch needs roller_crouch, the stand policy is the
-          # fallback walk slot).
-          for f in velstand.onnx alpha_walking.onnx alpha_stand.onnx \
-                   roller.onnx alpha_sitstand.onnx alpha_ground_pick.onnx \
-                   roller_crouch.onnx roulade.onnx \
-                   ball_kick_left.onnx ball_kick_right.onnx manifest.json; do
-            curl -L --fail -o "policies/$f" \
-              "https://huggingface.co/pollen-robotics/microduck-policies/resolve/main/$f"
-          done
+          # The manifest is the download list, so a policy added upstream is
+          # fetched without editing this workflow. DUCK_POLICY_BASE pins a ref.
+          bash scripts/fetch-policies.sh
 
       - name: Toolchain
         id: toolchain
