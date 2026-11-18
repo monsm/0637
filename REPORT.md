@@ -677,6 +677,10 @@ Core 在 `4477a89` 红了一次，失败项 `a_chorus_without_moves_sings_the_do
 - **验证**：本地 `cargo test --workspace --include-ignored` 213+9 全绿；`--features mujoco` 226+9 全绿（ffi:: 12/12 及以上，覆盖 C ABI/pad/IPC）；六道静态契约门禁全绿。Swift/Kotlin 与真机由 CI 裁决。
 - **CI 盲区（记录在案）**：core.yml 不编译 ffi.rs（无 mujoco feature），IPC/pad/ffi 接线靠 ios.yml/android.yml 构建与冒烟间接覆盖；后续立项给 core CI 加 mujoco 测试步骤。
 
+### 四之二十七、全方位对比报告（2026-11-18）
+
+`docs/COMPARISON_OFFICIAL_VS_MOBILE_2026-11-18.md`：8 维度 ×（分析 + 对抗复核）+ 合成（17 agent，3.1M tokens）。128 条 item：脚本清点 equivalent 51 / near 29 / deviation 27 / not_doing 8 / hardware 5 / unverified 8；采纳 10 条复核纠正（全部 equivalent→near）后落表 **41 / 39 / 27 / 8 / 5 / 8**。另列移动版独有能力 30+ 条（时间机器/fork、care/quests/成长手册、邻居合唱、MCP、备份搬家等官方没有的东西），27 条偏差集中成下一批施工清单（其中 6 条对应 QA 推后项），复核员补漏 36 条单列。
+
 ---
 
 ## 八、仓库与复现
