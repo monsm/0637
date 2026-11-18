@@ -238,7 +238,6 @@ jobs:
             echo "MUJOCO_LIB_DIR=$LIBDIR"
           } >> "$GITHUB_ENV"
           echo "MuJoCo 3.10.0 shared library: $LIBDIR"
-          cat "$LIBDIR/libs.txt"
 
       - name: Core MuJoCo tests
         env:
