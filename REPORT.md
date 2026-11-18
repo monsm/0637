@@ -695,6 +695,14 @@ Core 在 `4477a89` 红了一次，失败项 `a_chorus_without_moves_sings_the_do
 - **顺手修出的产品语义**：`play_emotion` 落实官方「一次只播一个情绪、期间请求丢弃」——此前每日任务完成的庆祝会覆盖孩子刚点的情绪（冒烟里 curious 被 excited 顶掉即是此因）。
 - **保留（刻意/边界，未改）**：BAM 执行器路径、齿隙编码器读数、传感器回报语义、麦克风替身、多鸭同世界、ToF 场景射线与相机帧流、命令延迟模型、运行期增删技能、社区策略门禁、setMode 整机重建、updaterd/configd 族、robotctl CLI、chorale 乐谱、head_imu、API_VERSION 握手、coverage 基线——均在对比报告 §0.2 逐条登记理由。
 
+### 四之二十九、情绪图鉴 + 语音闲聊（2026-11-18 夜）
+
+COMPANION 头脑风暴里仅剩未做的两项落地：
+
+- **情绪图鉴·把戏学校**：核心 `GET /collection` 返回 13 个情绪与 manifest 技能的**真实次数与首次解锁日期**。零编造规则:`Life.unlocks` 只在计数出现时记录当天;升级前的历史计数回填为「日期未知」(界面显示 —);`POST /life` 恢复时只接受规范键与 `YYYY-MM-DD`,客户端写不进假日期。双端各有图鉴页(复用 Dex 路由),点行即用现有技能/情绪通道去练习。
+- **语音闲聊**：AI 伙伴页内新增聊天区。用户输入(或一键取回 `last_heard`)→ 同一 OpenAI 兼容端点、纯文本回复 → 气泡显示 + 本机 TTS 朗读(音频只在手机)。提示词禁止编造,只许引用 `/state` 的真实数字;未配置模型时禁用。
+- **验证**：本地 Rust 252+9 / mujoco 282+9、Android BUILD SUCCESSFUL(85 JVM 测试)、六道契约门禁全绿;Swift 与 TTS 实机由 CI/真机裁决。QA 对抗复审结果见 `docs/QA_FEATURE_BATCH_2026-11-18.md`(若复审有 must-fix,已按档修完再推)。
+
 ---
 
 ## 八、仓库与复现
