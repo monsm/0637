@@ -154,7 +154,17 @@ fn main() {
             println!("cargo:rustc-link-lib=framework=CoreGraphics");
         }
         _ => {
-            println!("cargo:rustc-link-lib=mujoco");
+            // The desktop test job builds MuJoCo from source and folds the
+            // archive and its dependencies into one relocatable object; an
+            // absolute object argument needs no archive search semantics.
+            // A hand-built library directory without that object (the local
+            // dynamic setup) keeps the plain `-lmujoco` route.
+            let combined = std::path::Path::new(&libdir).join("mujoco_combined.o");
+            if combined.exists() {
+                println!("cargo:rustc-link-arg={}", combined.display());
+            } else {
+                println!("cargo:rustc-link-lib=mujoco");
+            }
         }
     }
 }

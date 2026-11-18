@@ -272,13 +272,10 @@ jobs:
           ld -r -o "$LIBDIR/mujoco_combined.o" \
             --whole-archive "$LIBDIR/libmujoco.a" --no-whole-archive \
             "${dependency_archives[@]}"
-          # rust-lld resolves `-lmujoco` against a real archive; a
-          # relocatable object merely named libmujoco.a is treated as an
-          # empty archive, which links with every mj_* undefined. Pack the
-          # object into an archive so the linker pulls it unconditionally.
-          rm "$LIBDIR/libmujoco.a"
-          ar rcs "$LIBDIR/libmujoco.a" "$LIBDIR/mujoco_combined.o"
-          rm "$LIBDIR/mujoco_combined.o"
+          # The combined object is linked by absolute path (build.rs sees
+          # `mujoco_combined.o` in the library directory), because a
+          # relocatable object merely named libmujoco.a is treated by
+          # rust-lld as an empty archive and every mj_* stays undefined.
 
           {
             echo "MUJOCO_INCLUDE_DIR=$SRC/include"
