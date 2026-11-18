@@ -31,3 +31,8 @@
 ## 复审判定
 
 三路修复后本地全绿；未再跑第三轮完整对抗复审（修复范围明确且每条都有先红后绿测试）。遗留跟进项：`/heard` 失败体字段变更需两端语音层展示（当前壳只读状态码，属既有行为）。
+
+## CI 首跑（2026-11-19 凌晨）
+
+- **Core ✅、Contracts ✅（台账 43 行/49 条目）、Android ✅**（88+18 JVM 测试与模拟器冒烟）。
+- **iOS ❌ 但非代码**：`build` job 连续三次 15 分钟后被取消，标注 "The job was not acquired by Runner of type hosted even after multiple attempts / macOS arm64 容量约束"——代码一步未跑。Swift 侧已过全部静态门禁（copy-keys 336=336、ui-baseline 棘轮、ui-entries 49/93 锚点、routes、features），且上一批 iOS 构建链路已验证。已多次重排；若持续无 runner，以静态门禁 + 本地逻辑测试为准，iOS 构建结论待 GitHub 容量恢复后补。
