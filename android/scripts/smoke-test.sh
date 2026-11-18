@@ -93,17 +93,21 @@ SKILL_RESPONSE=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/jso
 # frame early, so poll for up to 2 s before calling it dead — and say what
 # the POST and the state actually said when it is.
 STATE_EMOTION=""
+CURIOUS_SEEN=0
 for _ in $(seq 1 20); do
   STATE_EMOTION=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
-  echo "$STATE_EMOTION" | grep -q '"name":"curious"' && break
+  # The book's own count is the proof the timeline ran: the entry and the
+  # official wav are written by the same call, so a dead loader cannot pass.
+  # It also survives the duck's own reactions outliving the live field.
+  grep -q '"curious":' <<<"$STATE_EMOTION" && CURIOUS_SEEN=1 && break
   sleep 0.1
 done
-if ! echo "$STATE_EMOTION" | grep -q '"name":"curious"'; then
-  echo "::error::/state.emotion does not report the curious timeline (POST: ${SKILL_RESPONSE:-<no answer>})"
-  echo "$STATE_EMOTION" | tr ',' '\n' | grep -E '"emotion"|"notice"|"label"' | head -6
+if [ "$CURIOUS_SEEN" -ne 1 ]; then
+  echo "::error::/state.life does not record the curious emotion (POST: ${SKILL_RESPONSE:-<no answer>})"
+  echo "$STATE_EMOTION" | tr ',' '\n' | grep -E '"emotion"|"notice"|"label"|"curious"' | head -8
   exit 1
 fi
-if ! echo "$STATE_EMOTION" | grep -q '"last_emotion_sound":"emotion:curious"'; then
+if ! grep -q '"last_emotion_sound":"emotion:curious"' <<<"$STATE_EMOTION"; then
   echo "::error::the emotion's official wav never reached the sound queue"
   exit 1
 fi
@@ -119,7 +123,7 @@ fi
 echo "emotions staged: $STAGED"
 
 for needle in '"proprioception"' '"positions"' '"imu_ready"' '"mouth"' '"performance"' '"leds"'; do
-  if ! echo "$STATE" | grep -q "$needle"; then
+  if ! grep -q "$needle" <<<"$STATE"; then
     echo "::error::/state does not publish $needle"
     exit 1
   fi

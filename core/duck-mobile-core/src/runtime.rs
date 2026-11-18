@@ -2081,6 +2081,13 @@ impl<T: RobotIo> DuckRuntime<T> {
         if self.controller.busy() || self.controller.is_sitting() {
             return Err("a move is running; the duck must be standing still");
         }
+        // One at a time, robotd's rule: a request while one plays is
+        // dropped (`robotd/src/main.rs:2816-2820`). The duck's own
+        // celebrations take the same door, so a completed quest never
+        // clobbers a mood a person just asked for.
+        if self.emotion_playing.is_some() {
+            return Err("an emotion is already playing");
+        }
         let Some(emotion) = self.emotions.get(name) else {
             return Err("no such emotion");
         };
@@ -5191,6 +5198,49 @@ mod tests {
             skills: Vec::new(),
         };
         Policy::load(&paths, 0.05).expect("the bundled walk policy")
+    }
+
+    #[test]
+    fn one_emotion_at_a_time_and_a_celebration_never_clobbers_one() {
+        let probe = Probe {
+            sensors: Sensors::default(),
+            targets: [0.0; NUM_JOINTS],
+        };
+        let mut runtime = DuckRuntime::new(
+            probe,
+            test_policy(),
+            Tuning::default(),
+            SkillTuning::default(),
+            SafetyConfig::default(),
+        );
+        runtime.enable().ok();
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../upstream/microduck/robotd/emotions");
+        let loaded = runtime.load_emotions(&dir).expect("the official timelines");
+        assert!(loaded >= 13, "all thirteen timelines load");
+
+        assert!(runtime.trigger_emotion("curious").is_ok());
+        assert_eq!(
+            runtime.trigger_emotion("excited"),
+            Err("an emotion is already playing")
+        );
+        assert_eq!(
+            runtime.celebrate_emotion("excited"),
+            Err("an emotion is already playing"),
+            "a quest celebration takes the same one-at-a-time door"
+        );
+        let (name, _, duration) = runtime.emotion_state().expect("curious keeps playing");
+        assert_eq!(name, "curious");
+
+        let ticks = (duration / runtime.dt.as_secs_f64()).ceil() as usize + 2;
+        for _ in 0..ticks {
+            let _ = runtime.tick();
+        }
+        assert!(runtime.emotion_state().is_none(), "the timeline finished");
+        assert!(
+            runtime.celebrate_emotion("excited").is_ok(),
+            "the next emotion lands after the first ends"
+        );
     }
 
     #[test]
