@@ -24,3 +24,10 @@
 - **CI 首跑裁决**：新增的 ubuntu MuJoCo job、fmt/clippy 白名单、shellcheck 在 runner 上的版本差异；Swift/Kotlin 全量由 ios.yml/android.yml 裁决。
 - **已知 minor（交互级，已评估不影响主路径）**：coast 与 fork 的极端组合（手机 MuJoCo 不会读失败，仅测试 harness 可达）、分支会话下 GoingHome 回退原因的保留细节、`seated hold` 用实测位姿已改（原常量断言已替换）。
 - **刻意保留（对比报告 §0.2 逐条有理由）**：BAM 执行器路径、齿隙编码器读数、传感器回报语义、麦克风替身、多鸭同世界、ToF 场景射线/相机帧流、命令延迟、运行期增删技能、社区策略门禁、setMode 整机重建、updaterd/configd 族、robotctl CLI、chorale 乐谱、head_imu、API_VERSION 握手、coverage 基线。
+
+## 附：CI 首跑（2026-11-18 晚）
+
+- **Core**：首红两因——(a) `cargo fmt -p` 顺着 `#[path]` 格式化 upstream 文件（不可改），改为 rustfmt 逐自有文件 + `skip_children`；(b) ONNX Runtime 的 GitHub release 404（仓库整体不可达），Linux 取库回退 PyPI 同版本 wheel。新 MuJoCo job 另经三次链接方案迭代：`ld -r` 折叠 → `ar` 打包 → 直链 whole-archive 均失败（lld 在该 runner 上取不到静态档案符号），最终改为源码构建**共享库** + build.rs rpath，**Core 全绿（含 ffi 测试首次进 CI）**。
+- **Contracts**：shellcheck 抓到 fetch-ort 脚本 SC2155（先声明后赋值），修后绿。
+- **Android**：首红为两处 Compose import（已在本批 earlier 修掉）；二红是冒烟断言——POST `curious` 恰好完成当日「做 2 个表情」任务，庆祝播 `excited` 覆盖 curious，轮询永远看不到。修：`play_emotion` 落实官方「一次只播一个」；冒烟改用终身记录计数（与 wav 入队同一调用），并把大 JSON 的 `grep -q` 管道改为 here-string（`pipefail` 下 SIGPIPE 假阴性）。**Android 全绿**。
+- **iOS**：由 ios.yml 裁决。
