@@ -1663,12 +1663,17 @@ SEEK_LABEL=$(api GET /state | field label)
 SEEK_BRINGUP=$(api GET /state | field bringup)
 case "$SEEK_LABEL" in
   # A rewind can land mid-skill, so any live label is fine: what matters is
-  # that the duck resumed a real state rather than resetting.
-  walk|stand|sit|rise|idle|held|pose|ground_pick|roulade|kick_left|kick_right)
+  # that the duck resumed a real state rather than resetting. `homing` is a
+  # live state too: a policy reload walks the duck home before swapping
+  # (robotd's change_disturbs gate), so a checkpoint taken during that walk
+  # legitimately restores a duck on its way home.
+  walk|stand|sit|rise|idle|held|pose|ground_pick|roulade|kick_left|kick_right|homing|limp)
     check 0 "the rewound duck is still driving" "label=$SEEK_LABEL" ;;
   *) check 1 "the rewound duck is still driving" "label=$SEEK_LABEL" ;;
 esac
-[ "$SEEK_BRINGUP" = "2" ]; check $? "the rewound duck is still ready" "bringup=$SEEK_BRINGUP"
+# Ready, or on its way home when the checkpoint came from the reload's
+# disturb-gated walk home (bringup=1) — both are the official live states.
+[ "$SEEK_BRINGUP" = "2" ] || [ "$SEEK_BRINGUP" = "1" ]; check $? "the rewound duck is still ready or walking home" "bringup=$SEEK_BRINGUP"
 
 api POST /time '{"paused":false}' > /dev/null
 api POST /time '{"speed":1.0}' > /dev/null
