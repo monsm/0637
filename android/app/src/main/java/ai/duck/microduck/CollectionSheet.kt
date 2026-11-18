@@ -231,6 +231,7 @@ fun CollectionSheet(onClose: () -> Unit) {
                     modifier = Modifier.heightIn(max = 460.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
+                    collectionBadges(ui)
                     collectionSection(Copy.collectionMoods, "moods", ui.emotions, trySkill)
                     collectionSection(Copy.collectionTricks, "tricks", ui.skills, trySkill)
                 }
@@ -246,6 +247,83 @@ fun CollectionSheet(onClose: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * The badge shelf: the words come from Copy, the progress from the core's
+ * own counts. A locked badge stays greyed out but keeps its real number, so
+ * "7/13" is visible before it is earned.
+ */
+private fun LazyListScope.collectionBadges(book: CollectionUi) {
+    item {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                Copy.badgeSection,
+                color = Color.White.copy(alpha = 0.55f),
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .padding(top = 6.dp, bottom = 2.dp)
+                    .testTag("collection-section-badges"),
+            )
+            CollectionBadges.evaluate(book).forEach { badge ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .testTag("collection-badge-${badge.id}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        if (badge.unlocked) "✓" else "·",
+                        color = if (badge.unlocked) {
+                            DuckTheme.StateGood
+                        } else {
+                            Color.White.copy(alpha = 0.45f)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        badgeTitle(badge.id),
+                        // Locked badges are greyed out, not hidden: the goal
+                        // and its true progress stay readable.
+                        color = if (badge.unlocked) Color.White else Color.White.copy(alpha = 0.5f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        // The book's real number, capped at the goal for the
+                        // cell only: 1001 moods still reads 1000/1000.
+                        "${badge.progress.coerceIn(0, badge.target)}/${badge.target}",
+                        color = if (badge.unlocked) {
+                            DuckTheme.AccentData
+                        } else {
+                            Color.White.copy(alpha = 0.45f)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.testTag("collection-badge-progress-${badge.id}"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** The badge's name from the one Copy dictionary; ids never reach the screen. */
+private fun badgeTitle(id: String): String = when (id) {
+    CollectionBadges.FIRST_MOOD -> Copy.badgeFirstMood
+    CollectionBadges.ALL_MOODS -> Copy.badgeAllMoods
+    CollectionBadges.FIRST_TRICK -> Copy.badgeFirstTrick
+    CollectionBadges.ALL_TRICKS -> Copy.badgeAllTricks
+    CollectionBadges.MOODS_10 -> Copy.badgeMoods10
+    CollectionBadges.MOODS_100 -> Copy.badgeMoods100
+    CollectionBadges.MOODS_1000 -> Copy.badgeMoods1000
+    CollectionBadges.TRICKS_10 -> Copy.badgeTricks10
+    CollectionBadges.TRICKS_100 -> Copy.badgeTricks100
+    else -> id
 }
 
 private fun LazyListScope.collectionSection(

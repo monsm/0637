@@ -360,6 +360,28 @@ val quack get() = pick("Quack", "叫一声")
     val collectionTricks get() = pick("Tricks", "把戏")
     val collectionFirst get() = pick("First unlocked", "首次解锁")
     val collectionLocked get() = pick("Not tried yet", "还没试过")
+    // The badge shelf (G3): earned from the same /collection counts, never
+    // from a separate ledger. The names are the ticket's, word for word with
+    // iOS; a locked badge still shows its true progress.
+    val badgeSection get() = pick("Badges", "徽章")
+    val badgeFirstMood get() = pick("First feeling", "初次心动")
+    val badgeAllMoods get() = pick("All 13 moods", "十三种心情")
+    val badgeFirstTrick get() = pick("First lesson", "第一课")
+    val badgeAllTricks get() = pick("Trick school", "把戏毕业")
+    val badgeMoods10 get() = pick("10 moods", "十次心情")
+    val badgeMoods100 get() = pick("100 moods", "百次心情")
+    val badgeMoods1000 get() = pick("1000 moods", "千次心情")
+    val badgeTricks10 get() = pick("10 tricks", "十次把戏")
+    val badgeTricks100 get() = pick("100 tricks", "百次把戏")
+    // Teaching the duck words (G3): a phrase -> wire target table that lives
+    // on this phone and is replayed to the core once it is ready.
+    val aliasTitle get() = pick("Teach your words", "教它说话")
+    val aliasHint get() = pick("Say this", "说这个")
+    val aliasDoes get() = pick("and the duck does", "然后鸭子做")
+    val aliasAdd get() = pick("Add", "添加")
+    val aliasEmpty get() = pick("No words yet", "还没有教过")
+    val aliasLocalOnly get() = pick("Saved on this phone", "只存在这台手机")
+    val aliasTooLong get() = pick("Too long", "太长了")
     // The vet book, and the file it exports.
     val lifeRecord get() = pick("Life record", "终身记录")
     val walked get() = pick("walked", "走过")

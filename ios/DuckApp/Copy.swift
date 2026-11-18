@@ -382,6 +382,26 @@ enum Copy {
     static var collectionTricks: String { pick("Tricks", "把戏") }
     static var collectionFirst: String { pick("First unlocked", "首次解锁") }
     static var collectionLocked: String { pick("Not tried yet", "还没试过") }
+    // The collection's badges (G2): thresholds over the core's own counts.
+    // These keys are byte-for-byte the same as Android's parallel ticket.
+    static var badgeSection: String { pick("Badges", "徽章") }
+    static var badgeFirstMood: String { pick("First feeling", "初次心动") }
+    static var badgeAllMoods: String { pick("All 13 moods", "十三种心情") }
+    static var badgeFirstTrick: String { pick("First lesson", "第一课") }
+    static var badgeAllTricks: String { pick("Trick school", "把戏毕业") }
+    static var badgeMoods10: String { pick("10 moods", "十次心情") }
+    static var badgeMoods100: String { pick("100 moods", "百次心情") }
+    static var badgeMoods1000: String { pick("1000 moods", "千次心情") }
+    static var badgeTricks10: String { pick("10 tricks", "十次把戏") }
+    static var badgeTricks100: String { pick("100 tricks", "百次把戏") }
+    // Teaching the duck words (G2). Byte-for-byte with Android's ticket.
+    static var aliasTitle: String { pick("Teach your words", "教它说话") }
+    static var aliasHint: String { pick("Say this", "说这个") }
+    static var aliasDoes: String { pick("and the duck does", "然后鸭子做") }
+    static var aliasAdd: String { pick("Add", "添加") }
+    static var aliasEmpty: String { pick("No words yet", "还没有教过") }
+    static var aliasLocalOnly: String { pick("Saved on this phone", "只存在这台手机") }
+    static var aliasTooLong: String { pick("Too long", "太长了") }
     // Daily quests.
     static var quests: String { pick("Today's quests", "今日小挑战") }
     static var questDone: String { pick("Done", "完成") }

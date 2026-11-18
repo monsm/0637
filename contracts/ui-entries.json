@@ -432,6 +432,46 @@
       }
     },
     {
+      "id": "badges",
+      "zh": "图鉴徽章",
+      "conform_b4": "extension",
+      "note": "图鉴页徽章架（G2）：只读阈值展示，不算 dex 页可点控件；经 dex feature 的 ledger_ids 同一笔账（2026-11-19 H2）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/CollectionSheet.swift",
+          "collection-section-badges"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/CollectionSheet.kt",
+          "collection-section-badges"
+        ]
+      }
+    },
+    {
+      "id": "collection-open",
+      "zh": "图鉴（第二入口）",
+      "conform_b4": "extension",
+      "note": "iOS 仪表 / Android 鸭子面板里的第二枚图鉴入口，与抽屉 more-dex 并存（violation 停放：B4 §2:61 仪表不再堆入口）；2026-11-19 H2 随鸭子面板 ≤6 落账",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/InstrumentSheet.swift",
+          "collection-open"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "collection-open"
+        ]
+      }
+    },
+    {
       "id": "day-rows",
       "zh": "日子行",
       "conform_b4": "extension",
@@ -531,7 +571,7 @@
       "id": "big-buttons",
       "zh": "大字模式",
       "conform_b4": "extension",
-      "note": "七批 #26；两端入口不同组（iOS 这只鸭子组 / Android 记录组）——§5 无此行，归属待会议拍板",
+      "note": "七批 #26；2026-11-19 H2 两端同迁工具页（鸭子面板满 6 控件，≤6 规矩重排；id/tag 保持 duck-panel-big 不变）",
       "ios": {
         "implemented": true,
         "anchor": [
@@ -804,6 +844,26 @@
         "anchor": [
           "android/app/src/main/java/ai/duck/microduck/DiarySheet.kt",
           "Copy.speak"
+        ]
+      }
+    },
+    {
+      "id": "alias",
+      "zh": "教它说话",
+      "conform_b4": "extension",
+      "note": "2026-11-19 H2 登记；鸭子面板页内行（与同页心跳/罗盘同级同跳数，点开本地会话表），iOS 原在仪表随契约迁鸭子面板，横屏另在 LandscapeMenu 同 id（platform-specific）；锚点取页面行",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MorePages.swift",
+          "alias-open"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "alias-open"
         ]
       }
     },

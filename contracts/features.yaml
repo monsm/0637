@@ -16,8 +16,8 @@
 #   玩一玩：操控方式、AB 试穿、推把对比、HUD
 #   邻居：配对码、DKPD 收发、ensemble、合唱、礼物
 #   每日任务：任务板、成长手册(iOS)、日子行
-#   这只鸭子：心跳、手电筒、语言、大字、罗盘
-#   工具：家长时长、房间灯、备份、ToF
+#   这只鸭子：心跳、手电筒、语言、罗盘、教它说话（倾斜看 iOS-only）
+#   工具：家长时长、房间灯、备份、ToF、大字模式
 #   积木规则：定时器（触发档位）；编舞铺：LED 灯光步；日记：开口说话
 # 倒放不占行（时间栏）。
 #
@@ -80,12 +80,12 @@ pages:
     group: duck
     zh: 这只鸭子
     controls: 6
-    entries: [heart, flashlight, language, big-buttons, compass, tilt-look]
+    entries: [heart, flashlight, language, compass, tilt-look, alias]
   - id: tools
     group: duck
     zh: 工具
-    controls: 4
-    entries: [parent-time, room-lamp, backup, tof]
+    controls: 5
+    entries: [parent-time, room-lamp, backup, tof, big-buttons]
   - id: ai
     group: duck
     zh: AI 伙伴
@@ -128,7 +128,7 @@ pages:
     entries: [rewind-play]
 
 # 功能台账：22 项 + 2 项 no-ui；另加 iOS 独有的成长手册/成就墙与倾斜看、
-# 以及 定时器/大字/日子行 等扩展项，共 32 行。
+# 以及 定时器/大字/日子行/教它说话 等扩展项，共 43 行。
 # enabled_when: 门控（无邻居时 ensemble/合唱/礼物 可见但禁用，不是消失）。
 # data_chain: 只改入口不改账的边界声明。
 features:
@@ -352,6 +352,8 @@ features:
     page: dex
     hops: 2
     conform_b4: ok
+    ledger_ids: [collection-open, badges]
+    note: 图鉴抽屉行两端同页；鸭子面板/仪表里的第二枚图鉴入口（collection-open）与图鉴页徽章架（badges，只读遥测不计控件）同一笔账
     ios: implemented
     android: implemented
     data_chain: none
@@ -416,10 +418,10 @@ features:
   - id: big-buttons
     zh: 大字模式
     group: duck
-    page: duck-panel
+    page: tools
     hops: 2
     conform_b4: extension
-    note: 两端同组（Android 原先在记录组，按老板拍板挪鸭子组）
+    note: 两端同页（2026-11-16 老板拍板挪鸭子组；2026-11-19 H2 鸭子面板满 6，大字随 ≤6 挪工具页，两端同迁，id/tag 不变）
     ios: implemented
     android: implemented
     data_chain: none
@@ -429,6 +431,16 @@ features:
     page: duck-panel
     hops: 2
     conform_b4: extension
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: alias
+    zh: 教它说话
+    group: duck
+    page: duck-panel
+    hops: 2
+    conform_b4: extension
+    note: 鸭子面板页内行，与同页心跳/罗盘同级同跳数（行本身 2 跳，点开本地会话表，不打折也不加层）；iOS 横屏另在 LandscapeMenu 同组同 id，platform-specific 附加入口，Android 无横屏菜单、竖横屏同走抽屉
     ios: implemented
     android: implemented
     data_chain: none

@@ -223,7 +223,10 @@ private fun loadBranchB(folder: String): String? {
     }
 }
 
-/** 这只鸭子: heart, flashlight, language, big buttons, compass - five. */
+/** 这只鸭子: heart, flashlight, language, compass, collection, teach words
+ *  - six, under the cap. Big buttons moved to the tools page together with
+ *  iOS (2026-11-19 H2: the panel was at a seven-control reality; the
+ *  contract reordered it to six). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DuckPanelSheet(
@@ -253,6 +256,14 @@ internal fun DuckPanelSheet(
         }
     }
     var compassOn by remember { mutableStateOf(prefs.getBoolean("duck_compass_on", false)) }
+    // The alias page replaces the panel inside the same sheet rather than
+    // stacking a second modal: one sheet at a time, and no new route case
+    // (the route table is a frozen contract).
+    var aliasOpen by remember { mutableStateOf(false) }
+    if (aliasOpen) {
+        AliasSheet(onClose = { aliasOpen = false })
+        return
+    }
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
@@ -285,11 +296,6 @@ internal fun DuckPanelSheet(
                 tag = "duck-panel-language",
             ) { onLanguage() }
             ControlRow(
-                Copy.bigButtons,
-                note = Copy.bigButtonsNote,
-                tag = "duck-panel-big",
-            ) { onOpen(DuckRoute.Big) }
-            ControlRow(
                 Copy.compass,
                 note = Copy.compassNote,
                 state = if (compassOn) Copy.stateOn else Copy.stateOff,
@@ -306,11 +312,18 @@ internal fun DuckPanelSheet(
                 note = Copy.dexRowNote,
                 tag = "collection-open",
             ) { onOpen(DuckRoute.Dex) }
+            // Teach it words: a phrase on this phone, an existing official
+            // intent on the duck. The table is local-first and replayed.
+            ControlRow(
+                Copy.aliasTitle,
+                note = Copy.aliasLocalOnly,
+                tag = "alias-open",
+            ) { aliasOpen = true }
         }
     }
 }
 
-/** 工具: parent time, room lamp, backup, ToF - four controls. */
+/** 工具: parent time, room lamp, backup, ToF, big buttons - five controls. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ToolsSheet(
@@ -418,6 +431,15 @@ internal fun ToolsSheet(
                     tofStrip = withContext(Dispatchers.IO) { fetchTofStrip() }
                 }
             }
+            // Big buttons lives here now: the duck panel was over the
+            // six-control cap, and both phones moved the row together
+            // (2026-11-19 H2). The tag keeps its duck-panel name so the
+            // ledger anchor and the UI tests do not churn.
+            ControlRow(
+                Copy.bigButtons,
+                note = Copy.bigButtonsNote,
+                tag = "duck-panel-big",
+            ) { onOpen(DuckRoute.Big) }
         }
     }
 }

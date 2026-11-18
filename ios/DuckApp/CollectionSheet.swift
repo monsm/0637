@@ -93,6 +93,199 @@ struct CollectionBook: Equatable {
     }
 }
 
+/// One badge in the collection book: a real threshold over the core's own
+/// counters. The thresholds are the ticket's; the numbers are the book's.
+/// Nothing here guesses a count, a date or an unlock.
+enum CollectionBadgeKind: String, CaseIterable {
+    case firstMood
+    case allMoods
+    case firstTrick
+    case allTricks
+    case moods10
+    case moods100
+    case moods1000
+    case tricks10
+    case tricks100
+
+    /// The official release's thirteen moods — the core's `MOODS_TOTAL`.
+    /// "All 13 moods" must mean all thirteen, not "all the rows this page
+    /// happened to receive": a build that loaded five must not wear it.
+    static let officialMoods = 13
+
+    var icon: String {
+        switch self {
+        case .firstMood: return "heart.fill"
+        case .allMoods: return "heart.circle.fill"
+        case .firstTrick: return "graduationcap.fill"
+        case .allTricks: return "rosette"
+        case .moods10: return "hand.thumbsup.fill"
+        case .moods100: return "flame.fill"
+        case .moods1000: return "crown.fill"
+        case .tricks10: return "star.fill"
+        case .tricks100: return "trophy.fill"
+        }
+    }
+
+    /// The cross-shell id the accessibility tags use. Android's shelf
+    /// carries the same kebab-case ids, so a test reads both phones alike.
+    var id: String {
+        switch self {
+        case .firstMood: return "first-mood"
+        case .allMoods: return "all-moods"
+        case .firstTrick: return "first-trick"
+        case .allTricks: return "all-tricks"
+        case .moods10: return "moods-10"
+        case .moods100: return "moods-100"
+        case .moods1000: return "moods-1000"
+        case .tricks10: return "tricks-10"
+        case .tricks100: return "tricks-100"
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .firstMood: return Copy.badgeFirstMood
+        case .allMoods: return Copy.badgeAllMoods
+        case .firstTrick: return Copy.badgeFirstTrick
+        case .allTricks: return Copy.badgeAllTricks
+        case .moods10: return Copy.badgeMoods10
+        case .moods100: return Copy.badgeMoods100
+        case .moods1000: return Copy.badgeMoods1000
+        case .tricks10: return Copy.badgeTricks10
+        case .tricks100: return Copy.badgeTricks100
+        }
+    }
+
+    /// Which half of the book this badge counts; the condition line uses
+    /// the collection's own noun so it follows the interface language.
+    var isTrick: Bool {
+        switch self {
+        case .firstTrick, .allTricks, .tricks10, .tricks100: return true
+        default: return false
+        }
+    }
+
+    /// The "all" badges read goal/goal; the firsts and milestones read
+    /// "≥ goal". Both spell out the real unlock condition.
+    var isAll: Bool {
+        switch self {
+        case .allMoods, .allTricks: return true
+        default: return false
+        }
+    }
+}
+
+/// One evaluated badge. `progress` is the book's real number; the display
+/// caps it at the goal, so 1001 moods still reads 1000/1000.
+struct CollectionBadge: Identifiable, Equatable {
+    let kind: CollectionBadgeKind
+    let unlocked: Bool
+    let progress: Int
+    let goal: Int
+
+    var id: String { kind.id }
+    var title: String { kind.title }
+    var icon: String { kind.icon }
+
+    var progressText: String {
+        "\(min(max(progress, 0), goal))/\(goal)"
+    }
+
+    /// The unlock condition, on the row's second line. The nouns come from
+    /// the same two book headers the page already shows.
+    var conditionText: String {
+        let noun = kind.isTrick ? Copy.collectionTricks : Copy.collectionMoods
+        return kind.isAll ? "\(noun) \(goal)/\(goal)" : "\(noun) ≥ \(goal)"
+    }
+}
+
+/// The nine badges, computed only from `GET /collection`. Pure, so the
+/// thresholds and the locked/unlocked edges are unit-tested without a core.
+enum CollectionBadges {
+    static func evaluate(book: CollectionBook) -> [CollectionBadge] {
+        // One row per name, as the core publishes. A repeated row must not
+        // count twice or let a badge unlock on its own repetition.
+        let moods = distinct(book.emotions)
+        let tricks = distinct(book.tricks)
+        let moodsTried = moods.filter { !$0.isLocked }.count
+        let tricksTried = tricks.filter { !$0.isLocked }.count
+        let moodPlays = moods.reduce(0) { $0 + max(0, $1.count) }
+        let trickPlays = tricks.reduce(0) { $0 + max(0, $1.count) }
+        let moodGoal = CollectionBadgeKind.officialMoods
+        // An empty trick list is not a graduation: "all of {}" is true and
+        // would lie, so the goal is the rows the manifest really published.
+        let trickGoal = tricks.count
+
+        return [
+            CollectionBadge(
+                kind: .firstMood,
+                unlocked: moodsTried > 0,
+                progress: moodsTried > 0 ? 1 : 0,
+                goal: 1
+            ),
+            CollectionBadge(
+                kind: .allMoods,
+                unlocked: moodsTried >= moodGoal,
+                progress: moodsTried,
+                goal: moodGoal
+            ),
+            CollectionBadge(
+                kind: .firstTrick,
+                unlocked: tricksTried > 0,
+                progress: tricksTried > 0 ? 1 : 0,
+                goal: 1
+            ),
+            CollectionBadge(
+                kind: .allTricks,
+                unlocked: trickGoal > 0 && tricksTried == trickGoal,
+                progress: tricksTried,
+                goal: trickGoal
+            ),
+            CollectionBadge(
+                kind: .moods10,
+                unlocked: moodPlays >= 10,
+                progress: moodPlays,
+                goal: 10
+            ),
+            CollectionBadge(
+                kind: .moods100,
+                unlocked: moodPlays >= 100,
+                progress: moodPlays,
+                goal: 100
+            ),
+            CollectionBadge(
+                kind: .moods1000,
+                unlocked: moodPlays >= 1000,
+                progress: moodPlays,
+                goal: 1000
+            ),
+            CollectionBadge(
+                kind: .tricks10,
+                unlocked: trickPlays >= 10,
+                progress: trickPlays,
+                goal: 10
+            ),
+            CollectionBadge(
+                kind: .tricks100,
+                unlocked: trickPlays >= 100,
+                progress: trickPlays,
+                goal: 100
+            ),
+        ]
+    }
+
+    private static func distinct(_ entries: [CollectionEntry]) -> [CollectionEntry] {
+        var seen: Set<String> = []
+        var out: [CollectionEntry] = []
+        for entry in entries {
+            if seen.insert(entry.name).inserted {
+                out.append(entry)
+            }
+        }
+        return out
+    }
+}
+
 /// One page's snapshot of the core's vet book. This is view state, not the
 /// duck's own state, so it lives beside the page instead of growing the
 /// controller's published surface; the fetch still follows the same
@@ -143,6 +336,7 @@ struct CollectionSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if let book = store.book {
                         totals(book)
+                        badgeSection(book)
                         section(Copy.collectionMoods, tag: "moods", entries: book.emotions)
                         section(Copy.collectionTricks, tag: "tricks", entries: book.tricks)
                     } else if store.busy {
@@ -216,6 +410,52 @@ struct CollectionSheet: View {
             .padding(.vertical, 6)
             .background(Color.white.opacity(0.08), in: Capsule())
             .accessibilityIdentifier(id)
+    }
+
+    /// The badges, before the rows they are measured from. Every number is
+    /// the core's; a locked badge is dimmed and shows exactly how far away
+    /// its threshold still is.
+    private func badgeSection(_ book: CollectionBook) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(Copy.badgeSection)
+                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, 4)
+            ForEach(CollectionBadges.evaluate(book: book)) { badge in
+                badgeRow(badge)
+            }
+        }
+        .accessibilityIdentifier("collection-section-badges")
+    }
+
+    private func badgeRow(_ badge: CollectionBadge) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: badge.icon)
+                .font(.system(.subheadline))
+                .foregroundStyle(
+                    badge.unlocked ? Color.duckData : Color.white.opacity(0.4)
+                )
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(badge.title)
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(badge.unlocked ? 1 : 0.4))
+                // The unlock condition is the row's second line, in the
+                // collection's own nouns: "Moods 7/13" is the state, and
+                // "Moods 13/13" (or "≥ 10") is the threshold.
+                Text(badge.conditionText)
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 8)
+            Text(badge.progressText)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .frame(minHeight: 44)
+        .opacity(badge.unlocked ? 1 : 0.55)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("collection-badge-\(badge.id)")
     }
 
     private func section(

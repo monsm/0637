@@ -178,6 +178,10 @@ class MainActivity : ComponentActivity() {
                             // restore, so the duck wakes on the gait it
                             // went to sleep on.
                             replayWalkPolicy(activity, created)
+                            // The words the person taught are the phone's
+                            // copy too; the core's alias table is process
+                            // memory, so replay it once the core answers.
+                            replayVoiceAliases(VoiceAliasStore.prefs(activity))
                             // The phone's calendar day with the saved quest
                             // board; this is independent of care restore.
                             postQuestDay(activity)

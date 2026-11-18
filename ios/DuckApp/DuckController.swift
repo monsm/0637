@@ -472,6 +472,12 @@ final class DuckController: ObservableObject {
     /// override is process memory; the startup restore hands the stored
     /// name back through `/config` once the intent server is up.
     private let walkPolicies = WalkPolicyStore()
+    /// The words a person taught the duck (G2). Same shape as the walk
+    /// slot: `/config` is process memory, so the phone keeps the table and
+    /// replays it once after the core is up. Deliberately not published:
+    /// the sheet owns its draft, and the controller's published surface is
+    /// a ratchet.
+    private let voiceAliases = VoiceAliasStore()
     private let motion = CMMotionManager()
     private var lastPush = Date.distantPast
     /// The duck's own voice: the core decides when, this owns the speaker.
@@ -1093,6 +1099,26 @@ final class DuckController: ObservableObject {
         return false
     }
 
+    /// Hand the learned words back through `/config` once the intent server
+    /// answers. Same readiness loop as the walk slot: the server comes up
+    /// with the core, and a launch can beat it. A refusal is final and is
+    /// not retried; false means the table was not taken. Called on the
+    /// restore worker.
+    private static func replayVoiceAliases(_ table: [String: String]) -> Bool {
+        guard let body = VoiceAliasStore.configBody(table) else { return false }
+        var attempts = 0
+        while attempts < 40 {
+            attempts += 1
+            guard getStateSync() != nil else {
+                Thread.sleep(forTimeInterval: 0.25)
+                continue
+            }
+            return postSyncData("/config", body)
+        }
+        NSLog("duck: voice aliases not replayed: core not ready")
+        return false
+    }
+
     /// Whether the boot set actually carries the stored walk file. The
     /// core's loader drops an override whose file is missing from the
     /// directory it is loading, so reloading the boot set for a name that
@@ -1177,7 +1203,11 @@ final class DuckController: ObservableObject {
             rulesPayload = try? JSONSerialization.data(withJSONObject: payload)
         }
         let walkName = walkPolicies.name
-        guard saved != nil || rulesPayload != nil || walkName != nil else {
+        // A fresh install with only learned words has something to hand
+        // back too; leaving this out of the guard silently skipped the
+        // alias replay until some other state existed.
+        let aliases = voiceAliases.table
+        guard saved != nil || rulesPayload != nil || walkName != nil || !aliases.isEmpty else {
             companionRestored = true
             return
         }
@@ -1192,6 +1222,16 @@ final class DuckController: ObservableObject {
             var walkTaken = false
             if let walkName {
                 walkTaken = Self.replayWalkPolicy(walkName)
+            }
+            // The words a person taught the duck: one whole-table replace,
+            // the same hand-back the walk slot gets. A refusal is the
+            // core's ruling and is not retried; the table stays on the
+            // phone for the next launch.
+            if !aliases.isEmpty {
+                let taken = Self.replayVoiceAliases(aliases)
+                if !taken {
+                    NSLog("duck: voice aliases refused by the core")
+                }
             }
             if let saved {
                 let care = saved["care"] as? [String: Any]
