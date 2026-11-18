@@ -785,9 +785,7 @@ fn dispatch(
         proto::Call::RobotRest => proto::Response::ok(Some(id), &handlers.rest()),
         proto::Call::RobotShutdown => proto::Response::ok(Some(id), &handlers.shutdown()),
         proto::Call::RobotSound(p) => proto::Response::ok(Some(id), &handlers.sound(*p)),
-        proto::Call::RobotFlashlight(p) => {
-            proto::Response::ok(Some(id), &handlers.flashlight(*p))
-        }
+        proto::Call::RobotFlashlight(p) => proto::Response::ok(Some(id), &handlers.flashlight(*p)),
         proto::Call::RobotMode => proto::Response::ok(Some(id), &handlers.mode()),
         proto::Call::RobotSetMode(p) => {
             proto::Response::ok(Some(id), &handlers.set_mode(p.clone()))
@@ -1188,7 +1186,9 @@ mod tests {
         client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.head\",\"params\":{\"neck_pitch\":0.1,\"head_pitch\":0.0,\"head_yaw\":0.0,\"head_roll\":0.0}}\n");
         client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.pose\",\"params\":{\"z\":0.01,\"roll\":0.1,\"pitch\":0.2,\"active\":true}}\n");
         client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.mouth\",\"params\":{\"open\":0.6}}\n");
-        client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.sound\",\"params\":{\"tag\":\"coo\"}}\n");
+        client.send(
+            "{\"jsonrpc\":\"2.0\",\"method\":\"robot.sound\",\"params\":{\"tag\":\"coo\"}}\n",
+        );
         client.request(7, "hello", "{\"api_version\":51}");
         let reply = parse(client.read_line(Duration::from_secs(2)).expect("reply"));
         assert_eq!(reply.id, Some(proto::Id::Number(7)));

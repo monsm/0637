@@ -71,14 +71,15 @@ jobs:
       - name: Format the crate (blocking)
         run: |
           set -euo pipefail
-          cd core
-          # Package-scoped rather than `--all`: cargo fmt --all also formats
-          # the upstream path dependencies, and `duck-control/src/policy.rs`
-          # currently has two pre-existing rustfmt hunks. That file is not
-          # ours — CI compiles a clean upstream clone plus the patch — so it
-          # stays in the advisory step below. Everything this repository owns
-          # (duck-mobile-core's src, tests and build.rs) is covered here.
-          cargo fmt -p duck-mobile-core --check
+          cd "$GITHUB_WORKSPACE"
+          # Only the files this repository owns. rustfmt follows `#[path]`
+          # modules, and duck-mobile-core compiles robotd's control.rs and
+          # idle_head.rs straight from the upstream checkout — those are not
+          # ours to reformat, and the clean clone CI uses differs from any
+          # local formatting pass. `skip_children` keeps each invocation
+          # local to the file named.
+          mapfile -t files < <(git ls-files 'core/duck-mobile-core/src/*.rs' 'core/duck-mobile-core/tests/*.rs' 'core/duck-mobile-core/build.rs')
+          rustfmt --edition 2024 --check --config skip_children=true "${files[@]}"
 
       - name: Format the full workspace (advisory)
         continue-on-error: true
@@ -264,14 +265,20 @@ jobs:
           # does not read libs.txt, and a bare archive would leave the
           # dependency archives unresolved and drop MuJoCo's self-registering
           # STL/OBJ decoders. Fold everything into one relocatable object
-          # named libmujoco.a — GNU ld includes a relocatable object found
-          # through `-l` unconditionally. Only MuJoCo itself is whole-archived
-          # (the Android/iOS branch does the same); dependencies stay
-          # on-demand so nothing is pulled twice.
-          ld -r -o "$LIBDIR/libmujoco_combined.a" \
+          # and then into a real archive, so any linker that resolves
+          # `-lmujoco` pulls the whole object. Only MuJoCo itself is
+          # whole-archived (the Android/iOS branch does the same);
+          # dependencies stay on-demand so nothing is pulled twice.
+          ld -r -o "$LIBDIR/mujoco_combined.o" \
             --whole-archive "$LIBDIR/libmujoco.a" --no-whole-archive \
             "${dependency_archives[@]}"
-          mv "$LIBDIR/libmujoco_combined.a" "$LIBDIR/libmujoco.a"
+          # rust-lld resolves `-lmujoco` against a real archive; a
+          # relocatable object merely named libmujoco.a is treated as an
+          # empty archive, which links with every mj_* undefined. Pack the
+          # object into an archive so the linker pulls it unconditionally.
+          rm "$LIBDIR/libmujoco.a"
+          ar rcs "$LIBDIR/libmujoco.a" "$LIBDIR/mujoco_combined.o"
+          rm "$LIBDIR/mujoco_combined.o"
 
           {
             echo "MUJOCO_INCLUDE_DIR=$SRC/include"
