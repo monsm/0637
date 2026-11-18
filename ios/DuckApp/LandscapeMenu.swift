@@ -9,6 +9,11 @@ struct LandscapeMenu: View {
     @Binding var stickMode: StickMode
     @Binding var surface: ContentView.Surface
     let onOpen: (DuckRoute) -> Void
+    /// The words page (G2). The route table is pinned by
+    /// scripts/check-routes.py, so this presents AliasSheet locally rather
+    /// than adding a DuckRoute case. Not named `show*`: that prefix is the
+    /// route gate's loose-state scent.
+    @State private var aliasOpen = false
 
     var body: some View {
         Menu {
@@ -82,6 +87,10 @@ struct LandscapeMenu: View {
                         Label(Copy.ai, systemImage: "brain.head.profile")
                     }
                     .accessibilityIdentifier("open-ai")
+                    Button { aliasOpen = true } label: {
+                        Label(Copy.aliasTitle, systemImage: "text.bubble.fill")
+                    }
+                    .accessibilityIdentifier("alias-open")
                     Button { controller.postNight(on: !controller.nightActive) } label: {
                         Label(
                             controller.nightActive ? Copy.goodMorning : Copy.goodNight,
@@ -120,6 +129,11 @@ struct LandscapeMenu: View {
             }
         .accessibilityLabel(Copy.menu)
         .accessibilityIdentifier("duck-menu")
+        .sheet(isPresented: $aliasOpen) {
+            AliasSheet(controller: controller)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     /// One icon per stick mode, so the menu reads at a glance instead of

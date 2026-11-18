@@ -44,7 +44,7 @@ IOS_MORE = "ios/DuckApp/MoreSheet.swift"
 DRAWER_BUDGET = 16
 PAGE_CAP = 6
 GROUP_COUNT = 4
-LEDGER_TOTAL = 42  # 22 + extensions + 2 no-ui
+LEDGER_TOTAL = 43  # 22 + extensions + 2 no-ui（2026-11-19 H2 增「教它说话」）
 TIME_BAR_ID = "rewind-play"
 NEIGHBOUR_GATED = {"ensemble", "chorus", "gifts"}
 
@@ -156,10 +156,16 @@ def check_ui_matches(cfg, root):
         "ios/DuckApp/InstrumentSheet.swift", "ios/DuckApp/PeersSheet.swift",
         "ios/DuckApp/DiarySheet.swift", "ios/DuckApp/ProgressKit.swift",
         "ios/DuckApp/RulesSheet.swift", "ios/DuckApp/DanceSheet.swift",
+        # H2 2026-11-19: the destination pages and the collection sheet
+        # joined the scan so the alias / badges / collection-open anchors
+        # are actually verified, not skipped as "outside the scanned set".
+        "ios/DuckApp/MorePages.swift", "ios/DuckApp/CollectionSheet.swift",
         "android/app/src/main/java/ai/duck/microduck/Shell.kt",
         "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
         "android/app/src/main/java/ai/duck/microduck/Companion.kt",
         "android/app/src/main/java/ai/duck/microduck/DanceSheet.kt",
+        "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+        "android/app/src/main/java/ai/duck/microduck/CollectionSheet.kt",
     ]:
         fp = root / p
         if fp.exists():

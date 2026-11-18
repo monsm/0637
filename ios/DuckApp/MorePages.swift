@@ -124,11 +124,16 @@ struct PlayMoreSheet: View {
 }
 
 /// 这只鸭子: the duck group's own toggles (heart, flashlight, language,
-/// big buttons, compass) - five controls, under the cap.
+/// compass, teach-words, tilt) - six controls, under the cap. Big buttons
+/// moved to the tools page together with Android (2026-11-19 H2: the panel
+/// was at the seven-control reality; the contract reordered it to six).
 struct DuckPanelSheet: View {
     @ObservedObject var controller: DuckController
     @Binding var languageTick: Int
-    let onOpen: (DuckRoute) -> Void
+    /// The words page (G2). A local presentation, the same pattern the
+    /// instrument used: the route table is pinned by scripts/check-routes.py,
+    /// so a sheet from inside a page is a local `.sheet`, not a route case.
+    @State private var aliasOpen = false
 
     var body: some View {
         PageChrome(title: Copy.thisDuck) {
@@ -156,12 +161,6 @@ struct DuckPanelSheet: View {
                 languageTick &+= 1
             }
             PageRow(
-                title: Copy.bigButtons,
-                note: Copy.bigButtonsNote,
-                selected: false,
-                id: "duck-panel-big"
-            ) { onOpen(.big) }
-            PageRow(
                 title: Copy.compass,
                 note: Copy.compassNote,
                 selected: controller.compassOn,
@@ -172,12 +171,24 @@ struct DuckPanelSheet: View {
                 selected: controller.tiltLook,
                 id: "duck-panel-tilt"
             ) { controller.tiltLook.toggle() }
+            PageRow(
+                title: Copy.aliasTitle,
+                note: Copy.aliasLocalOnly,
+                selected: false,
+                id: "alias-open"
+            ) { aliasOpen = true }
+        }
+        .sheet(isPresented: $aliasOpen) {
+            AliasSheet(controller: controller)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 }
 
-/// 工具: the parent's four tools. The lamp and ToF rows keep their honest
-/// notes; the backup row opens the existing sheet.
+/// 工具: the parent's tools, plus big buttons relocated here so the "This
+/// duck" panel fits under the six-control cap (2026-11-19 H2, both phones
+/// moved together; the row keeps its duck-panel-big id).
 struct ToolsSheet: View {
     @ObservedObject var controller: DuckController
     let onOpen: (DuckRoute) -> Void
@@ -227,6 +238,12 @@ struct ToolsSheet: View {
                 selected: false,
                 id: "tools-tof"
             ) { controller.refreshTofStrip() }
+            PageRow(
+                title: Copy.bigButtons,
+                note: Copy.bigButtonsNote,
+                selected: false,
+                id: "duck-panel-big"
+            ) { onOpen(.big) }
         }
     }
 }

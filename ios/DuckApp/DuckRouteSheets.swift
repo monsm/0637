@@ -132,8 +132,7 @@ struct DuckRouteSheets: View {
         case .duckPanel:
             DuckPanelSheet(
                 controller: controller,
-                languageTick: $languageTick,
-                onOpen: { child = $0 }
+                languageTick: $languageTick
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
