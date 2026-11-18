@@ -2655,18 +2655,35 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             match result {
                 Ok(value) => value,
                 Err(error) => {
-                    // The verb was understood but did not run — a taught word
-                    // whose skill the last reload dropped, say. This is a
-                    // hearing answer, not a duck state: unlike `refuse`, it
-                    // leaves `core.label` alone, and it keeps `heard` and
-                    // `phrase` so the client can see what was meant.
-                    json!({
-                        "ok": false,
-                        "heard": text,
-                        "phrase": phrase,
-                        "error": error,
-                        "reason": "the verb did not run",
-                    })
+                    // The verb was understood but did not run. Two different
+                    // situations share this shape:
+                    //
+                    // - An emotion is already playing. robotd's own rule is
+                    //   "a request while one plays is dropped" — a voice
+                    //   remote firing two moods in a row is the normal case,
+                    //   not an error, and the client should not see a
+                    //   failure for it.
+                    // - A taught word whose skill the last reload dropped,
+                    //   say. That is a hearing answer, not a duck state:
+                    //   unlike `refuse`, it leaves `core.label` alone, and it
+                    //   keeps `heard` and `phrase` so the client can see what
+                    //   was meant.
+                    if error == "an emotion is already playing" {
+                        json!({
+                            "ok": true,
+                            "heard": text,
+                            "phrase": phrase,
+                            "dropped": "an emotion is already playing",
+                        })
+                    } else {
+                        json!({
+                            "ok": false,
+                            "heard": text,
+                            "phrase": phrase,
+                            "error": error,
+                            "reason": "the verb did not run",
+                        })
+                    }
                 }
             }
         }
@@ -5394,6 +5411,30 @@ mod tests {
     /// leaves behind — is a hearing answer, not a duck state: the reply
     /// keeps `heard` and `phrase`, and the duck's label is not overwritten
     /// with the move's own error.
+    #[test]
+    fn a_heard_mood_while_one_plays_is_dropped_not_failed() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            let emotions = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../upstream/microduck/robotd/emotions");
+            let _ = c.runtime.load_emotions(&emotions);
+            tick_until_ready(core);
+            let first = apply_intent(c, Intent::Heard("开心".to_owned()));
+            assert_eq!(first["ok"], true, "{first}");
+            // A voice remote firing a second mood while the first plays is
+            // the normal case: robotd drops it, the answer says so, and the
+            // client does not see a failure.
+            let second = apply_intent(c, Intent::Heard("好奇".to_owned()));
+            assert_eq!(second["ok"], true, "{second}");
+            assert_eq!(
+                second["dropped"], "an emotion is already playing",
+                "{second}"
+            );
+            assert!(second["error"].is_null(), "{second}");
+        }
+    }
+
     #[test]
     fn a_heard_word_whose_target_vanished_keeps_its_context() {
         let (_guard, core) = new_core();
