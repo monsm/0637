@@ -5,6 +5,64 @@ import AVFoundation
 import CoreMotion
 import simd
 
+/// The walk slot's shell-side memory.
+///
+/// The core's `POST /config {"walk_policy": name}` is a process-global
+/// override: a relaunch starts from the set's own slot again. Official
+/// `robotd` writes the name into `robotd.toml` and resolves it at boot
+/// (`upstream/microduck/robotd/src/main.rs:5276-5292`); a phone has no
+/// config file, so the shell keeps it in UserDefaults and hands the same
+/// string back through `/config` once the core exists. The value is
+/// replayed verbatim — `"none"` included — because what a name means, and
+/// whether it is legal at all, is the core's ruling and not the shell's.
+struct WalkPolicyStore {
+    /// Beside the rules/quests keys, and deliberately not a Copy key:
+    /// nothing visible is named by it.
+    static let defaultsKey = "duck_walk_policy_v1"
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    /// The last name handed over, exactly as it was written. Empty or
+    /// blank is not a name: Android's store treats it as "forget", and an
+    /// empty `/config` value is the core's clear request, so there is
+    /// nothing to replay.
+    var name: String? {
+        guard let stored = defaults.string(forKey: Self.defaultsKey),
+              !stored.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        return stored
+    }
+
+    /// Remember a name for the next launch. Blank forgets: there is no
+    /// file to name. `"none"` is not blank — it is stored and replayed
+    /// verbatim, and the core rules on the sentinel.
+    func remember(_ name: String) {
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            defaults.removeObject(forKey: Self.defaultsKey)
+        } else {
+            defaults.set(name, forKey: Self.defaultsKey)
+        }
+    }
+
+    func forget() {
+        defaults.removeObject(forKey: Self.defaultsKey)
+    }
+
+    /// Hand the stored name to the core without editing it. The closure
+    /// answers whether the core took it; false when nothing usable was
+    /// stored, so the caller can tell "no request" from "refused". Pure
+    /// apart from the injected store, so a test can record the exact
+    /// replayed string.
+    @discardableResult
+    func replay(apply: (String) -> Bool) -> Bool {
+        guard let stored = name else { return false }
+        return apply(stored)
+    }
+}
+
 /// Owns the Rust core and ticks it at 50 Hz on the main run loop.
 ///
 /// The renderer and the core share the main thread, so Metal never reads
@@ -65,7 +123,10 @@ final class DuckController: ObservableObject {
         }
 
         // Programs saved before chains existed have no `then` key; they must
-        // still load rather than being dropped as corrupt.
+        // still load rather than being dropped as corrupt. The same holds
+        // for `period_s`: a program saved before timer rules carried no
+        // period. The synthesized encoder writes `period_s`; without this
+        // decode the value was silently lost on every round trip.
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             trigger = try container.decode(String.self, forKey: .trigger)
@@ -75,6 +136,7 @@ final class DuckController: ObservableObject {
                 [DuckRuleStep].self,
                 forKey: .then
             ) ?? []
+            periodS = try container.decodeIfPresent(Int.self, forKey: .periodS)
         }
     }
     struct DuckRuleStep: Codable, Equatable {
@@ -110,6 +172,17 @@ final class DuckController: ObservableObject {
     private static let dexKey = "duck_dex_first_v1"
     private static let rulesKey = "duck_rules_v1"
     private static let questKey = "duck_quests_v1"
+    /// The core's own trigger vocabulary (`core/duck-mobile-core/src/rules.rs:16`).
+    /// "pet" is the 摸摸 trigger; "timer" is the clock the editor offers too.
+    static let ruleTriggers: Set<String> = ["clap", "whistle", "pet", "timer"]
+    /// The editor's three actions. The core also accepts "light"
+    /// (`rules.rs:19`), but neither phone's editor offers it, so a shared
+    /// program stays inside the vocabulary both editors can show.
+    static let ruleActions: Set<String> = ["skill", "emotion", "sound"]
+    /// A timer's period in whole simulated seconds. The core refuses a timer
+    /// outside this window (`rules.rs:72-73,113-120`); the shell keeps the
+    /// same bounds so a pasted program is never one the core rejects whole.
+    static let rulePeriodBounds = 5...3600
 
     @Published var ready = false
     @Published var errorMessage: String?
@@ -394,6 +467,10 @@ final class DuckController: ObservableObject {
     private var tickCount = 0
     private var perfAnchor = Date()
     private var policyDirectory = ""
+    /// The walk slot as the shell remembers it across launches. The core's
+    /// override is process memory; the startup restore hands the stored
+    /// name back through `/config` once the intent server is up.
+    private let walkPolicies = WalkPolicyStore()
     private let motion = CMMotionManager()
     private var lastPush = Date.distantPast
     /// The duck's own voice: the core decides when, this owns the speaker.
@@ -987,8 +1064,87 @@ final class DuckController: ObservableObject {
         }.resume()
     }
 
+    /// Hand the stored walk-slot name back through `/config`. This is the
+    /// route that carries the core's official `walk="none"` refusal — the
+    /// C ABI's historic wrapper still clears that sentinel in silence — so
+    /// the shell sends the name verbatim and lets the core rule. Runs on
+    /// the restore worker; the intent server comes up with the core, so it
+    /// waits for /state before the one POST. A refusal is final and is not
+    /// retried; false means the name was not taken.
+    private static func replayWalkPolicy(_ name: String) -> Bool {
+        var attempts = 0
+        while attempts < 40 {
+            attempts += 1
+            guard getStateSync() != nil else {
+                Thread.sleep(forTimeInterval: 0.25)
+                continue
+            }
+            guard let body = try? JSONSerialization.data(
+                withJSONObject: ["walk_policy": name]
+            ) else { return false }
+            let accepted = postSyncData("/config", body)
+            if !accepted {
+                NSLog("duck: walk policy %@ refused by the core", name)
+            }
+            return accepted
+        }
+        NSLog("duck: walk policy %@ not replayed: core not ready", name)
+        return false
+    }
+
+    /// Whether the boot set actually carries the stored walk file. The
+    /// core's loader drops an override whose file is missing from the
+    /// directory it is loading, so reloading the boot set for a name that
+    /// lives beside a user's set would clear the override instead of
+    /// preserving it for that set. When it is not here, the override waits
+    /// for the reload that loads its own set.
+    private func bootSetHasWalkPolicy(_ name: String) -> Bool {
+        setHasWalkPolicy(name, in: policyDirectory)
+    }
+
+    /// Whether a policy directory carries the named walk file.
+    private func setHasWalkPolicy(_ name: String, in directory: String) -> Bool {
+        guard !directory.isEmpty else { return false }
+        let path = URL(fileURLWithPath: directory)
+            .appendingPathComponent(name)
+            .path
+        return FileManager.default.fileExists(atPath: path)
+    }
+
+    /// The directory Reload AI resolves: the person's own set when it has a
+    /// manifest, otherwise the bundled official set.
+    private func policyReloadDirectory() -> String {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        let userPolicies = documents?.appendingPathComponent("policies")
+        if let userPolicies,
+           FileManager.default.fileExists(atPath: userPolicies.appendingPathComponent("manifest.json").path) {
+            return userPolicies.path
+        }
+        return policyDirectory
+    }
+
+    /// Re-resolve the set the core booted with so a replayed walk override
+    /// lands: the override is read while a set loads, and `duck_core_new`
+    /// loaded its set before the replay. The caller only does this when the
+    /// boot set carries the named file — see `bootSetHasWalkPolicy` — so
+    /// the loader cannot drop the override on the way.
+    private func reloadBootPolicies() {
+        guard let core, !policyDirectory.isEmpty else { return }
+        let loaded = policyDirectory.withCString {
+            duck_core_reload_policies(core, $0)
+        }
+        if loaded != 0, let reason = duck_core_last_error() {
+            NSLog("duck: walk policy reload refused: %@", String(cString: reason))
+        }
+    }
+
     /// Called once the core is up: give back what the last session saved. A
-    /// fresh install has nothing; the duck starts at its defaults.
+    /// fresh install has nothing; the duck starts at its defaults. The walk
+    /// slot is part of this hand-back: the core's override is process
+    /// memory, so the name goes through `/config` here, and the boot set is
+    /// re-resolved when it carries that file so the duck wakes on the gait
+    /// it went to sleep on. A name that belongs to a user's own set waits
+    /// for the reload that loads it.
     func restoreCompanionState() {
         guard !companionRestoreStarted else { return }
         companionRestoreStarted = true
@@ -1012,25 +1168,15 @@ final class DuckController: ObservableObject {
         if let data = defaults.data(forKey: Self.rulesKey),
            let decoded = try? JSONDecoder().decode([DuckRule].self, from: data) {
             savedRules = decoded
-            // The same payload saveRules builds, follow-up steps included:
-            // a restore that drops `then` silently truncates the child's
-            // program, and the next Blocks edit writes the truncation back.
-            let payload = ["rules": decoded.map { rule -> [String: Any] in
-                var item: [String: Any] = [
-                    "trigger": rule.trigger,
-                    "action": rule.action,
-                    "value": rule.value,
-                ]
-                if !rule.then.isEmpty {
-                    item["then"] = rule.then.map {
-                        ["action": $0.action, "value": $0.value]
-                    }
-                }
-                return item
-            }]
+            // The same payload saveRules builds, follow-up steps and a
+            // timer's period included: a restore that drops either
+            // silently truncates the child's program, and the next Blocks
+            // edit writes the truncation back.
+            let payload = Self.rulesPayload(decoded)
             rulesPayload = try? JSONSerialization.data(withJSONObject: payload)
         }
-        guard saved != nil || rulesPayload != nil else {
+        let walkName = walkPolicies.name
+        guard saved != nil || rulesPayload != nil || walkName != nil else {
             companionRestored = true
             return
         }
@@ -1039,6 +1185,13 @@ final class DuckController: ObservableObject {
         // gate closed until then so a fresh duck cannot overwrite the file.
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var delivered = true
+            // Before care and rules: the duck should wake on the gait it
+            // went to sleep on. The name travels verbatim; the core rules
+            // on it, `"none"` included.
+            var walkTaken = false
+            if let walkName {
+                walkTaken = Self.replayWalkPolicy(walkName)
+            }
             if let saved {
                 let care = saved["care"] as? [String: Any]
                 let life = saved["life"] as? [String: Any]
@@ -1088,6 +1241,13 @@ final class DuckController: ObservableObject {
                 guard let self else { return }
                 if !savedRules.isEmpty { self.rules = savedRules }
                 self.companionRestored = delivered
+                // The override is read by a load; the boot set was
+                // resolved before this replay. Re-resolve it only when it
+                // owns the named file — otherwise the override stays in
+                // the core for the reload that loads its own set.
+                if walkTaken, let walkName, self.bootSetHasWalkPolicy(walkName) {
+                    self.reloadBootPolicies()
+                }
             }
         }
     }
@@ -1637,6 +1797,163 @@ final class DuckController: ObservableObject {
         postJSON("/chorus", ["moves": ["laugh", "yes_fast"]])
     }
 
+    // MARK: - The block program on the wire
+
+    /// One rule as the core's wire object. Save, restore and share all use
+    /// this one builder, so `period_s` cannot go missing on one path while
+    /// the other keeps it. The period travels only for a timer, exactly as
+    /// the core reads it (`rules.rs:160-164`).
+    static func ruleWireObject(_ rule: DuckRule) -> [String: Any] {
+        var item: [String: Any] = [
+            "trigger": rule.trigger,
+            "action": rule.action,
+            "value": rule.value,
+        ]
+        if rule.trigger == "timer", let periodS = rule.periodS {
+            item["period_s"] = periodS
+        }
+        if !rule.then.isEmpty {
+            item["then"] = rule.then.map {
+                ["action": $0.action, "value": $0.value]
+            }
+        }
+        return item
+    }
+
+    /// The exact POST /rules body, and the set a backup carries.
+    static func rulesPayload(_ rules: [DuckRule]) -> [String: Any] {
+        ["rules": rules.map { Self.ruleWireObject($0) }]
+    }
+
+    /// The share document: a block program travels between phones as text
+    /// (share sheet, message, clipboard). The version tag lets a future
+    /// format change without guessing; the rules are the exact wire shape
+    /// the core accepts, so an imported program runs unchanged.
+    static func shareText(_ rules: [DuckRule]) -> String {
+        var payload = rulesPayload(rules)
+        payload["microduck-rules"] = 1
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let text = String(data: data, encoding: .utf8)
+        else { return "" }
+        return text
+    }
+
+    /// A wire `period_s` as whole seconds, or nil for anything JSON cannot
+    /// honestly call a whole number inside the core's own 5...3600 window.
+    static func rulePeriod(_ raw: Any?) -> Int? {
+        guard let number = raw as? NSNumber else { return nil }
+        let seconds = number.doubleValue
+        guard seconds.rounded() == seconds,
+              seconds >= Double(rulePeriodBounds.lowerBound),
+              seconds <= Double(rulePeriodBounds.upperBound)
+        else { return nil }
+        return Int(seconds)
+    }
+
+    /// Read one rule as the running core published it. The core is the
+    /// authority here, so the shell translates the shape without applying
+    /// the editor's vocabulary; a timer keeps the period the core stores.
+    static func runningRule(fromWire item: [String: Any]) -> DuckRule? {
+        guard let trigger = item["trigger"] as? String,
+              let action = item["action"] as? String,
+              let raw = item["value"] as? String
+        else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+        let periodS = trigger == "timer" ? rulePeriod(item["period_s"]) : nil
+        let then = (item["then"] as? [[String: Any]] ?? [])
+            .prefix(4)
+            .compactMap { step -> DuckRuleStep? in
+                guard let action = step["action"] as? String,
+                      let raw = step["value"] as? String
+                else { return nil }
+                let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !value.isEmpty else { return nil }
+                return DuckRuleStep(action: action, value: value)
+            }
+        return DuckRule(
+            trigger: trigger,
+            action: action,
+            value: value,
+            then: then,
+            periodS: periodS
+        )
+    }
+
+    /// The blocks a pasted document really yields, and how many timer
+    /// blocks its sender wrote with a period the core would refuse.
+    struct SharedRulesImport {
+        let rules: [DuckRule]
+        let skippedTimers: Int
+    }
+
+    /// Read a shared program from pasted text: either the versioned
+    /// document or a bare rules array. The names must be in the core's
+    /// trigger list and the editor's action list; a timer keeps its
+    /// `period_s`, because the core stores and re-serialises that field.
+    /// A timer outside the core's 5...3600 window is dropped and counted —
+    /// sending it would make the core refuse the whole program — and the
+    /// sheet names that refusal instead of importing a silently shorter
+    /// program. nil means the text was not a program at all.
+    static func parseSharedRules(_ text: String) -> SharedRulesImport? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data)
+        else { return nil }
+        let list: [[String: Any]]
+        if let array = root as? [[String: Any]] {
+            list = array
+        } else if let doc = root as? [String: Any],
+                  doc["microduck-rules"] as? Int == 1,
+                  let array = doc["rules"] as? [[String: Any]] {
+            list = array
+        } else {
+            return nil
+        }
+        var imported: [DuckRule] = []
+        var skippedTimers = 0
+        for item in list {
+            guard let trigger = item["trigger"] as? String,
+                  let action = item["action"] as? String,
+                  let raw = item["value"] as? String,
+                  ruleTriggers.contains(trigger),
+                  ruleActions.contains(action)
+            else { continue }
+            // The core trims with Rust's `trim()`, which knows the whole
+            // Unicode White_Space set; `.whitespaces` does not include a
+            // newline, and a value the core would refuse is not a block.
+            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { continue }
+            var periodS: Int?
+            if trigger == "timer" {
+                guard let seconds = rulePeriod(item["period_s"]) else {
+                    skippedTimers += 1
+                    continue
+                }
+                periodS = seconds
+            }
+            let then = (item["then"] as? [[String: Any]] ?? [])
+                .prefix(4)
+                .compactMap { step -> DuckRuleStep? in
+                    guard let action = step["action"] as? String,
+                          let raw = step["value"] as? String,
+                          ruleActions.contains(action)
+                    else { return nil }
+                    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !value.isEmpty else { return nil }
+                    return DuckRuleStep(action: action, value: value)
+                }
+            imported.append(DuckRule(
+                trigger: trigger,
+                action: action,
+                value: value,
+                then: then,
+                periodS: periodS
+            ))
+        }
+        return SharedRulesImport(rules: imported, skippedTimers: skippedTimers)
+    }
+
     /// The block program the core is running. A GET, because the core is the
     /// authority; the local copy is only the editor's working set.
     func loadRules() {
@@ -1652,19 +1969,7 @@ final class DuckController: ObservableObject {
             }
             return
         }
-        rules = list.compactMap { item in
-            guard let trigger = item["trigger"] as? String,
-                  let action = item["action"] as? String,
-                  let value = item["value"] as? String
-            else { return nil }
-            let then = (item["then"] as? [[String: Any]] ?? []).compactMap { step -> DuckRuleStep? in
-                guard let action = step["action"] as? String,
-                      let value = step["value"] as? String
-                else { return nil }
-                return DuckRuleStep(action: action, value: value)
-            }
-            return DuckRule(trigger: trigger, action: action, value: value, then: then)
-        }
+        rules = list.compactMap { Self.runningRule(fromWire: $0) }
     }
 
     /// Replace the set in the core and on disk. The core validates; an
@@ -1673,19 +1978,7 @@ final class DuckController: ObservableObject {
         guard next.count <= 8 else { return }
         let previous = rules
         rules = next
-        let payload = ["rules": next.map { rule -> [String: Any] in
-            var item: [String: Any] = [
-                "trigger": rule.trigger,
-                "action": rule.action,
-                "value": rule.value,
-            ]
-            if !rule.then.isEmpty {
-                item["then"] = rule.then.map {
-                    ["action": $0.action, "value": $0.value]
-                }
-            }
-            return item
-        }]
+        let payload = Self.rulesPayload(next)
         guard let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
         // The core is the authority. It stays off the main thread, so the
         // answer comes back on a worker; a refusal puts the old program back
@@ -1712,88 +2005,46 @@ final class DuckController: ObservableObject {
 
     // MARK: - Sharing the block program
 
-    /// The share document: a block program travels between phones as text
-    /// (share sheet, message, clipboard). The version tag lets a future
-    /// format change without guessing; the rules are the exact wire shape
-    /// the core accepts, so an imported program runs unchanged.
+    /// The share document, built from the same wire shape the core accepts.
     var rulesShareText: String {
-        let payload: [String: Any] = [
-            "microduck-rules": 1,
-            "rules": rules.map { rule -> [String: Any] in
-                var item: [String: Any] = [
-                    "trigger": rule.trigger,
-                    "action": rule.action,
-                    "value": rule.value,
-                ]
-                if !rule.then.isEmpty {
-                    item["then"] = rule.then.map {
-                        ["action": $0.action, "value": $0.value]
-                    }
-                }
-                return item
-            },
-        ]
-        guard let data = try? JSONSerialization.data(withJSONObject: payload),
-              let text = String(data: data, encoding: .utf8)
-        else { return "" }
-        return text
+        Self.shareText(rules)
+    }
+
+    /// What a paste did: how many blocks it carried, how many were actually
+    /// added to the child's own set (duplicates and the eight-block cap can
+    /// leave that lower), and how many timer blocks it skipped.
+    struct RulesImportResult {
+        let parsed: Int
+        let added: Int
+        let skippedTimers: Int
     }
 
     /// Read a shared program from pasted text and merge it into the child's
-    /// own. Returns how many blocks were added, or nil when the text was not
-    /// a program. Validation mirrors the editor's vocabulary; a malformed
-    /// entry is dropped rather than raining junk on the core.
+    /// own. nil means the text was not a program. A timer with an illegal
+    /// period is not silent: it is left out and counted in `skippedTimers`,
+    /// and the sheet names that refusal. The rest of a legal program still
+    /// imports, the same rule the Android shell follows.
     @discardableResult
-    func importRules(from text: String) -> Int? {
-        let triggers: Set<String> = ["clap", "whistle", "pet"]
-        let actions: Set<String> = ["skill", "emotion", "sound"]
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let data = trimmed.data(using: .utf8),
-              let root = try? JSONSerialization.jsonObject(with: data)
-        else { return nil }
-        let list: [[String: Any]]
-        if let array = root as? [[String: Any]] {
-            list = array
-        } else if let doc = root as? [String: Any],
-                  doc["microduck-rules"] as? Int == 1,
-                  let array = doc["rules"] as? [[String: Any]] {
-            list = array
-        } else {
-            return nil
+    func importRules(from text: String) -> RulesImportResult? {
+        guard let imported = Self.parseSharedRules(text) else { return nil }
+        guard !imported.rules.isEmpty else {
+            // Nothing legal to merge; the sheet still has the timer count
+            // to report, and the core is not sent an unchanged program.
+            return RulesImportResult(
+                parsed: 0,
+                added: 0,
+                skippedTimers: imported.skippedTimers
+            )
         }
-        // The core trims with Rust's `trim()`, which knows the whole Unicode
-        // White_Space set. `.whitespaces` does not include a newline, so a
-        // value of a single newline looked fine here and was refused there —
-        // and a refused program is a program the core is not running.
-        let imported = list.compactMap { item -> DuckRule? in
-            guard let trigger = item["trigger"] as? String,
-                  let action = item["action"] as? String,
-                  let raw = item["value"] as? String,
-                  triggers.contains(trigger),
-                  actions.contains(action)
-            else { return nil }
-            let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !value.isEmpty else { return nil }
-            let then = (item["then"] as? [[String: Any]] ?? [])
-                .prefix(4)
-                .compactMap { step -> DuckRuleStep? in
-                    guard let action = step["action"] as? String,
-                          let raw = step["value"] as? String,
-                          actions.contains(action)
-                    else { return nil }
-                    let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !value.isEmpty else { return nil }
-                    return DuckRuleStep(action: action, value: value)
-                }
-            return DuckRule(trigger: trigger, action: action, value: value, then: then)
-        }
-        guard !imported.isEmpty else { return nil }
         var next = rules
         var added = 0
-        for rule in imported {
+        for rule in imported.rules {
             if next.count >= 8 { break }
+            // The period is part of a timer's identity: a 30 s timer and a
+            // 60 s timer with the same action are two different blocks.
             let exists = next.contains {
-                $0.trigger == rule.trigger && $0.action == rule.action && $0.value == rule.value
+                $0.trigger == rule.trigger && $0.action == rule.action
+                    && $0.value == rule.value && $0.periodS == rule.periodS
             }
             if !exists {
                 next.append(rule)
@@ -1801,7 +2052,11 @@ final class DuckController: ObservableObject {
             }
         }
         saveRules(next)
-        return added
+        return RulesImportResult(
+            parsed: imported.rules.count,
+            added: added,
+            skippedTimers: imported.skippedTimers
+        )
     }
 
     // MARK: - The diary
@@ -2865,6 +3120,36 @@ final class DuckController: ObservableObject {
         if started != 0 { lastSkill = name }
     }
 
+    /// Remember the walk slot and hand it to the core now. No screen calls
+    /// this yet: it is the shell-side twin of `robotctl policy load walk`
+    /// and of `POST /config {"walk_policy": …}` for a tool driving this
+    /// phone. The name travels verbatim — `"none"` included — and the core
+    /// rules on it; a refusal stores nothing, and a blank name forgets the
+    /// override. A taken name is persisted, and the reload that loads the
+    /// set carrying that file resolves it.
+    func setWalkPolicy(_ name: String) {
+        if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            walkPolicies.forget()
+            return
+        }
+        guard let body = try? JSONSerialization.data(
+            withJSONObject: ["walk_policy": name]
+        ) else { return }
+        guard Self.postSyncData("/config", body) else {
+            NSLog("duck: walk policy %@ refused by the core", name)
+            return
+        }
+        walkPolicies.remember(name)
+        // Reload only when the set the button would load carries the file;
+        // otherwise leave the override in the core for the reload that
+        // loads the set that owns it. Loading a set without the file would
+        // drop the override as a stale key.
+        let directory = policyReloadDirectory()
+        if setHasWalkPolicy(name, in: directory) {
+            reloadPolicies()
+        }
+    }
+
     /// Reload a user-supplied policy set from Documents/policies when it has a
     /// manifest, otherwise the bundled official set. Custom ONNX runs under the
     /// same 61-D observation contract as the robot. The core validates the set
@@ -2873,15 +3158,9 @@ final class DuckController: ObservableObject {
     /// stride discredits.
     func reloadPolicies() {
         guard let core else { return }
-        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-        let userPolicies = documents?.appendingPathComponent("policies")
-        let directory: String
-        if let userPolicies,
-           FileManager.default.fileExists(atPath: userPolicies.appendingPathComponent("manifest.json").path) {
-            directory = userPolicies.path
-        } else {
-            directory = policyDirectory
-        }
+        let directory = policyReloadDirectory()
+        // The walk override is process memory, handed over by the startup
+        // replay or setWalkPolicy; this load is where it resolves.
         let loaded = directory.withCString { duck_core_reload_policies(core, $0) }
         if loaded != 0 {
             if let reason = duck_core_last_error() {

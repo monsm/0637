@@ -10,7 +10,7 @@
 //! model can read the duck's state, its provenance and its sensor readings,
 //! which is what makes it useful as a tool rather than a remote control.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::intent::IntentQueue;
 
@@ -311,11 +311,18 @@ fn call(name: &str, arguments: &Value, queue: &IntentQueue) -> Result<Value, Str
             "life": serde_json::from_str::<serde_json::Value>(&queue.life_json())
                 .unwrap_or(serde_json::json!({})),
         })),
-        "duck_care" => Ok(serde_json::from_str::<serde_json::Value>(&queue.care_json())
-            .map(|care| serde_json::json!({ "ok": true, "care": care["care"].clone() }))
-            .unwrap_or_else(|_| serde_json::json!({ "ok": false, "error": "care unavailable" }))),
+        "duck_care" => Ok(
+            serde_json::from_str::<serde_json::Value>(&queue.care_json())
+                .map(|care| serde_json::json!({ "ok": true, "care": care["care"].clone() }))
+                .unwrap_or_else(
+                    |_| serde_json::json!({ "ok": false, "error": "care unavailable" }),
+                ),
+        ),
         "duck_wheee" => Ok(queue.request(crate::intent::Intent::Wheee(
-            arguments.get("hold").and_then(Value::as_bool).unwrap_or(false),
+            arguments
+                .get("hold")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         ))),
         "duck_look" => Ok(queue.request(crate::intent::Intent::Look {
             target: [

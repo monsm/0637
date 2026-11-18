@@ -5,6 +5,7 @@
 //! constant-command entry is a skill, a phase-encoded one is the ground pick, a
 //! posture-flag one is the sit/stand, and the walk policy is velstand.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -37,24 +38,169 @@ impl PolicyBundle {
     }
 }
 
-/// The walk-slot override: the phone's twin of the official `[policy] walk`
-/// config key, which resolves ahead of everything a set declares
-/// (`robotd-params`' `ResolvedPolicy.walk`, config over default). The name is
-/// relative to the policies directory; the official `"none"` sentinel clears
-/// it. It is a process global because the official config key is one.
-static WALK_OVERRIDE: Mutex<Option<String>> = Mutex::new(None);
+/// The networks this core can point at a file of a person's choosing: the
+/// official `[policy]` keys it drives itself (`robotd-params`'
+/// `PolicyParams`/`Slot`). The other three official slots — `kick_left`,
+/// `kick_right`, `roulade` — are skills here, and a skill's identity on this
+/// core is its manifest skill *name* (`skills_from`), not a slot key: the
+/// file is whatever that entry says, so a slot override by file name could
+/// name a file the skill list does not publish and make the two disagree.
+/// They are deliberately not override targets, and the refusal says so by
+/// listing the names that are.
+const OVERRIDABLE_SLOTS: [&str; 4] = ["walk", "stand", "sitstand", "ground_pick"];
 
-/// Point the walk slot at one file in the policies directory — `robotctl
-/// policy load walk <file>` has no robotctl on a phone, so the shell sets the
-/// override here and reloads. `None` clears the override so the next reload
-/// resolves the set's own walk slot again.
+const WALK_SLOT: &str = "walk";
+
+/// The official refusal for `walk = "none"`: the walking policy is the slot
+/// every other one falls back to, so `robot.loadPolicy` will not switch it
+/// off (`robotd/src/main.rs`' `load_policy_request`). `resolved_with` additionally
+/// ignores a `"none"` already in the file, and `drop_unloadable_overrides`
+/// clears it and reports degraded.
+const WALK_NONE_REFUSAL: &str = "the walking policy cannot be switched off — it is what every \
+     other slot falls back to. `policy reset walk` returns it to this robot's own";
+
+/// The slot overrides: the phone's twin of the official `[policy] <slot>`
+/// config keys, which resolve ahead of everything a set declares
+/// (`robotd-params`' `PolicyParams::resolved_with`, config over default). A
+/// value is a file name relative to the policies directory, or the official
+/// `"none"` sentinel for a slot switched off. It is a process global because
+/// the official keys are one machine-level config.
+static SLOT_OVERRIDES: Mutex<BTreeMap<&'static str, String>> = Mutex::new(BTreeMap::new());
+
+/// Overrides a load had to fall back from, for the health gate to take with
+/// [`take_override_warnings`]. The official daemon records the same reasons
+/// on its `SlotErrors` and reports degraded; the core has no runtime handle
+/// here, so it leaves them in this queue for the shell's reload hook.
+static OVERRIDE_WARNINGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// The canonical spelling of an overridable slot, or the official
+/// `robot.loadPolicy` refusal: the names this core does know. Official
+/// `Slot::parse` matches the wire spelling exactly, so this does too.
+fn canonical_slot(slot: &str) -> Result<&'static str, String> {
+    OVERRIDABLE_SLOTS
+        .iter()
+        .copied()
+        .find(|known| *known == slot)
+        .ok_or_else(|| {
+            format!(
+                "no policy slot named {slot:?}; expected one of {}",
+                OVERRIDABLE_SLOTS.join(", ")
+            )
+        })
+}
+
+/// A name, not a route out of the policies directory — the same rule the C
+/// ABI applied to the walk override.
+fn validate_override_name(name: &str) -> Result<(), String> {
+    if name.contains('\\') || name.contains('/') || name.contains("..") {
+        return Err(format!(
+            "{name:?} is not a file name in the policies directory"
+        ));
+    }
+    Ok(())
+}
+
+/// Point one slot at a file in the policies directory, or clear/disable it —
+/// `robotctl policy load <slot> <file|none>` has no robotctl on a phone, so
+/// the shell sets the override here and reloads.
+///
+/// For `walk`, `None` clears the override and `"none"` is refused with the
+/// official wording: a robot with no walking network has nothing to run. For
+/// the other slots, `Some(name)` overrides the slot, `Some("none")` disables
+/// it (the slot resolves to no path), and `None` clears the override so the
+/// next reload resolves the set's own slot again.
+pub fn set_slot_override(slot: &str, value: Option<String>) -> Result<(), String> {
+    let slot = canonical_slot(slot)?;
+    let mut overrides = SLOT_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let Some(value) = value else {
+        overrides.remove(slot);
+        return Ok(());
+    };
+    if value.is_empty() {
+        return Err(format!(
+            "empty path for slot {slot:?}; omit the override to clear it"
+        ));
+    }
+    if is_none_sentinel(&value) {
+        if slot == WALK_SLOT {
+            return Err(WALK_NONE_REFUSAL.to_owned());
+        }
+        // The literal that turns a slot off, stored as the official config
+        // file spells it. It names no file, so it is never validated.
+        overrides.insert(slot, "none".to_owned());
+        return Ok(());
+    }
+    validate_override_name(&value)?;
+    overrides.insert(slot, value);
+    Ok(())
+}
+
+/// The current override for one slot, `"none"` included so a reader can tell
+/// a disabled slot from an unset one.
+pub fn slot_override(slot: &str) -> Option<String> {
+    let slot = canonical_slot(slot).ok()?;
+    SLOT_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(slot)
+        .cloned()
+}
+
+/// Clear every slot override, the official `policy reset` with no slot.
+pub fn clear_slot_overrides() {
+    SLOT_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clear();
+}
+
+/// Take the reasons a reload fell back from an override, for the shell's
+/// reload hook to mark the health gate degraded with. Drains the queue: each
+/// warning is reported once, like the official boot-time report.
+pub fn take_override_warnings() -> Vec<String> {
+    std::mem::take(
+        &mut *OVERRIDE_WARNINGS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    )
+}
+
+/// The override table is a process global. Tests that resolve a slot or
+/// change an override take this lock so a parallel test never reads another
+/// test's state. The intent tests' `/config` route shares the table, so the
+/// lock is crate-visible for them too.
+#[cfg(test)]
+pub(crate) static OVERRIDE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Hold [`OVERRIDE_TEST_LOCK`] with the table clear and no warnings left
+/// over — the state every override test assumes.
+#[cfg(test)]
+pub(crate) fn override_test_lock() -> std::sync::MutexGuard<'static, ()> {
+    let guard = OVERRIDE_TEST_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    clear_slot_overrides();
+    let _ = take_override_warnings();
+    guard
+}
+
+/// Point the walk slot at one file — the pre-slot-table signature, kept for
+/// the C ABI and existing callers. It has no error channel, so its historic
+/// reading of empty and the official `"none"` sentinel stands: both clear the
+/// override. [`set_slot_override`] is the API that carries the official walk
+/// refusal; this wrapper cannot report it.
 pub fn set_walk_override(name: Option<String>) {
-    *WALK_OVERRIDE.lock().unwrap() = name.filter(|name| !name.is_empty());
+    let name = name.filter(|name| !name.is_empty() && !is_none_sentinel(name));
+    // The name still goes through the table's validation; a rejected name
+    // leaves the previous override in place, as the C ABI's own gate does.
+    let _ = set_slot_override(WALK_SLOT, name);
 }
 
 /// The current walk-slot override, if one is set.
 pub fn walk_override() -> Option<String> {
-    WALK_OVERRIDE.lock().unwrap().clone()
+    slot_override(WALK_SLOT)
 }
 
 /// The official sentinel: a config path of `"none"` means "no policy here",
@@ -213,7 +359,9 @@ fn read_manifest(dir: &Path) -> Option<Manifest> {
         }
     }
     let mut policy: SetPolicy = serde_json::from_str(&text).ok()?;
-    let slot = serde_json::from_str::<SlotFlat>(&text).ok().and_then(|flat| flat.slot);
+    let slot = serde_json::from_str::<SlotFlat>(&text)
+        .ok()
+        .and_then(|flat| flat.slot);
     if policy.file.is_empty() {
         let mut found: Vec<PathBuf> = std::fs::read_dir(dir)
             .ok()?
@@ -264,6 +412,21 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
         }
     }
 
+    // An override whose file is gone costs its slot and nothing else, which
+    // is the official `drop_unloadable_overrides` rule for a config key left
+    // behind by a deleted file: drop it, record why, and let the set resolve
+    // as if it had never been set. Here the question is only whether the file
+    // exists; the full ONNX validation is the reload's own job.
+    if let Some(name) = slot_override(WALK_SLOT)
+        && !is_none_sentinel(&name)
+    {
+        let path = dir.join(&name);
+        if !path.is_file() {
+            warn_override_unloadable(WALK_SLOT, &path);
+            let _ = set_slot_override(WALK_SLOT, None);
+        }
+    }
+
     // Walking keeps the app's long-standing preference: velstand is the
     // current gait (a walking set also ships alpha_walking, which is older).
     // A non-walking mode takes the manifest's perpetual entry tagged with it.
@@ -288,7 +451,10 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
     }
     .ok_or_else(|| format!("no {:?} locomotion policy in {}", mode, dir.display()))?;
 
-    let walk_file = walk.file_name().and_then(|name| name.to_str()).unwrap_or("");
+    let walk_file = walk
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
     let action_scale = manifest.as_ref().and_then(|manifest| {
         manifest
             .set
@@ -329,6 +495,14 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
             existing(dir.join(fallback))
         });
 
+    // The `[policy]` overrides for the three slots whose resolution is not the
+    // walk gait's own (walk is applied in `walk_gait`): the named file wins
+    // over the set, `"none"` leaves the slot with nothing, and a file that is
+    // gone falls back to what the set resolved and is reported.
+    let stand = apply_slot_override(dir, "stand", None);
+    let sitstand = apply_slot_override(dir, "sitstand", sitstand);
+    let ground_pick = apply_slot_override(dir, "ground_pick", ground_pick);
+
     let (skills, pick_timing, sit_timing) = match manifest.as_ref() {
         Some(manifest) => (
             // Skills are deliberately not filtered by mode, exactly as
@@ -366,20 +540,24 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
             .and_then(|timing| timing.action_scale)
             .unwrap_or(fallback_scale),
         ground_pick_gain_ratio: 1.0,
-        sitstand_rise_s: sit_timing
-            .map_or(robotd_params::DEFAULT_SITSTAND_RISE_S, |timing| timing.rise_s),
-        sitstand_ramp_s: sit_timing
-            .map_or(robotd_params::DEFAULT_SITSTAND_RAMP_S, |timing| timing.ramp_s),
+        sitstand_rise_s: sit_timing.map_or(robotd_params::DEFAULT_SITSTAND_RISE_S, |timing| {
+            timing.rise_s
+        }),
+        sitstand_ramp_s: sit_timing.map_or(robotd_params::DEFAULT_SITSTAND_RAMP_S, |timing| {
+            timing.ramp_s
+        }),
         skills: skills.clone(),
     };
 
     let paths = PolicyPaths {
         walk,
-        // **No standing network in either mode**, which is the robot's own
-        // default: velstand (set v5) stands still at zero command on its own,
-        // and `[policy] stand = "none"` in the shipped config. `alpha_stand`
-        // ships in the set for sets that predate velstand, not for this one.
-        stand: None,
+        // **No standing network by default in either mode**, which is the
+        // robot's own default: velstand (set v5) stands still at zero command
+        // on its own, and `[policy] stand = "none"` in the shipped config.
+        // `alpha_stand` ships in the set for sets that predate velstand, not
+        // for this one. An explicit `stand` override is the way a person
+        // loads one back (`apply_slot_override` above).
+        stand,
         sitstand,
         ground_pick,
         skills: skills
@@ -400,6 +578,40 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
 
 fn existing(path: PathBuf) -> Option<PathBuf> {
     path.exists().then_some(path)
+}
+
+/// Apply one slot override to a resolved path, the way the official config
+/// key applies to a slot: the named file wins, `"none"` resolves to nothing,
+/// and no override leaves the set's own value. An override whose file is gone
+/// falls back to `resolved`, keeps its slot out of the failure (the set still
+/// runs), is dropped from the table, and leaves a warning for
+/// [`take_override_warnings`] — `drop_unloadable_overrides`' rule.
+fn apply_slot_override(dir: &Path, slot: &str, resolved: Option<PathBuf>) -> Option<PathBuf> {
+    let Some(name) = slot_override(slot) else {
+        return resolved;
+    };
+    if is_none_sentinel(&name) {
+        return None;
+    }
+    let path = dir.join(&name);
+    if path.is_file() {
+        return Some(path);
+    }
+    warn_override_unloadable(slot, &path);
+    let _ = set_slot_override(slot, None);
+    resolved
+}
+
+/// Record why a slot fell back, in the official daemon's words: the override
+/// will not load and the slot's default stands.
+fn warn_override_unloadable(slot: &str, path: &Path) {
+    OVERRIDE_WARNINGS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(format!(
+            "the {slot} policy override {} will not load; falling back to this slot's default",
+            path.display()
+        ));
 }
 
 /// The walk slot, resolved the way the official daemon resolves it, with the
@@ -511,18 +723,12 @@ fn fallback_skills(dir: &Path) -> Vec<SkillDef> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, MutexGuard};
+    use std::sync::MutexGuard;
 
-    /// The walk override is a process global. Tests that resolve a walk slot
-    /// take this lock so a parallel test never reads another test's override.
-    static WALK_TEST_LOCK: Mutex<()> = Mutex::new(());
-
-    /// Hold the lock for the duration of a walk-resolution test, with the
-    /// override guaranteed clear — the state every other test assumes.
+    /// Hold the lock for the duration of an override test, with the table
+    /// clear and no warnings left over — the state every other test assumes.
     fn walk_test_lock() -> MutexGuard<'static, ()> {
-        let guard = WALK_TEST_LOCK.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        set_walk_override(None);
-        guard
+        override_test_lock()
     }
 
     /// A temp policies directory with stub files — the resolver only checks
@@ -548,16 +754,20 @@ mod tests {
         };
         let bundle = load(&dir).expect("manifest");
         assert!(bundle.paths.walk.ends_with("velstand.onnx"));
-        assert!(bundle
-            .paths
-            .sitstand
-            .as_ref()
-            .is_some_and(|path| path.ends_with("alpha_sitstand.onnx")));
-        assert!(bundle
-            .paths
-            .ground_pick
-            .as_ref()
-            .is_some_and(|path| path.ends_with("alpha_ground_pick.onnx")));
+        assert!(
+            bundle
+                .paths
+                .sitstand
+                .as_ref()
+                .is_some_and(|path| path.ends_with("alpha_sitstand.onnx"))
+        );
+        assert!(
+            bundle
+                .paths
+                .ground_pick
+                .as_ref()
+                .is_some_and(|path| path.ends_with("alpha_ground_pick.onnx"))
+        );
         assert_eq!(bundle.skill_tuning.ground_pick_period, 4.0);
         assert_eq!(bundle.skill_tuning.ground_pick_end_phase, 0.7);
         assert_eq!(bundle.skill_tuning.sitstand_rise_s, 1.0);
@@ -598,15 +808,24 @@ mod tests {
         let walk = load_mode(&dir, Mode::Walk).expect("walk");
         let roller = load_mode(&dir, Mode::Roller).expect("roller");
 
-        assert!(walker_walk(&walk), "walking keeps velstand: {:?}", walk.paths.walk);
+        assert!(
+            walker_walk(&walk),
+            "walking keeps velstand: {:?}",
+            walk.paths.walk
+        );
         assert!(roller.paths.walk.ends_with("roller.onnx"));
-        assert!(roller.standing_disabled, "the roller has no standing network");
+        assert!(
+            roller.standing_disabled,
+            "the roller has no standing network"
+        );
         assert_eq!(roller.paths.stand, None);
-        assert!(roller
-            .paths
-            .ground_pick
-            .as_ref()
-            .is_some_and(|path| path.ends_with("roller_crouch.onnx")));
+        assert!(
+            roller
+                .paths
+                .ground_pick
+                .as_ref()
+                .is_some_and(|path| path.ends_with("roller_crouch.onnx"))
+        );
         // The crouch's own timing comes from the manifest, not the walking pick.
         assert_eq!(roller.skill_tuning.ground_pick_period, 5.0);
         assert_eq!(roller.skill_tuning.ground_pick_end_phase, 0.7);
@@ -650,7 +869,9 @@ mod tests {
         let dir = write_set(
             "model-api",
             &["velstand.onnx"],
-            Some(r#"{ "model_api": 3, "policies": [ { "file": "velstand.onnx", "kind": "perpetual" } ] }"#),
+            Some(
+                r#"{ "model_api": 3, "policies": [ { "file": "velstand.onnx", "kind": "perpetual" } ] }"#,
+            ),
         );
         let error = load(&dir).expect_err("model API 3 is newer than the daemon");
         assert!(error.contains("model API 3"), "{error}");
@@ -721,7 +942,11 @@ mod tests {
             ),
         );
         let bundle = load(&dir).expect("the declared gait loads");
-        assert!(bundle.paths.walk.ends_with("my_gait.onnx"), "{:?}", bundle.paths.walk);
+        assert!(
+            bundle.paths.walk.ends_with("my_gait.onnx"),
+            "{:?}",
+            bundle.paths.walk
+        );
     }
 
     /// A slot-less perpetual entry is the main gait when the set ships no
@@ -736,7 +961,11 @@ mod tests {
             Some(r#"{ "policies": [ { "file": "my_gait.onnx", "kind": "perpetual" } ] }"#),
         );
         let bundle = load(&dir).expect("the declared gait loads");
-        assert!(bundle.paths.walk.ends_with("my_gait.onnx"), "{:?}", bundle.paths.walk);
+        assert!(
+            bundle.paths.walk.ends_with("my_gait.onnx"),
+            "{:?}",
+            bundle.paths.walk
+        );
     }
 
     /// The override is the config twin: it wins over what the set declares,
@@ -753,12 +982,225 @@ mod tests {
         );
         set_walk_override(Some("chosen.onnx".to_owned()));
         let bundle = load(&dir).expect("the override loads");
-        assert!(bundle.paths.walk.ends_with("chosen.onnx"), "{:?}", bundle.paths.walk);
-        // And the official `"none"` sentinel clears it again.
+        assert!(
+            bundle.paths.walk.ends_with("chosen.onnx"),
+            "{:?}",
+            bundle.paths.walk
+        );
+        // The legacy wrapper keeps its old "none"/empty-clears reading — the
+        // C ABI maps its sentinel there before calling it — while the slot
+        // API refuses walk = "none" (see the test below).
         set_walk_override(Some("none".to_owned()));
         let bundle = load(&dir).expect("the sentinel clears the override");
-        assert!(bundle.paths.walk.ends_with("my_gait.onnx"), "{:?}", bundle.paths.walk);
+        assert!(
+            bundle.paths.walk.ends_with("my_gait.onnx"),
+            "{:?}",
+            bundle.paths.walk
+        );
         set_walk_override(None);
+    }
+
+    /// The official `robot.loadPolicy` refuses `walk = "none"`: the walking
+    /// policy is what every other slot falls back to. Other slots can be
+    /// switched off, and the sentinel is reported as the override.
+    #[test]
+    fn walk_cannot_be_switched_off_and_other_slots_can() {
+        let _lock = walk_test_lock();
+        let error =
+            set_slot_override("walk", Some("none".to_owned())).expect_err("walk is required");
+        assert!(error.contains("cannot be switched off"), "{error}");
+        assert!(error.contains("policy reset walk"), "{error}");
+        assert_eq!(slot_override("walk"), None);
+
+        set_slot_override("sitstand", Some("none".to_owned())).expect("a slot to disable");
+        assert_eq!(slot_override("sitstand").as_deref(), Some("none"));
+        set_slot_override("sitstand", None).expect("reset");
+        assert_eq!(slot_override("sitstand"), None);
+    }
+
+    /// `sitstand = "none"` leaves the slot empty after a load — the local
+    /// twin of the official key disabling the commanded sit↔stand.
+    #[test]
+    fn a_disabled_sitstand_slot_has_no_path() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "sitstand-none",
+            &["velstand.onnx", "alpha_sitstand.onnx"],
+            None,
+        );
+        let bundle = load(&dir).expect("the set loads");
+        assert!(bundle.paths.sitstand.is_some());
+        set_slot_override("sitstand", Some("none".to_owned())).expect("disable");
+        let bundle = load(&dir).expect("the disabled set loads");
+        assert_eq!(bundle.paths.sitstand, None);
+    }
+
+    /// A slot override wins over the set's own entry, exactly as `[policy]
+    /// ground_pick` wins over the default on the robot.
+    #[test]
+    fn a_ground_pick_override_wins_over_the_set() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "ground-pick-override",
+            &[
+                "velstand.onnx",
+                "alpha_ground_pick.onnx",
+                "custom_pick.onnx",
+            ],
+            None,
+        );
+        let bundle = load(&dir).expect("the set loads");
+        assert!(
+            bundle
+                .paths
+                .ground_pick
+                .as_ref()
+                .is_some_and(|path| path.ends_with("alpha_ground_pick.onnx")),
+            "{:?}",
+            bundle.paths.ground_pick
+        );
+        set_slot_override("ground_pick", Some("custom_pick.onnx".to_owned())).expect("override");
+        let bundle = load(&dir).expect("the override loads");
+        assert!(
+            bundle
+                .paths
+                .ground_pick
+                .as_ref()
+                .is_some_and(|path| path.ends_with("custom_pick.onnx")),
+            "{:?}",
+            bundle.paths.ground_pick
+        );
+    }
+
+    /// The walking set ships no standing network; an override is how a person
+    /// points the slot at one without editing the manifest.
+    #[test]
+    fn a_stand_override_loads_a_network_the_set_does_not_ship() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "stand-override",
+            &["velstand.onnx", "stand_custom.onnx"],
+            None,
+        );
+        let bundle = load(&dir).expect("the set loads");
+        assert_eq!(bundle.paths.stand, None);
+        set_slot_override("stand", Some("stand_custom.onnx".to_owned())).expect("override");
+        let bundle = load(&dir).expect("the override loads");
+        assert!(
+            bundle
+                .paths
+                .stand
+                .as_ref()
+                .is_some_and(|path| path.ends_with("stand_custom.onnx")),
+            "{:?}",
+            bundle.paths.stand
+        );
+    }
+
+    /// An override whose file is gone costs its slot and nothing else — the
+    /// official `drop_unloadable_overrides` rule. The slot falls back to the
+    /// set's value, the override is dropped, and the reason is left for the
+    /// health gate to take (`take_override_warnings`).
+    #[test]
+    fn an_unloadable_override_falls_back_and_is_reported() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "override-fallback",
+            &[
+                "velstand.onnx",
+                "alpha_sitstand.onnx",
+                "alpha_ground_pick.onnx",
+            ],
+            None,
+        );
+        set_slot_override("walk", Some("gone_walk.onnx".to_owned())).expect("walk override");
+        set_slot_override("sitstand", Some("gone_sit.onnx".to_owned())).expect("sitstand override");
+        set_slot_override("ground_pick", Some("gone_pick.onnx".to_owned())).expect("pick override");
+
+        let bundle = load(&dir).expect("the set still loads");
+        assert!(
+            bundle.paths.walk.ends_with("velstand.onnx"),
+            "{:?}",
+            bundle.paths.walk
+        );
+        assert!(
+            bundle
+                .paths
+                .sitstand
+                .as_ref()
+                .is_some_and(|path| path.ends_with("alpha_sitstand.onnx")),
+            "{:?}",
+            bundle.paths.sitstand
+        );
+        assert!(
+            bundle
+                .paths
+                .ground_pick
+                .as_ref()
+                .is_some_and(|path| path.ends_with("alpha_ground_pick.onnx")),
+            "{:?}",
+            bundle.paths.ground_pick
+        );
+
+        // Dropped, as the config key would be on the robot: a later reload
+        // must not warn about it again.
+        assert_eq!(slot_override("walk"), None);
+        assert_eq!(slot_override("sitstand"), None);
+        assert_eq!(slot_override("ground_pick"), None);
+
+        let warnings = take_override_warnings();
+        for (slot, file) in [
+            ("walk", "gone_walk.onnx"),
+            ("sitstand", "gone_sit.onnx"),
+            ("ground_pick", "gone_pick.onnx"),
+        ] {
+            assert!(
+                warnings
+                    .iter()
+                    .any(|warning| warning.contains(slot) && warning.contains(file)),
+                "no {slot} warning in {warnings:?}"
+            );
+        }
+        assert!(
+            take_override_warnings().is_empty(),
+            "each warning is reported once"
+        );
+    }
+
+    /// A name that could walk out of the policies directory is refused before
+    /// it is stored, the same rule the C ABI applied to the walk override.
+    #[test]
+    fn an_override_may_not_leave_the_policies_directory() {
+        let _lock = walk_test_lock();
+        for bad in [
+            "sub/gait.onnx",
+            "sub\\gait.onnx",
+            "../gait.onnx",
+            "..",
+            "ga..it.onnx",
+        ] {
+            let error = set_slot_override("ground_pick", Some(bad.to_owned())).expect_err(bad);
+            assert!(error.contains("not a file name"), "{bad}: {error}");
+        }
+        assert_eq!(slot_override("ground_pick"), None);
+    }
+
+    /// Official `Slot::parse` names seven slots; this core's skill slots are
+    /// keyed by manifest skill name instead, so they are not override targets
+    /// and an unknown name is refused with the list of names it does know.
+    #[test]
+    fn unknown_and_skill_slots_are_refused() {
+        let _lock = walk_test_lock();
+        for slot in ["kick_left", "kick_right", "roulade", "walk_policy"] {
+            let error = set_slot_override(slot, Some("x.onnx".to_owned())).expect_err(slot);
+            assert!(error.contains("no policy slot named"), "{slot}: {error}");
+        }
+        let error = set_slot_override("kick_left", None).expect_err("unknown even when clearing");
+        assert!(
+            error.contains("expected one of walk, stand, sitstand, ground_pick"),
+            "{error}"
+        );
+        assert_eq!(slot_override("kick_left"), None);
     }
 
     /// No manifest and no override is the behaviour the app has always had:
@@ -768,7 +1210,11 @@ mod tests {
         let _lock = walk_test_lock();
         let dir = write_set("no-manifest", &["velstand.onnx"], None);
         let bundle = load(&dir).expect("velstand loads");
-        assert!(bundle.paths.walk.ends_with("velstand.onnx"), "{:?}", bundle.paths.walk);
+        assert!(
+            bundle.paths.walk.ends_with("velstand.onnx"),
+            "{:?}",
+            bundle.paths.walk
+        );
     }
 
     fn walker_walk(bundle: &PolicyBundle) -> bool {

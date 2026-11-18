@@ -59,3 +59,14 @@ jobs:
       - name: Protected paths (warning)
         if: github.event_name == 'push'
         run: python3 scripts/check-protected-paths.py . ${{ github.event.before }}
+      - name: Shellcheck
+        run: |
+          set -euo pipefail
+          # The runner image ships shellcheck; install only if this one does
+          # not, so the gate is the same binary on every image.
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y shellcheck
+          fi
+          shellcheck --version
+          bash scripts/shellcheck.sh

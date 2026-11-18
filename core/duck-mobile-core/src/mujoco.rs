@@ -17,7 +17,7 @@ use duck_control::imu::ImuData;
 use duck_control::io::{JointTargets, Result, RobotIo, Sensors, SlowSensors};
 use duck_control::model::{DEFAULT_POSITION, NUM_JOINTS};
 
-use crate::bam::{current_ma, BamModel};
+use crate::bam::{BamModel, current_ma};
 
 #[repr(C)]
 struct DuckMj {
@@ -86,7 +86,12 @@ unsafe extern "C" {
         solimp3: c_double,
         solimp4: c_double,
     );
-    fn duck_mj_set_dof_friction(handle: *mut DuckMj, dof: c_int, frictionloss: c_double, damping: c_double);
+    fn duck_mj_set_dof_friction(
+        handle: *mut DuckMj,
+        dof: c_int,
+        frictionloss: c_double,
+        damping: c_double,
+    );
     fn duck_mj_external_torque(handle: *mut DuckMj, dof: c_int) -> c_double;
     fn duck_mj_actuator_torque(handle: *mut DuckMj, dof: c_int) -> c_double;
     fn duck_mj_set_ctrl(handle: *mut DuckMj, actuator: c_int, value: c_double);
@@ -216,9 +221,8 @@ impl MujocoIo {
             if unsafe { duck_mj_geom_type(self.handle, geom as i32) } == 0 {
                 // A plane geom is the room's ground. Move it, then let the
                 // physics re-derive everything that stands on it.
-                let pos = unsafe {
-                    slice::from_raw_parts_mut(duck_mj_geom_pos(self.handle), count * 3)
-                };
+                let pos =
+                    unsafe { slice::from_raw_parts_mut(duck_mj_geom_pos(self.handle), count * 3) };
                 pos[geom * 3 + 2] = z;
                 unsafe { duck_mj_forward(self.handle) };
                 return Some(geom);
@@ -244,7 +248,8 @@ impl MujocoIo {
         let path = CString::new(xml_path.as_ref().to_string_lossy().as_bytes())
             .map_err(|error| error.to_string())?;
         let mut error = [0 as c_char; 1024];
-        let handle = unsafe { duck_mj_load(path.as_ptr(), error.as_mut_ptr(), error.len() as c_int) };
+        let handle =
+            unsafe { duck_mj_load(path.as_ptr(), error.as_mut_ptr(), error.len() as c_int) };
         if handle.is_null() {
             let message = unsafe { CStr::from_ptr(error.as_ptr()) }
                 .to_string_lossy()
@@ -291,8 +296,7 @@ impl MujocoIo {
         for actuator in 0..nu {
             let joint = unsafe { duck_mj_actuator_trnid(handle, actuator as c_int, 0) };
             if joint >= 0 {
-                actuator_dof[actuator] =
-                    unsafe { duck_mj_jnt_dofadr(handle, joint) } as usize;
+                actuator_dof[actuator] = unsafe { duck_mj_jnt_dofadr(handle, joint) } as usize;
             }
         }
         for wire in 0..NUM_JOINTS {
@@ -381,16 +385,7 @@ impl MujocoIo {
                 duck_mj_make_motor(handle, actuator as c_int);
                 duck_mj_set_force_limit(handle, actuator as c_int, force_limit);
                 duck_mj_zero_joint_friction(
-                    handle,
-                    joint,
-                    armature,
-                    -5.0e4,
-                    -2.0e2,
-                    0.99,
-                    0.9999,
-                    0.001,
-                    0.5,
-                    2.0,
+                    handle, joint, armature, -5.0e4, -2.0e2, 0.99, 0.9999, 0.001, 0.5, 2.0,
                 );
             }
         }
@@ -401,14 +396,22 @@ impl MujocoIo {
         unsafe { duck_mj_reset(self.handle) };
         {
             let qpos = unsafe { slice::from_raw_parts_mut(duck_mj_qpos(self.handle), self.nq) };
-            qpos[self.trunk_qpos..self.trunk_qpos + 7]
-                .copy_from_slice(&[0.0, 0.0, HOME_TRUNK_Z, 1.0, 0.0, 0.0, 0.0]);
+            qpos[self.trunk_qpos..self.trunk_qpos + 7].copy_from_slice(&[
+                0.0,
+                0.0,
+                HOME_TRUNK_Z,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+            ]);
             for wire in 0..NUM_JOINTS {
                 if let Some(address) = self.wire_qpos[wire] {
                     qpos[address] = DEFAULT_POSITION[wire];
                 }
             }
-            self.held_trunk.copy_from_slice(&qpos[self.trunk_qpos..self.trunk_qpos + 7]);
+            self.held_trunk
+                .copy_from_slice(&qpos[self.trunk_qpos..self.trunk_qpos + 7]);
             self.held_joints = [0.0; NUM_JOINTS];
             for wire in 0..NUM_JOINTS {
                 if let Some(address) = self.wire_qpos[wire] {
@@ -513,11 +516,7 @@ impl MujocoIo {
         let pos = unsafe { slice::from_raw_parts(duck_mj_xpos(self.handle), count * 3) };
         let quat = unsafe { slice::from_raw_parts(duck_mj_xquat(self.handle), count * 4) };
         (
-            [
-                pos[body * 3],
-                pos[body * 3 + 1],
-                pos[body * 3 + 2],
-            ],
+            [pos[body * 3], pos[body * 3 + 1], pos[body * 3 + 2]],
             [
                 quat[body * 4],
                 quat[body * 4 + 1],
@@ -698,7 +697,8 @@ impl MujocoIo {
                 u[2] * v[0] - u[0] * v[2],
                 u[0] * v[1] - u[1] * v[0],
             ];
-            let length = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+            let length =
+                (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
             if length > 0.0 {
                 for value in &mut normal {
                     *value /= length;
@@ -724,7 +724,8 @@ impl MujocoIo {
         if geom >= self.geom_count() {
             return None;
         }
-        let pos = unsafe { slice::from_raw_parts(duck_mj_geom_pos(self.handle), self.geom_count() * 3) };
+        let pos =
+            unsafe { slice::from_raw_parts(duck_mj_geom_pos(self.handle), self.geom_count() * 3) };
         let quat =
             unsafe { slice::from_raw_parts(duck_mj_geom_quat(self.handle), self.geom_count() * 4) };
         // Resolve the material: geom_rgba alone is the default grey for
@@ -752,7 +753,11 @@ impl MujocoIo {
         if ptr.is_null() {
             None
         } else {
-            Some(unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned())
+            Some(
+                unsafe { CStr::from_ptr(ptr) }
+                    .to_string_lossy()
+                    .into_owned(),
+            )
         }
     }
 
@@ -877,13 +882,9 @@ impl RobotIo for MujocoIo {
         Some(self.trunk())
     }
 
-    fn push(&mut self, velocity: [f64; 3]) -> Result<()> {        unsafe {
-            duck_mj_set_trunk_velocity(
-                self.handle,
-                velocity[0],
-                velocity[1],
-                velocity[2],
-            );
+    fn push(&mut self, velocity: [f64; 3]) -> Result<()> {
+        unsafe {
+            duck_mj_set_trunk_velocity(self.handle, velocity[0], velocity[1], velocity[2]);
         }
         Ok(())
     }
@@ -911,8 +912,7 @@ impl RobotIo for MujocoIo {
         for axis in 0..3 {
             let position = qpos[self.trunk_qpos + axis];
             let velocity = qvel[self.trunk_dof + axis];
-            force[axis] = CARRY_STIFFNESS * (target[axis] - position)
-                - CARRY_DAMPING * velocity;
+            force[axis] = CARRY_STIFFNESS * (target[axis] - position) - CARRY_DAMPING * velocity;
         }
         // A hand is strong but not a rigid weld; with the duck's 0.77 kg, 60 N is
         // already far past any acceleration a person would impart.
@@ -954,8 +954,7 @@ impl RobotIo for MujocoIo {
                     bam.previous_torque.fill(0.0);
                 }
             } else {
-                let ctrl =
-                    unsafe { slice::from_raw_parts_mut(duck_mj_ctrl(self.handle), self.nu) };
+                let ctrl = unsafe { slice::from_raw_parts_mut(duck_mj_ctrl(self.handle), self.nu) };
                 ctrl.fill(0.0);
             }
             return Ok(());
@@ -1070,13 +1069,23 @@ mod tests {
     /// wheel joints that are simply not in the wire table.
     #[test]
     fn the_roller_scene_loads_with_the_same_wire_mapping() {
-        let scene = std::path::Path::new(
-            r"D:\AI\Duck\upstream\microduck_rl\src\mjlab_microduck\robot\microduck\scene_rollers.xml",
+        // The scene lives in the fetched upstream checkout; resolve it the way
+        // every fixture test does, and let CI's DUCK_REQUIRE_FIXTURES=1 turn a
+        // missing asset into a failure rather than a silent skip.
+        let scene = crate::fixtures::workspace_root().join(
+            "upstream/microduck_rl/src/mjlab_microduck/robot/microduck/scene_rollers.xml",
         );
-        if !scene.exists() {
+        if !scene.is_file() {
+            if crate::fixtures::required() {
+                panic!("the roller scene is missing at {}", scene.display());
+            }
+            eprintln!(
+                "skipping: the roller scene is not here at {}",
+                scene.display()
+            );
             return;
         }
-        let io = MujocoIo::load(scene).expect("the roller scene loads");
+        let io = MujocoIo::load(&scene).expect("the roller scene loads");
         assert!(io.body_count() > 0);
         // Every leg, neck and head servo is present. The roller model has no
         // mouth joint, exactly like the walking one, so a beak intent is

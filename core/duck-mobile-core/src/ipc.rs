@@ -40,12 +40,23 @@
 //! `intent.rs`'s loopback trust, no authentication: the loopback address is the phone
 //! talking to itself, and the socket is never exposed on the LAN.
 //!
-//! Scope is ticket E's method set: `hello`, `robot.health`, `robot.move`, `robot.head`,
-//! `robot.do`, `robot.subscribe`. Anything else that parses as an official `Call` is
-//! refused with `METHOD_NOT_FOUND` and the official "is not served by robotd" sentence —
-//! the same refusal a `robotd` missing a route gives, which is the designed skew
-//! behaviour rather than a parse error. Extending the served set is a `dispatch` arm
-//! plus a [`RobotHandlers`] method for the wiring ticket, not a protocol change.
+//! Scope: the `robot.*` methods a phone can honestly serve — `hello`,
+//! `robot.health`, `robot.safeToRestart`, `robot.move`, `robot.head`,
+//! `robot.look`, `robot.stop`, `robot.enable`, `robot.init`, `robot.relax`,
+//! `robot.rest`, `robot.shutdown`, `robot.do`, `robot.pose`, `robot.mouth`,
+//! `robot.sound`, `robot.flashlight`, `robot.mode`, `robot.setMode`,
+//! `robot.policies`, `robot.model`, `robot.vetbook`, `robot.skills`,
+//! `robot.loadPolicy`, `robot.reloadPolicies` and `robot.subscribe`.
+//!
+//! Deliberately not served, and refused with `METHOD_NOT_FOUND` and the
+//! official "is not served by robotd" sentence: `robot.theremin` and
+//! `robot.chorale` (no ToF depth source, no chorale score player),
+//! `robot.setSkill`/`robot.removeSkill` (the phone's skill set is the
+//! manifest's; there is no `robotd.toml` edit surface), and the updaterd /
+//! configd namespaces. That is the same refusal a `robotd` missing a route
+//! gives, which is the designed skew behaviour rather than a parse error.
+//! Extending the served set is a `dispatch` arm plus a [`RobotHandlers`]
+//! method, not a protocol change.
 //!
 //! What this module does **not** do: it owns no runtime. Where the health verdict, the
 //! twist and the per-tick state frames come from is [`RobotHandlers`] and
@@ -121,6 +132,119 @@ pub trait RobotHandlers: Send + Sync + 'static {
     /// `robot.do` — a one-shot skill by name (or the sit↔stand toggle). The refusal
     /// reasons are the handler's: the official ones name what the robot *can* do.
     fn do_skill(&self, params: proto::DoParams) -> proto::IntentResult;
+
+    /// `robot.look` — solve the head IK for a trunk-frame point and hand the joints to
+    /// the same path `robot.head` feeds. The official dispatch does the IK on the IPC
+    /// side (`robotd/src/main.rs:5395-5410`), so this answers with `LookResult`
+    /// immediately rather than waiting for a control tick.
+    fn look(&self, _params: proto::LookParams) -> proto::LookResult {
+        proto::LookResult {
+            head: proto::HeadParams::default(),
+            clamped: true,
+        }
+    }
+
+    /// `robot.pose` — a standing body pose. Continuous intent.
+    fn pose(&self, _params: proto::PoseParams) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.mouth` — beak opening, 0..1. Continuous intent.
+    fn mouth(&self, _params: proto::MouthParams) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.sound` — a voice-bank tag. The wheee tag is a hold, not a one-shot.
+    fn sound(&self, _params: proto::SoundParams) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.flashlight` — the virtual face LED.
+    fn flashlight(&self, _params: proto::FlashlightParams) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.stop` — zero the twist. Official `Intents::stop` does exactly that and
+    /// leaves the policy enabled (`intents.rs:328-330`).
+    fn stop(&self) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.enable` — ask the policy to drive (`on:false` stops the policy and keeps
+    /// torque on). `toggle` flips the robot's own state.
+    fn enable(&self, _params: proto::EnableParams) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.init` — torque on and ramp to the home pose, no policy needed.
+    fn init(&self) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.relax` — cut torque and stay powered/limp.
+    fn relax(&self) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.rest` — sit and ease into the rest pose without powering off.
+    fn rest(&self) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.shutdown` — sit, rest, torque off, power-off latch.
+    fn shutdown(&self) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.mode` — which drive bundle is loaded.
+    fn mode(&self) -> proto::ModeResult {
+        proto::ModeResult::default()
+    }
+
+    /// `robot.setMode` — switch the whole drive bundle.
+    fn set_mode(&self, _params: proto::SetModeParams) -> proto::IntentResult {
+        proto::IntentResult::refused("mode switching is not wired")
+    }
+
+    /// `robot.policies` — what each slot is actually running.
+    fn policies(&self) -> proto::PoliciesResult {
+        proto::PoliciesResult::default()
+    }
+
+    /// `robot.model` — the static geometry the per-tick poses are stated in.
+    fn model(&self) -> proto::ModelResult {
+        proto::ModelResult::default()
+    }
+
+    /// `robot.vetbook` — the lifetime record. A JSON value rather than the official
+    /// `Vetbook` struct: the phone's book publishes the same counters in the flat shape
+    /// `book().summary()` has always served (`/life`, the shells).
+    fn vetbook(&self) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    /// `robot.skills` — every skill, with its parameters, and the built-ins.
+    fn skills(&self) -> proto::SkillsResult {
+        proto::SkillsResult::default()
+    }
+
+    /// `robot.loadPolicy` — point one slot at a file (or reset it), then reload.
+    fn load_policy(&self, _params: proto::LoadPolicyParams) -> proto::IntentResult {
+        proto::IntentResult::refused("policy loading is not wired")
+    }
+
+    /// `robot.reloadPolicies` — re-read every slot from disk.
+    fn reload_policies(&self) -> proto::IntentResult {
+        proto::IntentResult::accepted()
+    }
+
+    /// `robot.safeToRestart` — whether restarting motor control now would drop the duck.
+    fn safe_to_restart(&self) -> proto::SafeToRestartResult {
+        proto::SafeToRestartResult {
+            safe: true,
+            reason: None,
+        }
+    }
 
     /// The `robot.subscribe` acknowledgement: the policy identity that is constant for
     /// the life of the process. Defaults to a bare acceptance; the wiring ticket fills
@@ -425,10 +549,7 @@ pub fn start_listener(listener: TcpListener, handlers: Arc<dyn RobotHandlers>) -
                 }
             }
         });
-    RobotIpcServer {
-        shutdown,
-        registry,
-    }
+    RobotIpcServer { shutdown, registry }
 }
 
 /// What came off the socket: a complete line, a line past [`MAX_LINE`], or the end of
@@ -598,6 +719,9 @@ fn serve_connection(
 /// Apply a notification intent. Shared shape with the official `apply_intent`: move,
 /// head and do reach their handlers with no reply; nothing else applies.
 fn apply_notification(handlers: &Arc<dyn RobotHandlers>, call: &proto::Call) {
+    // `apply_intent`'s set: move, head, pose and mouth are continuous, plus a sound
+    // (the wheee hold arrives every tick) and a skill (a held button resends it).
+    // Nothing else applies as a notification.
     match call {
         proto::Call::RobotMove(p) => {
             handlers.move_twist(*p);
@@ -605,8 +729,17 @@ fn apply_notification(handlers: &Arc<dyn RobotHandlers>, call: &proto::Call) {
         proto::Call::RobotHead(p) => {
             handlers.head(*p);
         }
+        proto::Call::RobotPose(p) => {
+            handlers.pose(*p);
+        }
+        proto::Call::RobotMouth(p) => {
+            handlers.mouth(*p);
+        }
         proto::Call::RobotDo(p) => {
             handlers.do_skill(p.clone());
+        }
+        proto::Call::RobotSound(p) => {
+            handlers.sound(*p);
         }
         _ => {}
     }
@@ -633,12 +766,51 @@ fn dispatch(
             },
         ),
         proto::Call::RobotHealth => proto::Response::ok(Some(id), &handlers.health()),
+        proto::Call::RobotSafeToRestart => {
+            proto::Response::ok(Some(id), &handlers.safe_to_restart())
+        }
         // Continuous intents answered on the request path too: "a client that sends
         // `robot.move` with an `id` is not silently ignored — the spec permits either,
         // and refusing one because of a framing choice would be a surprise."
         proto::Call::RobotMove(p) => proto::Response::ok(Some(id), &handlers.move_twist(*p)),
         proto::Call::RobotHead(p) => proto::Response::ok(Some(id), &handlers.head(*p)),
+        proto::Call::RobotPose(p) => proto::Response::ok(Some(id), &handlers.pose(*p)),
+        proto::Call::RobotMouth(p) => proto::Response::ok(Some(id), &handlers.mouth(*p)),
         proto::Call::RobotDo(p) => proto::Response::ok(Some(id), &handlers.do_skill(p.clone())),
+        proto::Call::RobotLook(p) => proto::Response::ok(Some(id), &handlers.look(*p)),
+        proto::Call::RobotStop => proto::Response::ok(Some(id), &handlers.stop()),
+        proto::Call::RobotEnable(p) => proto::Response::ok(Some(id), &handlers.enable(*p)),
+        proto::Call::RobotInit => proto::Response::ok(Some(id), &handlers.init()),
+        proto::Call::RobotRelax => proto::Response::ok(Some(id), &handlers.relax()),
+        proto::Call::RobotRest => proto::Response::ok(Some(id), &handlers.rest()),
+        proto::Call::RobotShutdown => proto::Response::ok(Some(id), &handlers.shutdown()),
+        proto::Call::RobotSound(p) => proto::Response::ok(Some(id), &handlers.sound(*p)),
+        proto::Call::RobotFlashlight(p) => {
+            proto::Response::ok(Some(id), &handlers.flashlight(*p))
+        }
+        proto::Call::RobotMode => proto::Response::ok(Some(id), &handlers.mode()),
+        proto::Call::RobotSetMode(p) => {
+            proto::Response::ok(Some(id), &handlers.set_mode(p.clone()))
+        }
+        proto::Call::RobotPolicies => proto::Response::ok(Some(id), &handlers.policies()),
+        proto::Call::RobotModel => proto::Response::ok(Some(id), &handlers.model()),
+        proto::Call::RobotVetbook => proto::Response::ok(Some(id), &handlers.vetbook()),
+        proto::Call::RobotSkills => proto::Response::ok(Some(id), &handlers.skills()),
+        proto::Call::RobotLoadPolicy(p) => {
+            proto::Response::ok(Some(id), &handlers.load_policy(p.clone()))
+        }
+        proto::Call::RobotReloadPolicies => {
+            proto::Response::ok(Some(id), &handlers.reload_policies())
+        }
+        // Deliberately still `METHOD_NOT_FOUND`:
+        // - `robot.theremin` / `robot.chorale` / `chorale.*`: the phone has no ToF
+        //   depth source and no chorale score player (docs/COMPARISON… §5.1), so
+        //   answering "accepted" would promise an instrument or a song that cannot play.
+        // - `robot.setSkill` / `robot.removeSkill`: the phone's skill set is the
+        //   manifest's; there is no `robotd.toml` edit surface to persist a named skill
+        //   into, so the official write path has no honest mobile twin.
+        // - `robot.setSkill` callers get the same official refusal a `robotd` without
+        //   the route gives, which is the designed skew behaviour.
         other => proto::Response::err(
             Some(id),
             proto::Error::new(
@@ -668,6 +840,9 @@ mod tests {
     struct TestHandlers {
         moves: Mutex<Vec<proto::MoveParams>>,
         heads: Mutex<Vec<proto::HeadParams>>,
+        poses: Mutex<Vec<proto::PoseParams>>,
+        mouths: Mutex<Vec<proto::MouthParams>>,
+        sounds: Mutex<Vec<proto::SoundParams>>,
         skills: Mutex<Vec<String>>,
         refuse_do: AtomicBool,
     }
@@ -677,6 +852,9 @@ mod tests {
             Arc::new(Self {
                 moves: Mutex::new(Vec::new()),
                 heads: Mutex::new(Vec::new()),
+                poses: Mutex::new(Vec::new()),
+                mouths: Mutex::new(Vec::new()),
+                sounds: Mutex::new(Vec::new()),
                 skills: Mutex::new(Vec::new()),
                 refuse_do: AtomicBool::new(false),
             })
@@ -700,6 +878,21 @@ mod tests {
 
         fn head(&self, params: proto::HeadParams) -> proto::IntentResult {
             self.heads.lock().unwrap().push(params);
+            proto::IntentResult::accepted()
+        }
+
+        fn pose(&self, params: proto::PoseParams) -> proto::IntentResult {
+            self.poses.lock().unwrap().push(params);
+            proto::IntentResult::accepted()
+        }
+
+        fn mouth(&self, params: proto::MouthParams) -> proto::IntentResult {
+            self.mouths.lock().unwrap().push(params);
+            proto::IntentResult::accepted()
+        }
+
+        fn sound(&self, params: proto::SoundParams) -> proto::IntentResult {
+            self.sounds.lock().unwrap().push(params);
             proto::IntentResult::accepted()
         }
 
@@ -750,7 +943,10 @@ mod tests {
                 gain: None,
                 picked_up: false,
             },
-            control_loop: proto::LoopState { hz: 50.0, missed: 0 },
+            control_loop: proto::LoopState {
+                hz: 50.0,
+                missed: 0,
+            },
             joints: vec![0.0; proto::JOINT_NAMES.len()],
             targets: vec![0.0; proto::JOINT_NAMES.len()],
             velocities: Vec::new(),
@@ -850,7 +1046,11 @@ mod tests {
             "hello",
             &format!("{{\"api_version\":{}}}", proto::API_VERSION),
         );
-        let hello = parse(client.read_line(Duration::from_secs(2)).expect("hello reply"));
+        let hello = parse(
+            client
+                .read_line(Duration::from_secs(2))
+                .expect("hello reply"),
+        );
         assert_eq!(hello.id, Some(proto::Id::Number(1)));
         let hello: proto::HelloResult = hello.result_as().expect("HelloResult");
         assert_eq!(hello.api_version, proto::API_VERSION);
@@ -986,6 +1186,9 @@ mod tests {
         // request's reply there is silence.
         client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.move\",\"params\":{\"vx\":0.5,\"vy\":0.0,\"vyaw\":0.0}}\n");
         client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.head\",\"params\":{\"neck_pitch\":0.1,\"head_pitch\":0.0,\"head_yaw\":0.0,\"head_roll\":0.0}}\n");
+        client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.pose\",\"params\":{\"z\":0.01,\"roll\":0.1,\"pitch\":0.2,\"active\":true}}\n");
+        client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.mouth\",\"params\":{\"open\":0.6}}\n");
+        client.send("{\"jsonrpc\":\"2.0\",\"method\":\"robot.sound\",\"params\":{\"tag\":\"coo\"}}\n");
         client.request(7, "hello", "{\"api_version\":51}");
         let reply = parse(client.read_line(Duration::from_secs(2)).expect("reply"));
         assert_eq!(reply.id, Some(proto::Id::Number(7)));
@@ -994,7 +1197,24 @@ mod tests {
             "a notification got a reply"
         );
         assert_eq!(handlers.moves.lock().unwrap().last().unwrap().vx, 0.5);
-        assert_eq!(handlers.heads.lock().unwrap().last().unwrap().neck_pitch, 0.1);
+        assert_eq!(
+            handlers.heads.lock().unwrap().last().unwrap().neck_pitch,
+            0.1
+        );
+        assert_eq!(
+            handlers.poses.lock().unwrap().last().unwrap(),
+            &proto::PoseParams {
+                z: 0.01,
+                roll: 0.1,
+                pitch: 0.2,
+                active: true
+            }
+        );
+        assert_eq!(handlers.mouths.lock().unwrap().last().unwrap().open, 0.6);
+        assert_eq!(
+            handlers.sounds.lock().unwrap().last().unwrap().tag,
+            proto::SoundTag::Coo
+        );
 
         // The handler's refusal travels as a normal answer with a reason, not an error.
         handlers.refuse_do.store(true, Ordering::SeqCst);

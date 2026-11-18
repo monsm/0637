@@ -95,8 +95,7 @@ impl Care {
         let neglected = (idle_s - NEGLECT_AFTER_S).max(0.0);
         // Hunger drags the mood down; neglect drags it further; a bond lifts
         // the floor. The mood follows its target over about two minutes.
-        let target = 0.55 - 0.9 * self.hunger - (neglected / 300.0).min(0.5)
-            + 0.25 * self.bond;
+        let target = 0.55 - 0.9 * self.hunger - (neglected / 300.0).min(0.5) + 0.25 * self.bond;
         self.mood += (target.clamp(-1.0, 1.0) - self.mood) * (dt / 120.0).min(1.0);
 
         self.bond = (self.bond - BOND_DECAY_PER_S * dt).max(0.0);
@@ -142,8 +141,9 @@ impl Care {
 
     /// The night so far, in simulated seconds. Zero when no night is running.
     pub fn quiet_s(&self, now: u64) -> f64 {
-        self.night
-            .map_or(0.0, |night| now.saturating_sub(night.started_tick) as f64 * 0.02)
+        self.night.map_or(0.0, |night| {
+            now.saturating_sub(night.started_tick) as f64 * 0.02
+        })
     }
 
     /// The shared tail of every wake: the duck is up, the idle clock restarts
@@ -273,9 +273,16 @@ impl Care {
             self.last_touch = v;
         }
         if let Some(v) = value.get("budget_s").and_then(serde_json::Value::as_u64) {
-            self.budget_s = if v == 0 { None } else { Some((v.min(u32::MAX as u64)) as u32) };
+            self.budget_s = if v == 0 {
+                None
+            } else {
+                Some((v.min(u32::MAX as u64)) as u32)
+            };
         }
-        if let Some(v) = value.get("budget_base_s").and_then(serde_json::Value::as_f64) {
+        if let Some(v) = value
+            .get("budget_base_s")
+            .and_then(serde_json::Value::as_f64)
+        {
             self.budget_base_s = v.max(0.0);
         }
         if let Some(night) = value.get("night") {
@@ -338,9 +345,13 @@ mod tests {
         let rest = care.heart_bpm();
         assert!((55.0..90.0).contains(&rest), "rest {rest}");
         let mut happy = care;
-        happy.mood = 1.0; happy.bond = 1.0; happy.hunger = 0.0;
+        happy.mood = 1.0;
+        happy.bond = 1.0;
+        happy.hunger = 0.0;
         let mut sad = care;
-        sad.mood = -1.0; sad.bond = 0.0; sad.hunger = 1.0;
+        sad.mood = -1.0;
+        sad.bond = 0.0;
+        sad.hunger = 1.0;
         assert!(happy.heart_bpm() > sad.heart_bpm());
         let mut sleeper = happy;
         sleeper.asleep = true;
@@ -388,7 +399,10 @@ mod tests {
         // 200 ticks = 4 simulated seconds; at 200x that is 800 care-seconds,
         // past the twelve-minute doze threshold, without waiting.
         care.tick(200, 0.02, 200.0);
-        assert!(care.asleep, "a sped-up care clock must age the idle spell too");
+        assert!(
+            care.asleep,
+            "a sped-up care clock must age the idle spell too"
+        );
     }
 
     #[test]

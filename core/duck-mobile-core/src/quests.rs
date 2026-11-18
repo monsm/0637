@@ -7,7 +7,7 @@
 //! celebrate with one of its official emotions.
 
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// What a quest measures. The counter names are the vet book's wire names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,14 +50,44 @@ pub struct QuestBoard {
 }
 
 const BLUEPRINTS: &[(&str, Metric, f64, &str, &str)] = &[
-    ("walk", Metric::Metres, 2.0, "Walk 2 m together", "一起走 2 米"),
+    (
+        "walk",
+        Metric::Metres,
+        2.0,
+        "Walk 2 m together",
+        "一起走 2 米",
+    ),
     ("roll", Metric::Rolls, 2.0, "Roll over twice", "翻两个滚"),
-    ("pet", Metric::Pets, 3.0, "Pet the duck 3 times", "摸摸鸭子 3 次"),
-    ("hold", Metric::Pickups, 1.0, "Pick the duck up", "把鸭子抱起来"),
+    (
+        "pet",
+        Metric::Pets,
+        3.0,
+        "Pet the duck 3 times",
+        "摸摸鸭子 3 次",
+    ),
+    (
+        "hold",
+        Metric::Pickups,
+        1.0,
+        "Pick the duck up",
+        "把鸭子抱起来",
+    ),
     ("feed", Metric::Fed, 1.0, "Give one treat", "喂一次零食"),
     ("clap", Metric::Claps, 2.0, "Clap twice", "拍手两次"),
-    ("whistle", Metric::Whistles, 1.0, "Whistle once", "吹一次口哨"),
-    ("moods", Metric::Emotions, 2.0, "Show 2 moods", "做 2 个表情"),
+    (
+        "whistle",
+        Metric::Whistles,
+        1.0,
+        "Whistle once",
+        "吹一次口哨",
+    ),
+    (
+        "moods",
+        Metric::Emotions,
+        2.0,
+        "Show 2 moods",
+        "做 2 个表情",
+    ),
     ("skills", Metric::Skills, 2.0, "Do 2 moves", "做 2 个动作"),
     ("peck", Metric::GroundPicks, 2.0, "Peck twice", "贴地啄两次"),
     ("bond", Metric::Bond, 0.05, "Grow the bond", "亲密值涨一点"),
@@ -73,9 +103,9 @@ impl QuestBoard {
         }
         // A streak only survives consecutive days with all three done. It is
         // a gentle nudge, not a punishment: a missed day simply starts at 1.
-        let seed: u64 = day
-            .bytes()
-            .fold(0u64, |acc, byte| acc.wrapping_mul(31).wrapping_add(byte as u64));
+        let seed: u64 = day.bytes().fold(0u64, |acc, byte| {
+            acc.wrapping_mul(31).wrapping_add(byte as u64)
+        });
         let mut offset = (seed % BLUEPRINTS.len() as u64) as usize;
         let mut ids = Vec::with_capacity(3);
         let mut quests = Vec::with_capacity(3);
@@ -123,7 +153,11 @@ impl QuestBoard {
                 continue;
             }
             let now = if quest.metric == Metric::Bond {
-                values.get("care").and_then(|c| c.get("bond")).and_then(Value::as_f64).unwrap_or(0.0)
+                values
+                    .get("care")
+                    .and_then(|c| c.get("bond"))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0)
             } else {
                 metric_value(quest.metric, values)
             };
@@ -156,7 +190,11 @@ impl QuestBoard {
                     return 1.0;
                 }
                 let now = if quest.metric == Metric::Bond {
-                    values.get("care").and_then(|c| c.get("bond")).and_then(Value::as_f64).unwrap_or(0.0)
+                    values
+                        .get("care")
+                        .and_then(|c| c.get("bond"))
+                        .and_then(Value::as_f64)
+                        .unwrap_or(0.0)
                 } else {
                     metric_value(quest.metric, values)
                 };
@@ -216,8 +254,9 @@ impl QuestBoard {
             if !target.is_finite() || target <= 0.0 {
                 return;
             }
-            let Some((_, metric, _, title_en, title_zh)) =
-                BLUEPRINTS.iter().find(|(blueprint_id, ..)| *blueprint_id == id)
+            let Some((_, metric, _, title_en, title_zh)) = BLUEPRINTS
+                .iter()
+                .find(|(blueprint_id, ..)| *blueprint_id == id)
             else {
                 return;
             };
@@ -270,7 +309,8 @@ impl QuestBoard {
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_owned();
-        if (completed < 3 && last == day) || (!last.is_empty() && !is_plausible_day(&last))
+        if (completed < 3 && last == day)
+            || (!last.is_empty() && !is_plausible_day(&last))
             || last.as_str() > day
         {
             last.clear();
@@ -327,7 +367,11 @@ fn metric_value(metric: Metric, values: &Value) -> f64 {
     };
     match metric {
         Metric::Metres => number("metres"),
-        Metric::Rolls => life.get("skills").and_then(|s| s.get("roulade")).and_then(Value::as_f64).unwrap_or(0.0),
+        Metric::Rolls => life
+            .get("skills")
+            .and_then(|s| s.get("roulade"))
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0),
         Metric::Pets => number("pets"),
         Metric::Pickups => number("pickups"),
         Metric::Fed => number("fed"),
@@ -336,7 +380,11 @@ fn metric_value(metric: Metric, values: &Value) -> f64 {
         Metric::Emotions => emotions(),
         Metric::Skills => skills(),
         Metric::GroundPicks => number("ground_picks"),
-        Metric::Bond => values.get("care").and_then(|c| c.get("bond")).and_then(Value::as_f64).unwrap_or(0.0),
+        Metric::Bond => values
+            .get("care")
+            .and_then(|c| c.get("bond"))
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0),
     }
 }
 
@@ -351,7 +399,10 @@ fn days_in_month(year: i32, month: i32) -> i32 {
 }
 
 fn is_plausible_day(day: &str) -> bool {
-    let parts: Vec<i32> = day.split('-').filter_map(|part| part.parse().ok()).collect();
+    let parts: Vec<i32> = day
+        .split('-')
+        .filter_map(|part| part.parse().ok())
+        .collect();
     if parts.len() != 3 {
         return false;
     }
@@ -362,7 +413,10 @@ fn is_plausible_day(day: &str) -> bool {
 fn previous_day(day: &str) -> String {
     // The day before an ISO yyyy-mm-dd: real month lengths, leap years and
     // year rolls. A streak must survive the first of every month.
-    let parts: Vec<i32> = day.split('-').filter_map(|part| part.parse().ok()).collect();
+    let parts: Vec<i32> = day
+        .split('-')
+        .filter_map(|part| part.parse().ok())
+        .collect();
     if parts.len() != 3 || !is_plausible_day(day) {
         return String::new();
     }
@@ -399,7 +453,10 @@ mod tests {
         board.roll_day("2026-11-11", &state(0, 0, 0.0));
         assert_eq!(board.quests.len(), 3);
         let ids: Vec<&str> = board.quests.iter().map(|quest| quest.id.as_str()).collect();
-        assert_eq!(ids.iter().collect::<std::collections::HashSet<_>>().len(), 3);
+        assert_eq!(
+            ids.iter().collect::<std::collections::HashSet<_>>().len(),
+            3
+        );
         let clone = board.quests.clone();
         board.roll_day("2026-11-11", &state(5, 5, 10.0));
         assert_eq!(board.quests, clone, "a restart keeps the same goals");
@@ -478,9 +535,19 @@ mod tests {
         assert_eq!(board.best_streak, 4);
         let pet = board.quests.iter().find(|quest| quest.id == "pet").unwrap();
         assert_eq!(pet.metric, Metric::Pets);
-        assert!((pet.baseline - 0.0).abs() < 1e-9, "progress 2/3 of 3 = the 2 pets already done");
-        let roll = board.quests.iter().find(|quest| quest.id == "roll").unwrap();
-        assert!(roll.done && roll.celebrated, "a done quest does not celebrate twice");
+        assert!(
+            (pet.baseline - 0.0).abs() < 1e-9,
+            "progress 2/3 of 3 = the 2 pets already done"
+        );
+        let roll = board
+            .quests
+            .iter()
+            .find(|quest| quest.id == "roll")
+            .unwrap();
+        assert!(
+            roll.done && roll.celebrated,
+            "a done quest does not celebrate twice"
+        );
     }
 
     #[test]

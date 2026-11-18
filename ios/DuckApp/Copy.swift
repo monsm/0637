@@ -428,6 +428,15 @@ enum Copy {
     static var rulesShare: String { pick("Share program", "分享程序") }
     static var rulesPaste: String { pick("Paste program", "粘贴程序") }
     static var rulesPasteFailed: String { pick("That text is not a duck program", "这段文字不是鸭子程序") }
+    /// An imported timer whose period the core would refuse (5..3600 s).
+    /// The wording is shared byte-for-byte with Android's Copy key of the
+    /// same name, so the two phones say the same thing.
+    static var rulesTimerPeriodBad: String {
+        pick(
+            "A timer needs 5 to 3600 seconds; that block was not imported",
+            "定时需要 5 到 3600 秒，这一条没有导入"
+        )
+    }
     static func rulesPasted(_ count: Int) -> String {
         String(format: pick("Imported %d block(s)", "导入了 %d 条积木"), count)
     }

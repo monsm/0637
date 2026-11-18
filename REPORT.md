@@ -677,6 +677,22 @@ Core 在 `4477a89` 红了一次，失败项 `a_chorus_without_moves_sings_the_do
 - **验证**：本地 `cargo test --workspace --include-ignored` 213+9 全绿；`--features mujoco` 226+9 全绿（ffi:: 12/12 及以上，覆盖 C ABI/pad/IPC）；六道静态契约门禁全绿。Swift/Kotlin 与真机由 CI 裁决。
 - **CI 盲区（记录在案）**：core.yml 不编译 ffi.rs（无 mujoco feature），IPC/pad/ffi 接线靠 ios.yml/android.yml 构建与冒烟间接覆盖；后续立项给 core CI 加 mujoco 测试步骤。
 
+### 四之二十七、全方位对比报告（2026-11-18）
+
+`docs/COMPARISON_OFFICIAL_VS_MOBILE_2026-11-18.md`：8 维度 ×（分析 + 对抗复核）+ 合成（17 agent，3.1M tokens）。128 条 item：脚本清点 equivalent 51 / near 29 / deviation 27 / not_doing 8 / hardware 5 / unverified 8；采纳 10 条复核纠正（全部 equivalent→near）后落表 **41 / 39 / 27 / 8 / 5 / 8**。另列移动版独有能力 30+ 条（时间机器/fork、care/quests/成长手册、邻居合唱、MCP、备份搬家等官方没有的东西），27 条偏差集中成下一批施工清单（其中 6 条对应 QA 推后项），复核员补漏 36 条单列。
+
+### 四之二十八、按对比报告全量修复 + 三轮对抗复审（2026-11-18 晚）
+
+按老板指令「找到的问题全部修正」，对 `docs/COMPARISON_OFFICIAL_VS_MOBILE_2026-11-18.md` §5/§5.1 的可修项全量落地。六路并行工单 + 三轮对抗复审（6 维审查 → 双镜头验证 → 定点复核），累计拦下 **2 blocker + 16 major**，全部修复，每项带「先红后绿」回归证据。
+
+- **runtime**：rest/shutdown 分离（AtRest 保持 rest 位姿+力矩、cannot-sit 走 forget+切扭矩、摔倒不硬坐）；`enable(false)` 停策略回 home/座位（实测位姿）、`relax` 切扭矩；`init` 官方四分支（Limp 只上力矩不开策略）；health 启动判据改「从未成功读」（官方两分支）+ policy_error/连续错误；读取 coast；`safe_to_restart`；state skeleton/t_ns；timer 规则移出预算分支且夜间不触发；Checkpoint 补 disabled_hold/coast/has_read 等（fork/rewind 父子轨迹一致）。
+- **ffi/ipc**：DKRB 恢复 1s；pad Home/BodyPose/sit-stand/Rest 对齐官方；Drive 官方四轴；`robot.*` 扩到 21+ 方法（look/pose/mouth/sound/flashlight/stop/enable/init/relax/rest/shutdown/mode/setMode/policies/model/vetbook/skills/loadPolicy/reloadPolicies/safeToRestart，subscribe 补身份字段）；disturb 门按全部驱动槽 + Reload 语义；swap 落地绑定 owner 鸭（分支会话不误报）、step/seek 共用落地钩子、C ABI 三入口补驱动门；mode 切换等待在途换包。
+- **sensors/scripts/CI**：`to_tof_grid` 改用官方 `Reprojector` 几何；`fetch-policies.sh` 以 manifest 为清单（路径穿越拒绝）；core CI 新增 fmt/clippy、MuJoCo 特征测试 job；contracts 新增 shellcheck；mujoco 测试去 Windows 硬编码（fixtures/DUCK_POLICIES_DIR）。
+- **双端壳**：walk 覆盖持久化重放（两端同键同名；`"none"` 归一化）；规则分享/粘贴保留 `period_s` 与 timer 词表；Android 接 shake→push（阈值/限频与 iOS 逐值一致）；Android fingerprint/lastError 已在上一批。
+- **文档**：COMPANION 三动词→七动词；对比报告新增 §0 修复状态（27 条偏差与 §5.1 逐项处置）；本条批次账。
+- **验证**：本地默认特性 243+9、mujoco 272+9、Android JVM 70 全绿；六道静态契约门禁绿；Rust 侧新增测试 40+ 条。CI 新增步骤（ubuntu 上的 fmt/clippy/shellcheck/MuJoCo job）由首跑裁决。
+- **保留（刻意/边界，未改）**：BAM 执行器路径、齿隙编码器读数、传感器回报语义、麦克风替身、多鸭同世界、ToF 场景射线与相机帧流、命令延迟模型、运行期增删技能、社区策略门禁、setMode 整机重建、updaterd/configd 族、robotctl CLI、chorale 乐谱、head_imu、API_VERSION 握手、coverage 基线——均在对比报告 §0.2 逐条登记理由。
+
 ---
 
 ## 八、仓库与复现

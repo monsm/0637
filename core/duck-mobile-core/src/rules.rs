@@ -132,9 +132,7 @@ impl Rules {
                         .and_then(Value::as_str)
                         .ok_or_else(|| format!("rule {index}.{at}: missing action"))?;
                     if !ACTIONS.contains(&step_action) {
-                        return Err(format!(
-                            "rule {index}.{at}: no such action: {step_action}"
-                        ));
+                        return Err(format!("rule {index}.{at}: no such action: {step_action}"));
                     }
                     let step_value = step
                         .get("value")
@@ -158,7 +156,9 @@ impl Rules {
                 value: name.trim().to_owned(),
                 then,
                 period_s: if trigger == "timer" {
-                    item.get("period_s").and_then(Value::as_u64).map(|v| v as u32)
+                    item.get("period_s")
+                        .and_then(Value::as_u64)
+                        .map(|v| v as u32)
                 } else {
                     None
                 },
@@ -193,17 +193,19 @@ mod tests {
     #[test]
     fn the_light_step_keeps_the_official_flashlight_vocabulary() {
         let mut rules = Rules::default();
-        rules.set(&serde_json::json!({
-            "rules": [{
-                "trigger": "clap",
-                "action": "light",
-                "value": "yellow",
-                "then": [
-                    { "action": "sound", "value": "chirp" },
-                    { "action": "light", "value": "off" }
-                ]
-            }]
-        })).expect("a light step with an official colour must load");
+        rules
+            .set(&serde_json::json!({
+                "rules": [{
+                    "trigger": "clap",
+                    "action": "light",
+                    "value": "yellow",
+                    "then": [
+                        { "action": "sound", "value": "chirp" },
+                        { "action": "light", "value": "off" }
+                    ]
+                }]
+            }))
+            .expect("a light step with an official colour must load");
         // The word is validated by the runtime against COLORS, not here:
         // an invented colour is still a legal wire shape and must be refused
         // where the lamp lives, with no state changed.

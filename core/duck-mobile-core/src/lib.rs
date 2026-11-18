@@ -22,21 +22,21 @@ pub mod fixtures;
 pub mod intent;
 pub mod ipc;
 pub mod lan;
-pub mod pad;
 pub mod leds;
+pub mod pad;
 
+#[cfg(feature = "mujoco")]
+pub mod ffi;
 pub mod io;
 pub mod manifest;
 pub mod mcp;
+#[cfg(feature = "mujoco")]
+pub mod mujoco;
 pub mod params;
 pub mod pickup;
 pub mod provenance;
 pub mod quests;
 pub mod rules;
-#[cfg(feature = "mujoco")]
-pub mod ffi;
-#[cfg(feature = "mujoco")]
-pub mod mujoco;
 pub mod runtime;
 pub mod sensors;
 pub mod speech;
@@ -48,10 +48,10 @@ pub mod voice;
 // so they have to sit at *this* crate's root to link unchanged. Reusing the
 // files (rather than copying the recipes) is what makes the digital duck's
 // quack the same quack.
-#[path = "../../../upstream/microduck/sounds/src/rng.rs"]
-pub mod rng;
 #[path = "../../../upstream/microduck/sounds/src/personality.rs"]
 pub mod personality;
+#[path = "../../../upstream/microduck/sounds/src/rng.rs"]
+pub mod rng;
 #[path = "../../../upstream/microduck/sounds/src/synth.rs"]
 pub mod synth;
 #[path = "../../../upstream/microduck/sounds/src/voices.rs"]

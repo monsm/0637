@@ -1723,24 +1723,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                         ?.getItemAt(0)
                         ?.coerceToText(context)
                         ?.toString()
-                    val imported = clip?.let(::parseSharedRules)
-                    if (!rulesLoaded) {
-                        // The core's program has not been read yet, so there
-                        // is nothing to merge onto: doing it anyway would
-                        // replace everything the child built.
-                        Toast.makeText(context, Copy.rulesNotReady, Toast.LENGTH_LONG).show()
-                    } else if (imported != null) {
-                        val next = mergeRules(rules, imported)
-                        val added = next.size - rules.size
-                        applyRules(next)
-                        Toast.makeText(
-                            context,
-                            Copy.rulesPasted(added.coerceAtLeast(0)),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    } else {
-                        Toast.makeText(context, Copy.rulesPasteFailed, Toast.LENGTH_SHORT).show()
-                    }
+                    importRulesFromClip(context, clip, rules, rulesLoaded, ::applyRules)
                 }
             }
             rules.forEachIndexed { index, rule ->

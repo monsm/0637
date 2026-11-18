@@ -126,9 +126,8 @@ pub fn has_all(dir: &Path, names: &[&str]) -> bool {
 ///
 /// It lives in `upstream/microduck_rl`, which is fetched like the policies.
 pub fn scene_backlash() -> Option<PathBuf> {
-    let scene = workspace_root().join(
-        "upstream/microduck_rl/src/mjlab_microduck/robot/microduck/scene_backlash.xml",
-    );
+    let scene = workspace_root()
+        .join("upstream/microduck_rl/src/mjlab_microduck/robot/microduck/scene_backlash.xml");
     if scene.is_file() {
         return Some(scene);
     }

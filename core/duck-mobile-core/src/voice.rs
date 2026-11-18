@@ -139,7 +139,8 @@ impl Voice {
     }
 
     fn enqueue_segment(&mut self, segment: &str, variant: u32) {
-        self.pending_segments.push_back(format!("wheee:{segment}:{variant}"));
+        self.pending_segments
+            .push_back(format!("wheee:{segment}:{variant}"));
     }
 
     /// Render one sound, choosing the next variant of its tag.
@@ -195,7 +196,10 @@ mod tests {
             );
             let rms = (pcm.iter().map(|s| s * s).sum::<f32>() / pcm.len() as f32).sqrt();
             assert!(rms > 0.01, "{tag} is silent (rms {rms})");
-            assert!(pcm.iter().all(|s| s.is_finite()), "{tag} has a non-finite sample");
+            assert!(
+                pcm.iter().all(|s| s.is_finite()),
+                "{tag} has a non-finite sample"
+            );
         }
     }
 
