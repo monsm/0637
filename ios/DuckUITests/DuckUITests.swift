@@ -543,7 +543,7 @@ final class DuckUITests: XCTestCase {
         )
         XCTAssertTrue(
             app.buttons["more-dex"].exists,
-            "the drawer has no Mood dex row"
+            "the drawer has no Mood book row"
         )
         closeMore()
 
@@ -736,17 +736,20 @@ final class DuckUITests: XCTestCase {
     /// "close the AI sheet and you are back in the instrument" true.
     func testRouteTableReturnsToThePresentingSheet() throws {
         openMore()
-        let dexRow = app.buttons["more-dex"]
-        XCTAssertTrue(dexRow.waitForExistence(timeout: 5), "the drawer has no Dex row")
-        dexRow.tap()
+        let collectionRow = app.buttons["more-dex"]
         XCTAssertTrue(
-            app.staticTexts["dex-title"].waitForExistence(timeout: 10),
-            "the Dex sheet did not open from the drawer"
+            collectionRow.waitForExistence(timeout: 5),
+            "the drawer has no collection row"
         )
-        app.buttons["dex-close"].tap()
+        collectionRow.tap()
+        XCTAssertTrue(
+            app.staticTexts["collection-title"].waitForExistence(timeout: 10),
+            "the collection sheet did not open from the drawer"
+        )
+        app.buttons["collection-close"].tap()
         XCTAssertTrue(
             app.staticTexts["more-title"].waitForExistence(timeout: 10),
-            "closing Dex did not return to the drawer"
+            "closing the collection did not return to the drawer"
         )
         closeMore()
 
@@ -757,18 +760,18 @@ final class DuckUITests: XCTestCase {
             app.staticTexts["sheet-title"].waitForExistence(timeout: 10),
             "the instrument did not open"
         )
-        let dexOpen = app.buttons["dex-open"]
-        bringIntoView(dexOpen, scroll: app.scrollViews.firstMatch)
-        XCTAssertTrue(dexOpen.exists, "the instrument has no Dex entry")
-        dexOpen.tap()
+        let collectionOpen = app.buttons["collection-open"]
+        bringIntoView(collectionOpen, scroll: app.scrollViews.firstMatch)
+        XCTAssertTrue(collectionOpen.exists, "the instrument has no collection entry")
+        collectionOpen.tap()
         XCTAssertTrue(
-            app.staticTexts["dex-title"].waitForExistence(timeout: 10),
-            "the Dex sheet did not open from the instrument"
+            app.staticTexts["collection-title"].waitForExistence(timeout: 10),
+            "the collection sheet did not open from the instrument"
         )
-        app.buttons["dex-close"].tap()
+        app.buttons["collection-close"].tap()
         XCTAssertTrue(
             app.staticTexts["sheet-title"].waitForExistence(timeout: 10),
-            "closing Dex did not return to the instrument"
+            "closing the collection did not return to the instrument"
         )
         app.buttons["sheet-close"].tap()
     }

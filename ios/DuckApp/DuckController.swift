@@ -160,8 +160,9 @@ final class DuckController: ObservableObject {
     /// The calendar day the core was last told about, so a midnight that
     /// happens while the app is open still rolls the board.
     private var lastQuestDayPosted = ""
-    /// The collection page: every official move and emotion with its real
-    /// lifetime count, and the first day this phone saw the duck do it.
+    /// The local first-seen mood dex behind DexSheet. The collection page
+    /// now reads the core's own `/collection`; this stays for the legacy
+    /// page until the team retires it.
     struct DexEntry: Identifiable {
         let id: String
         let count: Int
@@ -1554,6 +1555,13 @@ final class DuckController: ObservableObject {
     private func postJSON(_ path: String, _ object: [String: Any]) {
         guard let data = try? JSONSerialization.data(withJSONObject: object) else { return }
         post(path, data)
+    }
+
+    /// The chat reply through the diary's system voice: one synthesizer,
+    /// the language the screen is showing, the same local /mouth intent.
+    func speakChat(_ text: String) {
+        speaker.updateLanguage(Copy.language)
+        speaker.speak(text)
     }
 
     /// Say hello to one duck, or to every duck on the Wi-Fi.

@@ -40,12 +40,12 @@ struct InstrumentSheet: View {
                 Button {
                     onOpen(.dex)
                 } label: {
-                    Label(Copy.dex, systemImage: "square.grid.3x3.fill")
+                    Label(Copy.collectionTitle, systemImage: "square.grid.3x3.fill")
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.bordered)
-                .accessibilityIdentifier("dex-open")
+                .accessibilityIdentifier("collection-open")
                 Button {
                     onOpen(.postcards)
                 } label: {

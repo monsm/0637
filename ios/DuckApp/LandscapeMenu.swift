@@ -73,7 +73,7 @@ struct LandscapeMenu: View {
                     }
                     .accessibilityIdentifier("open-postcards")
                     Button { onOpen(.dex) } label: {
-                        Label(Copy.dex, systemImage: Icons.dex)
+                        Label(Copy.collectionTitle, systemImage: Icons.dex)
                     }
                     .accessibilityIdentifier("open-dex")
                 }
