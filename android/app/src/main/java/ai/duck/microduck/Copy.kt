@@ -414,6 +414,11 @@ val quack get() = pick("Quack", "叫一声")
         "The duck has not finished starting; try again in a moment",
         "鸭子还没启动完，等一下再试",
     )
+    /** An imported timer whose period the core would refuse (5..3600 s). */
+    val rulesTimerPeriodBad get() = pick(
+        "A timer needs 5 to 3600 seconds; that block was not imported",
+        "定时需要 5 到 3600 秒，这一条没有导入",
+    )
     val rulesEmpty get() = pick(
         "No rules yet. Build one: when I clap, roll over.",
         "还没有规则。拼一个：拍手，就翻滚。",

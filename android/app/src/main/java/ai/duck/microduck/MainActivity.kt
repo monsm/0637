@@ -62,6 +62,11 @@ class MainActivity : ComponentActivity() {
     private var loop: DuckLoop? = null
     private var voice: Voice? = null
     private lateinit var input: DuckInput
+    private var sensorManager: android.hardware.SensorManager? = null
+    private var shakeListener: android.hardware.SensorEventListener? = null
+    private var shakeUsesRaw = false
+    private val shakeDetector = ShakeDetector()
+    private val gravitySeparator = GravitySeparator()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         companionReady = false
@@ -86,6 +91,7 @@ class MainActivity : ComponentActivity() {
         // follows the room, clamped to the readable band. No sensor leaves
         // the sheet's manual stops in charge — the number is never invented.
         val sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+        this.sensorManager = sensorManager
         // The compass, when the device has a rotation vector: the azimuth's
         // delta from the bearing at switch-on becomes the room's yaw offset.
         // No sensor, no row - the number is never invented. The listeners are
@@ -162,6 +168,12 @@ class MainActivity : ComponentActivity() {
                         // so it can never overwrite the file with defaults.
                         val activity = this@MainActivity
                         Thread {
+                            // The core's walk-slot override is process
+                            // memory; the phone's copy is in the "duck"
+                            // preferences. Hand it back before the care
+                            // restore, so the duck wakes on the gait it
+                            // went to sleep on.
+                            replayWalkPolicy(activity, created)
                             // The phone's calendar day with the saved quest
                             // board; this is independent of care restore.
                             postQuestDay(activity)
@@ -201,7 +213,76 @@ class MainActivity : ComponentActivity() {
         @Volatile @JvmStatic var companionReady = false
     }
 
+    override fun onResume() {
+        super.onResume()
+        // The phone's IMU is the duck's disturbance channel, as on iOS: a
+        // shake is a shove on the trunk. Registered only while the activity
+        // is in front; a sensor-less device stays quiet.
+        startShake()
+    }
+
+    /**
+     * The shake listener. `TYPE_LINEAR_ACCELERATION` already has gravity
+     * removed, the same signal CoreMotion's `userAcceleration` gives iOS;
+     * a device without it falls back to the raw accelerometer with the
+     * documented low-pass gravity estimate. The axes are the device's own
+     * (x right, y up, z out of the screen), the frame `duck_core_push`
+     * expects.
+     */
+    private fun startShake() {
+        val manager = sensorManager ?: return
+        if (shakeListener != null) return
+        val linear = manager.getDefaultSensor(android.hardware.Sensor.TYPE_LINEAR_ACCELERATION)
+        val raw = manager.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+        val sensor = linear ?: raw ?: return
+        shakeUsesRaw = linear == null
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                val values = if (shakeUsesRaw) {
+                    gravitySeparator.linear(event.values)
+                } else {
+                    if (event.values.size < 3) return
+                    doubleArrayOf(
+                        event.values[0].toDouble(),
+                        event.values[1].toDouble(),
+                        event.values[2].toDouble(),
+                    )
+                }
+                // SensorEvent.timestamp is a monotonic boot clock in ns; the
+                // wall clock is never read here.
+                val now = if (event.timestamp > 0) {
+                    event.timestamp / 1_000_000_000.0
+                } else {
+                    android.os.SystemClock.elapsedRealtimeNanos() / 1_000_000_000.0
+                }
+                val push = shakeDetector.onSample(values[0], values[1], values[2], now) ?: return
+                // The same impulse iOS sends: axis * 0.8 in CoreMotion's g,
+                // at most once per 0.4 s.
+                core?.push(push[0], push[1], push[2])
+            }
+
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+        }
+        val registered = runCatching {
+            manager.registerListener(
+                listener,
+                sensor,
+                android.hardware.SensorManager.SENSOR_DELAY_GAME,
+            )
+        }.getOrDefault(false)
+        if (registered) shakeListener = listener
+    }
+
+    private fun stopShake() {
+        val listener = shakeListener ?: return
+        runCatching { sensorManager?.unregisterListener(listener) }
+        shakeListener = null
+    }
+
     override fun onPause() {
+        // Background means no disturbance channel: the phone is not being
+        // shaken at a duck it cannot see.
+        stopShake()
         super.onPause()
         // Remember what the duck had done by now; onResume's sheet reads the
         // diff as "while you were away".
@@ -225,6 +306,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         companionReady = false
+        stopShake()
         voice?.stop()
         voice = null
         loop?.stop()

@@ -72,23 +72,37 @@ internal fun trimLikeCore(value: String): String =
 
 /** The program the core is running, read from GET /rules. */
 fun fetchRules(): List<RuleUi>? = try {
-    val summary = JSONObject(getJson("/rules")).optJSONObject("rules") ?: return null
+    parseRules(getJson("/rules"))
+} catch (_: Throwable) {
+    null
+}
+
+/** The `rules.rules` array of a GET /rules answer, timer periods included. */
+internal fun parseRules(text: String): List<RuleUi>? {
+    val summary = JSONObject(text).optJSONObject("rules") ?: return null
     val array = summary.optJSONArray("rules") ?: return emptyList()
-    (0 until array.length()).mapNotNull { index ->
+    return (0 until array.length()).mapNotNull { index ->
         val item = array.optJSONObject(index) ?: return@mapNotNull null
         val chain = item.optJSONArray("then")
+        val trigger = item.optString("trigger", "")
         RuleUi(
-            trigger = item.optString("trigger", ""),
+            trigger = trigger,
             action = item.optString("action", ""),
             value = item.optString("value", ""),
             then = if (chain == null) emptyList() else (0 until chain.length()).mapNotNull { at ->
                 val step = chain.optJSONObject(at) ?: return@mapNotNull null
                 RuleStep(step.optString("action", ""), step.optString("value", ""))
             },
+            // GET /rules serialises the core's own Rule, period_s included.
+            // Keeping it here is what lets an edit round-trip a timer rule
+            // instead of silently turning it into an invalid one.
+            periodS = if (trigger == "timer") {
+                item.optInt("period_s", 0).takeIf { it in RULE_TIMER_PERIOD }
+            } else {
+                null
+            },
         )
     }
-} catch (_: Throwable) {
-    null
 }
 
 /**
@@ -115,8 +129,13 @@ fun saveRules(context: Context, rules: List<RuleUi>, onResult: (Boolean) -> Unit
     }.start()
 }
 
+// The core's own trigger vocabulary (rules.rs TRIGGERS) and the editor's
+// action list. The core also accepts `light`, but neither editor offers it
+// and the iOS importer drops it; import must mean the same thing on both
+// phones, so the shared program uses this list too.
 internal val RULE_TRIGGERS = setOf("clap", "whistle", "pet", "timer")
 internal val RULE_ACTIONS = setOf("skill", "emotion", "sound")
+internal val RULE_TIMER_PERIOD = 5..3600
 internal const val RULE_MAX_STEPS = 4
 internal const val RULE_MAX_RULES = 8
 
@@ -155,12 +174,28 @@ internal fun rulesShareText(rules: List<RuleUi>): String {
 }
 
 /**
+ * A pasted document read back: the blocks that survived validation and how
+ * many timer blocks were dropped for a period the core would refuse. The
+ * count exists so the sheet can name the refusal instead of importing a
+ * silently shorter program.
+ */
+internal data class SharedRulesImport(
+    val rules: List<RuleUi>,
+    val skippedTimers: Int = 0,
+)
+
+/**
  * Read a shared program from pasted text: either the versioned document or a
  * bare rules array. Every rule is validated against the same vocabulary the
  * editor offers; a malformed entry is dropped rather than raining junk on the
  * core, and `null` means the text was not a program at all.
+ *
+ * A timer travels with its `period_s` — the exact field the core stores and
+ * serialises — and a period outside the core's 5..3600 window drops that
+ * block and is counted, because saving it would make the core refuse the
+ * whole program.
  */
-internal fun parseSharedRules(text: String): List<RuleUi>? = try {
+internal fun parseSharedRulesImport(text: String): SharedRulesImport? = try {
     val trimmed = text.trim()
     val array = if (trimmed.startsWith("[")) {
         org.json.JSONArray(trimmed)
@@ -169,6 +204,7 @@ internal fun parseSharedRules(text: String): List<RuleUi>? = try {
         if (doc.optInt("microduck-rules", 0) != 1) return null
         doc.optJSONArray("rules") ?: return null
     }
+    var skippedTimers = 0
     val rules = (0 until array.length()).mapNotNull { index ->
         val item = array.optJSONObject(index) ?: return@mapNotNull null
         val trigger = item.optString("trigger", "")
@@ -176,6 +212,16 @@ internal fun parseSharedRules(text: String): List<RuleUi>? = try {
         val value = trimLikeCore(item.optString("value", ""))
         if (trigger !in RULE_TRIGGERS || action !in RULE_ACTIONS || value.isEmpty()) {
             return@mapNotNull null
+        }
+        val periodS = if (trigger == "timer") {
+            val period = item.optInt("period_s", 0)
+            if (period !in RULE_TIMER_PERIOD) {
+                skippedTimers += 1
+                return@mapNotNull null
+            }
+            period
+        } else {
+            null
         }
         val chain = item.optJSONArray("then")
         val then = if (chain == null) {
@@ -192,11 +238,58 @@ internal fun parseSharedRules(text: String): List<RuleUi>? = try {
                 }
             }
         }
-        RuleUi(trigger, action, value, then)
+        RuleUi(trigger, action, value, then, periodS = periodS)
     }
-    rules.ifEmpty { null }
+    SharedRulesImport(rules, skippedTimers)
 } catch (_: Throwable) {
     null
+}
+
+/** The importable blocks, or null when nothing in the text can run. */
+internal fun parseSharedRules(text: String): List<RuleUi>? =
+    parseSharedRulesImport(text)?.rules?.ifEmpty { null }
+
+/**
+ * The paste chip's whole action, kept out of Shell.kt so the sheet stays
+ * within the god-file ratchet: read the pasted text, validate it against the
+ * core's vocabulary, merge it into the child's own program, and say what
+ * happened. A bad timer is named, not silently absent.
+ */
+internal fun importRulesFromClip(
+    context: Context,
+    clip: String?,
+    current: List<RuleUi>,
+    loaded: Boolean,
+    onApply: (List<RuleUi>) -> Unit,
+) {
+    if (!loaded) {
+        // The core's program has not been read yet, so there is nothing to
+        // merge onto: doing it anyway would replace what the child built.
+        android.widget.Toast.makeText(context, Copy.rulesNotReady, android.widget.Toast.LENGTH_LONG).show()
+        return
+    }
+    val imported = clip?.let(::parseSharedRulesImport)
+    if (imported == null) {
+        android.widget.Toast.makeText(context, Copy.rulesPasteFailed, android.widget.Toast.LENGTH_SHORT).show()
+        return
+    }
+    // The same two notes iOS builds: the timer refusal when one was skipped,
+    // then the imported count when anything was legal. Joined in one toast —
+    // a second toast would replace the first before it could be read.
+    val notes = mutableListOf<String>()
+    if (imported.skippedTimers > 0) notes.add(Copy.rulesTimerPeriodBad)
+    if (imported.rules.isNotEmpty()) {
+        val next = mergeRules(current, imported.rules)
+        val added = next.size - current.size
+        onApply(next)
+        notes.add(Copy.rulesPasted(added.coerceAtLeast(0)))
+    }
+    if (notes.isEmpty()) notes.add(Copy.rulesPasteFailed)
+    android.widget.Toast.makeText(
+        context,
+        notes.joinToString("\n"),
+        android.widget.Toast.LENGTH_LONG,
+    ).show()
 }
 
 /**
@@ -208,8 +301,11 @@ internal fun mergeRules(current: List<RuleUi>, imported: List<RuleUi>): List<Rul
     val merged = current.toMutableList()
     for (rule in imported) {
         if (merged.size >= RULE_MAX_RULES) break
+        // The period is part of a timer rule's identity: "every 30 s" and
+        // "every 5 min" are two blocks, not a duplicate of one.
         val exists = merged.any {
-            it.trigger == rule.trigger && it.action == rule.action && it.value == rule.value
+            it.trigger == rule.trigger && it.action == rule.action &&
+                it.value == rule.value && it.periodS == rule.periodS
         }
         if (!exists) merged.add(rule)
     }

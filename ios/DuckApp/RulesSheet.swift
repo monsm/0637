@@ -99,8 +99,24 @@ struct RulesSheet: View {
                         }
                         Button {
                             if let text = UIPasteboard.general.string,
-                               let added = controller.importRules(from: text) {
-                                importNote = Copy.rulesPasted(added)
+                               let result = controller.importRules(from: text) {
+                                if result.parsed == 0 && result.skippedTimers == 0 {
+                                    importNote = Copy.rulesPasteFailed
+                                } else {
+                                    // A timer the core would refuse is
+                                    // named, not silently absent from the
+                                    // imported set (the same rule Android
+                                    // follows): saving it would make the
+                                    // core reject the whole program.
+                                    var notes: [String] = []
+                                    if result.skippedTimers > 0 {
+                                        notes.append(Copy.rulesTimerPeriodBad)
+                                    }
+                                    if result.parsed > 0 {
+                                        notes.append(Copy.rulesPasted(result.added))
+                                    }
+                                    importNote = notes.joined(separator: "\n")
+                                }
                             } else {
                                 importNote = Copy.rulesPasteFailed
                             }
