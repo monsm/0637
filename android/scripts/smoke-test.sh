@@ -87,11 +87,20 @@ for name in sit stand ground_pick curious angry laugh yes; do
 done
 # An emotion is a scripted head/beak timeline with its own voice; /state
 # publishes which one the loop is playing, so a dead loader cannot pass.
-curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"name":"curious"}' http://127.0.0.1:8765/skill > /dev/null || true
-sleep 0.4
-STATE_EMOTION=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
+SKILL_RESPONSE=$(curl -sf --max-time 5 -X POST -H 'Content-Type: application/json'   -d '{"name":"curious"}' http://127.0.0.1:8765/skill || true)
+# The intent queue answers within 300 ms and the loop applies it on the next
+# tick. On a cold emulator (13 fps) a single look after 0.4 s can land one
+# frame early, so poll for up to 2 s before calling it dead — and say what
+# the POST and the state actually said when it is.
+STATE_EMOTION=""
+for _ in $(seq 1 20); do
+  STATE_EMOTION=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
+  echo "$STATE_EMOTION" | grep -q '"name":"curious"' && break
+  sleep 0.1
+done
 if ! echo "$STATE_EMOTION" | grep -q '"name":"curious"'; then
-  echo "::error::/state.emotion does not report the curious timeline"
+  echo "::error::/state.emotion does not report the curious timeline (POST: ${SKILL_RESPONSE:-<no answer>})"
+  echo "$STATE_EMOTION" | tr ',' '\n' | grep -E '"emotion"|"notice"|"label"' | head -6
   exit 1
 fi
 if ! echo "$STATE_EMOTION" | grep -q '"last_emotion_sound":"emotion:curious"'; then
