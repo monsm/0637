@@ -2017,6 +2017,16 @@ impl<T: RobotIo> DuckRuntime<T> {
         names
     }
 
+    /// The manifest's one-shot skills only — no emotion timelines.
+    ///
+    /// `skill_names` deliberately speaks `/skills`' shape, where an emotion
+    /// is one more skill the robot can perform. The collection page's
+    /// "tricks" are the manifest's own moves, and listing the thirteen moods
+    /// there a second time would make the page lie about what it holds.
+    pub fn manifest_skill_names(&self) -> Vec<String> {
+        self.controller.skill_names()
+    }
+
     /// `robot.do <emotion>` on the real duck: the emotion is a skill, so it
     /// goes through the same `/skills` list and `/skill` verb as a kick.
     pub fn trigger_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
@@ -2064,6 +2074,11 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// A dozing duck — a nap of its own or a night — is not stirred by its
     /// own celebration; the quest is still counted, the emotion waits.
     pub fn celebrate_emotion(&mut self, name: &str) -> Result<bool, &'static str> {
+        // A celebration is a mood; frozen time skips it quietly rather than
+        // refusing a quest that already completed.
+        if self.clock.paused {
+            return Ok(false);
+        }
         if self.care.asleep {
             return Ok(false);
         }
@@ -2078,6 +2093,12 @@ impl<T: RobotIo> DuckRuntime<T> {
     /// own: a caller that says where the emotion came from does not also
     /// want the duck's own note, or one cheer is two lines.
     fn play_emotion(&mut self, name: &str, record: bool) -> Result<bool, &'static str> {
+        // One gate for every mood that reaches the body: a rule, speech, a
+        // night's wake, a neighbour's cheer, a quest celebration. Frozen time
+        // must not count a mood the tick will never perform.
+        if self.clock.paused {
+            return Err("the duck is paused");
+        }
         if self.controller.busy() || self.controller.is_sitting() {
             return Err("a move is running; the duck must be standing still");
         }
@@ -2685,6 +2706,13 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     pub fn trigger_skill(&mut self, name: &str) -> Result<bool, &'static str> {
+        // Frozen time is the one state where no move may start: every caller
+        // — the pad, speech, a child's rule, a neighbour, a model — reaches
+        // this primitive, and the book counts what starts. Pet/Feed's own
+        // counters are not skills and still happen while frozen.
+        if self.clock.paused {
+            return Err("the duck is paused");
+        }
         self.care.touch(self.clock.tick);
         if self.emotions.get(name).is_some() {
             return self.trigger_emotion(name);

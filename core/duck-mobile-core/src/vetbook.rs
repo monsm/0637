@@ -56,6 +56,16 @@ pub struct Life {
     pub skills: BTreeMap<String, u64>,
     /// Emotions played, by name.
     pub emotions: BTreeMap<String, u64>,
+    /// The first day each move happened, keyed `emotion:<name>` /
+    /// `skill:<name>`. The value is the shell's calendar day (`YYYY-MM-DD`);
+    /// the empty string means the count predates this record, and the
+    /// collection page shows "—" rather than inventing a date.
+    #[serde(default)]
+    pub unlocks: BTreeMap<String, String>,
+    /// Whether the counts that already existed when the record was added have
+    /// been backfilled (once) with an unknown date.
+    #[serde(default)]
+    pub unlocks_backfilled: bool,
     /// Metres walked, from the contact odometry.
     pub metres: f64,
     /// Sit-then-power-off sequences that ran to the end.
@@ -159,6 +169,54 @@ pub fn is_known_event(event: &str) -> bool {
     false
 }
 
+/// Whether `day` is a real calendar day a shell can be living through:
+/// `YYYY-MM-DD`, year 2000–2100, month 1–12, and a day that exists in that
+/// month (February has 29 in a leap year).
+///
+/// This is the one gate every day that reaches the duck's records passes
+/// through. A ten-character shape is not enough: `2026-02-30` never happened,
+/// and a record dated with it would be a made-up fact.
+pub fn is_calendar_day(day: &str) -> bool {
+    if day.len() != 10 || !day.is_ascii() {
+        return false;
+    }
+    let bytes = day.as_bytes();
+    if bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    let number = |range: std::ops::Range<usize>| -> Option<u32> {
+        let slice = &day[range];
+        // `parse` would take a leading `+` ("2026-+1-18"); a calendar day is
+        // digits only, two per month and day.
+        if !slice.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+        slice.parse().ok()
+    };
+    let (Some(year), Some(month), Some(day_of_month)) = (number(0..4), number(5..7), number(8..10))
+    else {
+        return false;
+    };
+    if !(2000..=2100).contains(&year) || !(1..=12).contains(&month) {
+        return false;
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let last = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=last).contains(&day_of_month)
+}
+
+/// Whether `value` is what the collection writes: `""` (the count predates
+/// the record) or a real calendar day.
+pub fn is_unlock_day(value: &str) -> bool {
+    value.is_empty() || is_calendar_day(value)
+}
+
 impl Book {
     /// One tick's facts. The loop calls this every tick: no lock, no
     /// allocation beyond the counters themselves.
@@ -247,6 +305,53 @@ impl Book {
         }
     }
 
+    /// Record the first day each counted move happened.
+    ///
+    /// The first call backfills every count the duck already had with `""`:
+    /// those happened before there was a record, and the collection page must
+    /// say "unknown" rather than guess a date. From then on a count that has
+    /// no entry yet gets `day` — the calendar day the shell says it is. A
+    /// repeat call never overwrites an entry, so a first day stays the first
+    /// day. A day that is not a real calendar day records nothing: a made-up
+    /// date is worse than no date.
+    pub fn note_unlocks(&mut self, day: &str) {
+        if !is_calendar_day(day) {
+            return;
+        }
+        let life = &mut self.life;
+        if !life.unlocks_backfilled {
+            let mut existing = Vec::new();
+            for (name, count) in &life.emotions {
+                if *count > 0 {
+                    existing.push(format!("emotion:{name}"));
+                }
+            }
+            for (name, count) in &life.skills {
+                if *count > 0 {
+                    existing.push(format!("skill:{name}"));
+                }
+            }
+            for key in existing {
+                life.unlocks.entry(key).or_default();
+            }
+            life.unlocks_backfilled = true;
+        }
+        let mut missing = Vec::new();
+        for (name, count) in &life.emotions {
+            if *count > 0 && !life.unlocks.contains_key(&format!("emotion:{name}")) {
+                missing.push(format!("emotion:{name}"));
+            }
+        }
+        for (name, count) in &life.skills {
+            if *count > 0 && !life.unlocks.contains_key(&format!("skill:{name}")) {
+                missing.push(format!("skill:{name}"));
+            }
+        }
+        for key in missing {
+            life.unlocks.insert(key, day.to_owned());
+        }
+    }
+
     /// The top of the book, for a client that wants the story.
     pub fn summary(&self) -> serde_json::Value {
         serde_json::json!({
@@ -273,6 +378,8 @@ impl Book {
             "power_offs": self.life.power_offs,
             "skills": self.life.skills,
             "emotions": self.life.emotions,
+            "unlocks": self.life.unlocks,
+            "unlocks_backfilled": self.life.unlocks_backfilled,
             "events": self.events,
         })
     }
@@ -316,6 +423,174 @@ mod tests {
         book.emotion("curious");
         assert_eq!(book.life.skills.get("roulade"), Some(&2));
         assert_eq!(book.life.emotions.get("curious"), Some(&1));
+    }
+
+    /// The counts the duck already had when the collection arrived are
+    /// history: the first pass writes them with an unknown day, never a
+    /// guessed one, and leaves the counts themselves untouched.
+    #[test]
+    fn the_first_unlock_pass_backfills_history_with_an_unknown_day() {
+        let mut book = Book::default();
+        book.skill("roulade");
+        book.skill("roulade");
+        book.emotion("curious");
+        book.note_unlocks("2026-11-18");
+
+        assert!(book.life.unlocks_backfilled);
+        assert_eq!(
+            book.life.unlocks.get("emotion:curious").map(String::as_str),
+            Some("")
+        );
+        assert_eq!(
+            book.life.unlocks.get("skill:roulade").map(String::as_str),
+            Some("")
+        );
+        assert_eq!(book.life.emotions.get("curious"), Some(&1));
+        assert_eq!(book.life.skills.get("roulade"), Some(&2));
+    }
+
+    /// After the backfill, a move that happens for the first time is dated
+    /// with that day, and a later day never overwrites it.
+    #[test]
+    fn a_new_unlock_is_dated_once_and_never_redated() {
+        let mut book = Book::default();
+        // The first pass has nothing to backfill: this duck never played.
+        book.note_unlocks("2026-11-17");
+        assert!(book.life.unlocks_backfilled);
+
+        book.emotion("laugh");
+        book.note_unlocks("2026-11-18");
+        assert_eq!(
+            book.life.unlocks.get("emotion:laugh").map(String::as_str),
+            Some("2026-11-18")
+        );
+
+        book.emotion("laugh");
+        book.note_unlocks("2026-11-19");
+        assert_eq!(
+            book.life.unlocks.get("emotion:laugh").map(String::as_str),
+            Some("2026-11-18"),
+            "a second play must not move the first day"
+        );
+
+        book.skill("kick_left");
+        book.note_unlocks("2026-11-19");
+        assert_eq!(
+            book.life.unlocks.get("skill:kick_left").map(String::as_str),
+            Some("2026-11-19")
+        );
+    }
+
+    /// An old save has neither field. It must deserialize (serde default) and
+    /// then backfill the counts it restored, instead of dating them today.
+    #[test]
+    fn an_old_life_without_the_new_fields_loads_and_backfills() {
+        let old = r#"{"pets":4,"skills":{"roulade":2},"emotions":{"curious":1}}"#;
+        let life: Life = serde_json::from_str(old).expect("an old save still loads");
+        assert!(life.unlocks.is_empty());
+        assert!(!life.unlocks_backfilled);
+        assert_eq!(life.emotions.get("curious"), Some(&1));
+
+        let mut book = Book {
+            life,
+            ..Book::default()
+        };
+        book.note_unlocks("2026-11-18");
+        assert!(book.life.unlocks_backfilled);
+        assert_eq!(
+            book.life.unlocks.get("emotion:curious").map(String::as_str),
+            Some("")
+        );
+        assert_eq!(
+            book.life.unlocks.get("skill:roulade").map(String::as_str),
+            Some("")
+        );
+    }
+
+    /// A zero count is not a move that happened: it must not appear in the
+    /// collection, and the backfill must not invent an entry for it.
+    #[test]
+    fn a_zero_count_is_not_an_unlock() {
+        let mut book = Book::default();
+        book.life.emotions.insert("sad".to_owned(), 0);
+        book.note_unlocks("2026-11-18");
+        assert!(!book.life.unlocks.contains_key("emotion:sad"));
+    }
+
+    /// Days are real calendar days, not ten characters shaped like one: the
+    /// year range is the duck's, the month and day must exist (leap years
+    /// included), and an unlock may also say "unknown" with an empty string.
+    #[test]
+    fn only_real_calendar_days_are_accepted() {
+        for day in ["2000-01-01", "2026-11-18", "2024-02-29", "2100-12-31"] {
+            assert!(is_calendar_day(day), "{day} is a real day");
+            assert!(is_unlock_day(day), "{day} is a day the collection writes");
+        }
+        for day in [
+            "today",
+            "1999-12-31",
+            "2101-01-01",
+            "2026-00-10",
+            "2026-13-01",
+            "2026-01-00",
+            "2026-01-32",
+            "2026-02-29",
+            "2023-02-29",
+            "2026-04-31",
+            "2026-1-18",
+            "2026-+1-18",
+            "2026-11-+8",
+            "2026/11/18",
+            "2026-11-18 ",
+            "I flew to Paris",
+        ] {
+            assert!(!is_calendar_day(day), "{day} is not a real calendar day");
+            assert!(!is_unlock_day(day), "{day} is not an unlock day");
+        }
+        assert!(!is_calendar_day(""), "an empty day is not a calendar day");
+        assert!(is_unlock_day(""), "an unknown day is still a legal record");
+    }
+
+    /// A day that never existed must not become the first day of anything,
+    /// and an invalid day must not trigger the one-time backfill.
+    #[test]
+    fn note_unlocks_records_nothing_for_a_day_that_never_existed() {
+        let mut book = Book::default();
+        book.emotion("curious");
+        for day in ["", "2026-02-30", "today", "1999-01-01"] {
+            book.note_unlocks(day);
+        }
+        assert!(book.life.unlocks.is_empty());
+        assert!(!book.life.unlocks_backfilled);
+        book.note_unlocks("2026-11-18");
+        assert_eq!(
+            book.life.unlocks.get("emotion:curious").map(String::as_str),
+            Some("")
+        );
+    }
+
+    /// The new fields survive the JSON the shell persists: the summary is
+    /// what /life serves and POST /life reads back, and the flat Life
+    /// document keeps them through its own serde round trip.
+    #[test]
+    fn unlock_days_roundtrip_through_json() {
+        let mut book = Book::default();
+        book.note_unlocks("2026-11-17");
+        book.emotion("curious");
+        book.note_unlocks("2026-11-18");
+
+        let summary: serde_json::Value =
+            serde_json::from_str(&book.summary().to_string()).expect("summary");
+        assert_eq!(summary["unlocks"]["emotion:curious"], "2026-11-18");
+        assert_eq!(summary["unlocks_backfilled"], true);
+
+        let document = serde_json::to_string(&book.life).expect("life serializes");
+        let life: Life = serde_json::from_str(&document).expect("life parses");
+        assert_eq!(
+            life.unlocks.get("emotion:curious").map(String::as_str),
+            Some("2026-11-18")
+        );
+        assert!(life.unlocks_backfilled);
     }
 
     /// The life record only takes the words the core writes.

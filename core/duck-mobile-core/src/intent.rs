@@ -21,7 +21,7 @@
 //! No authentication: it binds to the local network for a phone or a desktop
 //! agent. Treat it as a development API, not an internet-facing service.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -207,6 +207,10 @@ pub struct IntentQueue {
     /// The official emotion names this build loaded, as the core last
     /// published them. The gift route refuses a mood that is not in here.
     emotions: Mutex<Vec<String>>,
+    /// The manifest's one-shot skills, as the core last published them. The
+    /// collection page's tricks: `/skills` also carries the emotions and the
+    /// loop's own verbs, so that list cannot stand in for this one.
+    manifest_skills: Mutex<Vec<String>>,
     /// When each peer last got a gift from this duck, for the sender's
     /// one-per-peer window. Keyed by peer id.
     gifts_sent: Mutex<HashMap<String, Instant>>,
@@ -260,6 +264,7 @@ impl IntentQueue {
             fingerprint: Mutex::new("{}".to_owned()),
             peers: Mutex::new(json!({ "peers": [] })),
             emotions: Mutex::new(Vec::new()),
+            manifest_skills: Mutex::new(Vec::new()),
             gifts_sent: Mutex::new(HashMap::new()),
             gift_event: Mutex::new(Value::Null),
             chorus: Mutex::new(json!({ "active": false })),
@@ -438,6 +443,70 @@ impl IntentQueue {
         }
     }
 
+    /// The collection page: every loaded mood and every manifest trick with
+    /// its real count and the day it was first unlocked.
+    ///
+    /// Nothing here is invented. A count of zero is a move that has not
+    /// happened, and it has no `first_day` at all — there is no date for
+    /// something never done. A positive count with an empty `first_day` is a
+    /// count that predates the record (the shell shows "—"), never a guessed
+    /// date; an entry whose value is not a real calendar day is served as
+    /// unknown rather than echoed. The lists come from the names the core
+    /// loaded, sorted by name; a queue that has never heard from a core
+    /// answers with empty tables, not an error.
+    pub fn collection_json(&self) -> String {
+        /// The official release's thirteen moods: the figure the page shows
+        /// as the denominator even before a build has loaded them.
+        const MOODS_TOTAL: usize = 13;
+
+        let book = self.life.lock().expect("intent life").clone();
+        let mut emotions = self.emotions.lock().expect("intent emotions").clone();
+        let mut skills = self
+            .manifest_skills
+            .lock()
+            .expect("intent manifest skills")
+            .clone();
+        emotions.sort();
+        emotions.dedup();
+        skills.sort();
+        skills.dedup();
+
+        // One row per loaded name, with the count the duck really has and
+        // the day the collection really recorded, if it recorded one.
+        let rows = |names: &[String], counts: &BTreeMap<String, u64>, prefix: &str| {
+            let mut unlocked = 0u64;
+            let rows: Vec<Value> = names
+                .iter()
+                .map(|name| {
+                    let count = counts.get(name).copied().unwrap_or(0);
+                    if count == 0 {
+                        return json!({ "name": name, "count": 0 });
+                    }
+                    unlocked += 1;
+                    let first_day = book
+                        .life
+                        .unlocks
+                        .get(&format!("{prefix}:{name}"))
+                        .filter(|day| crate::vetbook::is_unlock_day(day))
+                        .cloned()
+                        .unwrap_or_default();
+                    json!({ "name": name, "count": count, "first_day": first_day })
+                })
+                .collect();
+            (rows, unlocked)
+        };
+        let (emotion_rows, moods_unlocked) = rows(&emotions, &book.life.emotions, "emotion");
+        let (skill_rows, tricks_unlocked) = rows(&skills, &book.life.skills, "skill");
+        json!({
+            "ok": true,
+            "emotions": emotion_rows,
+            "skills": skill_rows,
+            "moods": { "unlocked": moods_unlocked, "total": MOODS_TOTAL },
+            "tricks": { "unlocked": tricks_unlocked, "total": skills.len() },
+        })
+        .to_string()
+    }
+
     pub fn sensors_json(&self) -> String {
         self.sensors.lock().expect("intent sensors").to_string()
     }
@@ -474,6 +543,13 @@ impl IntentQueue {
     /// this snapshot so a client's typo is refused before anything is queued.
     pub fn set_emotions(&self, names: Vec<String>) {
         *self.emotions.lock().expect("intent emotions") = names;
+    }
+
+    /// The manifest's one-shot skills, as the core last published them. The
+    /// collection page lists these as tricks; the published `/skills` list
+    /// also holds every emotion and the loop's own verbs.
+    pub fn set_manifest_skills(&self, names: Vec<String>) {
+        *self.manifest_skills.lock().expect("intent manifest skills") = names;
     }
 
     fn emotion_loaded(&self, name: &str) -> bool {
@@ -977,6 +1053,9 @@ fn handle(
         ("GET", "/sensors") => Ok(queue.sensors_json()),
         // The lifetime record, the same counters the shell keeps in storage.
         ("GET", "/life") => Ok(queue.life_json()),
+        // The collection page: every loaded mood and manifest trick with its
+        // real count and first day. A read, like /life: nothing is queued.
+        ("GET", "/collection") => Ok(queue.collection_json()),
         ("GET", "/quests") => Ok(queue.quests_json()),
         // The same record as a file a person can share, in the two shapes a
         // share sheet wants. No new counting path: both call vetbook/export.
@@ -1325,15 +1404,20 @@ fn handle(
             Ok(json!({ "ok": true, "queued": true }).to_string())
         }
         ("POST", "/quests/day") => {
-            let day = value["day"]
-                .as_str()
-                .unwrap_or("")
-                .chars()
-                .take(10)
-                .collect::<String>();
-            let board = value.get("board").cloned().unwrap_or(json!({}));
-            queue.set_day(day.clone());
-            Ok(queue.request(Intent::QuestDay(day, board)).to_string())
+            let day = value["day"].as_str().unwrap_or("");
+            // The day dates the duck's own records, so it has to be a real
+            // calendar day. A truncated or made-up string is refused whole:
+            // taking the first ten characters of "2026-02-30..." would put a
+            // day that never happened into the book.
+            if !crate::vetbook::is_calendar_day(day) {
+                Ok(json!({ "ok": false, "error": "quest day must be yyyy-mm-dd" }).to_string())
+            } else {
+                let board = value.get("board").cloned().unwrap_or(json!({}));
+                queue.set_day(day.to_owned());
+                Ok(queue
+                    .request(Intent::QuestDay(day.to_owned(), board))
+                    .to_string())
+            }
         }
         ("POST", "/config") => {
             let idle = value.get("idle_ritual_s").and_then(Value::as_f64);
@@ -1570,6 +1654,196 @@ mod tests {
         assert!(response.contains(r#""label":"walk""#), "{response}");
         let response = request(port, "GET", "/skills", "");
         assert!(response.contains("roulade"), "{response}");
+    }
+
+    /// The collection page: each loaded mood and manifest trick with the
+    /// duck's real count and the first day it was recorded, sorted by name.
+    /// A move that never happened has count 0 and no first day at all — the
+    /// page shows its locked state; the totals are the official thirteen
+    /// moods and the manifest's own tricks.
+    #[test]
+    fn http_serves_the_collection_with_real_counts_and_days() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_emotions(vec![
+            "sad".to_owned(),
+            "curious".to_owned(),
+            "laugh".to_owned(),
+        ]);
+        queue.set_manifest_skills(vec!["roulade".to_owned(), "kick_left".to_owned()]);
+        let mut book = crate::vetbook::Book::default();
+        for _ in 0..3 {
+            book.emotion("curious");
+        }
+        for _ in 0..5 {
+            book.skill("roulade");
+        }
+        book.life
+            .unlocks
+            .insert("emotion:curious".to_owned(), "2026-11-18".to_owned());
+        book.life
+            .unlocks
+            .insert("skill:roulade".to_owned(), String::new());
+        queue.set_life(&book);
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(port, "GET", "/collection", "");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let body = response.split("\r\n\r\n").nth(1).expect("a body");
+        let value: Value = serde_json::from_str(body).expect("collection JSON");
+        let names = |rows: &Value| -> Vec<String> {
+            rows.as_array()
+                .expect("rows")
+                .iter()
+                .map(|row| row["name"].as_str().expect("name").to_owned())
+                .collect()
+        };
+
+        assert_eq!(value["ok"], json!(true));
+        assert_eq!(
+            names(&value["emotions"]),
+            vec!["curious".to_owned(), "laugh".to_owned(), "sad".to_owned()]
+        );
+        assert_eq!(value["emotions"][0]["count"], json!(3));
+        assert_eq!(value["emotions"][0]["first_day"], json!("2026-11-18"));
+        assert_eq!(value["emotions"][2]["count"], json!(0));
+        assert!(
+            value["emotions"][2].get("first_day").is_none(),
+            "a move that never happened has no date to send: {value}"
+        );
+        assert_eq!(value["moods"], json!({ "unlocked": 1, "total": 13 }));
+
+        assert_eq!(
+            names(&value["skills"]),
+            vec!["kick_left".to_owned(), "roulade".to_owned()]
+        );
+        assert_eq!(value["skills"][0]["count"], json!(0));
+        assert!(
+            value["skills"][0].get("first_day").is_none(),
+            "a trick that never happened has no date to send: {value}"
+        );
+        assert_eq!(value["skills"][1]["count"], json!(5));
+        assert_eq!(value["skills"][1]["first_day"], json!(""));
+        assert_eq!(value["tricks"], json!({ "unlocked": 1, "total": 2 }));
+    }
+
+    /// A queue with no core behind it still answers the page — empty tables,
+    /// not an error — and a day learned through the same route the shell uses
+    /// is the day the next unlock gets.
+    #[test]
+    fn a_day_from_the_route_dates_the_next_unlock() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        // Nothing has been loaded and no core has published a book: the page
+        // is an empty table, not an error.
+        let response = request(port, "GET", "/collection", "");
+        let empty: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("collection JSON");
+        assert_eq!(empty["emotions"], json!([]));
+        assert_eq!(empty["skills"], json!([]));
+        assert_eq!(empty["moods"], json!({ "unlocked": 0, "total": 13 }));
+        assert_eq!(empty["tricks"], json!({ "unlocked": 0, "total": 0 }));
+
+        // The core then publishes the names it loaded.
+        queue.set_emotions(vec!["curious".to_owned()]);
+        queue.set_manifest_skills(vec!["roulade".to_owned()]);
+
+        // The route hands the day to the queue immediately, before the queued
+        // intent waits for a tick (the test drain never runs one).
+        let _ = request(
+            port,
+            "POST",
+            "/quests/day",
+            r#"{"day":"2026-11-18","board":{}}"#,
+        );
+        assert_eq!(queue.day(), "2026-11-18");
+
+        // What the core's tick does after the same day: backfill once, then
+        // date the mood that happens now.
+        let mut book = crate::vetbook::Book::default();
+        book.note_unlocks(&queue.day());
+        book.emotion("curious");
+        book.note_unlocks(&queue.day());
+        queue.set_life(&book);
+
+        let response = request(port, "GET", "/collection", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("collection JSON");
+        assert_eq!(value["emotions"][0]["name"], json!("curious"));
+        assert_eq!(value["emotions"][0]["count"], json!(1));
+        assert_eq!(value["emotions"][0]["first_day"], json!("2026-11-18"));
+        assert_eq!(value["moods"], json!({ "unlocked": 1, "total": 13 }));
+    }
+
+    /// A date that never existed is never served, even if a book carries one
+    /// (an old save, a hostile POST). The row keeps its real count and says
+    /// the day is unknown.
+    #[test]
+    fn the_collection_never_serves_a_day_that_never_existed() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_emotions(vec!["curious".to_owned(), "laugh".to_owned()]);
+        let mut book = crate::vetbook::Book::default();
+        book.emotion("curious");
+        book.emotion("laugh");
+        book.life
+            .unlocks
+            .insert("emotion:curious".to_owned(), "2026-02-30".to_owned());
+        book.life
+            .unlocks
+            .insert("emotion:laugh".to_owned(), "I flew to Paris".to_owned());
+        queue.set_life(&book);
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(port, "GET", "/collection", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("collection JSON");
+        for row in value["emotions"].as_array().expect("emotions") {
+            assert_eq!(row["count"], json!(1));
+            assert_eq!(
+                row["first_day"], "",
+                "an unreal day is served as unknown: {row}"
+            );
+        }
+    }
+
+    /// The day route validates before it writes: a malformed or impossible
+    /// day is refused whole and must not become the queue's calendar.
+    #[test]
+    fn a_day_that_is_not_a_calendar_day_is_refused() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for body in [
+            r#"{"day":"2026-02-30"}"#,
+            r#"{"day":"1999-12-31"}"#,
+            r#"{"day":"2026-11-18 and more"}"#,
+            r#"{"day":"today"}"#,
+            r#"{"day":""}"#,
+            r#"{}"#,
+        ] {
+            let response = request(port, "POST", "/quests/day", body);
+            assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+            assert!(
+                response.contains(r#""ok":false"#),
+                "{body} was not refused: {response}"
+            );
+            assert_eq!(queue.day(), "", "{body} became the duck's day");
+            assert!(queue.drain().is_empty(), "{body} still reached the duck");
+        }
+
+        let response = request(port, "POST", "/quests/day", r#"{"day":"2026-11-18"}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(queue.day(), "2026-11-18");
     }
 
     #[test]
