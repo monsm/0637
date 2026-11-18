@@ -690,7 +690,9 @@ Core 在 `4477a89` 红了一次，失败项 `a_chorus_without_moves_sings_the_do
 - **sensors/scripts/CI**：`to_tof_grid` 改用官方 `Reprojector` 几何；`fetch-policies.sh` 以 manifest 为清单（路径穿越拒绝）；core CI 新增 fmt/clippy、MuJoCo 特征测试 job；contracts 新增 shellcheck；mujoco 测试去 Windows 硬编码（fixtures/DUCK_POLICIES_DIR）。
 - **双端壳**：walk 覆盖持久化重放（两端同键同名；`"none"` 归一化）；规则分享/粘贴保留 `period_s` 与 timer 词表；Android 接 shake→push（阈值/限频与 iOS 逐值一致）；Android fingerprint/lastError 已在上一批。
 - **文档**：COMPANION 三动词→七动词；对比报告新增 §0 修复状态（27 条偏差与 §5.1 逐项处置）；本条批次账。
-- **验证**：本地默认特性 243+9、mujoco 272+9、Android JVM 70 全绿；六道静态契约门禁绿；Rust 侧新增测试 40+ 条。CI 新增步骤（ubuntu 上的 fmt/clippy/shellcheck/MuJoCo job）由首跑裁决。
+- **验证**：本地默认特性 244+9、mujoco 273+9、Android JVM 70 全绿；六道静态契约门禁绿；Rust 侧新增测试 40+ 条。CI 落地：Core ✅（含新 MuJoCo job，ffi 测试首次进 CI）、Contracts ✅、Android ✅（模拟器冒烟含新情绪断言）、iOS 由 ios.yml 裁决。
+- **CI 落地时修的三件基础设施**：① ONNX Runtime 的 GitHub 仓库整个 404（2026-11-18），Linux 取库脚本回退到同版本 PyPI wheel（stdlib 解析 URL，不依赖 pip）；② 新 MuJoCo job 改用源码构建的共享库 + rpath（静态档案在该 runner 上 lld 取不到符号，`ld -r`/`ar`/whole-archive 三法皆失败）；③ fmt 门禁只格式化本仓库自有文件（rustfmt 会顺着 `#[path]` 进入 upstream）。
+- **顺手修出的产品语义**：`play_emotion` 落实官方「一次只播一个情绪、期间请求丢弃」——此前每日任务完成的庆祝会覆盖孩子刚点的情绪（冒烟里 curious 被 excited 顶掉即是此因）。
 - **保留（刻意/边界，未改）**：BAM 执行器路径、齿隙编码器读数、传感器回报语义、麦克风替身、多鸭同世界、ToF 场景射线与相机帧流、命令延迟模型、运行期增删技能、社区策略门禁、setMode 整机重建、updaterd/configd 族、robotctl CLI、chorale 乐谱、head_imu、API_VERSION 握手、coverage 基线——均在对比报告 §0.2 逐条登记理由。
 
 ---
