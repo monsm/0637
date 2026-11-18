@@ -74,7 +74,11 @@ impl Controller {
     }
 
     /// Restore the driving network and its memory.
-    pub fn restore_policy_state(&mut self, net: Option<duck_control::policy::Net>, bytes: &[u8]) -> bool {
+    pub fn restore_policy_state(
+        &mut self,
+        net: Option<duck_control::policy::Net>,
+        bytes: &[u8],
+    ) -> bool {
         self.policy_mut().restore_state(net, bytes)
     }
 

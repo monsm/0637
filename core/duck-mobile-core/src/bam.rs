@@ -38,7 +38,11 @@ impl BamModel {
     pub fn xl330_m6() -> Self {
         let value: Value = serde_json::from_str(include_str!("../params/xl330_m6.json"))
             .expect("bundled BAM parameters");
-        let get = |name: &str| value[name].as_f64().unwrap_or_else(|| panic!("BAM parameter {name}"));
+        let get = |name: &str| {
+            value[name]
+                .as_f64()
+                .unwrap_or_else(|| panic!("BAM parameter {name}"))
+        };
         Self {
             kt: get("kt"),
             r: get("R"),
@@ -83,15 +87,8 @@ impl BamModel {
     }
 
     /// `(frictionloss, damping)` for MuJoCo's friction budget.
-    pub fn frictions(
-        &self,
-        motor_torque: f64,
-        external_torque: f64,
-        dq: f64,
-    ) -> (f64, f64) {
-        let gearbox = (external_torque * self.load_external
-            - motor_torque * self.load_motor)
-            .abs();
+    pub fn frictions(&self, motor_torque: f64, external_torque: f64, dq: f64) -> (f64, f64) {
+        let gearbox = (external_torque * self.load_external - motor_torque * self.load_motor).abs();
         let gearbox_stribeck = (external_torque * self.load_external_stribeck
             - motor_torque * self.load_motor_stribeck)
             .abs();
@@ -114,7 +111,11 @@ impl BamModel {
         if enable {
             frictionloss += stribeck
                 * (if direction_motor { gearbox2_motor } else { 0.0 }
-                    + if direction_external { gearbox2_external } else { 0.0 });
+                    + if direction_external {
+                        gearbox2_external
+                    } else {
+                        0.0
+                    });
         }
 
         (frictionloss, self.friction_viscous)
@@ -155,13 +156,22 @@ mod tests {
         let model = BamModel::xl330_m6();
         // 2 rad of error at kp=200 is past the PWM limit; 0.1 rad is not.
         let volts = model.voltage(2.0, 0.0, 0.0, 7.4);
-        assert!((volts - 7.4).abs() < 1e-12, "saturated at +vin, got {volts}");
+        assert!(
+            (volts - 7.4).abs() < 1e-12,
+            "saturated at +vin, got {volts}"
+        );
         let volts = model.voltage(-2.0, 0.0, 0.0, 7.4);
-        assert!((volts + 7.4).abs() < 1e-12, "saturated at -vin, got {volts}");
+        assert!(
+            (volts + 7.4).abs() < 1e-12,
+            "saturated at -vin, got {volts}"
+        );
 
         let expected = 7.4 * (0.1 * 200.0 * model.error_gain);
         let volts = model.voltage(0.1, 0.0, 0.0, 7.4);
-        assert!((volts - expected).abs() < 1e-12, "unsaturated law: {volts} vs {expected}");
+        assert!(
+            (volts - expected).abs() < 1e-12,
+            "unsaturated law: {volts} vs {expected}"
+        );
     }
 
     #[test]

@@ -5,9 +5,9 @@
 //! renderer. All pointers are borrowed for the call only.
 #![allow(unsafe_op_in_unsafe_fn)]
 
+use std::collections::VecDeque;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_double, c_float, c_int, c_ulonglong};
-use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
@@ -20,9 +20,7 @@ use duck_control::safety::SafetyConfig;
 use crate::intent::{Intent, IntentQueue};
 use crate::lan::GiftKind;
 use crate::mujoco::MujocoIo;
-use crate::runtime::{
-    BringupState, DuckRuntime, HealthVerdict, PolicySwap, TickReport,
-};
+use crate::runtime::{BringupState, DuckRuntime, HealthVerdict, PolicySwap, TickReport};
 
 #[repr(C)]
 pub struct DuckStatus {
@@ -141,7 +139,93 @@ pub struct DuckCore {
     /// session, and judging it would answer `robot.health` with a stalled loop
     /// while `/state`, which reads the same branch, says the duck is fine.
     health_snapshot: Arc<std::sync::Mutex<duck_ipc_proto::HealthResult>>,
+    /// What the `robot.*` read methods answer with (identity, slots, skills,
+    /// model, vetbook, safe-to-restart). Refreshed once per tick from the duck
+    /// the loop actually drove, for the same `Sync` reason as the health
+    /// snapshot: the IPC handlers run on connection threads.
+    robot_snapshot: Arc<std::sync::Mutex<RobotSnapshot>>,
+    /// The power requests `robot.enable` / `init` / `relax` / `rest` /
+    /// `shutdown` queue for the next tick. The runtime is owned by the control
+    /// thread, so the handlers only queue; the tick applies them through the
+    /// same branch swap every other intent takes.
+    control: Arc<std::sync::Mutex<Vec<ControlCommand>>>,
+    /// The manifest's skill table as the loaded bundle declared it, so
+    /// `robot.skills` can answer with parameters rather than bare names.
+    skill_defs: Vec<robotd_params::SkillDef>,
+    /// The runtime that owns a queued (GoingHome) policy change — the
+    /// `selected` index at queue time, 0 for the original — plus the loaded
+    /// paths it will install. Branch sessions make the owner essential: a
+    /// reload queued on branch B must not be judged against the original, and
+    /// a reload of the original must not be consumed by a branch tick.
+    swap_landing: Option<(usize, Vec<(String, Option<PathBuf>)>)>,
 }
+
+/// What the `robot.*` handlers can read without touching the runtime: the
+/// identity frame, the slot report, the skills table and the lifetime record,
+/// refreshed by [`publish_ipc`] on the thread that owns the body.
+#[derive(Debug, Clone)]
+struct RobotSnapshot {
+    subscribe: duck_ipc_proto::SubscribeResult,
+    policies: duck_ipc_proto::PoliciesResult,
+    skills: duck_ipc_proto::SkillsResult,
+    model: duck_ipc_proto::ModelResult,
+    vetbook: serde_json::Value,
+    mode: String,
+    policies_dir: PathBuf,
+    /// The policy-enabled mirror `robot.enable`'s `toggle` reads. Written by
+    /// every door that changes the flag — the IPC control queue, the pad's
+    /// Init/Toggle/Home, the C ABI enable/disable, `Intent::PowerOn`, a
+    /// branch select or a time-machine restore, and a mode switch — and by
+    /// [`publish_ipc`]'s powered-off/limp catch for the runtime's own
+    /// transitions.
+    enabled: bool,
+    safe_to_restart: duck_ipc_proto::SafeToRestartResult,
+}
+
+impl RobotSnapshot {
+    fn new(model: duck_ipc_proto::ModelResult, policies_dir: PathBuf) -> Self {
+        Self {
+            subscribe: duck_ipc_proto::SubscribeResult::default(),
+            policies: duck_ipc_proto::PoliciesResult::default(),
+            skills: duck_ipc_proto::SkillsResult::default(),
+            model,
+            vetbook: serde_json::Value::Null,
+            mode: "walk".to_owned(),
+            policies_dir,
+            enabled: true,
+            safe_to_restart: duck_ipc_proto::SafeToRestartResult {
+                safe: true,
+                reason: None,
+            },
+        }
+    }
+}
+
+/// One power request queued by the IPC handlers for the next tick. The
+/// official dispatch only queues these too (`robotd/src/main.rs:5587-5670`),
+/// so the answer never waits for the body.
+#[derive(Debug, Clone, Copy)]
+enum ControlCommand {
+    Enable(bool),
+    Init,
+    Relax,
+    Rest,
+    Shutdown,
+    /// `robot.loadPolicy`: the override is already recorded; re-read the set on
+    /// the tick thread with the official *slot change* disturb rule, not the
+    /// reload-always-disturbs one.
+    ReloadSlot,
+}
+
+/// Which official `PolicyChange` a re-read stands for
+/// (`robotd/src/main.rs:2047-2070`): `Reload` disturbs whatever is driving;
+/// a slot change disturbs only when the file behind the *driving* slot moved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReloadKind {
+    Reload,
+    SlotChange,
+}
+
 
 struct Branch {
     label: String,
@@ -166,6 +250,38 @@ struct RobotHandlers {
     intents: Arc<IntentQueue>,
     health: Arc<std::sync::Mutex<duck_ipc_proto::HealthResult>>,
     revision: String,
+    snapshot: Arc<std::sync::Mutex<RobotSnapshot>>,
+    control: Arc<std::sync::Mutex<Vec<ControlCommand>>>,
+}
+
+impl RobotHandlers {
+    fn queue_control(&self, command: ControlCommand) {
+        if let Ok(mut queue) = self.control.lock() {
+            queue.push(command);
+        }
+    }
+
+    fn snapshot<T>(&self, read: impl FnOnce(&RobotSnapshot) -> T, fallback: T) -> T {
+        match self.snapshot.lock() {
+            Ok(snapshot) => read(&snapshot),
+            Err(_) => fallback,
+        }
+    }
+}
+
+/// The official `FlashlightColor` wire spelling (`duck-ipc-proto`'s serde
+/// rename: snake_case).
+fn flashlight_color_name(color: duck_ipc_proto::FlashlightColor) -> &'static str {
+    use duck_ipc_proto::FlashlightColor;
+    match color {
+        FlashlightColor::White => "white",
+        FlashlightColor::Red => "red",
+        FlashlightColor::Green => "green",
+        FlashlightColor::Blue => "blue",
+        FlashlightColor::Yellow => "yellow",
+        FlashlightColor::Cyan => "cyan",
+        FlashlightColor::Magenta => "magenta",
+    }
 }
 
 impl crate::ipc::RobotHandlers for RobotHandlers {
@@ -178,7 +294,8 @@ impl crate::ipc::RobotHandlers for RobotHandlers {
 
     fn move_twist(&self, params: duck_ipc_proto::MoveParams) -> duck_ipc_proto::IntentResult {
         // The same continuous intent `/twist` queues: no verdict to await.
-        self.intents.push(Intent::Twist([params.vx, params.vy, params.vyaw]));
+        self.intents
+            .push(Intent::Twist([params.vx, params.vy, params.vyaw]));
         duck_ipc_proto::IntentResult::accepted()
     }
 
@@ -193,12 +310,31 @@ impl crate::ipc::RobotHandlers for RobotHandlers {
     }
 
     fn do_skill(&self, params: duck_ipc_proto::DoParams) -> duck_ipc_proto::IntentResult {
+        // Official `robot.do`'s door checks (`robotd/src/main.rs:5431-5445`):
+        // the policy must be driving, and a reload's walk home must have
+        // finished. "Accepted then silently dropped by the loop" is the answer
+        // the official dispatch refuses.
+        let (enabled, homed) = self.snapshot(
+            |snapshot| (snapshot.enabled, snapshot.policies.homed.unwrap_or(false)),
+            (false, false),
+        );
+        if !enabled {
+            return duck_ipc_proto::IntentResult::refused(
+                "the policy is not driving — press Start on the pad",
+            );
+        }
+        if !homed {
+            return duck_ipc_proto::IntentResult::refused(
+                "the robot is still going to its home pose; try again in a moment",
+            );
+        }
         // The same awaited round `/skill` answers with: the next tick decides,
         // and the verdict is the duck's own refusal reason.
-        let answer = self
-            .intents
-            .request(Intent::Skill(params.skill.clone()));
-        let accepted = answer.get("ok").and_then(serde_json::Value::as_bool).unwrap_or(false);
+        let answer = self.intents.request(Intent::Skill(params.skill.clone()));
+        let accepted = answer
+            .get("ok")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
         let reason = answer
             .get("error")
             .and_then(serde_json::Value::as_str)
@@ -211,6 +347,255 @@ impl crate::ipc::RobotHandlers for RobotHandlers {
                 skill = params.skill
             )),
         }
+    }
+
+    fn look(&self, params: duck_ipc_proto::LookParams) -> duck_ipc_proto::LookResult {
+        // The official dispatch runs the IK on the IPC side against the same
+        // MJCF (`robotd/src/main.rs:5395-5410`) and feeds the joints to the
+        // head intent path. The phone does the identical call — `look_at` is
+        // the same `HeadFk::alpha()` the runtime uses — so the answer and the
+        // intent cannot disagree.
+        let gaze = kinematics::head::HeadFk::alpha().look_at(
+            [params.x, params.y, params.z],
+            params.neck_pitch,
+        );
+        self.intents.push(Intent::Head(gaze.joints));
+        let [neck_pitch, head_pitch, head_yaw, head_roll] = gaze.joints;
+        duck_ipc_proto::LookResult {
+            head: duck_ipc_proto::HeadParams {
+                neck_pitch,
+                head_pitch,
+                head_yaw,
+                head_roll,
+            },
+            clamped: gaze.clamped,
+        }
+    }
+
+    fn pose(&self, params: duck_ipc_proto::PoseParams) -> duck_ipc_proto::IntentResult {
+        // `PoseIntent`: the loop glides toward the pose while active; false
+        // releases it at once (the official B-button exit).
+        if params.active {
+            self.intents
+                .push(Intent::Body(params.z, params.roll, params.pitch));
+        } else {
+            self.intents.push(Intent::BodyRelease);
+        }
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn mouth(&self, params: duck_ipc_proto::MouthParams) -> duck_ipc_proto::IntentResult {
+        self.intents.push(Intent::Mouth(params.open));
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn sound(&self, params: duck_ipc_proto::SoundParams) -> duck_ipc_proto::IntentResult {
+        use duck_ipc_proto::SoundTag;
+        // The wheee tag is a level, not a one-shot: the official handler routes
+        // it to the hold channel rather than the sound queue (`intents.rs:395-407`).
+        if params.tag == SoundTag::Wheee {
+            self.intents
+                .push(Intent::Wheee(params.hold.unwrap_or(true)));
+        } else {
+            self.intents.push(Intent::Sound(params.tag.as_str().to_owned()));
+        }
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn flashlight(&self, params: duck_ipc_proto::FlashlightParams) -> duck_ipc_proto::IntentResult {
+        self.intents.push(Intent::Flashlight {
+            toggle: params.toggle,
+            on: params.on,
+            color: flashlight_color_name(params.color).to_owned(),
+        });
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn stop(&self) -> duck_ipc_proto::IntentResult {
+        // Official `Intents::stop` is `set_twist([0; 3])`, not a disable
+        // (`intents.rs:328-330`): the policy keeps running with a zero command.
+        self.intents.push(Intent::Twist([0.0; 3]));
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn enable(&self, params: duck_ipc_proto::EnableParams) -> duck_ipc_proto::IntentResult {
+        // `toggle` flips the robot's own state; evaluated against the shared
+        // mirror every policy-enable door writes from the runtime, never
+        // against a client-side belief (`robotd/src/main.rs:5711-5745`).
+        let on = if params.toggle {
+            !self.snapshot(|snapshot| snapshot.enabled, false)
+        } else {
+            params.on
+        };
+        self.queue_control(ControlCommand::Enable(on));
+        // Match the official answer's reason. Not verified against the body —
+        // the request is a queued intent on both sides.
+        let reason = if on {
+            "enabled — driving"
+        } else {
+            "disabled — returning to the home pose"
+        };
+        duck_ipc_proto::IntentResult {
+            accepted: true,
+            reason: Some(reason.to_owned()),
+        }
+    }
+
+    fn init(&self) -> duck_ipc_proto::IntentResult {
+        self.queue_control(ControlCommand::Init);
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn relax(&self) -> duck_ipc_proto::IntentResult {
+        self.queue_control(ControlCommand::Relax);
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn rest(&self) -> duck_ipc_proto::IntentResult {
+        self.queue_control(ControlCommand::Rest);
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn shutdown(&self) -> duck_ipc_proto::IntentResult {
+        self.queue_control(ControlCommand::Shutdown);
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn mode(&self) -> duck_ipc_proto::ModeResult {
+        duck_ipc_proto::ModeResult {
+            mode: self.snapshot(|snapshot| snapshot.mode.clone(), "walk".to_owned()),
+        }
+    }
+
+    fn set_mode(&self, params: duck_ipc_proto::SetModeParams) -> duck_ipc_proto::IntentResult {
+        if params.mode != "walk" && params.mode != "roller" {
+            return duck_ipc_proto::IntentResult::refused("mode must be \"walk\" or \"roller\"");
+        }
+        // The whole-bundle switch is the same `Intent::Mode` the HTTP `/mode`
+        // route queues; "already in that mode" is an acceptance there too.
+        self.intents.push(Intent::Mode(params.mode));
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn policies(&self) -> duck_ipc_proto::PoliciesResult {
+        self.snapshot(
+            |snapshot| snapshot.policies.clone(),
+            duck_ipc_proto::PoliciesResult::default(),
+        )
+    }
+
+    fn model(&self) -> duck_ipc_proto::ModelResult {
+        self.snapshot(
+            |snapshot| snapshot.model.clone(),
+            duck_ipc_proto::ModelResult::default(),
+        )
+    }
+
+    fn vetbook(&self) -> serde_json::Value {
+        self.snapshot(
+            |snapshot| snapshot.vetbook.clone(),
+            serde_json::Value::Null,
+        )
+    }
+
+    fn skills(&self) -> duck_ipc_proto::SkillsResult {
+        self.snapshot(
+            |snapshot| snapshot.skills.clone(),
+            duck_ipc_proto::SkillsResult::default(),
+        )
+    }
+
+    fn load_policy(&self, params: duck_ipc_proto::LoadPolicyParams) -> duck_ipc_proto::IntentResult {
+        // The official wire takes an absolute path; a phone has one policies
+        // directory and no `robotd` config file, so the same request takes a
+        // bare file name resolved against that directory. Separators and `..`
+        // are refused: an override is a file beside the manifest, not a route
+        // out of the bundle.
+        let dir = self.snapshot(|snapshot| snapshot.policies_dir.clone(), PathBuf::new());
+        if dir.as_os_str().is_empty() {
+            return duck_ipc_proto::IntentResult::refused("the policies directory is not known yet");
+        }
+        // The one combination the official type allows and nothing means.
+        if params.slot.is_none() && params.path.is_some() {
+            return duck_ipc_proto::IntentResult::refused(
+                "a path needs a slot; omit both to reset every slot to its default",
+            );
+        }
+        match (params.slot.as_deref(), params.path.as_deref()) {
+            // Reset every slot to the set's own.
+            (None, None) => crate::manifest::clear_slot_overrides(),
+            (Some(slot), path) => {
+                let value = match path {
+                    None => None,
+                    Some(path) if crate::manifest::is_none_sentinel(path) => {
+                        Some("none".to_owned())
+                    }
+                    Some(name) => {
+                        if name.contains('\\') || name.contains('/') || name.contains("..") {
+                            return duck_ipc_proto::IntentResult::refused(format!(
+                                "{name:?} is not a file name in the policies directory"
+                            ));
+                        }
+                        if !dir.join(name).is_file() {
+                            return duck_ipc_proto::IntentResult::refused(format!(
+                                "no policy {name:?} in {}",
+                                dir.display()
+                            ));
+                        }
+                        Some(name.to_owned())
+                    }
+                };
+                // The phone's override table is the four networks it drives
+                // itself (walk/stand/sitstand/ground_pick); the official
+                // kick_left/kick_right/roulade slots are manifest skills here,
+                // identified by skill name rather than slot key
+                // (`manifest.rs`' `OVERRIDABLE_SLOTS`). The refusal names the
+                // slots this build does have.
+                if let Err(error) = crate::manifest::set_slot_override(slot, value) {
+                    return duck_ipc_proto::IntentResult::refused(error);
+                }
+            }
+            // Covered by the `(None, Some)` refusal above with the official wording.
+            (None, Some(_)) => unreachable!("the path-without-slot case was refused above"),
+        }
+        // The reload is the half that opens and validates the files; a
+        // refusal lands in the health gate (degraded) and on `notice`, the
+        // same way the HTTP reload's does. It is queued as a *slot change*:
+        // the official `robot.loadPolicy` writes one config key and compares
+        // only the network that is driving, where `robot.reloadPolicies`
+        // disturbs whatever is in motion.
+        self.queue_control(ControlCommand::ReloadSlot);
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn reload_policies(&self) -> duck_ipc_proto::IntentResult {
+        let dir = self.snapshot(|snapshot| snapshot.policies_dir.clone(), PathBuf::new());
+        if dir.as_os_str().is_empty() {
+            return duck_ipc_proto::IntentResult::refused("the policies directory is not known yet");
+        }
+        self.intents
+            .push(Intent::Reload(dir.to_string_lossy().into_owned()));
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn safe_to_restart(&self) -> duck_ipc_proto::SafeToRestartResult {
+        self.snapshot(
+            |snapshot| snapshot.safe_to_restart.clone(),
+            duck_ipc_proto::SafeToRestartResult {
+                safe: true,
+                reason: None,
+            },
+        )
+    }
+
+    fn subscribe_info(&self) -> duck_ipc_proto::SubscribeResult {
+        self.snapshot(
+            |snapshot| snapshot.subscribe.clone(),
+            duck_ipc_proto::SubscribeResult {
+                accepted: true,
+                ..Default::default()
+            },
+        )
     }
 
     fn revision(&self) -> Option<String> {
@@ -294,7 +679,10 @@ fn stage(name: &str) {
             ) -> c_int;
         }
         const ANDROID_LOG_INFO: c_int = 4;
-        if let (Ok(tag), Ok(text)) = (CString::new("duck-rust"), CString::new(format!("stage {name}"))) {
+        if let (Ok(tag), Ok(text)) = (
+            CString::new("duck-rust"),
+            CString::new(format!("stage {name}")),
+        ) {
             unsafe {
                 __android_log_print(
                     ANDROID_LOG_INFO,
@@ -322,8 +710,38 @@ fn stage(name: &str) {
 /// fingerprint are 32 bits of that identity: stable, reproducible, and different
 /// for every build with different assets.
 fn seed_from_fingerprint(fingerprint: &str) -> u32 {
-    u32::from_str_radix(fingerprint.get(..8).unwrap_or_else(|| fingerprint), 16)
-        .unwrap_or_default()
+    u32::from_str_radix(fingerprint.get(..8).unwrap_or_else(|| fingerprint), 16).unwrap_or_default()
+}
+
+/// `robot.model`: the static geometry the per-tick `robot.state` poses are
+/// stated in, from the same `kinematics` crate the FK and the policies use
+/// (`robotd/src/main.rs:5954-5966`).
+///
+/// `asset` carries the official family constant (`duck-ipc-proto`'s
+/// `ROBOT_MODEL = "microduck"`) rather than "alpha": a client asks which robot
+/// it is talking to, and every phone build runs the microduck family's alpha
+/// MJCF. The static skeleton tree and `frames_at_zero` poses are left empty —
+/// the mobile core has no skeleton publishing path yet (COMPARISON §5.1), and
+/// zeros would claim link poses this build never computed.
+fn robot_model_result() -> duck_ipc_proto::ModelResult {
+    let model = kinematics::Model::alpha();
+    let tof = kinematics::tof::Reprojector::alpha();
+    duck_ipc_proto::ModelResult {
+        asset: duck_ipc_proto::ROBOT_MODEL.to_owned(),
+        trunk_height_m: model.trunk_height_m(),
+        joint_names: duck_ipc_proto::JOINT_NAMES
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect(),
+        head_joints: ["neck_pitch", "head_pitch", "head_yaw", "head_roll"]
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect(),
+        tof_beams: tof.beams().to_vec(),
+        tof_fov_deg: kinematics::tof::FOV_DEG,
+        frames_at_zero: duck_ipc_proto::FramesState::default(),
+        skeleton: Vec::new(),
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -361,9 +779,8 @@ pub unsafe extern "C" fn duck_core_new(
                 .location()
                 .map(|l| format!("{}:{}", l.file(), l.line()))
                 .unwrap_or_default();
-            let message =
-                CString::new(format!("rust panic: {payload} at {location}"))
-                    .unwrap_or_else(|_| CString::new("rust panic").expect("static"));
+            let message = CString::new(format!("rust panic: {payload} at {location}"))
+                .unwrap_or_else(|_| CString::new("rust panic").expect("static"));
             const ANDROID_LOG_ERROR: c_int = 4;
             let tag = CString::new("duck-rust").expect("static");
             unsafe {
@@ -420,16 +837,14 @@ pub unsafe extern "C" fn duck_core_new(
         // button and an API call cannot disagree about what exists. The
         // loop's own verbs are listed only while the slot behind them is
         // loaded — the same condition `robotd`'s own list applies.
-        let (sitstand_loaded, ground_pick_loaded) =
-            (bundle.paths.sitstand.is_some(), bundle.paths.ground_pick.is_some());
-        let skills = published_skills(
-            runtime.skill_names(),
-            sitstand_loaded,
-            ground_pick_loaded,
-        )
-        .into_iter()
-        .map(|name| CString::new(name).unwrap_or_default())
-        .collect();
+        let (sitstand_loaded, ground_pick_loaded) = (
+            bundle.paths.sitstand.is_some(),
+            bundle.paths.ground_pick.is_some(),
+        );
+        let skills = published_skills(runtime.skill_names(), sitstand_loaded, ground_pick_loaded)
+            .into_iter()
+            .map(|name| CString::new(name).unwrap_or_default())
+            .collect();
         let meshes = (0..runtime.io().mesh_count())
             .map(|mesh| {
                 CString::new(runtime.io().mesh_name(mesh).unwrap_or_default()).unwrap_or_default()
@@ -450,28 +865,39 @@ pub unsafe extern "C" fn duck_core_new(
         let health_snapshot = Arc::new(std::sync::Mutex::new(
             duck_ipc_proto::HealthResult::default(),
         ));
+        // The read-side identity and the power-request queue: the IPC
+        // handlers run on connection threads and the runtime belongs to the
+        // control thread, so they get snapshots to read and a queue to write.
+        let robot_snapshot = Arc::new(std::sync::Mutex::new(RobotSnapshot::new(
+            robot_model_result(),
+            policies.clone(),
+        )));
+        let control: Arc<std::sync::Mutex<Vec<ControlCommand>>> =
+            Arc::new(std::sync::Mutex::new(Vec::new()));
+        let skill_defs = bundle.skills.clone();
         let handlers = RobotHandlers {
             intents: intents.clone(),
             health: health_snapshot.clone(),
             revision: provenance.fingerprint.clone(),
+            snapshot: robot_snapshot.clone(),
+            control: control.clone(),
         };
-        let (ipc, label) =
-            match crate::ipc::start(crate::ipc::ROBOT_IPC_PORT, Arc::new(handlers)) {
-                Ok(server) => {
-                    stage(&format!(
-                        "robot ipc listening on {}",
-                        crate::ipc::ROBOT_IPC_PORT
-                    ));
-                    (Some(server), "idle".to_owned())
-                }
-                Err(error) => {
-                    let reason = format!("robot ipc unavailable: {error}");
-                    stage(&reason);
-                    (None, reason)
-                }
-            };
+        let (ipc, label) = match crate::ipc::start(crate::ipc::ROBOT_IPC_PORT, Arc::new(handlers)) {
+            Ok(server) => {
+                stage(&format!(
+                    "robot ipc listening on {}",
+                    crate::ipc::ROBOT_IPC_PORT
+                ));
+                (Some(server), "idle".to_owned())
+            }
+            Err(error) => {
+                let reason = format!("robot ipc unavailable: {error}");
+                stage(&reason);
+                (None, reason)
+            }
+        };
 
-        Ok(DuckCore {
+        let core = DuckCore {
             runtime,
             skills,
             meshes,
@@ -515,14 +941,22 @@ pub unsafe extern "C" fn duck_core_new(
             // The per-tick health snapshot the IPC server reads: the runtime
             // is not `Sync`, so the tick thread writes and the handler reads.
             health_snapshot,
-        })
+            robot_snapshot,
+            control,
+            skill_defs,
+            swap_landing: None,
+        };
+        // A read is truthful before the first tick too: the official daemon
+        // serves `robot.policies` from the snapshot the loop publishes and
+        // answers during startup rather than racing the first load. This is
+        // that first publish.
+        publish_ipc(&core);
+        Ok(core)
     });
 
     let result = match result {
         Ok(result) => result,
-        Err(payload) => Err(format!(
-            "panic during core creation: {payload:?}"
-        )),
+        Err(payload) => Err(format!("panic during core creation: {payload:?}")),
     };
 
     match result {
@@ -559,7 +993,7 @@ pub unsafe extern "C" fn duck_core_reload_policies(
         return -1;
     };
     let core = &mut *core;
-    match reload_policies(core, &dir) {
+    match reload_policies(core, &dir, ReloadKind::Reload, 0) {
         Ok(_) => {
             clear_last_error();
             0
@@ -604,7 +1038,9 @@ pub unsafe extern "C" fn duck_core_set_walk_policy(
     // A file name, not a route out of the directory: the official config key
     // takes a path, but a phone override is one file beside the manifest.
     if name.contains('\\') || name.contains('/') || name.contains("..") {
-        set_last_error(&format!("{name:?} is not a file name in the policies directory"));
+        set_last_error(&format!(
+            "{name:?} is not a file name in the policies directory"
+        ));
         return -1;
     }
     // Cheap check first, the way `robotd`'s set_skill validates what it
@@ -662,10 +1098,7 @@ pub unsafe extern "C" fn duck_core_flashlight(
 /// bundle. Returns the number loaded, or -1. The emotions then appear in
 /// `/skills`, `/skill`, MCP and the shell's skill ring.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn duck_core_load_emotions(
-    core: *mut DuckCore,
-    dir: *const c_char,
-) -> c_int {
+pub unsafe extern "C" fn duck_core_load_emotions(core: *mut DuckCore, dir: *const c_char) -> c_int {
     if core.is_null() {
         return -1;
     }
@@ -742,10 +1175,7 @@ pub unsafe extern "C" fn duck_core_set_mode(core: *mut DuckCore, mode: *const c_
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn duck_core_start_intent_server(
-    core: *mut DuckCore,
-    port: c_int,
-) -> c_int {
+pub unsafe extern "C" fn duck_core_start_intent_server(core: *mut DuckCore, port: c_int) -> c_int {
     if core.is_null() || port <= 0 || port > 65535 {
         return -1;
     }
@@ -833,7 +1263,9 @@ fn scene_for(core: &DuckCore, mode: robotd_params::Mode) -> Option<String> {
         robotd_params::Mode::Roller => {
             let dir = path.parent()?;
             let roller = dir.join("scene_rollers.xml");
-            roller.exists().then(|| roller.to_string_lossy().into_owned())
+            roller
+                .exists()
+                .then(|| roller.to_string_lossy().into_owned())
         }
     }
 }
@@ -863,11 +1295,34 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
         // the same way.
         return Err("the duck is powering off; power it on first".to_owned());
     }
+    if core.runtime.swap_pending() {
+        // A policy change is on its way home; swapping the whole bundle under
+        // it would land one change on top of another (`robotd/src/main.rs:2906-2919`).
+        return Err(
+            "a policy change is still being applied; try again when it lands".to_owned(),
+        );
+    }
     let scene = scene_for(core, mode)
         .ok_or_else(|| format!("no scene for {name} beside {}", core.scene))?;
     // Reload the set the duck is actually running — a /reload may have
     // replaced the startup directory with a user's own policy set.
-    let bundle = crate::manifest::load_mode(&core.policies, mode)?;
+    let bundle = match crate::manifest::load_mode(&core.policies, mode) {
+        Ok(bundle) => bundle,
+        Err(error) => {
+            // A switch that never loaded still discovered which overrides
+            // fell back: they are degraded reasons for the duck that keeps
+            // running, exactly as a failed reload's are.
+            for warning in crate::manifest::take_override_warnings() {
+                core.runtime.mark_degraded(warning);
+            }
+            return Err(error);
+        }
+    };
+    // The new set's skill table is what `robot.skills` reports from now on
+    // (`robotd`'s `robot.skills` reads the configured table, not the loaded
+    // snapshot; `main.rs:4880-4924`). Kept even if the swap is refused below —
+    // then it is the table the next successful switch will run.
+    core.skill_defs = bundle.skills.clone();
     let mut policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
     if bundle.standing_disabled {
         // No standing network in the roller bundle: command magnitude must
@@ -882,12 +1337,16 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
         bundle.skill_tuning,
         SafetyConfig::default(),
     );
-    // Carry the clock: a frozen or slowed duck stays frozen or slowed across
-    // the switch, and the cue must not be an unpause.
+    // The clock and pose the duck is in now. A limp duck — relaxed, or left
+    // in the rest pose by `robot.rest` — swaps modes and **stays limp**; the
+    // official switch only ramps a robot that was up (`robotd/src/main.rs:2930-2960`).
+    let was_limp = matches!(core.runtime.bringup(), BringupState::Limp);
     let clock = core.runtime.clock();
     runtime.set_paused(clock.paused);
     runtime.set_speed(clock.speed);
-    runtime.enable().map_err(|error| error.to_string())?;
+    if !was_limp {
+        runtime.enable().map_err(|error| error.to_string())?;
+    }
     runtime.set_mode(mode);
     // `enable` queues the boot greet; a mode switch is the robot's cue instead:
     // one chirp for walking, two for roller (robotd's own).
@@ -918,6 +1377,23 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     // A different body is a different duck: the old timeline and branches
     // describe a robot that no longer exists.
     core.runtime = runtime;
+    // The fresh runtime has no pending swap; a landing marker for the old
+    // runtime must not be applied to it.
+    core.swap_landing = None;
+    // The fresh runtime was enabled above, so the `robot.enable toggle`
+    // mirror follows the body that is now running.
+    if let Ok(mut snapshot) = core.robot_snapshot.lock() {
+        snapshot.enabled = runtime_policy_enabled(&core.runtime);
+    }
+    // Overrides this load fell back from: the official boot-time report, as
+    // degraded reasons on the duck that is now running. Never unhealthy — the
+    // bundle did load, just not the slot that was asked for.
+    for warning in crate::manifest::take_override_warnings() {
+        core.runtime.mark_degraded(warning);
+    }
+    // The new bundle resolved its slots: apply its own policy-error verdict
+    // (there is none after a successful load).
+    core.runtime.clear_policy_error();
     core.model_generation = core.model_generation.wrapping_add(1);
     core.timeline.clear();
     core.branches.clear();
@@ -966,8 +1442,13 @@ enum Reloaded {
     GoingHome,
 }
 
-fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<Reloaded, String> {
-    let result = reload_policies_inner(core, dir);
+fn reload_policies(
+    core: &mut DuckCore,
+    dir: &str,
+    kind: ReloadKind,
+    owner: usize,
+) -> Result<Reloaded, String> {
+    let result = reload_policies_inner(core, dir, kind, owner);
     // The health gate learns why a reload did not take — caller-marked
     // degraded, never unhealthy: the duck kept the policy it had, so there is
     // nothing to roll back. A reload that lands clears the mark; one still
@@ -980,10 +1461,204 @@ fn reload_policies(core: &mut DuckCore, dir: &str) -> Result<Reloaded, String> {
             .runtime
             .mark_degraded(format!("policy reload refused: {reason}")),
     }
+    // An override the loader had to fall back from is robotd's own degraded
+    // reason (`robotd/src/main.rs:561-600`: a failed slot override is reported
+    // on the slot and judged degraded). `manifest` queues each one once, at
+    // the load that discovered it; drain them here, on the same thread that
+    // owns the health gate, so they do not linger into an unrelated reload.
+    for warning in crate::manifest::take_override_warnings() {
+        core.runtime.mark_degraded(warning);
+    }
+    // The policy-error (unhealthy) door has no mobile equivalent at this
+    // seam: `Policy::load` is mandatory at core creation, and a failed reload
+    // or mode switch keeps the set that is running, so the duck never ticks
+    // with no policy. The runtime's own `policy_error` is set by the paths
+    // that can lose a network; `clear_policy_error` runs when a reload lands.
+    if matches!(&result, Ok(Reloaded::Landed)) {
+        core.runtime.clear_policy_error();
+    }
     result
 }
 
-fn reload_policies_inner(core: &mut DuckCore, dir: &str) -> Result<Reloaded, String> {
+/// `robotd`'s `change_disturbs` (`robotd/src/main.rs:2047-2070`), with the
+/// one-network scope the mobile core can see.
+///
+/// Official rule, verbatim in shape:
+/// - nothing driving → not disturbing (`:2053-2055`);
+/// - `Driving::Seated` → not disturbing (`:2056-2058`) — a parked duck holds
+///   a static pose, so a swap under it is invisible;
+/// - `PolicyChange::Reload` → disturbing (`:2059-2061`), because the paths
+///   cannot say whether the bytes behind the same path changed;
+/// - otherwise only the network that stepped last tick counts: walk vs walk,
+///   stand vs stand, sitstand vs sitstand, ground_pick vs ground_pick, and
+///   the whole skill list for a skill (skills are addressed by index)
+///   (`:2062-2070`).
+///
+/// `driving` is gated by `was_driving` at the call site (`:3040-3047`): a
+/// disabled, limp or mid-ramp duck has nothing running that a swap could
+/// interrupt.
+fn reload_disturbs(
+    kind: ReloadKind,
+    driving: Option<&crate::control::Driving>,
+    before: &[(String, Option<PathBuf>)],
+    after: &duck_control::policy::PolicyPaths,
+) -> bool {
+    use crate::control::Driving;
+    let Some(driving) = driving else {
+        return false;
+    };
+    if matches!(driving, Driving::Seated) {
+        return false;
+    }
+    if kind == ReloadKind::Reload {
+        return true;
+    }
+    let before_slot = |name: &str| {
+        before
+            .iter()
+            .find(|(slot, _)| slot == name)
+            .and_then(|(_, path)| path.clone())
+    };
+    match driving {
+        Driving::Walk => before_slot("walk") != Some(after.walk.clone()),
+        Driving::Stand => before_slot("stand") != after.stand.clone(),
+        Driving::SitStand => before_slot("sitstand") != after.sitstand.clone(),
+        Driving::Seated => false,
+        Driving::GroundPick => before_slot("ground_pick") != after.ground_pick.clone(),
+        Driving::Skill(_) => {
+            // `driving_net_paths` lists the four fixed slots first, then every
+            // configured skill in index order — the order a running skill is
+            // addressed by, which is what the official comparison protects.
+            let before_skills: Vec<Option<PathBuf>> = before
+                .iter()
+                .skip(4)
+                .map(|(_, path)| path.clone())
+                .collect();
+            let after_skills: Vec<Option<PathBuf>> =
+                after.skills.iter().cloned().map(Some).collect();
+            before_skills != after_skills
+        }
+    }
+}
+
+/// The exact `driving_net_paths` list a bundle will publish once it lands:
+/// the four fixed slots, then every configured skill by name in index order.
+/// Used to tell a landed swap from one the runtime dropped (a rewind or a
+/// shutdown clears `pending_swap` without installing anything).
+fn expected_loaded_paths(
+    paths: &duck_control::policy::PolicyPaths,
+    skills: &[robotd_params::SkillDef],
+) -> Vec<(String, Option<PathBuf>)> {
+    let mut out = vec![
+        ("walk".to_owned(), Some(paths.walk.clone())),
+        ("stand".to_owned(), paths.stand.clone()),
+        ("sitstand".to_owned(), paths.sitstand.clone()),
+        ("ground_pick".to_owned(), paths.ground_pick.clone()),
+    ];
+    for (index, path) in paths.skills.iter().enumerate() {
+        let name = skills
+            .get(index)
+            .map(|skill| skill.name.clone())
+            .unwrap_or_else(|| index.to_string());
+        out.push((name, Some(path.clone())));
+    }
+    out
+}
+
+/// A queued policy change landed: publish what the running controller really
+/// holds — not the requested bundle — and clear the degraded mark the change
+/// carried. The reload's skill table and slot flags are deliberately not
+/// published at request time for a `GoingHome` change: the old set is still
+/// the one driving until the ramp finishes.
+fn publish_loaded_skills(core: &mut DuckCore) {
+    let (paths, names) = {
+        let active = active_runtime(core);
+        let paths = active.driving_net_paths();
+        let sitstand = paths
+            .iter()
+            .find(|(slot, _)| slot == "sitstand")
+            .is_some_and(|(_, path)| path.is_some());
+        let ground_pick = paths
+            .iter()
+            .find(|(slot, _)| slot == "ground_pick")
+            .is_some_and(|(_, path)| path.is_some());
+        let names = published_skills(active.skill_names(), sitstand, ground_pick);
+        (paths, names)
+    };
+    core.sitstand_loaded = paths
+        .iter()
+        .find(|(slot, _)| slot == "sitstand")
+        .is_some_and(|(_, path)| path.is_some());
+    core.ground_pick_loaded = paths
+        .iter()
+        .find(|(slot, _)| slot == "ground_pick")
+        .is_some_and(|(_, path)| path.is_some());
+    core.skills = names
+        .iter()
+        .map(|name| CString::new(name.clone()).unwrap_or_default())
+        .collect();
+    core.intents.set_skills(names);
+}
+
+/// A queued policy change landed on the duck the client is watching: publish
+/// its skill table and clear the degraded mark **on that duck**. A branch
+/// session's landing must not clear the original's health, and vice versa.
+fn publish_landed_policy_set(core: &mut DuckCore) {
+    publish_loaded_skills(core);
+    on_active(core, |runtime| {
+        runtime.clear_degraded();
+        runtime.clear_policy_error();
+    });
+    core.label = "policy reloaded".to_owned();
+}
+
+fn clear_swap_landing_for_active(core: &mut DuckCore) {
+    if core
+        .swap_landing
+        .as_ref()
+        .is_some_and(|(owner, _)| *owner == core.selected)
+    {
+        core.swap_landing = None;
+    }
+}
+
+/// The production landing hook, shared by the 50 Hz tick and the time
+/// machine's step/seek doors. A marker belongs to one runtime (`owner`); a
+/// tick of another duck must neither judge nor consume it.
+fn settle_policy_swap(core: &mut DuckCore) {
+    let Some((owner, _)) = core.swap_landing.as_ref() else {
+        return;
+    };
+    if *owner != core.selected {
+        return;
+    }
+    let (pending, loaded, shutting) = {
+        let active = active_runtime(core);
+        (
+            active.swap_pending(),
+            active.driving_net_paths(),
+            active.shutting_down(),
+        )
+    };
+    if pending {
+        return;
+    }
+    let Some((_, expected)) = core.swap_landing.take() else {
+        return;
+    };
+    // A rewind or a shutdown clears `pending_swap` without installing the
+    // set. Comparing the loaded paths is what tells the two apart.
+    if !shutting && loaded == expected {
+        publish_landed_policy_set(core);
+    }
+}
+
+fn reload_policies_inner(
+    core: &mut DuckCore,
+    dir: &str,
+    kind: ReloadKind,
+    owner: usize,
+) -> Result<Reloaded, String> {
     // Reload the set this duck is actually running, not always the walking one.
     let bundle = crate::manifest::load_mode(Path::new(dir), core.runtime.mode())?;
     let mut policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
@@ -991,22 +1666,41 @@ fn reload_policies_inner(core: &mut DuckCore, dir: &str) -> Result<Reloaded, Str
         policy.set_standing_disabled(true);
     }
     let tuning = bundle.tuning();
-    // `robotd`'s `change_disturbs` gate (main.rs:3015-3106): a change that
+    // The configured skill table follows the set that was asked for; it is
+    // what `robot.skills` reports (`robotd`'s `skills_report` reads config,
+    // not the loaded snapshot).
+    core.skill_defs = bundle.skills.clone();
+    // `robotd`'s `change_disturbs` gate (main.rs:2047-2070): a change that
     // replaces the network the duck is driving is not swapped under a moving
     // gait — the next tick would be a different policy's idea of what the legs
     // were doing. The duck goes to the home pose first and the swap lands
-    // there, torque on throughout. The mobile core has no file digests to
-    // compare, so the caller's verdict is the walk slot itself: the loaded
-    // policy's file against the set being reloaded to. Conservative by design
-    // and by the official rule: only the network in the driving slot counts,
-    // a change to the standing/sitstand/skill files lands in place because
-    // none of them stepped last tick's gait.
-    let disturbs = core.runtime.walking_slot_path() != Some(bundle.paths.walk.clone());
+    // there, torque on throughout. The comparison is per-slot, against the
+    // duck's own `driving_net_paths` (the loaded paths, not an overlay), and a
+    // `Reload` disturbs whenever something is driving even if every path is
+    // identical — that is exactly the case it exists for (same path, new
+    // bytes). Only a network that stepped last tick counts (`driving_prev` is
+    // private; `enabled && Ready` is its public equivalent — a disabled, limp
+    // or mid-ramp duck drives nothing), the official `was_driving` gate at
+    // main.rs:3040-3047.
+    let was_driving = matches!(core.runtime.bringup(), BringupState::Ready)
+        && core
+            .runtime
+            .checkpoint()
+            .is_some_and(|checkpoint| checkpoint.enabled);
+    let driving = if was_driving {
+        core.runtime.driving()
+    } else {
+        None
+    };
+    let before = core.runtime.driving_net_paths();
+    let disturbs = reload_disturbs(kind, driving.as_ref(), &before, &bundle.paths);
+    let landing = expected_loaded_paths(&bundle.paths, &bundle.skills);
     match core
         .runtime
         .replace_policy_disturbing(policy, tuning, bundle.skill_tuning, disturbs)
     {
         PolicySwap::Refused => {
+            core.swap_landing = None;
             // The runtime's own half of the official refusal: from inside a
             // shutdown the path home would stand the duck up under the sit.
             // The words go through the same refusal channel as any reload
@@ -1021,11 +1715,14 @@ fn reload_policies_inner(core: &mut DuckCore, dir: &str) -> Result<Reloaded, Str
             // running policy cannot do the new set's verbs yet. The landing
             // itself is observable through the runtime (`swap_pending`,
             // `swap_state`); publishing it on `/skills` early would be a lie.
+            core.swap_landing = Some((owner, landing));
             core.policies = PathBuf::from(dir);
             core.label = "policy swap: walking home first".to_owned();
             return Ok(Reloaded::GoingHome);
         }
-        PolicySwap::InPlace => {}
+        PolicySwap::InPlace => {
+            core.swap_landing = None;
+        }
     }
     // The set the duck runs changed: a later mode switch re-reads this
     // directory, whichever route did the reload.
@@ -1066,15 +1763,9 @@ const TIMELINE_CAPACITY: usize = 3000;
 fn checkpoint_now(core: &mut DuckCore) {
     let selected = core.selected;
     let checkpoint = if selected > 0 && selected <= core.branches.len() {
-        std::mem::swap(
-            &mut core.runtime,
-            &mut core.branches[selected - 1].runtime,
-        );
+        std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
         let checkpoint = core.runtime.checkpoint();
-        std::mem::swap(
-            &mut core.runtime,
-            &mut core.branches[selected - 1].runtime,
-        );
+        std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
         checkpoint
     } else {
         core.runtime.checkpoint()
@@ -1084,7 +1775,11 @@ fn checkpoint_now(core: &mut DuckCore) {
     };
     // One entry per tick: a second checkpoint at the same tick replaces the
     // first rather than stacking.
-    if core.timeline.back().is_some_and(|last| last.tick == checkpoint.tick) {
+    if core
+        .timeline
+        .back()
+        .is_some_and(|last| last.tick == checkpoint.tick)
+    {
         core.timeline.pop_back();
     }
     core.timeline.push_back(checkpoint);
@@ -1110,6 +1805,7 @@ fn refuse(core: &mut DuckCore, message: String) -> serde_json::Value {
 /// the duration of the dispatch and swap it back afterwards. Branch-management
 /// and mode intents act on the collection itself and are exempt.
 fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
+    let stepping = matches!(&intent, Intent::Step(_));
     let global = matches!(
         &intent,
         Intent::Mode(_)
@@ -1123,22 +1819,110 @@ fn apply_intent(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
     );
     let selected = core.selected;
     if global || selected == 0 || selected > core.branches.len() {
-        return apply_intent_active(core, intent);
+        let result = apply_intent_active(core, intent);
+        // A step runs the selected duck's ticks outside `duck_core_tick`; a
+        // queued policy change can land inside them.
+        if stepping {
+            settle_policy_swap(core);
+            publish_state(core);
+        }
+        return result;
     }
-    std::mem::swap(
-        &mut core.runtime,
-        &mut core.branches[selected - 1].runtime,
-    );
+    std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
     let result = apply_intent_active(core, intent);
-    std::mem::swap(
-        &mut core.runtime,
-        &mut core.branches[selected - 1].runtime,
-    );
+    std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
+    if stepping {
+        settle_policy_swap(core);
+        publish_state(core);
+    }
     result
 }
 
-fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
-    match intent {
+/// The policy-enabled flag the `robot.enable toggle` reply is decided from.
+/// The runtime has no getter of its own (`runtime.rs` deliberately keeps the
+/// flag private), but a checkpoint carries it — and a power request is rare
+/// enough that one snapshot per call costs nothing.
+fn runtime_policy_enabled(active: &DuckRuntime<MujocoIo>) -> bool {
+    active.checkpoint().map(|checkpoint| checkpoint.enabled).unwrap_or(false)
+}
+
+/// The official loop's gate for one-shot skills, sit/stand and ground pick:
+/// `snapshot.enabled && bringup == Ready && shutdown_sit.is_none()`
+/// (`robotd/src/main.rs:2768-2775`). The emotion path is the same driving
+/// question (`was_driving`, `:2813-2820`). A duck in the rest pose is Limp and
+/// disabled, so this refuses there instead of accepting a move the forgotten
+/// controller would freeze until the next Start.
+fn policy_drives(active: &DuckRuntime<MujocoIo>) -> bool {
+    !active.shutting_down()
+        && matches!(active.bringup(), BringupState::Ready)
+        && runtime_policy_enabled(active)
+}
+
+/// Keep the `robot.enable toggle` mirror in step with the body at every door
+/// that changes the policy flag. The tick thread owns the runtime; the IPC
+/// handler reads this shared cell, so each door writes what the runtime just
+/// reported rather than letting a client-side belief drift.
+fn set_policy_enabled_mirror(core: &DuckCore, enabled: bool) {
+    if let Ok(mut snapshot) = core.robot_snapshot.lock() {
+        snapshot.enabled = enabled;
+    }
+}
+
+/// Apply one queued `robot.enable`/`init`/`relax`/`rest`/`shutdown` through
+/// the duck the client is watching — the same branch swap every intent takes.
+/// Returns the watched duck's resulting policy-enabled flag, for the mirror
+/// `robot.enable toggle` reads.
+fn apply_control(core: &mut DuckCore, command: ControlCommand) -> bool {
+    let selected = core.selected;
+    // `robot.loadPolicy` re-reads through the same disturb gate as the HTTP
+    // reload, but as a slot change. The directory is the one this core runs,
+    // read on the tick thread so it cannot race a concurrent `Intent::Reload`.
+    let run = |core: &mut DuckCore| -> bool {
+        if matches!(command, ControlCommand::ReloadSlot) {
+            let dir = core.policies.to_string_lossy().into_owned();
+            if let Err(reason) = reload_policies(core, &dir, ReloadKind::SlotChange, selected) {
+                core.label = format!("reload failed: {reason}");
+                core.notice = Some((core.runtime.clock().tick, core.label.clone()));
+            }
+            return runtime_policy_enabled(&core.runtime);
+        }
+        apply_control_to(&mut core.runtime, command)
+    };
+    let (enabled, swapped) = if selected > 0 && selected <= core.branches.len() {
+        std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
+        (run(core), true)
+    } else {
+        (run(core), false)
+    };
+    if swapped && selected > 0 {
+        std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
+    }
+    enabled
+}
+
+fn apply_control_to(runtime: &mut DuckRuntime<MujocoIo>, command: ControlCommand) -> bool {
+    match command {
+        // Official `robot.enable`: stop/start the *policy*, torque untouched
+        // on the way down (`runtime.rs`' `set_policy_enabled`).
+        ControlCommand::Enable(on) => runtime.set_policy_enabled(on),
+        // `robot.init`'s four official branches live in `runtime.init`.
+        ControlCommand::Init => {
+            let _ = runtime.init();
+        }
+        // `robot.relax`: torque off, stay powered and limp.
+        ControlCommand::Relax => runtime.relax(),
+        // `robot.rest`: sit and ease into the rest pose, no power-off latch.
+        ControlCommand::Rest => runtime.request_rest(),
+        // `robot.shutdown`: sit, rest, torque off, power-off latch.
+        ControlCommand::Shutdown => runtime.request_shutdown(),
+        // Handled by `apply_control` before it reaches the runtime: it needs
+        // the core's manifest and slot table, not a runtime method.
+        ControlCommand::ReloadSlot => {}
+    }
+    runtime_policy_enabled(runtime)
+}
+
+fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value {    match intent {
         Intent::Twist(twist) => {
             core.runtime.set_api_twist(twist);
             json!({ "ok": true, "twist": twist })
@@ -1179,6 +1963,18 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         Intent::GroundPick if core.runtime.shutting_down() => {
             refuse(core, "the duck is powering off".to_owned())
         }
+        // The loop's one-shot gate (`robotd/src/main.rs:2768-2775`): a skill,
+        // a sit toggle or a ground pick needs a policy that drove last tick
+        // and a robot at home, not merely a powered body. A resting duck is
+        // Limp and disabled; accepting here froze the move until Start.
+        Intent::Skill(_) | Intent::Sit | Intent::GroundPick
+            if !policy_drives(&core.runtime) =>
+        {
+            refuse(
+                core,
+                "the policy is not driving — press Start on the pad".to_owned(),
+            )
+        }
         Intent::Skill(name) => {
             // The ring and `/skills` name the same verbs. `sit`/`stand` are
             // idempotent here even though the pad's A button toggles: a client
@@ -1203,9 +1999,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 _ => core
                     .runtime
                     .trigger_skill(&name)
-                    .map(|started| {
-                        json!({ "ok": true, "skill": name, "chained": !started })
-                    })
+                    .map(|started| json!({ "ok": true, "skill": name, "chained": !started }))
                     .map_err(str::to_owned),
             };
             match result {
@@ -1226,7 +2020,10 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             json!({ "ok": true, "pending": true, "shutdown": true })
         }
         Intent::PowerOn => match core.runtime.power_on() {
-            Ok(()) => json!({ "ok": true, "powered_off": false }),
+            Ok(()) => {
+                set_policy_enabled_mirror(core, true);
+                json!({ "ok": true, "powered_off": false })
+            }
             Err(error) => refuse(core, format!("power-on refused: {error}")),
         },
         Intent::Mode(name) => match switch_mode(core, &name) {
@@ -1238,7 +2035,10 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             // `queue_sound` is the authority on what is a valid tag.
             let known = crate::voice::TAGS.contains(&tag.as_str())
                 || tag.strip_prefix("emotion:").is_some_and(|name| {
-                    core.runtime.emotion_names().iter().any(|loaded| loaded == name)
+                    core.runtime
+                        .emotion_names()
+                        .iter()
+                        .any(|loaded| loaded == name)
                 });
             if known {
                 core.runtime.queue_sound(&tag);
@@ -1262,30 +2062,74 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             let book = core.runtime.book_mut();
             let life = &mut book.life;
             let num = |key: &str| -> Option<f64> { saved.get(key).and_then(|v| v.as_f64()) };
-            if let Some(v) = num("powered_s") { life.powered_s = v; }
-            if let Some(v) = num("torqued_s") { life.torqued_s = v; }
-            if let Some(v) = num("walking_s") { life.walking_s = v; }
-            if let Some(v) = num("standing_s") { life.standing_s = v; }
-            if let Some(v) = num("sitting_s") { life.sitting_s = v; }
-            if let Some(v) = num("held_s") { life.held_s = v; }
-            if let Some(v) = num("boots") { life.boots = v as u64 + 1; }
-            if let Some(v) = num("falls") { life.falls = v as u64; }
-            if let Some(v) = num("pickups") { life.pickups = v as u64; }
-            if let Some(v) = num("ground_picks") { life.ground_picks = v as u64; }
-            if let Some(v) = num("sit_downs") { life.sit_downs = v as u64; }
-            if let Some(v) = num("stand_ups") { life.stand_ups = v as u64; }
-            if let Some(v) = num("wake_ups") { life.wake_ups = v as u64; }
-            if let Some(v) = num("pets") { life.pets = v as u64; }
-            if let Some(v) = num("fed") { life.fed = v as u64; }
-            if let Some(v) = num("claps") { life.claps = v as u64; }
-            if let Some(v) = num("whistles") { life.whistles = v as u64; }
-            if let Some(v) = num("metres") { life.metres = v; }
-            if let Some(v) = num("power_offs") { life.power_offs = v as u64; }
+            if let Some(v) = num("powered_s") {
+                life.powered_s = v;
+            }
+            if let Some(v) = num("torqued_s") {
+                life.torqued_s = v;
+            }
+            if let Some(v) = num("walking_s") {
+                life.walking_s = v;
+            }
+            if let Some(v) = num("standing_s") {
+                life.standing_s = v;
+            }
+            if let Some(v) = num("sitting_s") {
+                life.sitting_s = v;
+            }
+            if let Some(v) = num("held_s") {
+                life.held_s = v;
+            }
+            if let Some(v) = num("boots") {
+                life.boots = v as u64 + 1;
+            }
+            if let Some(v) = num("falls") {
+                life.falls = v as u64;
+            }
+            if let Some(v) = num("pickups") {
+                life.pickups = v as u64;
+            }
+            if let Some(v) = num("ground_picks") {
+                life.ground_picks = v as u64;
+            }
+            if let Some(v) = num("sit_downs") {
+                life.sit_downs = v as u64;
+            }
+            if let Some(v) = num("stand_ups") {
+                life.stand_ups = v as u64;
+            }
+            if let Some(v) = num("wake_ups") {
+                life.wake_ups = v as u64;
+            }
+            if let Some(v) = num("pets") {
+                life.pets = v as u64;
+            }
+            if let Some(v) = num("fed") {
+                life.fed = v as u64;
+            }
+            if let Some(v) = num("claps") {
+                life.claps = v as u64;
+            }
+            if let Some(v) = num("whistles") {
+                life.whistles = v as u64;
+            }
+            if let Some(v) = num("metres") {
+                life.metres = v;
+            }
+            if let Some(v) = num("power_offs") {
+                life.power_offs = v as u64;
+            }
             if let Some(m) = saved.get("skills").and_then(|v| v.as_object()) {
-                life.skills = m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_u64()?))).collect();
+                life.skills = m
+                    .iter()
+                    .filter_map(|(k, v)| Some((k.clone(), v.as_u64()?)))
+                    .collect();
             }
             if let Some(m) = saved.get("emotions").and_then(|v| v.as_object()) {
-                life.emotions = m.iter().filter_map(|(k, v)| Some((k.clone(), v.as_u64()?))).collect();
+                life.emotions = m
+                    .iter()
+                    .filter_map(|(k, v)| Some((k.clone(), v.as_u64()?)))
+                    .collect();
             }
             if let Some(a) = saved.get("events").and_then(|v| v.as_array()) {
                 // Only the words the core itself writes. The restore route
@@ -1348,7 +2192,16 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         },
         Intent::Posture(sit) => {
             if core.runtime.is_sitting() == sit {
+                // Already in the asked-for posture: no move to gate.
                 json!({ "ok": true, "sitting": sit, "unchanged": true })
+            } else if !policy_drives(&core.runtime) {
+                // The seat is driven by the sitstand network; it needs the same
+                // driving robot the official skill gate requires
+                // (`robotd/src/main.rs:2768-2775`).
+                refuse(
+                    core,
+                    "the policy is not driving — press Start on the pad".to_owned(),
+                )
             } else {
                 match core.runtime.sit_toggle() {
                     Ok(_) => json!({ "ok": true, "sitting": sit }),
@@ -1445,8 +2298,14 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 return refuse(core, "a performance is already playing".to_owned());
             }
             if !moves.iter().all(|name| {
-                active_runtime(core).emotion_names().iter().any(|loaded| loaded == name)
-            }) || !sounds.iter().all(|tag| crate::voice::TAGS.contains(&tag.as_str())) {
+                active_runtime(core)
+                    .emotion_names()
+                    .iter()
+                    .any(|loaded| loaded == name)
+            }) || !sounds
+                .iter()
+                .all(|tag| crate::voice::TAGS.contains(&tag.as_str()))
+            {
                 return refuse(core, "no such mood or sound".to_owned());
             }
             let id = format!("ensemble-{}", active_runtime(core).clock().tick);
@@ -1459,7 +2318,15 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                     let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
                     // The lead plays too: its own part is the first role.
                     on_active(core, |runtime| {
-                        runtime.start_ensemble("lead", 0, roles + 1, moves.clone(), sounds.clone(), peers, Some(id.clone()));
+                        runtime.start_ensemble(
+                            "lead",
+                            0,
+                            roles + 1,
+                            moves.clone(),
+                            sounds.clone(),
+                            peers,
+                            Some(id.clone()),
+                        );
                     });
                     json!({ "ok": true, "roles": roles + 1, "moves": moves, "sounds": sounds })
                 }
@@ -1485,7 +2352,8 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             })
         }
         Intent::RestoreBackup(value) => {
-            if value.get("format").and_then(serde_json::Value::as_str) != Some("microduck-backup/1") {
+            if value.get("format").and_then(serde_json::Value::as_str) != Some("microduck-backup/1")
+            {
                 return refuse(core, "unknown backup format".to_owned());
             }
             // Three parts, three of the duck's own doors: the care restore
@@ -1498,14 +2366,15 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 core,
                 Intent::RestoreCare(value.get("care").cloned().unwrap_or(json!({}))),
             );
-            let day = value.get("day").and_then(serde_json::Value::as_str).unwrap_or("").to_owned();
+            let day = value
+                .get("day")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_owned();
             let quests = if day.len() == 10 {
                 apply_intent_active(
                     core,
-                    Intent::QuestDay(
-                        day,
-                        value.get("quests").cloned().unwrap_or(json!({})),
-                    ),
+                    Intent::QuestDay(day, value.get("quests").cloned().unwrap_or(json!({}))),
                 )
             } else {
                 json!({ "ok": false, "error": "the backup carries no calendar day" })
@@ -1582,10 +2451,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 // family app only opens it AFTER the person set the same
                 // six-digit pairing code the neighbours use; a stranger
                 // on the Wi-Fi then has no control channel at all.
-                let paired = core
-                    .lan
-                    .as_ref()
-                    .is_some_and(|lan| lan.pair_code_set());
+                let paired = core.lan.as_ref().is_some_and(|lan| lan.pair_code_set());
                 if !paired {
                     return refuse(core, "set a six-digit pairing code first".to_owned());
                 }
@@ -1642,6 +2508,22 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 // say what was heard and that nothing matched.
                 return json!({ "ok": false, "heard": text, "reason": "no verb matched" });
             };
+            // Speech reaches the same execution path as a button. A verb that
+            // moves the duck waits for the driving robot the official loop
+            // requires; a sound does not move anything and stays available.
+            if matches!(
+                &heard,
+                crate::speech::Heard::Skill(_)
+                    | crate::speech::Heard::Sit
+                    | crate::speech::Heard::Stand
+                    | crate::speech::Heard::GroundPick
+            ) && !policy_drives(&core.runtime)
+            {
+                return refuse(
+                    core,
+                    "the policy is not driving — press Start on the pad".to_owned(),
+                );
+            }
             let result = match heard {
                 crate::speech::Heard::Skill(name) => core
                     .runtime
@@ -1709,7 +2591,12 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             // mistake as a mode switch: refused.
             refuse(core, "the duck is powering off".to_owned())
         }
-        Intent::Reload(dir) => match reload_policies(core, &dir) {
+        Intent::Reload(dir) => match reload_policies(
+            core,
+            &dir,
+            ReloadKind::Reload,
+            core.selected,
+        ) {
             // Both halves are a reload that took: an in-place change, or one
             // queued behind the path home. `/state` answers for the swap's
             // landing through the runtime; `refuse` only on a real failure.
@@ -1784,7 +2671,10 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         Intent::Fork(label) => {
             // Every branch is stepped every tick: cap the collection.
             if core.branches.len() >= MAX_BRANCHES {
-                refuse(core, format!("fork refused: at most {MAX_BRANCHES} branches"))
+                refuse(
+                    core,
+                    format!("fork refused: at most {MAX_BRANCHES} branches"),
+                )
             } else {
                 match core.runtime.fork() {
                     Some(fork) => {
@@ -1805,6 +2695,13 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             if core.selected > core.branches.len() {
                 core.selected = 0;
             }
+            // Branch indices just shifted; a marker keyed by index can no
+            // longer be trusted. The new active duck's table is republished
+            // below like any selection change.
+            core.swap_landing = None;
+            publish_loaded_skills(core);
+            let enabled = runtime_policy_enabled(active_runtime(core));
+            set_policy_enabled_mirror(core, enabled);
             json!({ "ok": true, "label": label })
         }
         Intent::SelectBranch(label) => {
@@ -1814,6 +2711,12 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 .position(|branch| branch.label == label)
                 .map_or(0, |index| index + 1);
             core.selected = index;
+            // The toggle mirror and the published skill table follow the duck
+            // the client now watches; both are core-level snapshots of a
+            // per-runtime fact.
+            let enabled = runtime_policy_enabled(active_runtime(core));
+            set_policy_enabled_mirror(core, enabled);
+            publish_loaded_skills(core);
             json!({ "ok": true, "selected": if index == 0 { String::new() } else { label } })
         }
         Intent::Seek(ticks) => {
@@ -1852,7 +2755,9 @@ fn health_summary(verdict: HealthVerdict) -> serde_json::Value {
     match verdict {
         HealthVerdict::Healthy => json!({ "verdict": "healthy", "reasons": [] }),
         HealthVerdict::Degraded { reasons } => json!({ "verdict": "degraded", "reasons": reasons }),
-        HealthVerdict::Unhealthy { reasons } => json!({ "verdict": "unhealthy", "reasons": reasons }),
+        HealthVerdict::Unhealthy { reasons } => {
+            json!({ "verdict": "unhealthy", "reasons": reasons })
+        }
     }
 }
 
@@ -1874,15 +2779,9 @@ fn active_runtime(core: &DuckCore) -> &DuckRuntime<MujocoIo> {
 fn on_active(core: &mut DuckCore, f: impl FnOnce(&mut DuckRuntime<MujocoIo>)) {
     let selected = core.selected;
     if selected > 0 && selected <= core.branches.len() {
-        std::mem::swap(
-            &mut core.runtime,
-            &mut core.branches[selected - 1].runtime,
-        );
+        std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
         f(&mut core.runtime);
-        std::mem::swap(
-            &mut core.runtime,
-            &mut core.branches[selected - 1].runtime,
-        );
+        std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
     } else {
         f(&mut core.runtime);
     }
@@ -1890,8 +2789,8 @@ fn on_active(core: &mut DuckCore, f: impl FnOnce(&mut DuckRuntime<MujocoIo>)) {
 
 /// Whether the duck is up — the pad's belief about a toggle's outcome, the
 /// same predicate the mapper's `up` flag is fed from: torque on and at the
-/// home pose. `Home` (disable + enable) leaves the duck up, `Rest`/`Shutdown`
-/// leave it down.
+/// home pose. `Home` (policy off + re-home) leaves the duck up, `Rest` leaves
+/// it in the rest pose, `Shutdown` powers it off.
 ///
 /// The duck judged is the one the pad drives — [`active_runtime`], the selected
 /// branch when there is one — not the original `core.runtime` sits on while a
@@ -1902,6 +2801,20 @@ fn duck_is_up(core: &DuckCore) -> bool {
     !active.shutting_down()
         && !active.is_sitting()
         && matches!(active.bringup(), BringupState::Homing | BringupState::Ready)
+}
+
+/// The DKRB cadence: peek the last-report instant, and stamp it only when a
+/// report is actually due. The old `core.pad_report_at.take()` consumed the
+/// timestamp on every frame, so a not-due decision turned the next beat due —
+/// a report every other tick (≈25 Hz) instead of the official one per second
+/// (`pad-map/src/wire.rs:254-344`, `netpadd/src/main.rs:189,317`).
+fn pad_report_due(core: &mut DuckCore, pad: &crate::pad::Pad, now: Instant) -> bool {
+    if pad.report_due(crate::pad::Accept::Taken, core.pad_report_at, now) {
+        core.pad_report_at = Some(now);
+        true
+    } else {
+        false
+    }
 }
 
 /// One tick of the official UDP pad: the frame arrives, the mapper decides the
@@ -1952,8 +2865,10 @@ fn pad_tick(core: &mut DuckCore) {
     pad_apply_frame(core, &frame, now);
 
     // DKRB: the driving client is told health and posture once a second, and
-    // at once when it just connected.
-    if pad.report_due(crate::pad::Accept::Taken, core.pad_report_at.take(), now) {
+    // at once when it just connected. `pad_report_due` peeks the clock and
+    // stamps it only on a report; consuming it on a quiet beat was the ≈25 Hz
+    // cadence this ticket fixed.
+    if pad_report_due(core, &pad, now) {
         let active = active_runtime(core);
         let input = crate::pad::PadReportInput {
             health: Some(active.health_result()),
@@ -1990,11 +2905,7 @@ fn pad_tick(core: &mut DuckCore) {
 /// can bind and cannot deliver at a deterministic instant. The wire duties —
 /// the DKST answer, the driving verdict, the DKRB report — stay in `pad_tick`,
 /// because they are the receiver's, not the duck's.
-fn pad_apply_frame(
-    core: &mut DuckCore,
-    frame: &crate::pad::PadFrame,
-    now: Instant,
-) {
+fn pad_apply_frame(core: &mut DuckCore, frame: &crate::pad::PadFrame, now: Instant) {
     // The mapper's `up` belief is the robot's own state as the pad last heard
     // it — and under a phone the robot's state is directly readable. Re-read
     // it from the watched duck before the mapper decides what the next Start
@@ -2063,16 +2974,20 @@ fn pad_apply_frame(
 /// The continuous stick commands, the official way (`stick_frame` in
 /// `pad-map/src/mapper.rs`), with the default bindings and limits of
 /// `robotd_params::PadAxesParams` / `PadHeadParams` / `PadBodyParams`:
-/// deadzone 0.1, drive vx ±0.4 m/s and vyaw ±1.0 rad/s, head travel 2.5 rad
-/// per joint, body z -0.025..0.010 m and roll ±15°.
+/// deadzone 0.1, drive vx ±0.4 m/s / vy ±0.3 m/s / vyaw ±1.0 rad/s, head
+/// travel 2.5 rad per joint, body z -0.025..0.010 m and roll ±15°.
 ///
-/// `Drive`: ly is +vx, lx turns at the left stick's vyaw — the mapping the
-/// shell's joystick already used (0.4 m/s, 1.0 rad/s, 0.1 deadzone).
-/// `HeadDrive`: the same drive plus the right stick poses the head. `Head`:
-/// the body is stopped and all four axes pose the head. `BodyPose`: the body
-/// holds (move zeroed) and the left stick crouches/leans, the right stick
-/// poses the head.
-fn pad_frame_commands(core: &mut DuckCore, frame: &crate::pad::PadFrame, mode: crate::pad::PadMode) {
+/// `Drive`: the official `DriveAxes` — left stick walks (LeftY) and strafes
+/// (LeftX, inverted), right stick turns (RightX, inverted).
+/// `HeadDrive`: left stick walks and turns, right stick poses the head (the
+/// official mode has no strafe). `Head`: the body is stopped and all four axes
+/// pose the head. `BodyPose`: the body holds (move zeroed) and the left stick
+/// crouches/leans, the right stick poses the head.
+fn pad_frame_commands(
+    core: &mut DuckCore,
+    frame: &crate::pad::PadFrame,
+    mode: crate::pad::PadMode,
+) {
     use robotd_params::pad_axes::{AxisBinding, Sticks};
 
     // The official default bindings and limits, from `robotd_params` itself —
@@ -2091,11 +3006,23 @@ fn pad_frame_commands(core: &mut DuckCore, frame: &crate::pad::PadFrame, mode: c
         right_x: frame.right_x,
         right_y: frame.right_y,
     };
-    let drive_cmd = |vx: &AxisBinding, vyaw: &AxisBinding| {
+    let drive_cmd = |vx: &AxisBinding, vy: &AxisBinding, vyaw: &AxisBinding| {
         [
-            robotd_params::PadDriveParams::scale(evaluate(vx, &sticks, axes.deadzone), drive.vx_min, drive.vx_max),
-            0.0,
-            robotd_params::PadDriveParams::scale(evaluate(vyaw, &sticks, axes.deadzone), drive.vyaw_min, drive.vyaw_max),
+            robotd_params::PadDriveParams::scale(
+                evaluate(vx, &sticks, axes.deadzone),
+                drive.vx_min,
+                drive.vx_max,
+            ),
+            robotd_params::PadDriveParams::scale(
+                evaluate(vy, &sticks, axes.deadzone),
+                drive.vy_min,
+                drive.vy_max,
+            ),
+            robotd_params::PadDriveParams::scale(
+                evaluate(vyaw, &sticks, axes.deadzone),
+                drive.vyaw_min,
+                drive.vyaw_max,
+            ),
         ]
     };
     let head_cmd = |bindings: &[AxisBinding; 4]| {
@@ -2107,17 +3034,26 @@ fn pad_frame_commands(core: &mut DuckCore, frame: &crate::pad::PadFrame, mode: c
         ]
     };
     match mode {
-        // Drive: the one-stick formula the shells' joystick already sends —
-        // vx = ly * vx_max, wz = -lx * vyaw_max, 0.1 deadzone — which is also
-        // the official `HeadDriveAxes` binding (`vx: LeftY`, `vyaw: LeftX`,
-        // no strafe). The official `DriveAxes` would put the turn on the right
-        // stick; the mobile pad keeps the phone joystick's convention so a
-        // person does not have to relearn the sticks between the two.
+        // Drive: the official `DriveAxes` binding (`pad_axes.rs:154-179`) —
+        // left stick walks and strafes, the right stick turns. This is a
+        // pad-only mapping: the phone's own joystick reaches the loop through
+        // the shells' C ABI calls, not through this function.
         crate::pad::PadMode::Drive => on_active(core, |runtime| {
-            runtime.set_twist(drive_cmd(&axes.head_drive.vx, &axes.head_drive.vyaw));
+            runtime.set_twist(drive_cmd(
+                &axes.drive.vx,
+                &axes.drive.vy,
+                &axes.drive.vyaw,
+            ));
         }),
         crate::pad::PadMode::HeadDrive => on_active(core, |runtime| {
-            runtime.set_twist(drive_cmd(&axes.head_drive.vx, &axes.head_drive.vyaw));
+            // The right stick is busy with the head, so this official mode
+            // has no strafe (`HeadDriveAxes.vy: None`, `pad_axes.rs:196-203`):
+            // left stick walks and turns.
+            runtime.set_twist(drive_cmd(
+                &axes.head_drive.vx,
+                &axes.head_drive.vy,
+                &axes.head_drive.vyaw,
+            ));
             runtime.set_head(head_cmd(&[
                 axes.head_drive.neck_pitch,
                 axes.head_drive.head_pitch,
@@ -2137,7 +3073,11 @@ fn pad_frame_commands(core: &mut DuckCore, frame: &crate::pad::PadFrame, mode: c
         crate::pad::PadMode::BodyPose => on_active(core, |runtime| {
             runtime.set_twist([0.0, 0.0, 0.0]);
             runtime.set_body(
-                robotd_params::PadDriveParams::scale(evaluate(&axes.body_pose.z, &sticks, axes.deadzone), body.z_min, body.z_max),
+                robotd_params::PadDriveParams::scale(
+                    evaluate(&axes.body_pose.z, &sticks, axes.deadzone),
+                    body.z_min,
+                    body.z_max,
+                ),
                 evaluate(&axes.body_pose.roll, &sticks, axes.deadzone) * body.roll_max,
                 0.0,
             );
@@ -2191,8 +3131,31 @@ fn dispatch_pad_event(core: &mut DuckCore, event: &crate::pad::PadButtonEvent) -
                     refusal = Some("the duck is powering off".to_owned());
                     return;
                 }
+                if !policy_drives(runtime) {
+                    // The same gate the intent arm applies: a pad button on a
+                    // resting or disabled duck is refused, not queued into a
+                    // controller that forgot its moves.
+                    refusal = Some(
+                        "the policy is not driving — press Start on the pad".to_owned(),
+                    );
+                    return;
+                }
                 let result: Result<(), String> = match skill.as_str() {
-                    "sit" | "stand" | "sit_toggle" => runtime
+                    // `sit`/`stand` are idempotent, exactly as the HTTP
+                    // `/skill` arm reads them; `sit_toggle` is the pad's own
+                    // toggle spelling and flips whatever the duck is doing.
+                    "sit" | "stand" => {
+                        let sitting = runtime.is_sitting();
+                        if (skill == "sit") == sitting {
+                            Ok(())
+                        } else {
+                            runtime
+                                .sit_toggle()
+                                .map(|_| ())
+                                .map_err(|error| format!("skill refused: {error}"))
+                        }
+                    }
+                    "sit_toggle" => runtime
                         .sit_toggle()
                         .map(|_| ())
                         .map_err(|error| format!("skill refused: {error}")),
@@ -2208,31 +3171,37 @@ fn dispatch_pad_event(core: &mut DuckCore, event: &crate::pad::PadButtonEvent) -
             });
             refusal
         }
-        // `robot.init`: stand up and hold. A duck that was powered off comes
-        // back through `power_on` (which forgets the seat and enables); an
-        // already-powered duck simply enables. A duck mid power-off is
-        // refused, the way every other move is.
+        // `robot.init`: the official power request's four branches — a
+        // powered-off duck refuses, a limp one ramps up without needing a
+        // policy, a seated Ready duck holds its seat, and a standing Ready one
+        // re-homes. `runtime.init` is that whole decision.
         PadButtonEvent::Init => {
             let mut refusal = None;
+            let mut enabled_after = None;
             on_active(core, |runtime| {
                 if runtime.shutting_down() {
                     refusal = Some("the duck is powering off".to_owned());
                     return;
                 }
-                let result = if runtime.powered_off() {
-                    runtime.power_on()
-                } else {
-                    runtime.enable()
-                };
-                refusal = result.err().map(|error| format!("init refused: {error}"));
+                refusal = runtime
+                    .init()
+                    .err()
+                    .map(|error| format!("init refused: {error}"));
+                enabled_after = Some(runtime_policy_enabled(runtime));
             });
+            if let Some(enabled) = enabled_after {
+                set_policy_enabled_mirror(core, enabled);
+            }
             refusal
         }
-        // `robot.enable toggle`: the robot owns the state. Off means the duck
-        // sits (the shell's own end-of-drive), on means the policy is asked to
-        // drive from home — the toggle answer is what the mapper believes.
+        // `robot.enable toggle`: the robot owns the state. The reply's reason
+        // names the state the robot ended in; a toggle OFF stops the policy
+        // and returns to the home pose with torque still on (the official
+        // falling edge, `robotd/src/main.rs:3763-3795`), never the torque cut
+        // `relax`/`shutdown` own.
         PadButtonEvent::Toggle => {
             let mut refusal = None;
+            let mut enabled_after = None;
             on_active(core, |runtime| {
                 if runtime.shutting_down() {
                     // The duck is powering off: the toggle is refused, the way
@@ -2240,16 +3209,22 @@ fn dispatch_pad_event(core: &mut DuckCore, event: &crate::pad::PadButtonEvent) -
                     refusal = Some("the duck is powering off".to_owned());
                     return;
                 }
-                let result = if runtime.powered_off() {
-                    runtime.power_on()
+                if runtime.powered_off() {
+                    // Powered off is not a policy state the toggle owns: ask
+                    // for the power-on the shell's button would.
+                    refusal = runtime
+                        .power_on()
+                        .err()
+                        .map(|error| format!("toggle refused: {error}"));
                 } else {
-                    // The duck is standing and driving: the pad asks it to stop
-                    // driving, the same disable the shell's end-of-drive button
-                    // runs.
-                    runtime.disable()
-                };
-                refusal = result.err().map(|error| format!("toggle refused: {error}"));
+                    let on = !runtime_policy_enabled(runtime);
+                    runtime.set_policy_enabled(on);
+                }
+                enabled_after = Some(runtime_policy_enabled(runtime));
             });
+            if let Some(enabled) = enabled_after {
+                set_policy_enabled_mirror(core, enabled);
+            }
             refusal
         }
         // The virtual face LED, one press.
@@ -2273,30 +3248,51 @@ fn dispatch_pad_event(core: &mut DuckCore, event: &crate::pad::PadButtonEvent) -
             on_active(core, |runtime| runtime.wheee(false));
             None
         }
-        // Start held: home pose, motors stiff, policy off. The official home
-        // sequence: disable the policy, then re-enable so the duck ramps back
-        // to the home pose with torque on.
+        // Start held: home pose, motors stiff, policy off. The official
+        // sequence is `robot.enable{on:false}` then `robot.init`
+        // (`pad-map/src/mapper.rs:262-281`): the disable comes first so the
+        // policy cannot pick the robot up again once the ramp ends. A seated
+        // duck is held in its seat by `init`'s Ready+sitting branch; it is not
+        // re-homed onto its feet.
         PadButtonEvent::Home => {
             let mut refusal = None;
+            let mut enabled_after = None;
+            let from = core.pad_mode;
+            core.pad_mode = crate::pad::PadMode::Drive;
             on_active(core, |runtime| {
                 if runtime.shutting_down() {
                     refusal = Some("the duck is powering off".to_owned());
                     return;
                 }
+                // Held Start also puts the sticks back to plain driving, so
+                // the mode's exit calls run here (the mapper has already set
+                // its own mode to Drive and sent no ModeChange event).
+                if from == crate::pad::PadMode::BodyPose {
+                    runtime.release_body();
+                }
+                if from.poses_head() {
+                    runtime.set_head([0.0; 4]);
+                }
+                runtime.set_policy_enabled(false);
                 refusal = runtime
-                    .disable()
-                    .and_then(|()| runtime.enable())
+                    .init()
                     .err()
                     .map(|error| format!("home refused: {error}"));
+                enabled_after = Some(runtime_policy_enabled(runtime));
             });
+            if let Some(enabled) = enabled_after {
+                set_policy_enabled_mirror(core, enabled);
+            }
             refusal
         }
-        // Select held 2 s: sit, rest pose, torque off. The mobile runtime's
-        // one sit→rest→torque-off sequence is the shutdown sit (`robotd`'s own
-        // sequence); a phone has no servo reboot, so the rest ends latched off
-        // — the next Start tap (Init) powers the duck back on.
+        // Select held 2 s: sit down and ease into the rest pose. This is
+        // `robot.rest`, not `robot.shutdown`: the official rest runs the same
+        // sit and rest ramp and ends without a power-off latch
+        // (`robotd/src/main.rs:3130-3175`). The phone has no servos to reboot,
+        // so the duck keeps torque as it was and stays powered
+        // (`runtime.rs`'s `request_rest`).
         PadButtonEvent::Rest => {
-            on_active(core, |runtime| runtime.request_shutdown());
+            on_active(core, |runtime| runtime.request_rest());
             None
         }
         // Select held 4 s: power off, latched. The same sequence as the HTTP
@@ -2307,20 +3303,20 @@ fn dispatch_pad_event(core: &mut DuckCore, event: &crate::pad::PadButtonEvent) -
         }
         // The D-pad switched what the sticks mean. The mode is the mapper's
         // (core-level); the head/body writes belong to the watched duck, and
-        // leaving a head mode puts the head back to rest (the official
-        // mode-exit call).
+        // the exit calls happen when a mode is **left**, exactly as the
+        // official `mode_exit_calls` (`pad-map/src/mapper.rs:40-54`): a body
+        // left leaning or a head left turned stays that way, and the next mode
+        // does not send the joints the last one did. Entering `BodyPose` does
+        // not release the pose it is about to hold.
         PadButtonEvent::ModeChange(mode) => {
             let mode = *mode;
+            let from = core.pad_mode;
             core.pad_mode = mode;
-            if !mode.poses_head() || mode == crate::pad::PadMode::BodyPose {
-                on_active(core, |runtime| {
-                    if !mode.poses_head() {
-                        runtime.set_head([0.0, 0.0, 0.0, 0.0]);
-                    }
-                    if mode == crate::pad::PadMode::BodyPose {
-                        runtime.release_body();
-                    }
-                });
+            if from == crate::pad::PadMode::BodyPose && mode != crate::pad::PadMode::BodyPose {
+                on_active(core, |runtime| runtime.release_body());
+            }
+            if from.poses_head() && !mode.poses_head() {
+                on_active(core, |runtime| runtime.set_head([0.0; 4]));
             }
             None
         }
@@ -2586,7 +3582,10 @@ pub unsafe extern "C" fn duck_core_enable(core: *mut DuckCore) -> c_int {
         return -1;
     }
     match (*core).runtime.enable() {
-        Ok(()) => 0,
+        Ok(()) => {
+            set_policy_enabled_mirror(&*core, true);
+            0
+        }
         Err(_) => -1,
     }
 }
@@ -2597,7 +3596,10 @@ pub unsafe extern "C" fn duck_core_disable(core: *mut DuckCore) -> c_int {
         return -1;
     }
     match (*core).runtime.disable() {
-        Ok(()) => 0,
+        Ok(()) => {
+            set_policy_enabled_mirror(&*core, false);
+            0
+        }
         Err(_) => -1,
     }
 }
@@ -2664,10 +3666,15 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
             } => gifts.push((from, name, gift, value)),
             // A chorus is a room-wide performance, applied after the gifts;
             // the runtime dedupes by id and the one-at-a-time rule.
-            crate::lan::PeerEvent::Chorus { id, moves, .. } => {
-                choruses.push((id, moves))
-            }
-            crate::lan::PeerEvent::Ensemble { id, role, roles, moves, sounds, .. } => {
+            crate::lan::PeerEvent::Chorus { id, moves, .. } => choruses.push((id, moves)),
+            crate::lan::PeerEvent::Ensemble {
+                id,
+                role,
+                roles,
+                moves,
+                sounds,
+                ..
+            } => {
                 if !active_runtime(core).chorus_active() {
                     let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
                     on_active(core, |runtime| {
@@ -2699,6 +3706,25 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         // be waiting at all, and the queue keeps the answer bounded.
         core.intents.answer(queued.id, result);
     }
+    // The IPC power requests, on the same tick and the same watched duck as
+    // every other intent. The handlers answered `accepted` when they queued
+    // them, exactly as the official dispatch does.
+    let controls: Vec<ControlCommand> = core
+        .control
+        .lock()
+        .map(|mut queue| queue.drain(..).collect())
+        .unwrap_or_default();
+    if !controls.is_empty() {
+        let mut enabled = None;
+        for command in controls {
+            enabled = Some(apply_control(core, command));
+        }
+        // The mirror `robot.enable toggle` reads: the body just decided, so
+        // publish its answer rather than the handler's guess.
+        if let (Some(enabled), Ok(mut snapshot)) = (enabled, core.robot_snapshot.lock()) {
+            snapshot.enabled = enabled;
+        }
+    }
     // The official UDP pad: a CLIENT, not a sense. The frame arrives here and
     // the mapper (ported from `pad-map/src/mapper.rs`) decides the events the
     // official mapping would send; this dispatches them through the same
@@ -2724,22 +3750,27 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     if let Some(checkpoint) = core.pending_restore.take() {
         let selected = core.selected;
         if selected > 0 && selected <= core.branches.len() {
-            std::mem::swap(
-                &mut core.runtime,
-                &mut core.branches[selected - 1].runtime,
-            );
+            std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
             if !core.runtime.restore(&checkpoint) {
                 core.label = "restore refused".to_owned();
             }
-            std::mem::swap(
-                &mut core.runtime,
-                &mut core.branches[selected - 1].runtime,
-            );
+            std::mem::swap(&mut core.runtime, &mut core.branches[selected - 1].runtime);
         } else if !core.runtime.restore(&checkpoint) {
             core.label = "restore refused".to_owned();
         }
         core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
+        // `restore` drops any pending policy swap (the future it belonged to
+        // is gone), so a marker owned by the duck that was rewound must go
+        // with it. A marker on another branch is untouched.
+        clear_swap_landing_for_active(core);
+        // The policy flag travels with the checkpoint; the toggle mirror
+        // follows the duck that now runs the restored tick.
+        let enabled_after = runtime_policy_enabled(active_runtime(core));
+        set_policy_enabled_mirror(core, enabled_after);
     }
+    // A change that landed while the clock was frozen still needs its skill
+    // table published; nothing else observes the falling edge.
+    settle_policy_swap(core);
     // Frozen time freezes the duck the client is watching, including a branch.
     let active_paused = active_runtime(core).clock().paused;
     if active_paused {
@@ -2799,6 +3830,7 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
         Ok(report) => {
             core.label = report.label.clone();
             core.last = Some(report);
+            settle_policy_swap(core);
             // The lifetime record travels with the state: a client reading
             // /state sees the same counters /life serves, for the duck it sees.
             let book = active_runtime(core).book().clone();
@@ -2830,13 +3862,203 @@ fn publish_ipc(core: &DuckCore) {
     let active = active_runtime(core);
     let runtime_health = active.health_result();
     if let Ok(mut snapshot) = core.health_snapshot.lock() {
-        *snapshot = runtime_health;
+        *snapshot = runtime_health.clone();
     }
+    refresh_robot_snapshot(core, active, &runtime_health);
     let Some(ipc) = core.ipc.as_ref() else {
         return;
     };
     if let Some(state) = active.robot_state() {
         ipc.publish_state(&state);
+    }
+}
+
+/// Refresh the read-side snapshot the `robot.*` handlers answer from. Runs on
+/// the thread that owns the body, once per tick, for the duck the loop just
+/// drove — [`active_runtime`], the selected branch when there is one.
+///
+/// Everything here is a fact the runtime itself reports: slot paths from
+/// `driving_net_paths`, the skill table the manifest loaded, the lifetime book,
+/// the mode, and the health verdict the same tick published. Nothing is
+/// inferred from `/state` or from a client's belief.
+fn refresh_robot_snapshot(
+    core: &DuckCore,
+    active: &DuckRuntime<MujocoIo>,
+    health: &duck_ipc_proto::HealthResult,
+) {
+    let paths = active.driving_net_paths();
+    let slot_path = |name: &str| {
+        paths
+            .iter()
+            .find(|(slot, _)| slot == name)
+            .and_then(|(_, path)| path.clone())
+    };
+    let file_name = |name: &str| {
+        slot_path(name).and_then(|path| {
+            path.file_name()
+                .map(|file| file.to_string_lossy().into_owned())
+        })
+    };
+    let loaded = |name: &str| slot_path(name).is_some();
+
+    // The six slots a phone can drive (the four fixed networks plus the
+    // manifest's skills by name) with their overrides. `origin` stays absent:
+    // the phone has no official/community/local provenance split — a file in
+    // the policies directory is all this core knows (COMPARISON §5.1).
+    let slots: Vec<duck_ipc_proto::PolicySlot> = paths
+        .iter()
+        .map(|(slot, path)| duck_ipc_proto::PolicySlot {
+            slot: slot.clone(),
+            path: path.as_ref().map(|path| path.display().to_string()),
+            origin: None,
+            overridden: crate::manifest::slot_override(slot).is_some(),
+            error: None,
+        })
+        .collect();
+    // The skills **this duck** loaded, not the core-level manifest table:
+    // in a branch session the selected runtime can be running a different
+    // set, and pairing the global `skill_defs` with its slots would describe
+    // a robot that is not there. The table still supplies parameters, matched
+    // by name and (when it names one) by the same file.
+    let loaded_skills: Vec<(String, Option<PathBuf>)> = paths.iter().skip(4).cloned().collect();
+    let configured_skills: Vec<String> = loaded_skills
+        .iter()
+        .map(|(name, _)| name.clone())
+        .collect();
+    let emotions = active.emotion_names();
+
+    // `robot.skills`: every loaded one-shot with the parameters the manifest
+    // declared for that name, plus the two names the daemon owns itself. A
+    // skill entry is never "overridden" here — the phone has no skill
+    // override table (`robot.setSkill`/`removeSkill` are deliberately not
+    // served).
+    let skill_params: Vec<duck_ipc_proto::SkillParams> = loaded_skills
+        .iter()
+        .map(|(name, path)| {
+            let def = core.skill_defs.iter().find(|skill| {
+                skill.name == *name
+                    && match (&skill.path, path) {
+                        (Some(def_path), Some(loaded)) => def_path == loaded,
+                        (None, _) => true,
+                        (Some(_), None) => false,
+                    }
+            });
+            match def {
+                Some(skill) => duck_ipc_proto::SkillParams {
+                    name: skill.name.clone(),
+                    path: skill.path.as_ref().map(|path| path.display().to_string()),
+                    duration: Some(skill.duration),
+                    command: Some(skill.command),
+                    unwind: Some(skill.unwind),
+                    unwind_s: Some(skill.unwind_s),
+                    chain: Some(skill.chain),
+                    action_scale: skill.params.action_scale,
+                    gain_ratio: skill.params.gain_ratio,
+                    overridden: false,
+                },
+                // A loaded skill the core-level table does not name (the
+                // selected branch runs another set): report what is true —
+                // the name and the file — and no invented parameters.
+                None => duck_ipc_proto::SkillParams {
+                    name: name.clone(),
+                    path: path.as_ref().map(|path| path.display().to_string()),
+                    overridden: false,
+                    ..Default::default()
+                },
+            }
+        })
+        .collect();
+    let built_in: Vec<String> = ["ground_pick", "sit_toggle"]
+        .into_iter()
+        .filter(|name| {
+            // Official `skills_report`: a name that is also a configured
+            // table entry is reported there, not twice (`main.rs:4880-4924`).
+            !loaded_skills.iter().any(|(loaded, _)| loaded == name)
+                && match *name {
+                    "ground_pick" => loaded("ground_pick"),
+                    _ => loaded("sitstand"),
+                }
+        })
+        .map(str::to_owned)
+        .collect();
+
+    // Why nothing is driving, when nothing is. Policy errors come from the
+    // health verdict (the runtime's `policy_error` is folded into it); a
+    // missing walking network has the official sentence.
+    let unavailable = health
+        .reason
+        .as_deref()
+        .and_then(|reason| reason.strip_prefix("policy unavailable: "))
+        .map(str::to_owned)
+        .or_else(|| {
+            (!loaded("walk")).then(|| "no policy configured; holding the startup pose".to_owned())
+        });
+
+    let safe = active.safe_to_restart();
+    let previous_enabled = core
+        .robot_snapshot
+        .lock()
+        .map(|snapshot| snapshot.enabled)
+        .unwrap_or(true);
+    // A limp or powered-off duck is not driving a policy, whatever a stale
+    // mirror says. Every explicit policy-off door (`robot.enable on:false`,
+    // Home, relax, the shell's disable) writes the mirror directly; this catch
+    // covers the flags the runtime changes on its own (power-off finishing, a
+    // limp fall).
+    let enabled = if active.powered_off() || matches!(active.bringup(), BringupState::Limp) {
+        false
+    } else {
+        previous_enabled
+    };
+    let snapshot = RobotSnapshot {
+        subscribe: duck_ipc_proto::SubscribeResult {
+            accepted: true,
+            walk: file_name("walk"),
+            stand: file_name("stand"),
+            sitstand: file_name("sitstand"),
+            ground_pick: file_name("ground_pick"),
+            // The configurable one-shots and the emotions, exactly the list
+            // `robot.do` answers to beyond the three policy slots above.
+            skills: configured_skills
+                .iter()
+                .cloned()
+                .chain(emotions.iter().cloned())
+                .collect(),
+            unavailable,
+        },
+        policies: duck_ipc_proto::PoliciesResult {
+            mode: active.mode().as_str().to_owned(),
+            // The phone has no `[policy] enabled` config key: a loaded core
+            // always runs its policies.
+            enabled: true,
+            slots,
+            skills: configured_skills,
+            homed: Some(matches!(active.bringup(), BringupState::Ready)),
+            sitting: Some(active.is_sitting()),
+            // A failed change publishes its reason on `notice` and the health
+            // gate, not here; there is no separate change-error slot.
+            change_error: None,
+        },
+        skills: duck_ipc_proto::SkillsResult {
+            skills: skill_params,
+            built_in,
+        },
+        model: core
+            .robot_snapshot
+            .lock()
+            .map(|snapshot| snapshot.model.clone())
+            .unwrap_or_else(|_| robot_model_result()),
+        vetbook: active.book().summary(),
+        mode: active.mode().as_str().to_owned(),
+        policies_dir: core.policies.clone(),
+        enabled,
+        safe_to_restart: duck_ipc_proto::SafeToRestartResult {
+            safe,
+            reason: (!safe).then(|| "the duck is moving".to_owned()),
+        },
+    };
+    if let Ok(mut slot) = core.robot_snapshot.lock() {
+        *slot = snapshot;
     }
 }
 
@@ -2903,10 +4125,7 @@ pub unsafe extern "C" fn duck_core_load_pickup(
         return -1;
     };
     let core = &mut *core;
-    match core
-        .runtime
-        .load_pickup(std::path::Path::new(&path))
-    {
+    match core.runtime.load_pickup(std::path::Path::new(&path)) {
         Ok(()) => 0,
         Err(error) => {
             core.label = error;
@@ -3002,7 +4221,11 @@ pub unsafe extern "C" fn duck_core_queue_sound(core: *mut DuckCore, tag: *const 
     };
     let known = crate::voice::TAGS.contains(&tag.as_str())
         || tag.strip_prefix("emotion:").is_some_and(|name| {
-            (*core).runtime.emotion_names().iter().any(|loaded| loaded == name)
+            (*core)
+                .runtime
+                .emotion_names()
+                .iter()
+                .any(|loaded| loaded == name)
         });
     if !known {
         return -1;
@@ -3048,26 +4271,41 @@ pub unsafe extern "C" fn duck_core_trigger_skill(
     };
     // The shell's ring and `/skill` name the same verbs, so the C entry point
     // accepts them too: `sit` and `stand` are idempotent, `ground_pick` is the
-    // loop's own, and anything else is a manifest skill.
+    // loop's own, and anything else is a manifest skill. It acts on the duck
+    // the client is watching (a selected branch in a branch session) and
+    // applies the same driving gate as the HTTP arm and the pad button: a
+    // resting or disabled duck is refused, not frozen.
     let core = &mut *core;
-    let result = match name.as_str() {
-        "sit" | "stand" => {
-            let sitting = core.runtime.is_sitting();
-            if (name == "sit") == sitting {
-                Ok(true)
-            } else {
-                core.runtime.sit_toggle().map(|_| true)
-            }
+    let mut outcome = None;
+    on_active(core, |runtime| {
+        if !policy_drives(runtime) {
+            outcome = Some(Err("the policy is not driving — press Start on the pad".to_owned()));
+            return;
         }
-        "ground_pick" => core.runtime.start_ground_pick().map(|()| true),
-        _ => core.runtime.trigger_skill(&name),
-    };
-    match result {
-        Ok(started) => i32::from(started),
-        Err(error) => {
+        let result = match name.as_str() {
+            "sit" | "stand" => {
+                let sitting = runtime.is_sitting();
+                if (name == "sit") == sitting {
+                    Ok(true)
+                } else {
+                    runtime.sit_toggle().map(|_| true).map_err(str::to_owned)
+                }
+            }
+            "ground_pick" => runtime
+                .start_ground_pick()
+                .map(|()| true)
+                .map_err(str::to_owned),
+            _ => runtime.trigger_skill(&name).map_err(str::to_owned),
+        };
+        outcome = Some(result);
+    });
+    match outcome {
+        Some(Ok(started)) => i32::from(started),
+        Some(Err(error)) => {
             core.label = format!("skill refused: {error}");
             0
         }
+        None => 0,
     }
 }
 
@@ -3076,9 +4314,16 @@ pub unsafe extern "C" fn duck_core_sit_toggle(core: *mut DuckCore) -> c_int {
     if core.is_null() {
         return -1;
     }
-    match (*core).runtime.sit_toggle() {
-        Ok(_) => 0,
-        Err(_) => -1,
+    let core = &mut *core;
+    let mut allowed = false;
+    on_active(core, |runtime| {
+        allowed = policy_drives(runtime) && runtime.sit_toggle().is_ok();
+    });
+    if allowed {
+        0
+    } else {
+        core.label = "sit refused: the policy is not driving".to_owned();
+        -1
     }
 }
 
@@ -3087,9 +4332,16 @@ pub unsafe extern "C" fn duck_core_ground_pick(core: *mut DuckCore) -> c_int {
     if core.is_null() {
         return -1;
     }
-    match (*core).runtime.start_ground_pick() {
-        Ok(()) => 0,
-        Err(_) => -1,
+    let core = &mut *core;
+    let mut allowed = false;
+    on_active(core, |runtime| {
+        allowed = policy_drives(runtime) && runtime.start_ground_pick().is_ok();
+    });
+    if allowed {
+        0
+    } else {
+        core.label = "ground pick refused: the policy is not driving".to_owned();
+        -1
     }
 }
 
@@ -3127,7 +4379,10 @@ pub unsafe extern "C" fn duck_core_status(core: *mut DuckCore, out: *mut DuckSta
         BringupState::Ready => 2,
     };
     out.fallen = active.fallen() as c_int;
-    out.gain = core.last.as_ref().map_or(200, |report| report.gain as c_int);
+    out.gain = core
+        .last
+        .as_ref()
+        .map_or(200, |report| report.gain as c_int);
     out.label = [0; 64];
     let label = core.label.as_bytes();
     let count = label.len().min(63);
@@ -3139,7 +4394,9 @@ pub unsafe extern "C" fn duck_core_status(core: *mut DuckCore, out: *mut DuckSta
     let report = core.last.as_ref();
     out.imu_ready = active.imu_ready() as c_int;
     out.picked_up = active.picked_up() as c_int;
-    out.p_held = report.and_then(|report| report.p_held).map_or(0.0, f64::from);
+    out.p_held = report
+        .and_then(|report| report.p_held)
+        .map_or(0.0, f64::from);
     out.mouth = report.map_or(0.0, |report| report.mouth);
     out.volts = report.and_then(|report| report.volts).unwrap_or(0.0);
     out.has_mouth = active.has_mouth() as c_int;
@@ -3258,10 +4515,7 @@ pub unsafe extern "C" fn duck_core_geom_info(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn duck_core_mesh_name(
-    core: *mut DuckCore,
-    mesh: c_int,
-) -> *const c_char {
+pub unsafe extern "C" fn duck_core_mesh_name(core: *mut DuckCore, mesh: c_int) -> *const c_char {
     if core.is_null() || mesh < 0 {
         return std::ptr::null();
     }
@@ -3308,8 +4562,11 @@ pub unsafe extern "C" fn duck_core_step(core: *mut DuckCore, ticks: c_int) {
     if let Some(report) = report {
         core.label = report.label.clone();
         core.last = Some(report);
-        publish_state(core);
     }
+    // A queued policy change can land inside those ticks; settle after the
+    // branch swap has been undone, and let its label win over the gait's.
+    settle_policy_swap(core);
+    publish_state(core);
 }
 
 /// Step back to a saved tick. Returns 0 when the rewind landed. The rewind
@@ -3340,6 +4597,9 @@ pub unsafe extern "C" fn duck_core_seek(core: *mut DuckCore, back_ticks: c_int) 
     if !landed {
         return -1;
     }
+    // `restore` dropped any pending policy swap on this duck; its landing
+    // marker must go with the future it belonged to.
+    clear_swap_landing_for_active(core);
     core.timeline.retain(|saved| saved.tick <= checkpoint.tick);
     // The published state must follow the rewind: the duck is somewhere
     // else now, and the shell would keep showing where it was.
@@ -3474,15 +4734,30 @@ mod tests {
     /// refused duck.)
     static CORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-    fn new_core() -> (std::sync::MutexGuard<'static, ()>, *mut DuckCore) {
+    /// The two process-global test locks, held for a core test's whole run:
+    /// the fixed IPC port and the slot-override table. The override lock is
+    /// the one the manifest tests take, so a parallel `cargo test` (the CI
+    /// job runs the default thread count) cannot load a set through another
+    /// test's override.
+    struct CoreGuard {
+        _core: std::sync::MutexGuard<'static, ()>,
+        _overrides: std::sync::MutexGuard<'static, ()>,
+    }
+
+    fn new_core() -> (CoreGuard, *mut DuckCore) {
         let guard = CORE_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let scene = CString::new(
-            r"D:\AI\Duck\upstream\microduck_rl\src\mjlab_microduck\robot\microduck\scene_backlash.xml",
-        )
-        .unwrap();
-        let policies = CString::new(r"D:\AI\Duck\policies").unwrap();
+        let overrides = crate::manifest::override_test_lock();
+        // Resolve the official assets the way every other test does: the
+        // workspace checkout, or `DUCK_POLICIES_DIR` on a CI runner. No
+        // machine-specific path.
+        let scene = crate::fixtures::scene_backlash()
+            .expect("the official training scene (fetch upstream/microduck_rl)");
+        let policies =
+            crate::fixtures::policies_dir().expect("the official policy bundle (fetch policies)");
+        let scene = CString::new(scene.to_string_lossy().into_owned()).unwrap();
+        let policies = CString::new(policies.to_string_lossy().into_owned()).unwrap();
         let mut error = [0 as c_char; 1024];
         let core = unsafe {
             duck_core_new(
@@ -3496,7 +4771,13 @@ mod tests {
             let message = unsafe { CStr::from_ptr(error.as_ptr()) }.to_string_lossy();
             panic!("duck_core_new failed: {message}");
         }
-        (guard, core)
+        (
+            CoreGuard {
+                _core: guard,
+                _overrides: overrides,
+            },
+            core,
+        )
     }
 
     /// Tick until the duck finishes its bring-up ramp and is Ready. The
@@ -3529,6 +4810,19 @@ mod tests {
             }
         }
         panic!("the duck never reached Ready");
+    }
+
+    /// Tick until a queued policy swap has landed. A disturbing change walks
+    /// home first (up to `HOME_RAMP` plus the walk home); 800 ticks is the
+    /// same headroom the other reload tests use.
+    fn wait_for_swap(core: *mut DuckCore) {
+        for _ in 0..800 {
+            unsafe { duck_core_tick(core) };
+            if !unsafe { (*core).runtime.swap_pending() } {
+                return;
+            }
+        }
+        panic!("the policy swap never landed");
     }
 
     #[test]
@@ -3598,12 +4892,6 @@ mod tests {
 
         // End to end: a directory with no policies in it is refused with the
         // loader's own reason, not a bare -1.
-        let scene = Path::new(
-            r"D:\AI\Duck\upstream\microduck_rl\src\mjlab_microduck\robot\microduck\scene_backlash.xml",
-        );
-        if !scene.is_file() {
-            return; // the fixture tests above would have panicked already
-        }
         let (_guard, core) = new_core();
         let dir = CString::new(
             std::env::temp_dir()
@@ -3617,7 +4905,9 @@ mod tests {
         unsafe { duck_core_tick(core) };
         assert_eq!(unsafe { duck_core_reload_policies(core, dir.as_ptr()) }, -1);
         let reason = unsafe { duck_core_last_error() };
-        let text = unsafe { CStr::from_ptr(reason) }.to_string_lossy().into_owned();
+        let text = unsafe { CStr::from_ptr(reason) }
+            .to_string_lossy()
+            .into_owned();
         assert!(text.contains("no Walk locomotion policy in"), "{text}");
 
         // The refusal is a degraded mark, not a healthy duck: the judge can
@@ -3625,14 +4915,18 @@ mod tests {
         let verdict = unsafe { (*core).runtime.health() };
         match &verdict {
             crate::runtime::HealthVerdict::Degraded { reasons } => assert!(
-                reasons.iter().any(|reason| reason.starts_with("policy reload refused")),
+                reasons
+                    .iter()
+                    .any(|reason| reason.starts_with("policy reload refused")),
                 "{reasons:?}"
             ),
             other => panic!("a refused reload must mark the duck degraded: {other:?}"),
         }
 
         // A reload that lands clears the mark again.
-        let policies = CString::new(r"D:\AI\Duck\policies").unwrap();
+        let fixture_dir = crate::fixtures::policies_dir()
+            .expect("the official policy bundle (fetch policies)");
+        let policies = CString::new(fixture_dir.to_string_lossy().into_owned()).unwrap();
         assert_eq!(
             unsafe { duck_core_reload_policies(core, policies.as_ptr()) },
             0,
@@ -3690,9 +4984,15 @@ mod tests {
     /// 不同种子。种子是指纹前 8 位 hex，稳定且可复现。
     #[test]
     fn the_voice_seed_follows_the_fingerprint() {
-        let first = seed_from_fingerprint("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
-        let same = seed_from_fingerprint("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
-        let other = seed_from_fingerprint("00000000deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef");
+        let first = seed_from_fingerprint(
+            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        );
+        let same = seed_from_fingerprint(
+            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        );
+        let other = seed_from_fingerprint(
+            "00000000deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        );
         assert_eq!(first, same, "the same fingerprint is the same seed");
         assert_ne!(first, other, "a different fingerprint is a different duck");
         assert_eq!(first, 0xdeadbeef);
@@ -3708,7 +5008,10 @@ mod tests {
             // 通过私有字段读取（同模块测试）：种子必须在构造时已生效。
             (*core_ptr).runtime.voice_seed()
         };
-        assert_eq!(runtime_seed, seed, "the core's voice seed is the fingerprint's");
+        assert_eq!(
+            runtime_seed, seed,
+            "the core's voice seed is the fingerprint's"
+        );
         unsafe { duck_core_free(core) };
     }
 
@@ -3806,8 +5109,240 @@ mod tests {
         unsafe { duck_core_free(core) };
     }
 
-    /// IPC 端到端：起 core（8768），连接，robot.health 有答，robot.move
-    /// 驱动意图队列，robot.subscribe 收到 robot.state 推送。
+    /// DKRB cadence: the report clock is peeked, not consumed, so a beat that
+    /// is not due does not make the next one due. Official cadence is one
+    /// report per second (`pad-map/src/wire.rs:254-344`); the old
+    /// `pad_report_at.take()` produced one every other tick.
+    #[test]
+    fn dkrb_reports_once_a_second_not_every_other_tick() {
+        let (_guard, core) = new_core();
+        // Fixed UDP port: if another process owns it, this test cannot build
+        // a receiver, and the cadence itself is the pure `pad_report_due`
+        // arithmetic the rest of this test pins. Skip as the IPC end-to-end
+        // test does for its fixed TCP port.
+        let Some(pad) = crate::pad::Pad::start() else {
+            unsafe { duck_core_free(core) };
+            return;
+        };
+        let base = Instant::now();
+        let mut fired = Vec::new();
+        // The 50 Hz beat the live loop would run, injected with a synthetic
+        // clock: the report is due at t=0 (never reported), then only after a
+        // whole second. The old take() made 1.4 s due as well.
+        for ms in (0..3000).step_by(100) {
+            let due = unsafe {
+                pad_report_due(&mut *core, &pad, base + std::time::Duration::from_millis(ms))
+            };
+            if due {
+                fired.push(ms);
+            }
+        }
+        assert_eq!(
+            fired,
+            vec![0, 1000, 2000],
+            "DKRB fires once a second, not on the beat after every quiet one"
+        );
+        unsafe { duck_core_free(core) };
+    }
+
+    /// Drive mode is the official `DriveAxes` mapping, not the phone
+    /// joystick's one-stick convention: left stick walks (LeftY) and strafes
+    /// (LeftX, inverted), right stick turns (RightX, inverted)
+    /// (`robotd-params/src/pad_axes.rs:154-179`).
+    #[test]
+    fn drive_mode_maps_all_four_axes_like_the_official_default() {
+        use crate::pad::PadFrame;
+        let (_guard, core) = new_core();
+        let frame = PadFrame {
+            // Full forward, half left, full right: vx=+0.4, vy=-0.15,
+            // vyaw=+1.0 under the official signs and limits.
+            left_y: 1.0,
+            left_x: 0.5,
+            right_x: -1.0,
+            ..Default::default()
+        };
+        unsafe {
+            let c = &mut *core;
+            c.pad_mode = crate::pad::PadMode::Drive;
+            pad_frame_commands(c, &frame, crate::pad::PadMode::Drive);
+            let command = c
+                .runtime
+                .checkpoint()
+                .expect("the body has a state")
+                .command_twist;
+            assert!((command[0] - 0.4).abs() < 1e-9, "vx: {command:?}");
+            assert!((command[1] + 0.15).abs() < 1e-9, "vy: {command:?}");
+            assert!((command[2] - 1.0).abs() < 1e-9, "vyaw: {command:?}");
+
+            // Non-vacuity against HeadDrive: the same sticks there leave vy at
+            // zero and turn from the left stick, which is what Drive used to
+            // do. The two mappings must differ.
+            pad_frame_commands(c, &frame, crate::pad::PadMode::HeadDrive);
+            let head_drive = c
+                .runtime
+                .checkpoint()
+                .expect("the body has a state")
+                .command_twist;
+            assert!(head_drive[1].abs() < 1e-9, "head-drive has no strafe");
+            assert!(
+                (head_drive[2] + 0.5).abs() < 1e-9,
+                "head-drive turns from LeftX inverted: {head_drive:?}"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// BodyPose is released when the mode is **left**, not when it is entered
+    /// (`pad-map/src/mapper.rs:40-54`): a held crouch must survive the D-pad
+    /// press that starts it, and the next mode must not inherit it.
+    #[test]
+    fn body_pose_is_released_on_leaving_not_entering() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            // A body pose is being held.
+            on_active(c, |runtime| runtime.set_body(0.01, 0.1, 0.0));
+            assert!(c.runtime.checkpoint().unwrap().body_active);
+
+            // Entering BodyPose: the old dispatch released it here.
+            assert!(
+                dispatch_pad_event(c, &crate::pad::PadButtonEvent::ModeChange(crate::pad::PadMode::BodyPose))
+                    .is_none()
+            );
+            assert_eq!(c.pad_mode, crate::pad::PadMode::BodyPose);
+            assert!(
+                c.runtime.checkpoint().unwrap().body_active,
+                "entering BodyPose must keep the pose it is about to hold"
+            );
+
+            // Leaving BodyPose releases it.
+            assert!(
+                dispatch_pad_event(c, &crate::pad::PadButtonEvent::ModeChange(crate::pad::PadMode::Drive))
+                    .is_none()
+            );
+            assert_eq!(c.pad_mode, crate::pad::PadMode::Drive);
+            assert!(
+                !c.runtime.checkpoint().unwrap().body_active,
+                "leaving BodyPose releases the pose"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// Start held is the official home sequence: policy off, then `init`
+    /// (`pad-map/src/mapper.rs:262-281`). The duck must stay powered with
+    /// torque on — not go limp through the shell's `disable` — and the policy
+    /// must stay off after the ramp.
+    #[test]
+    fn start_held_homes_with_the_policy_off_and_torque_on() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            assert!(runtime_policy_enabled(&c.runtime), "driving before Home");
+
+            assert!(dispatch_pad_event(c, &crate::pad::PadButtonEvent::Home).is_none());
+            assert!(
+                !c.runtime.checkpoint().unwrap().enabled,
+                "Home turns the policy off"
+            );
+            assert!(
+                !matches!(c.runtime.bringup(), BringupState::Limp),
+                "Home is init, not the shutdown-path disable: torque stays on and the duck ramps"
+            );
+            assert_eq!(
+                c.pad_mode,
+                crate::pad::PadMode::Drive,
+                "Home puts the sticks back to plain driving"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// Select held: two seconds is `robot.rest` (sit and rest pose, no
+    /// power-off), four is `robot.shutdown` (powers off). The two events no
+    /// longer share the shutdown path.
+    #[test]
+    fn pad_rest_parks_powered_and_pad_shutdown_powers_off() {
+        use crate::pad::PadButtonEvent;
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            assert!(dispatch_pad_event(c, &PadButtonEvent::Rest).is_none());
+            for _ in 0..400 {
+                duck_core_tick(core);
+            }
+            assert!(
+                !c.runtime.powered_off(),
+                "a pad rest must not latch the duck off"
+            );
+
+            assert!(dispatch_pad_event(c, &PadButtonEvent::Shutdown).is_none());
+            let _ = duck_core_tick(core);
+            assert!(
+                c.runtime.powered_off(),
+                "a pad shutdown is still the power-off path"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The pad's bound skill names follow the HTTP intent arm: `sit` and
+    /// `stand` are idempotent, `sit_toggle` flips (COMPARISON deviation #11).
+    #[test]
+    fn pad_sit_and_stand_are_idempotent_while_toggle_flips() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            // Bound exactly as a person could bind them; the button name is
+            // the mapper's, the skill name is the table's.
+            assert!(c.pad_mapper.bindings.bind("a", "sit"));
+            assert!(dispatch_pad_event(c, &crate::pad::PadButtonEvent::Skill("a")).is_none());
+            assert!(c.runtime.is_sitting(), "sit sat the duck");
+            assert!(
+                dispatch_pad_event(c, &crate::pad::PadButtonEvent::Skill("a")).is_none(),
+                "a second sit is accepted"
+            );
+            assert!(c.runtime.is_sitting(), "and it did not toggle the duck up");
+
+            assert!(c.pad_mapper.bindings.bind("a", "stand"));
+            // Let the seat settle: the default sitdown ramp is 2.0 s
+            // (`DEFAULT_SITSTAND_RAMP_S`), and the controller refuses to rise
+            // while it is still running ("still sitting down").
+            for _ in 0..140 {
+                duck_core_tick(core);
+            }
+            assert!(dispatch_pad_event(c, &crate::pad::PadButtonEvent::Skill("a")).is_none());
+            assert!(
+                !c.runtime.is_sitting(),
+                "stand started the rise from the seat"
+            );
+            assert!(
+                dispatch_pad_event(c, &crate::pad::PadButtonEvent::Skill("a")).is_none(),
+                "a second stand is accepted"
+            );
+            assert!(!c.runtime.is_sitting(), "and it did not sit the duck back down");
+
+            // The toggle spelling still flips, which is what the A button's
+            // shipped binding means. Let the rise finish first: a toggle
+            // mid-rise is the official "already standing up" refusal.
+            for _ in 0..120 {
+                duck_core_tick(core);
+            }
+            assert!(c.pad_mapper.bindings.bind("a", "sit_toggle"));
+            assert!(dispatch_pad_event(c, &crate::pad::PadButtonEvent::Skill("a")).is_none());
+            assert!(
+                c.runtime.is_sitting(),
+                "sit_toggle sits a duck that is up (mid-rise counts as not sitting)"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+
     #[test]
     fn robot_ipc_drives_the_core_end_to_end() {
         use std::io::{BufRead, BufReader};
@@ -3842,7 +5377,12 @@ mod tests {
         assert!(line.contains(r#""healthy""#), "{line}");
 
         // robot.move：经同一意图队列驱动 twist，duck 的下一拍有 twist。
-        send(&mut stream, 2, "robot.move", r#"{"vx":0.4,"vy":0.0,"vyaw":0.0}"#);
+        send(
+            &mut stream,
+            2,
+            "robot.move",
+            r#"{"vx":0.4,"vy":0.0,"vyaw":0.0}"#,
+        );
         let mut line = String::new();
         reader.read_line(&mut line).expect("move reply");
         assert!(line.contains(r#""accepted":true"#), "{line}");
@@ -3903,6 +5443,433 @@ mod tests {
 
         unsafe { duck_core_free(core) };
     }
+
+    /// The extended `robot.*` set, end to end over the real TCP socket: every
+    /// method's answer shape and the duck state its intent produced. The
+    /// methods are the official calls this build can honestly serve — the
+    /// remainder are pinned to `METHOD_NOT_FOUND` in `ipc.rs`.
+    #[test]
+    fn robot_ipc_serves_the_extended_method_set() {
+        use std::io::{BufRead, BufReader};
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            if c.ipc.is_none() {
+                // Fixed port taken by another test process: the socket face
+                // cannot be exercised here, and the core itself is fine.
+                duck_core_free(core);
+                return;
+            }
+        }
+        let stream = TcpStream::connect(("127.0.0.1", crate::ipc::ROBOT_IPC_PORT))
+            .expect("connect robot ipc");
+        let mut reader = BufReader::new(stream.try_clone().expect("dup"));
+        let mut stream = stream;
+
+        fn call(
+            stream: &mut TcpStream,
+            reader: &mut BufReader<TcpStream>,
+            id: u64,
+            method: &str,
+            params: &str,
+        ) -> serde_json::Value {
+            let line = format!(
+                "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"{method}\",\"params\":{params}}}\n"
+            );
+            stream.write_all(line.as_bytes()).expect("write");
+            stream.flush().expect("flush");
+            let mut reply = String::new();
+            reader.read_line(&mut reply).expect("reply");
+            serde_json::from_str(&reply).expect("json reply")
+        }
+        let result = |reply: &serde_json::Value| reply["result"].clone();
+
+        unsafe {
+            // Mode / model / policies / vetbook / skills / safeToRestart are
+            // reads answered from the tick snapshot.
+            let reply = call(&mut stream, &mut reader, 1, "robot.mode", "{}");
+            assert_eq!(result(&reply)["mode"], "walk", "{reply}");
+
+            let reply = call(&mut stream, &mut reader, 2, "robot.model", "{}");
+            let model = result(&reply);
+            assert_eq!(model["asset"], duck_ipc_proto::ROBOT_MODEL, "{reply}");
+            assert_eq!(model["joint_names"].as_array().unwrap().len(), 15);
+            assert_eq!(model["tof_beams"].as_array().unwrap().len(), 64);
+
+            let reply = call(&mut stream, &mut reader, 3, "robot.policies", "{}");
+            let policies = result(&reply);
+            assert_eq!(policies["mode"], "walk", "{reply}");
+            assert_eq!(policies["enabled"], true, "{reply}");
+            let slots = policies["slots"].as_array().expect("slots");
+            let walk = slots
+                .iter()
+                .find(|slot| slot["slot"] == "walk")
+                .expect("the walking slot is reported");
+            assert!(walk["path"].is_string(), "{reply}");
+
+            let reply = call(&mut stream, &mut reader, 4, "robot.vetbook", "{}");
+            let vetbook = result(&reply);
+            assert!(vetbook["powered_s"].is_number(), "{reply}");
+            assert!(vetbook["boots"].is_number(), "{reply}");
+
+            let reply = call(&mut stream, &mut reader, 5, "robot.skills", "{}");
+            let skills = result(&reply);
+            let names: Vec<&str> = skills["skills"]
+                .as_array()
+                .expect("skill table")
+                .iter()
+                .filter_map(|skill| skill["name"].as_str())
+                .collect();
+            assert!(names.contains(&"roulade"), "{reply}");
+            let built_in: Vec<&str> = skills["built_in"]
+                .as_array()
+                .expect("built-ins")
+                .iter()
+                .filter_map(|name| name.as_str())
+                .collect();
+            assert!(built_in.contains(&"ground_pick"), "{reply}");
+            assert!(built_in.contains(&"sit_toggle"), "{reply}");
+
+            let reply = call(&mut stream, &mut reader, 6, "robot.safeToRestart", "{}");
+            assert_eq!(result(&reply)["safe"], true, "{reply}");
+
+            // robot.look: the IK answer, then the head intent it queued lands
+            // on the next tick.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                7,
+                "robot.look",
+                "{\"x\":0.3,\"y\":0.1,\"z\":0.2,\"neck_pitch\":0.0}",
+            );
+            let look = result(&reply);
+            assert!(look["head"]["head_yaw"].is_number(), "{reply}");
+            assert!(look["clamped"].is_boolean(), "{reply}");
+            let expected = kinematics::head::HeadFk::alpha().look_at([0.3, 0.1, 0.2], 0.0);
+            duck_core_tick(core);
+            let head = (*core).runtime.checkpoint().unwrap().command_head;
+            for (index, value) in expected.joints.iter().enumerate() {
+                assert!(
+                    (head[index] - value).abs() < 1e-9,
+                    "the look queued the IK joints: {head:?} vs {:?}",
+                    expected.joints
+                );
+            }
+
+            // robot.pose: active glides toward the offsets; false releases.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                8,
+                "robot.pose",
+                "{\"z\":0.01,\"roll\":0.1,\"pitch\":0.0,\"active\":true}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            assert!(
+                (*core).runtime.checkpoint().unwrap().body_active,
+                "an active pose is held"
+            );
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                9,
+                "robot.pose",
+                "{\"active\":false}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            assert!(
+                !(*core).runtime.checkpoint().unwrap().body_active,
+                "an inactive pose releases it"
+            );
+
+            // robot.mouth: the intent reaches the beak command.
+            let has_mouth = (*core).runtime.has_mouth();
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                10,
+                "robot.mouth",
+                "{\"open\":0.5}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            let mouth = (*core).runtime.checkpoint().unwrap().mouth;
+            assert!(
+                if has_mouth {
+                    (mouth - 0.5).abs() < 1e-9
+                } else {
+                    mouth.abs() < 1e-9
+                },
+                "the beak command follows the scene: {mouth} (has_mouth {has_mouth})"
+            );
+
+            // robot.sound: a queued official tag.
+            (*core).runtime.clear_sounds();
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                11,
+                "robot.sound",
+                "{\"tag\":\"chirp\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            assert_eq!(
+                (*core).runtime.take_sound().as_deref(),
+                Some("chirp"),
+                "the chirp reached the voice queue"
+            );
+
+            // robot.flashlight: the virtual face LED.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                12,
+                "robot.flashlight",
+                "{\"on\":true,\"color\":\"red\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            let face = (*core).runtime.face();
+            assert_ne!(face.flashlight, 0, "the flashlight lit");
+            assert_eq!(face.color(), Some("red"));
+
+            // robot.stop: zero the twist, policy untouched.
+            (*core).runtime.set_twist([0.4, 0.0, 0.0]);
+            let reply = call(&mut stream, &mut reader, 13, "robot.stop", "{}");
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            let requested = (*core)
+                .runtime
+                .robot_state()
+                .expect("the stop tick published a frame")
+                .movement
+                .requested;
+            assert_eq!(
+                requested, [0.0; 3],
+                "stop zeroed the twist the gate saw"
+            );
+
+            // robot.enable: off stops the policy with torque on; toggle flips.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                14,
+                "robot.enable",
+                "{\"on\":false}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            assert!(
+                result(&reply)["reason"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("disabled"),
+                "{reply}"
+            );
+            duck_core_tick(core);
+            assert!(
+                !(*core).runtime.checkpoint().unwrap().enabled,
+                "enable on:false stopped the policy"
+            );
+            assert_ne!(
+                (*core).runtime.bringup(),
+                BringupState::Limp,
+                "enable on:false is not relax: torque stays on"
+            );
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                15,
+                "robot.enable",
+                "{\"on\":false,\"toggle\":true}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            assert!(
+                (*core).runtime.checkpoint().unwrap().enabled,
+                "the toggle turned the policy back on"
+            );
+
+            // robot.init: the official power request, accepted even when there
+            // is nothing to bring up.
+            let reply = call(&mut stream, &mut reader, 16, "robot.init", "{}");
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+
+            // robot.relax: torque off, limp, still powered.
+            let reply = call(&mut stream, &mut reader, 17, "robot.relax", "{}");
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            assert_eq!((*core).runtime.bringup(), BringupState::Limp);
+            assert!(
+                !(*core).runtime.powered_off(),
+                "relax is not a power-off"
+            );
+
+            // robot.rest: sit and rest, no power-off latch.
+            (*core).runtime.init().expect("stand back up from relax");
+            for _ in 0..400 {
+                duck_core_tick(core);
+                if matches!((*core).runtime.bringup(), BringupState::Ready) {
+                    break;
+                }
+            }
+            let reply = call(&mut stream, &mut reader, 18, "robot.rest", "{}");
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            for _ in 0..400 {
+                duck_core_tick(core);
+            }
+            assert!(
+                !(*core).runtime.powered_off(),
+                "robot.rest keeps the duck powered (robotd main.rs:3130-3175)"
+            );
+
+            // robot.shutdown: the power-off path, distinct from rest.
+            let reply = call(&mut stream, &mut reader, 19, "robot.shutdown", "{}");
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            let _ = duck_core_tick(core);
+            assert!(
+                (*core).runtime.powered_off(),
+                "robot.shutdown powers the duck off"
+            );
+
+            // robot.loadPolicy: a slot override is recorded and reloaded; the
+            // bare file name is resolved against the policies directory. The
+            // duck is powered back on first so the reload is not refused by
+            // the shutdown gate.
+            (*core).runtime.power_on().expect("power back on");
+            for _ in 0..400 {
+                duck_core_tick(core);
+                if matches!((*core).runtime.bringup(), BringupState::Ready) {
+                    break;
+                }
+            }
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                20,
+                "robot.loadPolicy",
+                "{\"slot\":\"sitstand\",\"path\":\"alpha_sitstand.onnx\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            assert_eq!(
+                crate::manifest::slot_override("sitstand").as_deref(),
+                Some("alpha_sitstand.onnx")
+            );
+            duck_core_tick(core);
+            // Reset returns the slot to the set's own.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                21,
+                "robot.loadPolicy",
+                "{\"slot\":\"sitstand\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            assert_eq!(crate::manifest::slot_override("sitstand"), None);
+            duck_core_tick(core);
+
+            // A path with no slot is the official refusal; a route out of the
+            // directory is refused with the mobile wording.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                22,
+                "robot.loadPolicy",
+                "{\"path\":\"alpha_sitstand.onnx\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], false, "{reply}");
+            assert!(
+                result(&reply)["reason"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("a path needs a slot"),
+                "{reply}"
+            );
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                23,
+                "robot.loadPolicy",
+                "{\"slot\":\"sitstand\",\"path\":\"../escape.onnx\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], false, "{reply}");
+
+            // robot.reloadPolicies reads the same directory back.
+            let reply = call(&mut stream, &mut reader, 24, "robot.reloadPolicies", "{}");
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+
+            // robot.setMode: the mode name is validated at the door; a known
+            // mode is queued through the same `Intent::Mode` `/mode` drives.
+            // Runs before the subscription, so its `duck_core_tick` state
+            // pushes cannot interleave with these request/response pairs.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                25,
+                "robot.setMode",
+                "{\"mode\":\"walk\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            duck_core_tick(core);
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                26,
+                "robot.setMode",
+                "{\"mode\":\"hover\"}",
+            );
+            assert_eq!(result(&reply)["accepted"], false, "{reply}");
+            assert!(
+                result(&reply)["reason"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("walk"),
+                "{reply}"
+            );
+
+            // robot.subscribe's acknowledgement carries the identity fields:
+            // the four slots and the configurable skills.
+            let reply = call(&mut stream, &mut reader, 27, "robot.subscribe", "{}");
+            let identity = result(&reply);
+            assert_eq!(identity["accepted"], true, "{reply}");
+            assert!(identity["walk"].is_string(), "{reply}");
+            assert!(identity["sitstand"].is_string(), "{reply}");
+            assert!(
+                identity["skills"]
+                    .as_array()
+                    .is_some_and(|skills| !skills.is_empty()),
+                "{reply}"
+            );
+
+            // The methods this phone cannot honestly serve stay the official
+            // not-served refusal.
+            let reply = call(&mut stream, &mut reader, 28, "robot.theremin", "{\"active\":false}");
+            assert_eq!(
+                reply["error"]["code"],
+                duck_ipc_proto::code::METHOD_NOT_FOUND,
+                "{reply}"
+            );
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                29,
+                "robot.setSkill",
+                "{\"name\":\"roulade\"}",
+            );
+            assert_eq!(
+                reply["error"]["code"],
+                duck_ipc_proto::code::METHOD_NOT_FOUND,
+                "{reply}"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
 
     /// Ticket S: a branch session must not make `robot.health` contradict
     /// `/state`. The selected branch is what the loop steps; the original is
@@ -4143,7 +6110,10 @@ mod tests {
                 "the branch came back up off the branch's own Init (the ramp is Homing, not Limp)"
             );
             assert!(
-                matches!(c.runtime.bringup(), BringupState::Ready | BringupState::Homing),
+                matches!(
+                    c.runtime.bringup(),
+                    BringupState::Ready | BringupState::Homing
+                ),
                 "the parent was never touched by the branch's Init: still up, still its own state"
             );
             assert_eq!(
@@ -4238,7 +6208,9 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("duck-disturb-reload-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp reload dir");
-        let source = crate::fixtures::policies_dir().expect("the official bundle").join("alpha_walking.onnx");
+        let source = crate::fixtures::policies_dir()
+            .expect("the official bundle")
+            .join("alpha_walking.onnx");
         std::fs::copy(&source, dir.join("alpha_walking.onnx")).expect("copy the other walk file");
 
         let (_guard, core) = new_core();
@@ -4306,38 +6278,76 @@ mod tests {
         unsafe { duck_core_free(core) };
     }
 
-    /// Ticket P+: a reload that leaves the driving network alone lands in
-    /// place. Reloading the set the duck already runs (the same walk file) is
-    /// the cheap case: `disturbs` is false, so `change_disturbs` swaps wherever
-    /// the duck stands and the verdict is `InPlace`, never the home walk.
-    ///
-    /// Non-vacuity: the old immediate `replace_policy` left `swap_pending`
-    /// false; this asserts the queued swap is there with the `InPlace` verdict,
-    /// which the old code never set.
+    /// Official `PolicyChange::Reload` disturbs whatever is driving even when
+    /// every path is identical — the case it exists for is same path, new
+    /// bytes (`robotd/src/main.rs:2059-2061`). A walking duck reloading its own
+    /// directory must therefore go home first.
     #[test]
-    fn a_reload_that_leaves_the_driving_network_alone_lands_in_place() {
+    fn a_same_path_reload_still_disturbs_a_driving_duck() {
         let (_guard, core) = new_core();
         unsafe {
             let c = &mut *core;
             tick_until_ready(core);
             let before = c.runtime.walking_slot_path().expect("walk loaded");
+            assert!(
+                c.runtime.driving().is_some(),
+                "the duck is driving at Ready"
+            );
 
-            // The same directory the duck started from, read back off the
-            // core: the walk slot resolves to exactly the path the running
-            // policy holds, so the walk slot does not change and nothing about
-            // the driving network moves. (Comparing a freshly-joined path here
-            // rather than the core's own `policies` would be lexically unequal
-            // to the loaded one and falsely report a disturbing change.)
             let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
             assert_eq!(duck_core_reload_policies(core, dir.as_ptr()), 0);
             assert!(
                 c.runtime.swap_pending(),
-                "the change is queued (even an in-place one lands on the next tick)"
+                "the reload is queued as a policy change"
+            );
+            assert_eq!(
+                c.runtime.swap_state(),
+                Some(PolicySwap::GoingHome),
+                "a Reload disturbs a driving network even with identical paths"
+            );
+            assert_eq!(
+                c.runtime.walking_slot_path().as_deref(),
+                Some(before.as_path()),
+                "and nothing has swapped yet"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A reload with nothing driving lands in place: the official `was_driving`
+    /// gate (`robotd/src/main.rs:3040-3047`) asks what stepped last tick, and a
+    /// disabled duck has nothing a swap could interrupt.
+    #[test]
+    fn a_reload_with_nothing_driving_lands_in_place() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            let before = c.runtime.walking_slot_path().expect("walk loaded");
+            // The official `robot.enable on:false`: policy stopped, torque on,
+            // bring-up still Ready — so the body is up but nothing is stepping.
+            c.runtime.set_policy_enabled(false);
+            let _ = duck_core_tick(core);
+            assert!(
+                !c.runtime.checkpoint().unwrap().enabled,
+                "the policy is off"
+            );
+            assert_eq!(
+                c.runtime.bringup(),
+                BringupState::Ready,
+                "and the duck is still standing"
+            );
+
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, dir.as_ptr()), 0);
+            assert!(
+                c.runtime.swap_pending(),
+                "the change is queued (an in-place one lands on the next tick)"
             );
             assert_eq!(
                 c.runtime.swap_state(),
                 Some(PolicySwap::InPlace),
-                "leaving the driving network alone is an in-place change"
+                "nothing driving means nothing to walk home for"
             );
             assert_eq!(
                 c.runtime.walking_slot_path().as_deref(),
@@ -4347,4 +6357,661 @@ mod tests {
         }
         unsafe { duck_core_free(core) };
     }
+
+    /// A slot change compares only the network that stepped last tick
+    /// (`robotd/src/main.rs:2062-2070`), per slot, not just walk. Standing,
+    /// sitstand, ground-pick and skill driving each make a change to their own
+    /// file disturbing; a change to a slot that is not driving stays in place.
+    #[test]
+    fn a_slot_change_disturbs_only_the_network_that_is_driving() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            // Install a standing network (the shipped set has none in the stand
+            // slot), reload, and let zero command select it.
+            crate::manifest::set_slot_override("stand", Some("alpha_stand.onnx".to_owned()))
+                .expect("stand override");
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, dir.as_ptr()), 0);
+            let _ = &dir;
+            wait_for_swap(core);
+            for _ in 0..200 {
+                let _ = duck_core_tick(core);
+                if matches!(
+                    c.runtime.driving(),
+                    Some(crate::control::Driving::Stand)
+                ) {
+                    break;
+                }
+            }
+            assert!(
+                matches!(c.runtime.driving(), Some(crate::control::Driving::Stand)),
+                "zero command selects the standing network: {:?}",
+                c.runtime.driving()
+            );
+
+            // The stand file changes while stand drives: disturbing.
+            crate::manifest::set_slot_override("stand", Some("alpha_walking.onnx".to_owned()))
+                .expect("stand override");
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            reload_policies(c, &dir.to_string_lossy(), ReloadKind::SlotChange, 0)
+                .expect("the slot change is queued");
+            assert!(c.runtime.swap_pending());
+            assert_eq!(
+                c.runtime.swap_state(),
+                Some(PolicySwap::GoingHome),
+                "changing the stand file while stand drives goes home first"
+            );
+            wait_for_swap(core);
+
+            // Ground pick driving: changing its file disturbs.
+            assert!(
+                c.runtime.start_ground_pick().is_ok(),
+                "the ground-pick slot is loaded"
+            );
+            let _ = duck_core_tick(core);
+            assert!(
+                matches!(
+                    c.runtime.driving(),
+                    Some(crate::control::Driving::GroundPick)
+                ),
+                "the pick is driving: {:?}",
+                c.runtime.driving()
+            );
+            crate::manifest::set_slot_override(
+                "ground_pick",
+                Some("alpha_stand.onnx".to_owned()),
+            )
+            .expect("ground-pick override");
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            reload_policies(c, &dir.to_string_lossy(), ReloadKind::SlotChange, 0)
+                .expect("the slot change is queued");
+            assert_eq!(
+                c.runtime.swap_state(),
+                Some(PolicySwap::GoingHome),
+                "changing the ground-pick file while it drives goes home first"
+            );
+            wait_for_swap(core);
+
+            // A change to a slot that is not the one driving is in place.
+            crate::manifest::set_slot_override("sitstand", Some("alpha_walking.onnx".to_owned()))
+                .expect("sitstand override");
+            // Something must be driving again: let the pick finish and the walk
+            // network take the zero command.
+            for _ in 0..400 {
+                let _ = duck_core_tick(core);
+                if c.runtime.driving().is_some_and(|driving| {
+                    !matches!(driving, crate::control::Driving::GroundPick)
+                }) {
+                    break;
+                }
+            }
+            assert!(
+                c.runtime.driving().is_some(),
+                "a network is driving again: {:?}",
+                c.runtime.driving()
+            );
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            reload_policies(c, &dir.to_string_lossy(), ReloadKind::SlotChange, 0)
+                .expect("the slot change is queued");
+            assert_eq!(
+                c.runtime.swap_state(),
+                Some(PolicySwap::InPlace),
+                "a non-driving slot's file change is in place: driving {:?}",
+                c.runtime.driving()
+            );
+            wait_for_swap(core);
+
+            // Sitstand driving means a rise, not the parked seat: Seated is
+            // the one driving state a swap may go under
+            // (`robotd/src/main.rs:2056-2058`).
+            assert!(c.runtime.sit_toggle().is_ok(), "sit down");
+            for _ in 0..160 {
+                let _ = duck_core_tick(core);
+            }
+            assert!(c.runtime.is_sitting(), "the duck reached the seat");
+            assert!(c.runtime.sit_toggle().is_ok(), "start the rise");
+            let _ = duck_core_tick(core);
+            assert!(
+                matches!(
+                    c.runtime.driving(),
+                    Some(crate::control::Driving::SitStand)
+                ),
+                "the rising sitstand network is driving: {:?}",
+                c.runtime.driving()
+            );
+            assert!(
+                !matches!(c.runtime.driving(), Some(crate::control::Driving::Seated)),
+                "a seated duck is the one driving state no swap may disturb; this is a rise"
+            );
+            crate::manifest::set_slot_override(
+                "sitstand",
+                Some("alpha_sitstand.onnx".to_owned()),
+            )
+            .expect("sitstand override");
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            reload_policies(c, &dir.to_string_lossy(), ReloadKind::SlotChange, 0)
+                .expect("the slot change is queued");
+            assert_eq!(
+                c.runtime.swap_state(),
+                Some(PolicySwap::GoingHome),
+                "changing the sitstand file while it drives goes home first"
+            );
+            wait_for_swap(core);
+
+            // Skill driving compares the whole skill list; a changed file in
+            // it disturbs (`robotd/src/main.rs:2069`).
+            for _ in 0..200 {
+                let _ = duck_core_tick(core);
+                if matches!(c.runtime.bringup(), BringupState::Ready) {
+                    break;
+                }
+            }
+            // The rise is a travelling move of its own; let it finish before
+            // asking for a one-shot.
+            for _ in 0..400 {
+                if !matches!(
+                    c.runtime.driving(),
+                    Some(crate::control::Driving::SitStand)
+                ) && !c.runtime.is_sitting()
+                {
+                    break;
+                }
+                let _ = duck_core_tick(core);
+            }
+            let started = c.runtime.trigger_skill("roulade");
+            assert!(
+                started.is_ok(),
+                "the manifest skill starts: {started:?}, bringup {:?}, sitting {}",
+                c.runtime.bringup(),
+                c.runtime.is_sitting()
+            );
+            let _ = duck_core_tick(core);
+            assert!(
+                matches!(c.runtime.driving(), Some(crate::control::Driving::Skill(_))),
+                "the skill is driving: {:?}",
+                c.runtime.driving()
+            );
+            let dir = skill_file_change_dir(c.policies.as_path());
+            reload_policies(c, &dir.to_string_lossy(), ReloadKind::SlotChange, 0)
+                .expect("the slot change is queued");
+            assert_eq!(
+                c.runtime.swap_state(),
+                Some(PolicySwap::GoingHome),
+                "a changed skill file while a skill drives goes home first"
+            );
+            let _ = std::fs::remove_dir_all(&dir);
+            // Leave the global override table as the test found it.
+            crate::manifest::clear_slot_overrides();
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A `GoingHome` reload's landing is the only place the new skill table can
+    /// be published: the old set is still the one driving while the duck walks
+    /// home. Nothing else observes `swap_pending` fall, so this pins the tick
+    /// hook — `/skills` sees the landed set, and the degraded mark the queue
+    /// carried is cleared.
+    #[test]
+    fn a_going_home_reload_publishes_its_skills_and_clears_degraded_when_it_lands() {
+        let (_guard, core) = new_core();
+        let dir = copy_policies_dir(
+            unsafe { &(*core).policies },
+            &["roulade.onnx"],
+        );
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            assert!(
+                c.intents.skills_json().contains("roulade"),
+                "the startup set ships roulade: {}",
+                c.intents.skills_json()
+            );
+            c.runtime.mark_degraded("probe degraded".to_owned());
+            assert!(matches!(
+                c.runtime.health(),
+                HealthVerdict::Degraded { .. }
+            ));
+
+            let reload_dir = CString::new(dir.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, reload_dir.as_ptr()), 0);
+            assert_eq!(
+                c.runtime.swap_state(),
+                Some(PolicySwap::GoingHome),
+                "the walking duck goes home first"
+            );
+            assert!(
+                c.intents.skills_json().contains("roulade"),
+                "the old set is still the one running on the way home"
+            );
+
+            let mut landed = false;
+            for _ in 0..800 {
+                duck_core_tick(core);
+                if !c.runtime.swap_pending() {
+                    landed = true;
+                    break;
+                }
+            }
+            assert!(landed, "the queued change landed");
+            assert!(
+                !c.intents.skills_json().contains("roulade"),
+                "the landed set has no roulade, and /skills says so: {}",
+                c.intents.skills_json()
+            );
+            assert!(
+                matches!(c.runtime.health(), HealthVerdict::Healthy),
+                "the landed change cleared the degraded mark: {:?}",
+                c.runtime.health()
+            );
+            assert_eq!(c.label, "policy reloaded");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A duck left in the rest pose is Limp and disabled. Skills, sit and
+    /// ground pick must be refused there (official loop gate,
+    /// `robotd/src/main.rs:2768-2775`), and a mode switch must leave the new
+    /// bundle limp rather than enabling it (`:2930-2960`).
+    #[test]
+    fn a_resting_duck_refuses_moves_and_stays_limp_across_a_mode_switch() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            c.runtime.request_rest();
+            for _ in 0..400 {
+                let _ = duck_core_tick(core);
+            }
+            assert!(!c.runtime.powered_off(), "the rest stays powered");
+            assert_eq!(c.runtime.bringup(), BringupState::Limp);
+            assert!(!c.runtime.checkpoint().unwrap().enabled);
+
+            for (label, intent) in [
+                ("skill", Intent::Skill("roulade".to_owned())),
+                ("sit", Intent::Sit),
+                ("ground_pick", Intent::GroundPick),
+            ] {
+                let answer = apply_intent(c, intent);
+                assert_eq!(answer["ok"], false, "{label}: {answer}");
+                assert!(
+                    answer["error"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .contains("not driving"),
+                    "{label}: {answer}"
+                );
+            }
+
+            // The pad's discrete Skill arm has the same gate.
+            assert!(c.pad_mapper.bindings.bind("a", "sit_toggle"));
+            let refusal = dispatch_pad_event(c, &crate::pad::PadButtonEvent::Skill("a"))
+                .expect("a pad skill on a resting duck is refused");
+            assert!(refusal.contains("not driving"), "{refusal}");
+
+            // `robot.do` refuses at the door for the same reason.
+            let handlers = RobotHandlers {
+                intents: c.intents.clone(),
+                health: c.health_snapshot.clone(),
+                revision: String::new(),
+                snapshot: c.robot_snapshot.clone(),
+                control: c.control.clone(),
+            };
+            let verdict = crate::ipc::RobotHandlers::do_skill(
+                &handlers,
+                duck_ipc_proto::DoParams {
+                    skill: "roulade".to_owned(),
+                },
+            );
+            assert!(!verdict.accepted, "{verdict:?}");
+            assert!(
+                verdict.reason.unwrap_or_default().contains("not driving"),
+                "the official refusal wording"
+            );
+
+            // `/posture` refuses a real change for the same reason, while an
+            // already-true posture stays an inert acceptance.
+            let answer = apply_intent(c, Intent::Posture(true));
+            assert_eq!(answer["ok"], false, "{answer}");
+            assert!(answer["error"].as_str().unwrap_or_default().contains("not driving"));
+            let answer = apply_intent(c, Intent::Posture(false));
+            assert_eq!(answer["ok"], true, "already standing: {answer}");
+
+            // `/heard` routes a moving verb through the same gate; a sound
+            // (which moves nothing) still plays.
+            let answer = apply_intent(c, Intent::Heard("sit".to_owned()));
+            assert_eq!(answer["ok"], false, "{answer}");
+            assert!(answer["error"].as_str().unwrap_or_default().contains("not driving"));
+            let answer = apply_intent(c, Intent::Heard("hello".to_owned()));
+            assert_eq!(answer["ok"], true, "a greeting is not a move: {answer}");
+
+            // The C ABI entries the shell's ring and big buttons call.
+            let skill = CString::new("roulade").unwrap();
+            assert_eq!(unsafe { duck_core_trigger_skill(core, skill.as_ptr()) }, 0);
+            assert_eq!(unsafe { duck_core_sit_toggle(core) }, -1);
+            assert_eq!(unsafe { duck_core_ground_pick(core) }, -1);
+
+            // The mode switch loads the roller bundle and does not stand the
+            // resting duck up.
+            let answer = switch_mode(c, "roller").expect("a limp mode switch is allowed");
+            assert_eq!(answer["mode"], "roller");
+            assert_eq!(c.runtime.mode(), robotd_params::Mode::Roller);
+            assert_eq!(
+                c.runtime.bringup(),
+                BringupState::Limp,
+                "the fresh runtime stays limp"
+            );
+            assert!(
+                !c.runtime.checkpoint().unwrap().enabled,
+                "and its policy is not enabled"
+            );
+            assert!(!c.runtime.powered_off());
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// Enable-off on a seated duck holds the seat. The mobile runtime commands
+    /// its constant [`crate::SEAT_POSITION`]; the official daemon holds the
+    /// measured `known_positions` at the stop (`robotd/src/main.rs:3772-3776`).
+    /// The difference is the runtime's, not something this test can change —
+    /// what this pins is the part both agree on: the seat survives the stop.
+    #[test]
+    fn enable_off_on_a_seated_duck_holds_the_seat() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            assert!(c.runtime.sit_toggle().is_ok(), "sit down");
+            for _ in 0..160 {
+                let _ = duck_core_tick(core);
+            }
+            assert!(c.runtime.is_sitting(), "the duck reached the seat");
+
+            c.runtime.set_policy_enabled(false);
+            let _ = duck_core_tick(core);
+            assert!(
+                c.runtime.is_sitting(),
+                "enable off keeps the seat (the disable that comes with a stop holds it)"
+            );
+            assert_eq!(
+                c.runtime.bringup(),
+                BringupState::Ready,
+                "stopping the policy is not a bring-up change"
+            );
+            assert!(!c.runtime.checkpoint().unwrap().enabled);
+            assert!(!c.runtime.powered_off());
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+
+    /// A reload queued in a branch session belongs to that branch. The owner
+    /// index is checked before judging the falling edge, so the original's
+    /// ticks cannot consume branch B's marker and B's landing publishes B's
+    /// skill table — never the other duck's.
+    #[test]
+    fn a_branch_reload_lands_on_its_owner_and_not_the_other_duck() {
+        let (_guard, core) = new_core();
+        let dir = copy_policies_dir(unsafe { &(*core).policies }, &["roulade.onnx"]);
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            let original_walk = c
+                .runtime
+                .driving_net_paths()
+                .into_iter()
+                .find(|(slot, _)| slot == "walk")
+                .and_then(|(_, path)| path);
+            let label = CString::new("b-owner").unwrap();
+            assert_eq!(duck_core_fork(core, label.as_ptr()), 0);
+            let answer = apply_intent(c, Intent::SelectBranch("b-owner".to_owned()));
+            assert_eq!(answer["selected"], "b-owner");
+
+            // The HTTP reload path: `apply_intent` swaps the selected branch
+            // in, so the owner recorded is B.
+            let answer = apply_intent(
+                c,
+                Intent::Reload(dir.to_string_lossy().into_owned()),
+            );
+            assert_eq!(answer["ok"], true, "{answer}");
+            assert_eq!(
+                c.swap_landing.as_ref().map(|(owner, _)| *owner),
+                Some(1),
+                "the marker is owned by the selected branch"
+            );
+
+            // Select the original before B's change lands. A's ticks must
+            // leave B's marker alone.
+            apply_intent(c, Intent::SelectBranch(String::new()));
+            for _ in 0..400 {
+                let _ = duck_core_tick(core);
+            }
+            assert_eq!(
+                c.swap_landing.as_ref().map(|(owner, _)| *owner),
+                Some(1),
+                "the original's ticks did not consume the branch's marker"
+            );
+            let walk_a = c
+                .runtime
+                .driving_net_paths()
+                .into_iter()
+                .find(|(slot, _)| slot == "walk")
+                .and_then(|(_, path)| path);
+            assert_eq!(walk_a, original_walk, "the original never swapped");
+            assert!(
+                c.intents.skills_json().contains("roulade"),
+                "and it still publishes its own table: {}",
+                c.intents.skills_json()
+            );
+
+            // Select B; its next tick settles its own marker and publishes
+            // the landed set.
+            apply_intent(c, Intent::SelectBranch("b-owner".to_owned()));
+            duck_core_tick(core);
+            assert!(
+                c.swap_landing.is_none(),
+                "B consumed its own landing marker"
+            );
+            assert!(
+                !c.intents.skills_json().contains("roulade"),
+                "B's landed set is the published table: {}",
+                c.intents.skills_json()
+            );
+            let walk_b = active_runtime(c)
+                .driving_net_paths()
+                .into_iter()
+                .find(|(slot, _)| slot == "walk")
+                .and_then(|(_, path)| path)
+                .expect("branch walk");
+            assert!(walk_b.starts_with(&dir), "B runs the reloaded set: {}", walk_b.display());
+            {
+                let snapshot = c.robot_snapshot.lock().unwrap();
+                assert!(
+                    snapshot.skills.skills.iter().all(|skill| skill.name != "roulade"),
+                    "robot.skills describes the active duck: {:?}",
+                    snapshot.skills.skills
+                );
+            }
+
+            // Back on the original, its table and robot.skills return.
+            apply_intent(c, Intent::SelectBranch(String::new()));
+            duck_core_tick(core);
+            {
+                let snapshot = c.robot_snapshot.lock().unwrap();
+                assert!(
+                    snapshot.skills.skills.iter().any(|skill| skill.name == "roulade"),
+                    "robot.skills follows the selection back to the original: {:?}",
+                    snapshot.skills.skills
+                );
+            }
+            assert!(c.intents.skills_json().contains("roulade"));
+
+            // Dropping a branch whose marker is queued clears it; branch
+            // indices shifted, so an index-keyed marker cannot survive.
+            apply_intent(c, Intent::SelectBranch("b-owner".to_owned()));
+            let answer = apply_intent(
+                c,
+                Intent::Reload(dir.to_string_lossy().into_owned()),
+            );
+            assert_eq!(answer["ok"], true, "{answer}");
+            assert!(c.swap_landing.is_some());
+            let answer = apply_intent(c, Intent::DropBranch("b-owner".to_owned()));
+            assert_eq!(answer["ok"], true, "{answer}");
+            assert_eq!(c.selected, 0);
+            assert!(c.swap_landing.is_none(), "a dropped owner's marker goes");
+            duck_core_tick(core);
+            assert!(
+                c.intents.skills_json().contains("roulade"),
+                "the table falls back to the original: {}",
+                c.intents.skills_json()
+            );
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A mode switch is refused while a policy change is still on its way home
+    /// (`robotd/src/main.rs:2906-2919`), rather than landing one change on top
+    /// of another.
+    #[test]
+    fn a_mode_switch_waits_for_a_queued_policy_change() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, dir.as_ptr()), 0);
+            assert!(c.runtime.swap_pending());
+            let error = switch_mode(c, "roller").expect_err("the switch waits");
+            assert!(error.contains("policy change"), "{error}");
+            assert!(
+                c.runtime.swap_pending(),
+                "and the queued change is still the one in flight"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A queued change can land inside `duck_core_step` (the time machine's
+    /// own loop, which does not call `duck_core_tick`). The step door runs the
+    /// same settling hook, so the landed set is published there too.
+    #[test]
+    fn a_policy_change_landing_inside_step_is_published() {
+        let (_guard, core) = new_core();
+        let dir = copy_policies_dir(unsafe { &(*core).policies }, &["roulade.onnx"]);
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            let reload = CString::new(dir.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, reload.as_ptr()), 0);
+            assert_eq!(c.runtime.swap_state(), Some(PolicySwap::GoingHome));
+            assert!(c.intents.skills_json().contains("roulade"));
+            duck_core_step(core, 500);
+            assert!(
+                !c.runtime.swap_pending(),
+                "the change landed during the step"
+            );
+            assert!(
+                !c.intents.skills_json().contains("roulade"),
+                "the step published the landed table: {}",
+                c.intents.skills_json()
+            );
+            assert_eq!(c.label, "policy reloaded");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A rewind drops a pending swap without landing it. The marker goes with
+    /// it, and the paused early return in the tick does not skip that cleanup.
+    #[test]
+    fn a_seek_drops_a_pending_landing_marker_even_while_paused() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            // Queue a disturbing change, then freeze the duck.
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, dir.as_ptr()), 0);
+            assert!(c.runtime.swap_pending());
+            c.intents.push(Intent::Pause(true));
+            let _ = duck_core_tick(core);
+            assert!(c.runtime.clock().paused, "the duck is frozen");
+            assert!(
+                c.runtime.swap_pending(),
+                "a frozen duck does not land the change"
+            );
+            // Seek restores the active runtime, which drops the pending swap.
+            assert_eq!(unsafe { duck_core_seek(core, 1) }, 0);
+            assert!(c.swap_landing.is_none(), "the seek cleared the marker");
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// Copy the policy bundle into a fresh temporary directory, leaving out
+    /// the named files. The manifest is copied unchanged, so an omitted file
+    /// drops that entry from the resolved set exactly as a deleted policy does.
+    fn copy_policies_dir(source: &Path, omit: &[&str]) -> PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |elapsed| elapsed.as_nanos());
+        let dir = std::env::temp_dir().join(format!(
+            "duck-policies-copy-{}-{stamp}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp policies dir");
+        for entry in std::fs::read_dir(source).expect("policies dir") {
+            let entry = entry.expect("entry");
+            let path = entry.path();
+            let name = entry.file_name();
+            if path.is_file() && !omit.iter().any(|omit| name == *omit) {
+                std::fs::copy(&path, dir.join(&name)).expect("copy policy file");
+            }
+        }
+        dir
+    }
+
+    /// Copy the policies directory and point the `roulade` manifest entry at a
+    /// second copy of the same network: the skill list's path changes, which is
+    /// what a driving skill protects.
+    fn skill_file_change_dir(source: &Path) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("duck-skill-reload-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp skill dir");
+        for entry in std::fs::read_dir(source).expect("policies dir") {
+            let entry = entry.expect("entry");
+            let path = entry.path();
+            if path.is_file() {
+                let name = entry.file_name();
+                std::fs::copy(&path, dir.join(&name)).expect("copy policy file");
+            }
+        }
+        std::fs::copy(
+            source.join("roulade.onnx"),
+            dir.join("roulade_alt.onnx"),
+        )
+        .expect("copy the skill network");
+        let manifest = std::fs::read_to_string(dir.join("manifest.json")).expect("manifest");
+        let mut value: serde_json::Value =
+            serde_json::from_str(&manifest).expect("manifest json");
+        for policy in value["policies"]
+            .as_array_mut()
+            .expect("policy list")
+            .iter_mut()
+        {
+            if policy["file"] == "roulade.onnx" {
+                policy["file"] = serde_json::json!("roulade_alt.onnx");
+            }
+        }
+        std::fs::write(
+            dir.join("manifest.json"),
+            serde_json::to_string_pretty(&value).expect("manifest json"),
+        )
+        .expect("write manifest");
+        dir
+    }
+
 }

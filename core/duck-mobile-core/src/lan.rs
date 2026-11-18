@@ -18,7 +18,7 @@
 //! PAIRED duck: both people typed the same six-digit code, so a stranger
 //! broadcasting on the Wi-Fi is visible but cannot touch the duck.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -177,7 +177,11 @@ impl Lan {
     /// and this duck answers with its own. Invalid or empty codes clear it.
     pub fn set_pair_code(&self, code: &str) -> bool {
         let code = code.trim();
-        let held = if valid_code(code) { Some(code.to_owned()) } else { None };
+        let held = if valid_code(code) {
+            Some(code.to_owned())
+        } else {
+            None
+        };
         let ok = held.is_some() || code.is_empty();
         if let Ok(mut inner) = self.inner.lock() {
             inner.pair_code = held.clone();
@@ -193,14 +197,19 @@ impl Lan {
     /// Whether this person has set a six-digit pairing code. The UDP pad
     /// uses it as its gate: no code, no unauthenticated control channel.
     pub fn pair_code_set(&self) -> bool {
-        self.inner.lock().is_ok_and(|inner| inner.pair_code.is_some())
+        self.inner
+            .lock()
+            .is_ok_and(|inner| inner.pair_code.is_some())
     }
 
     /// Ask one visible duck to pair. Unicast, like a gift; the answer marks
     /// both sides. An unknown peer or a duck we have no code for is refused
     /// before anything leaves the socket.
     pub fn pair(&self, target: &str) -> Result<(), String> {
-        let mut inner = self.inner.lock().map_err(|_| "the peer table is busy".to_owned())?;
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| "the peer table is busy".to_owned())?;
         let Some(code) = inner.pair_code.clone() else {
             return Err("set a six-digit pairing code first".to_owned());
         };
@@ -255,7 +264,13 @@ impl Lan {
                 (
                     inner.id.clone(),
                     inner.name.clone(),
-                    target.and_then(|id| inner.peers.iter().find(|peer| peer.id == id).map(|peer| peer.addr)),
+                    target.and_then(|id| {
+                        inner
+                            .peers
+                            .iter()
+                            .find(|peer| peer.id == id)
+                            .map(|peer| peer.addr)
+                    }),
                 )
             }
             Err(_) => return,
@@ -273,9 +288,7 @@ impl Lan {
                 let _ = self.socket.send_to(&bytes, addr);
             }
             None => {
-                let _ = self
-                    .socket
-                    .send_to(&bytes, ("255.255.255.255", PORT));
+                let _ = self.socket.send_to(&bytes, ("255.255.255.255", PORT));
             }
         }
     }
@@ -363,7 +376,10 @@ impl Lan {
     /// duck plays its own part. The shell passes one `score` of official
     /// names; the core assigns roles by the order of the paired peers.
     pub fn ensemble(&self, id: &str, moves: &[String], sounds: &[String]) -> Result<usize, String> {
-        let inner = self.inner.lock().map_err(|_| "the peer table is busy".to_owned())?;
+        let inner = self
+            .inner
+            .lock()
+            .map_err(|_| "the peer table is busy".to_owned())?;
         let now = now_ms();
         let roles: Vec<&Peer> = inner
             .peers
@@ -480,10 +496,7 @@ fn listen(socket: Arc<UdpSocket>, inner: Arc<Mutex<Inner>>) {
                 "from": id,
                 "name": name,
             });
-            let _ = socket.send_to(
-                message.to_string().as_bytes(),
-                ("255.255.255.255", PORT),
-            );
+            let _ = socket.send_to(message.to_string().as_bytes(), ("255.255.255.255", PORT));
             last_announce = Some(Instant::now());
         }
         let Ok((size, source)) = socket.recv_from(&mut buffer) else {
@@ -511,7 +524,10 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
     let kind = message.get("type").and_then(Value::as_str)?;
     // Only the five real verbs may touch the peer table: any other type is
     // noise, and noise must not create peers or evict the ducks we know.
-    if !matches!(kind, "announce" | "greet" | "hello" | "pair" | "gift" | "chorus" | "ensemble") {
+    if !matches!(
+        kind,
+        "announce" | "greet" | "hello" | "pair" | "gift" | "chorus" | "ensemble"
+    ) {
         return None;
     }
     let from = message
@@ -521,7 +537,12 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
     if from.is_empty() || from == inner.id {
         return None;
     }
-    let name = clean_name(message.get("name").and_then(Value::as_str).unwrap_or("Duck"));
+    let name = clean_name(
+        message
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("Duck"),
+    );
     match kind {
         "announce" => {
             upsert(inner, from, &name, source, now);
@@ -602,7 +623,10 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             if !valid_code(offered) || offered != ours {
                 return None;
             }
-            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            let to = message
+                .get("to")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
             if to.is_empty() || to == inner.id {
                 // A request with no "to" (or addressed to us) is the first
                 // half: mark them paired and answer with our own code so the
@@ -637,7 +661,10 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             // A gift is not a discovery: only a duck already in the table may
             // send one, so announce/greet remain the only verbs that create
             // peers. A gift may refresh that peer's last_seen.
-            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            let to = message
+                .get("to")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
             if to != "all" && to != inner.id {
                 return None;
             }
@@ -688,7 +715,10 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
         "chorus" => {
             // A chorus is not a discovery either: only a known duck may start
             // one, and it is for the whole room by construction.
-            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            let to = message
+                .get("to")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
             if to != "all" && to != inner.id {
                 return None;
             }
@@ -747,11 +777,18 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             // Same trust rule as a chorus: only a PAIRED duck may lead a
             // room-wide performance, and every move/sound must name an
             // official mood or the duck's own sound tag.
-            let to = message.get("to").and_then(Value::as_str).unwrap_or_default();
+            let to = message
+                .get("to")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
             if to != "all" && to != inner.id {
                 return None;
             }
-            let id = message.get("id").and_then(Value::as_str).unwrap_or_default().to_owned();
+            let id = message
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
             if id.is_empty() {
                 return None;
             }
@@ -763,19 +800,31 @@ fn ingest(inner: &mut Inner, message: &Value, source: SocketAddr, now: u128) -> 
             let moves: Vec<String> = message
                 .get("moves")
                 .and_then(Value::as_array)
-                .map(|rows| rows.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .map(|rows| {
+                    rows.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect()
+                })
                 .unwrap_or_default();
             let sounds: Vec<String> = message
                 .get("sounds")
                 .and_then(Value::as_array)
-                .map(|rows| rows.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .map(|rows| {
+                    rows.iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_owned)
+                        .collect()
+                })
                 .unwrap_or_default();
             // A whole dance is up to 8 beats, unlike the chorus's 1..=3.
             if moves.is_empty() && sounds.is_empty()
                 || moves.len() > 8
                 || sounds.len() > 8
                 || !moves.iter().all(|m| inner.emotions.iter().any(|n| n == m))
-                || !sounds.iter().all(|s| crate::voice::TAGS.contains(&s.as_str()))
+                || !sounds
+                    .iter()
+                    .all(|s| crate::voice::TAGS.contains(&s.as_str()))
             {
                 return None;
             }
@@ -846,11 +895,7 @@ fn valid_code(code: &str) -> bool {
 }
 
 fn clean_name(name: &str) -> String {
-    let trimmed: String = name
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(24)
-        .collect();
+    let trimmed: String = name.chars().filter(|c| !c.is_control()).take(24).collect();
     if trimmed.trim().is_empty() {
         "Duck".to_owned()
     } else {
@@ -931,7 +976,10 @@ mod tests {
         // The ensemble window also reads the "just happened" default on the
         // small simulated clock: the accepted packet goes past it.
         ingest(&mut duck, &packet, source(8767), 20_000);
-        assert!(matches!(duck.events.last(), Some(PeerEvent::Ensemble { role: 0, .. })));
+        assert!(matches!(
+            duck.events.last(),
+            Some(PeerEvent::Ensemble { role: 0, .. })
+        ));
     }
 
     #[test]
@@ -983,7 +1031,8 @@ mod tests {
             source(8767),
             1100,
         );
-        let reply: Value = serde_json::from_str(&reply.expect("a pair request is answered")).unwrap();
+        let reply: Value =
+            serde_json::from_str(&reply.expect("a pair request is answered")).unwrap();
         assert_eq!(reply["type"], "pair");
         assert_eq!(reply["to"], "peer01");
         assert_eq!(reply["code"], "123456");
@@ -1066,7 +1115,10 @@ mod tests {
             1200,
         );
         assert!(duck.peers[0].replied);
-        assert!(matches!(duck.events.first(), Some(PeerEvent::Replied { .. })));
+        assert!(matches!(
+            duck.events.first(),
+            Some(PeerEvent::Replied { .. })
+        ));
     }
 
     #[test]

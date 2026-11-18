@@ -81,7 +81,9 @@ pub fn collect(scene: &Path, policies: &Path) -> Provenance {
 
     let mut parts = Vec::new();
     for path in collect_files(scene, policies) {
-        let Some(digest) = hash_file(&path) else { continue };
+        let Some(digest) = hash_file(&path) else {
+            continue;
+        };
         let name = path
             .file_name()
             .and_then(|name| name.to_str())
@@ -108,7 +110,13 @@ impl Provenance {
         let parts: Vec<String> = self
             .parts
             .iter()
-            .map(|part| format!("{{\"file\":{},\"sha256\":\"{}\"}}", json_string(&part.name), part.digest))
+            .map(|part| {
+                format!(
+                    "{{\"file\":{},\"sha256\":\"{}\"}}",
+                    json_string(&part.name),
+                    part.digest
+                )
+            })
             .collect();
         format!(
             "{{\"schema\":\"duck-provenance-v1\",\"fingerprint\":\"{}\",\"mujoco\":{},\"files\":[{}]}}",
@@ -129,7 +137,9 @@ fn json_string(value: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
-            control if (control as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", control as u32)),
+            control if (control as u32) < 0x20 => {
+                out.push_str(&format!("\\u{:04x}", control as u32))
+            }
             other => out.push(other),
         }
     }

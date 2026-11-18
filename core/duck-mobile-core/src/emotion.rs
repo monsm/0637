@@ -105,7 +105,11 @@ impl Emotion {
             (self.keys[index - 1].clone(), self.keys[index].clone())
         };
         let span = b.t - a.t;
-        let alpha = if span > 1e-9 { ((t - a.t) / span).clamp(0.0, 1.0) } else { 0.0 };
+        let alpha = if span > 1e-9 {
+            ((t - a.t) / span).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
         let mix = |x: f64, y: f64| x + (y - x) * alpha;
         EmotionFrame {
             head: [
@@ -114,7 +118,11 @@ impl Emotion {
                 mix(a.head_yaw, b.head_yaw),
                 mix(a.head_roll, b.head_roll),
             ],
-            body: [mix(a.body_z.unwrap_or(0.0), b.body_z.unwrap_or(0.0)), 0.0, mix(a.body_pitch, b.body_pitch)],
+            body: [
+                mix(a.body_z.unwrap_or(0.0), b.body_z.unwrap_or(0.0)),
+                0.0,
+                mix(a.body_pitch, b.body_pitch),
+            ],
             twist: a.twist.map(|from| {
                 let to = b.twist.unwrap_or(from);
                 [
@@ -269,8 +277,30 @@ mod tests {
         let emotion = Emotion {
             name: "test".into(),
             keys: vec![
-                Key { t: 0.0, neck: 0.0, head_pitch: 0.0, head_yaw: 0.0, head_roll: 0.0, body_pitch: 0.0, body_z: None, twist: None, mouth: 0.0, skill: None },
-                Key { t: 1.0, neck: 0.0, head_pitch: 0.0, head_yaw: 1.0, head_roll: 0.0, body_pitch: 0.0, body_z: None, twist: None, mouth: 0.0, skill: None },
+                Key {
+                    t: 0.0,
+                    neck: 0.0,
+                    head_pitch: 0.0,
+                    head_yaw: 0.0,
+                    head_roll: 0.0,
+                    body_pitch: 0.0,
+                    body_z: None,
+                    twist: None,
+                    mouth: 0.0,
+                    skill: None,
+                },
+                Key {
+                    t: 1.0,
+                    neck: 0.0,
+                    head_pitch: 0.0,
+                    head_yaw: 1.0,
+                    head_roll: 0.0,
+                    body_pitch: 0.0,
+                    body_z: None,
+                    twist: None,
+                    mouth: 0.0,
+                    skill: None,
+                },
             ],
             pcm: vec![],
             sit_due: None,
@@ -282,7 +312,8 @@ mod tests {
 
     #[test]
     fn the_official_emotions_load() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../upstream/microduck/robotd/emotions");
+        let dir =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../upstream/microduck/robotd/emotions");
         let library = Library::load(&dir).expect("upstream emotions");
         assert!(!library.is_empty());
         assert!(library.get("curious").is_some());
@@ -292,7 +323,8 @@ mod tests {
 
     #[test]
     fn the_ritual_never_chooses_an_emotion_that_sits_the_duck() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../upstream/microduck/robotd/emotions");
+        let dir =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../upstream/microduck/robotd/emotions");
         let library = Library::load(&dir).expect("upstream emotions");
         let ritual = library.ritual_names();
         assert!(!ritual.is_empty());

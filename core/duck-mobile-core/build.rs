@@ -89,8 +89,8 @@ fn main() {
     let include = env::var("MUJOCO_INCLUDE_DIR").unwrap_or_else(|_| {
         r"D:\AI\Duck\work\.venv\Lib\site-packages\mujoco\include\mujoco".to_owned()
     });
-    let libdir = env::var("MUJOCO_LIB_DIR")
-        .unwrap_or_else(|_| r"D:\AI\Duck\work\mujoco-lib".to_owned());
+    let libdir =
+        env::var("MUJOCO_LIB_DIR").unwrap_or_else(|_| r"D:\AI\Duck\work\mujoco-lib".to_owned());
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
 
     cc::Build::new()
@@ -117,9 +117,7 @@ fn main() {
                 // 29 is the first API level whose libc.so exports the ELF
                 // TLS entry points (__tls_get_addr) that libc++_static needs.
                 let api = "29"; // matches minSdk and cargo ndk --platform
-                println!(
-                    "cargo:rustc-link-search=native={dir}/{api}"
-                );
+                println!("cargo:rustc-link-search=native={dir}/{api}");
             }
             // The NDK has no libdl.so, so rustc's -ldl resolves to libdl.a —
             // bionic's static-executable shim, whose malloc/newlocale/errno/

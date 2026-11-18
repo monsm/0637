@@ -10,7 +10,7 @@
 //! (the core needs `--no-default-features --features onnx-dynamic`; the
 //! feature set only matters for the policy tests, not for these probes).
 
-use duck_mobile_core::intent::{start_listener, IntentQueue};
+use duck_mobile_core::intent::{IntentQueue, start_listener};
 use serde_json::json;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -51,26 +51,28 @@ impl Harness {
     /// probe's synchronous request gets a real answer instead of a pending.
     fn start_applier(queue: &Arc<IntentQueue>, seen: Arc<Mutex<Vec<String>>>) {
         let queue = queue.clone();
-        std::thread::spawn(move || loop {
-            for item in queue.drain() {
-                seen.lock().unwrap().push(format!("{:?}", item.intent));
-                let answer = match &item.intent {
-                    duck_mobile_core::intent::Intent::Backup => json!({
-                        "format": "microduck-backup/1",
-                        "day": "2026-11-14",
-                        "care": {},
-                        "quests": {},
-                        "rules": {"rules": []},
-                        "fingerprint": "test",
-                    }),
-                    duck_mobile_core::intent::Intent::RestoreBackup(_) => {
-                        serde_json::json!({"ok": true})
-                    }
-                    _ => serde_json::json!({"ok": true}),
-                };
-                queue.answer(item.id, answer);
+        std::thread::spawn(move || {
+            loop {
+                for item in queue.drain() {
+                    seen.lock().unwrap().push(format!("{:?}", item.intent));
+                    let answer = match &item.intent {
+                        duck_mobile_core::intent::Intent::Backup => json!({
+                            "format": "microduck-backup/1",
+                            "day": "2026-11-14",
+                            "care": {},
+                            "quests": {},
+                            "rules": {"rules": []},
+                            "fingerprint": "test",
+                        }),
+                        duck_mobile_core::intent::Intent::RestoreBackup(_) => {
+                            serde_json::json!({"ok": true})
+                        }
+                        _ => serde_json::json!({"ok": true}),
+                    };
+                    queue.answer(item.id, answer);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
             }
-            std::thread::sleep(std::time::Duration::from_millis(5));
         });
     }
 
@@ -125,7 +127,10 @@ fn a_chorus_refuses_a_move_that_is_not_a_name() {
 fn a_chorus_needs_at_least_one_and_at_most_three_moves() {
     let h = Harness::start();
     h.refuses("/chorus", r#"{"moves":[]}"#);
-    h.refuses("/chorus", r#"{"moves":["laugh","yes_fast","laugh","yes_fast"]}"#);
+    h.refuses(
+        "/chorus",
+        r#"{"moves":["laugh","yes_fast","laugh","yes_fast"]}"#,
+    );
 }
 
 #[test]
@@ -199,7 +204,10 @@ fn a_painted_route_stays_inside_its_caps() {
 fn a_gift_needs_a_known_peer_and_a_known_gift() {
     let h = Harness::start();
     h.refuses("/peers/gift", r#"{"peer":"ghost","gift":"treat"}"#);
-    h.refuses("/peers/gift", r#"{"peer":"ghost","gift":"emotion","value":"laugh"}"#);
+    h.refuses(
+        "/peers/gift",
+        r#"{"peer":"ghost","gift":"emotion","value":"laugh"}"#,
+    );
     h.refuses("/peers/gift", r#"{"peer":"ghost","gift":"drone"}"#);
 }
 
@@ -209,7 +217,13 @@ fn a_backup_names_its_format_and_a_strange_one_is_refused() {
     // GET /backup answers with the versioned document; every part a client
     // could carry back is in it.
     let response = h.post("/backup", "{}");
-    for needle in ["microduck-backup/1", "\"care\"", "\"quests\"", "\"rules\"", "\"fingerprint\""] {
+    for needle in [
+        "microduck-backup/1",
+        "\"care\"",
+        "\"quests\"",
+        "\"rules\"",
+        "\"fingerprint\"",
+    ] {
         assert!(
             response.contains(needle.trim_matches('"')),
             "backup is missing {needle}: {response}"

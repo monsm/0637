@@ -49,7 +49,7 @@ pub mod buttons;
 pub mod hold;
 
 pub use buttons::Buttons;
-pub use hold::{HoldAction, HoldButton, HOME_HOLD, REST_HOLD, SHUTDOWN_HOLD};
+pub use hold::{HOME_HOLD, HoldAction, HoldButton, REST_HOLD, SHUTDOWN_HOLD};
 
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::{Arc, Mutex};
@@ -757,8 +757,7 @@ impl Shared {
         let ahead = frame
             .seq
             .wrapping_sub(self.seq.unwrap_or(frame.seq.wrapping_sub(1)));
-        let continues = self.peer == Some(from)
-            && (1..=MAX_SEQ_AHEAD).contains(&ahead);
+        let continues = self.peer == Some(from) && (1..=MAX_SEQ_AHEAD).contains(&ahead);
         match self.peer {
             Some(peer) if peer != from => {
                 // A second sender hears why it is ignored — at most once a
@@ -788,7 +787,10 @@ impl Shared {
             _ => {}
         }
         let connected = if self.peer.is_some() {
-            let (now_held, before) = (frame.held(), self.frame.map(|f| f.held()).unwrap_or(Buttons::NONE));
+            let (now_held, before) = (
+                frame.held(),
+                self.frame.map(|f| f.held()).unwrap_or(Buttons::NONE),
+            );
             self.pressed |= now_held.newly_set(before);
             self.released |= before.newly_set(now_held);
             false
@@ -807,11 +809,14 @@ impl Shared {
         self.accepted = self.accepted.wrapping_add(1);
         self.answer = Some((
             from,
-            self.status(if self.driving {
-                Verdict::Driving
-            } else {
-                Verdict::Busy
-            }, frame.seq),
+            self.status(
+                if self.driving {
+                    Verdict::Driving
+                } else {
+                    Verdict::Busy
+                },
+                frame.seq,
+            ),
         ));
         if connected {
             Accept::Connected
@@ -886,7 +891,8 @@ impl Pad {
     }
 
     pub fn set_enabled(&self, value: bool) {
-        self.enabled.store(value, std::sync::atomic::Ordering::Relaxed);
+        self.enabled
+            .store(value, std::sync::atomic::Ordering::Relaxed);
         if !value {
             if let Ok(mut state) = self.shared.lock() {
                 state.frame = None;
@@ -903,9 +909,7 @@ impl Pad {
             return None;
         }
         let mut state = self.shared.lock().ok()?;
-        let fresh = state
-            .last
-            .is_some_and(|at| at.elapsed() <= STALE);
+        let fresh = state.last.is_some_and(|at| at.elapsed() <= STALE);
         if fresh {
             state.frame
         } else {
@@ -967,12 +971,7 @@ impl Pad {
     /// from the caller ([`PadReportInput`]); the refusal from the shared
     /// [`Refused`] memory, filtered on [`REFUSAL_KEPT`].
     pub fn send_report(&self, input: &PadReportInput, refused: &Refused, now: Instant) {
-        let Some(peer) = self
-            .shared
-            .lock()
-            .ok()
-            .and_then(|state| state.peer)
-        else {
+        let Some(peer) = self.shared.lock().ok().and_then(|state| state.peer) else {
             return;
         };
         let report = RobotReport {
@@ -1006,9 +1005,7 @@ impl Pad {
     /// Button bits this build does not know, OR-ed over everything accepted —
     /// for one log line (`netpadd/src/receiver.rs:237-240`).
     pub fn reserved_bits_seen(&self) -> u16 {
-        self.shared
-            .lock()
-            .map_or(0, |state| state.reserved_seen)
+        self.shared.lock().map_or(0, |state| state.reserved_seen)
     }
 
     /// The client's whole state, ready for the shell: the fresh frame (None when
@@ -1158,7 +1155,10 @@ mod tests {
         assert_eq!(&b[..4], b"DKST");
         assert_eq!(b[4], 1);
         assert_eq!(b[5], 2, "Busy is verdict code 2 (`wire.rs:189-193`)");
-        assert_eq!(u32::from_le_bytes(b[6..10].try_into().unwrap()), 0xDEAD_BEEF);
+        assert_eq!(
+            u32::from_le_bytes(b[6..10].try_into().unwrap()),
+            0xDEAD_BEEF
+        );
         assert_eq!(u32::from_le_bytes(b[10..14].try_into().unwrap()), 7);
         assert_eq!(u32::from_le_bytes(b[14..18].try_into().unwrap()), 2);
         assert_eq!(u32::from_le_bytes(b[18..22].try_into().unwrap()), 1);
@@ -1210,7 +1210,10 @@ mod tests {
     fn another_sender_hears_busy_and_malformed_is_counted_not_answered() {
         let mut state = Shared::default();
         state.driving = true;
-        let (a, b) = ("10.0.0.2:5000".parse().unwrap(), "10.0.0.3:5000".parse().unwrap());
+        let (a, b) = (
+            "10.0.0.2:5000".parse().unwrap(),
+            "10.0.0.3:5000".parse().unwrap(),
+        );
         let now = Instant::now();
         state.on_datagram(a, &packet(1, 0, 0), now);
 
@@ -1277,7 +1280,10 @@ mod tests {
             &packet(1, 0, Buttons::A.0 | Buttons::UP.0),
             Instant::now(),
         );
-        assert_eq!((state.pressed, state.released), (Buttons::NONE, Buttons::NONE));
+        assert_eq!(
+            (state.pressed, state.released),
+            (Buttons::NONE, Buttons::NONE)
+        );
     }
 
     /// The DKRB layout: magic, version, then JSON — asserted against the
@@ -1312,7 +1318,10 @@ mod tests {
         assert!(v.get("refused").is_none(), "absent is not zero");
         assert_eq!(RobotReport::decode(&b).unwrap(), r);
         // An empty report is every field unknown, not zero (`wire.rs:427-428`).
-        assert_eq!(RobotReport::decode(b"DKRB\x01{}").unwrap(), RobotReport::default());
+        assert_eq!(
+            RobotReport::decode(b"DKRB\x01{}").unwrap(),
+            RobotReport::default()
+        );
         assert!(RobotReport::decode(&sample()).is_err());
     }
 
@@ -1327,7 +1336,10 @@ mod tests {
         refused.remember_refused("robot.do", "not home yet", t0);
         let at = |ms: u64| t0 + Duration::from_millis(ms);
         let r = refused.refusal(at(1_234)).expect("kept");
-        assert_eq!((r.method.as_str(), r.reason.as_str()), ("robot.do", "not home yet"));
+        assert_eq!(
+            (r.method.as_str(), r.reason.as_str()),
+            ("robot.do", "not home yet")
+        );
         assert_eq!(r.ago_ms, 1_234);
         assert!(refused.refusal(at(29_999)).is_some(), "still inside 30 s");
         assert!(refused.refusal(at(30_000)).is_none(), "dropped at 30 s");
@@ -1353,7 +1365,10 @@ mod tests {
         let mut m = PadMapper::new();
         assert!(m.bind("x", "roulade"));
         assert_eq!(m.skill("x"), Some("roulade"));
-        assert!(!m.bind("home", "x"), "Home is not bindable (`mapper.rs:330`)");
+        assert!(
+            !m.bind("home", "x"),
+            "Home is not bindable (`mapper.rs:330`)"
+        );
     }
 
     /// A frame becomes the events the official mapping asks for: A runs its
@@ -1391,7 +1406,14 @@ mod tests {
         };
         m.tick(&home, t, &mut events);
         assert_eq!(events, vec![PadButtonEvent::Flashlight]);
-        m.tick(&PadFrame { held: Buttons::HOME, ..Default::default() }, t, &mut events);
+        m.tick(
+            &PadFrame {
+                held: Buttons::HOME,
+                ..Default::default()
+            },
+            t,
+            &mut events,
+        );
         assert!(events.is_empty(), "held is not a second press");
 
         // D-pad up: head mode, once, then quiet while held.
@@ -1403,7 +1425,14 @@ mod tests {
         m.tick(&up, t, &mut events);
         assert_eq!(events, vec![PadButtonEvent::ModeChange(PadMode::Head)]);
         assert_eq!(m.mode(), PadMode::Head);
-        m.tick(&PadFrame { held: Buttons::UP, ..Default::default() }, t, &mut events);
+        m.tick(
+            &PadFrame {
+                held: Buttons::UP,
+                ..Default::default()
+            },
+            t,
+            &mut events,
+        );
         assert!(events.is_empty(), "still head mode, no new event");
     }
 
@@ -1433,10 +1462,17 @@ mod tests {
         // A tap is the RELEASE edge (`hold.rs:80`): nothing on the press.
         assert!(events.is_empty());
         m.tick(&release, at(200), &mut events);
-        assert_eq!(events, vec![PadButtonEvent::Init], "the tap stands the robot up");
+        assert_eq!(
+            events,
+            vec![PadButtonEvent::Init],
+            "the tap stands the robot up"
+        );
         assert!(events.is_empty() || events.len() == 1);
         events.clear();
-        assert!(events.is_empty(), "the release after a tap says nothing more");
+        assert!(
+            events.is_empty(),
+            "the release after a tap says nothing more"
+        );
 
         // The caller reports the robot stood up: the next tap is the toggle.
         m.set_up(true);
@@ -1451,7 +1487,11 @@ mod tests {
         assert!(events.is_empty());
         m.tick(&held, at(3_500), &mut events);
         assert_eq!(events, vec![PadButtonEvent::Home]);
-        assert_eq!(m.mode(), PadMode::Drive, "home resets the mode (`mapper.rs:271`)");
+        assert_eq!(
+            m.mode(),
+            PadMode::Drive,
+            "home resets the mode (`mapper.rs:271`)"
+        );
         m.tick(&release, at(9_020), &mut events);
         assert!(events.is_empty());
     }
@@ -1515,7 +1555,11 @@ mod tests {
         // treats the hold as a level that decays.
         assert_eq!(events, vec![PadButtonEvent::Wheee]);
         m.tick(&triggers(0.5, 0.0), t, &mut events);
-        assert_eq!(events, vec![PadButtonEvent::Wheee], "a hold notification per tick");
+        assert_eq!(
+            events,
+            vec![PadButtonEvent::Wheee],
+            "a hold notification per tick"
+        );
         m.tick(&triggers(0.0, 0.0), t, &mut events);
         assert_eq!(events, vec![PadButtonEvent::WheeeOff]);
     }
@@ -1540,7 +1584,11 @@ mod tests {
             ..Default::default()
         };
         m.tick(&still_down, at(3_000), &mut events);
-        m.tick(&still_down, at(3_000).checked_add(REST_HOLD).unwrap(), &mut events);
+        m.tick(
+            &still_down,
+            at(3_000).checked_add(REST_HOLD).unwrap(),
+            &mut events,
+        );
         assert!(
             events.is_empty(),
             "a hold begun against the pad that left does not rest: {events:?}"
@@ -1558,4 +1606,3 @@ mod tests {
         assert!(p.released.contains(Buttons::HOME));
     }
 }
-

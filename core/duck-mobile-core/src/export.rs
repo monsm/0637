@@ -61,16 +61,16 @@ pub fn markdown(life: &Life, care: &Care, fingerprint: &str) -> String {
     out.push_str(&format!("| 在手里 / held | {:.0} s |\n", life.held_s));
     out.push_str(&format!("| 启动 / launches | {} |\n", life.boots));
     out.push_str(&format!("| 摔倒 / falls | {} |\n", life.falls));
-    out.push_str(&format!("| 贴地啄 / ground picks | {} |\n", life.ground_picks));
+    out.push_str(&format!(
+        "| 贴地啄 / ground picks | {} |\n",
+        life.ground_picks
+    ));
     out.push_str(&format!("| 摸 / petted | {} |\n", life.pets));
     out.push_str(&format!("| 喂食 / fed | {} |\n", life.fed));
     out.push_str(&format!("| 拍手 / claps | {} |\n", life.claps));
     out.push_str(&format!("| 口哨 / whistles | {} |\n", life.whistles));
     out.push_str(&format!("| 关机 / power offs | {} |\n", life.power_offs));
-    out.push_str(&format!(
-        "| 饱腹 / fullness | {:.0}% |\n",
-        fullness
-    ));
+    out.push_str(&format!("| 饱腹 / fullness | {:.0}% |\n", fullness));
     out.push_str(&format!("| 心情 / mood | {:.0}% |\n", mood));
     out.push_str(&format!("| 亲密 / bond | {:.0}% |\n", care.bond * 100.0));
     if care.asleep {
@@ -90,7 +90,11 @@ pub fn markdown(life: &Life, care: &Care, fingerprint: &str) -> String {
     }
     out.push_str(&format!(
         "\n---\nbuild: `{}`\n",
-        if fingerprint.is_empty() { "unknown" } else { fingerprint }
+        if fingerprint.is_empty() {
+            "unknown"
+        } else {
+            fingerprint
+        }
     ));
     out
 }

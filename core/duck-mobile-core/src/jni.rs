@@ -3,33 +3,29 @@
 //! This file only marshals; every call lands on the same C ABI the iOS app
 //! uses, so both platforms run the identical core.
 #![allow(unsafe_op_in_unsafe_fn)]
-
 #![allow(non_snake_case)]
 
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
+use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::{jboolean, jdouble, jdoubleArray, jfloatArray, jint, jlong, jstring};
-use jni::JNIEnv;
 
 use crate::ffi::{
-    duck_core_body_count, duck_core_fingerprint, duck_core_last_error, duck_core_mode,
-    duck_core_model_generation, duck_core_next_sound,
-    duck_core_release_body, duck_core_set_performance,
-    duck_core_queue_sound, duck_core_render_sound, duck_core_set_mode,
-    duck_core_voice_rate, duck_core_wheee, duck_core_body_pose, duck_core_carry, duck_core_free,
-    duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_flashlight,
-    duck_core_load_emotions, duck_core_load_pickup, duck_core_intent_token,
-    duck_core_mesh_name, duck_core_mesh_soup,
-    duck_core_fork, duck_core_new, duck_core_oldest_tick, duck_core_paused, duck_core_seek,
-    duck_core_set_paused,
-    duck_core_set_speed, duck_core_speed, duck_core_step,
-    duck_core_push, duck_core_reload_policies, duck_core_render_qpos, duck_core_set_body,
-    duck_core_set_head, duck_core_set_twist, duck_core_sit_toggle, duck_core_skill_count,
-    duck_core_skill_name, duck_core_start_intent_server, duck_core_status, duck_core_tick,
-    duck_core_tick_index,
-    duck_core_trigger_skill, DuckCore, DuckStatus,
+    DuckCore, DuckStatus, duck_core_body_count, duck_core_body_pose, duck_core_carry,
+    duck_core_fingerprint, duck_core_flashlight, duck_core_fork, duck_core_free,
+    duck_core_geom_count, duck_core_geom_info, duck_core_ground_pick, duck_core_intent_token,
+    duck_core_last_error, duck_core_load_emotions, duck_core_load_pickup, duck_core_mesh_name,
+    duck_core_mesh_soup, duck_core_mode, duck_core_model_generation, duck_core_new,
+    duck_core_next_sound, duck_core_oldest_tick, duck_core_paused, duck_core_push,
+    duck_core_queue_sound, duck_core_release_body, duck_core_reload_policies,
+    duck_core_render_qpos, duck_core_render_sound, duck_core_seek, duck_core_set_body,
+    duck_core_set_head, duck_core_set_mode, duck_core_set_paused, duck_core_set_performance,
+    duck_core_set_speed, duck_core_set_twist, duck_core_sit_toggle, duck_core_skill_count,
+    duck_core_skill_name, duck_core_speed, duck_core_start_intent_server, duck_core_status,
+    duck_core_step, duck_core_tick, duck_core_tick_index, duck_core_trigger_skill,
+    duck_core_voice_rate, duck_core_wheee,
 };
 
 fn java_string(env: &mut JNIEnv, value: &JString) -> Option<String> {
@@ -69,9 +65,10 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeNew(
     scene: JString,
     policies: JString,
 ) -> jlong {
-    let (Some(scene), Some(policies)) =
-        (java_string(&mut env, &scene), java_string(&mut env, &policies))
-    else {
+    let (Some(scene), Some(policies)) = (
+        java_string(&mut env, &scene),
+        java_string(&mut env, &policies),
+    ) else {
         return 0;
     };
     let Ok(scene) = CString::new(scene) else {
@@ -202,7 +199,9 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeFlashlight(
     if handle == 0 {
         return -1;
     }
-    let Ok(name) = env.get_string(&color) else { return -1 };
+    let Ok(name) = env.get_string(&color) else {
+        return -1;
+    };
     let Ok(cname) = CString::new(name.to_string_lossy().as_bytes()) else {
         return -1;
     };
@@ -226,8 +225,12 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeLoadEmotions(
     if handle == 0 {
         return -1;
     }
-    let Ok(dir) = env.get_string(&path) else { return -1 };
-    let Ok(cpath) = CString::new(dir.to_string_lossy().as_bytes()) else { return -1 };
+    let Ok(dir) = env.get_string(&path) else {
+        return -1;
+    };
+    let Ok(cpath) = CString::new(dir.to_string_lossy().as_bytes()) else {
+        return -1;
+    };
     unsafe { duck_core_load_emotions(handle as *mut DuckCore, cpath.as_ptr()) as jint }
 }
 
@@ -335,7 +338,8 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSetMode(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeModelGeneration(    _env: JNIEnv,
+pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeModelGeneration(
+    _env: JNIEnv,
     _class: JClass,
     handle: jlong,
 ) -> jlong {
@@ -391,7 +395,12 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeRenderSound(
         return empty_floats(&mut env);
     };
     let count = unsafe {
-        duck_core_render_sound(handle as *mut DuckCore, tag.as_ptr(), std::ptr::null_mut(), 0)
+        duck_core_render_sound(
+            handle as *mut DuckCore,
+            tag.as_ptr(),
+            std::ptr::null_mut(),
+            0,
+        )
     };
     if count <= 0 {
         return empty_floats(&mut env);
@@ -685,7 +694,9 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeSkillName(
     if pointer.is_null() {
         return std::ptr::null_mut();
     }
-    let name = unsafe { CStr::from_ptr(pointer) }.to_string_lossy().into_owned();
+    let name = unsafe { CStr::from_ptr(pointer) }
+        .to_string_lossy()
+        .into_owned();
     env.new_string(name)
         .map(|string| string.into_raw())
         .unwrap_or(std::ptr::null_mut())
@@ -702,7 +713,9 @@ pub extern "system" fn Java_ai_duck_microduck_DuckCore_nativeMeshName(
     if pointer.is_null() {
         return std::ptr::null_mut();
     }
-    let name = unsafe { CStr::from_ptr(pointer) }.to_string_lossy().into_owned();
+    let name = unsafe { CStr::from_ptr(pointer) }
+        .to_string_lossy()
+        .into_owned();
     env.new_string(name)
         .map(|string| string.into_raw())
         .unwrap_or(std::ptr::null_mut())

@@ -12,7 +12,9 @@
 //! touches the control loop.
 
 /// The battery gauge, in the order it fills.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum Gauge {
     Unknown,
     Critical,
@@ -46,7 +48,11 @@ impl Gauge {
         };
         let low = Gauge::of(percent - GAUGE_HYSTERESIS);
         let high = Gauge::of(percent + GAUGE_HYSTERESIS);
-        if (low..=high).contains(&self) { self } else { Gauge::of(percent) }
+        if (low..=high).contains(&self) {
+            self
+        } else {
+            Gauge::of(percent)
+        }
     }
 }
 
@@ -157,7 +163,14 @@ mod tests {
         assert_eq!(flashlight_after(0, true, false, "white"), 1);
         assert_eq!(flashlight_after(1, true, false, "white"), 0);
         assert_eq!(flashlight_after(0, false, true, "cyan"), 6);
-        assert_eq!(Face { flashlight: 6, ..Face::default() }.color(), Some("cyan"));
+        assert_eq!(
+            Face {
+                flashlight: 6,
+                ..Face::default()
+            }
+            .color(),
+            Some("cyan")
+        );
         assert_eq!(Face::default().color(), None);
     }
 }

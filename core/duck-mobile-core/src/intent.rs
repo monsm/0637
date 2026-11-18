@@ -28,7 +28,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// How long a one-shot route waits for the tick to decide. The loop runs at
 /// 50 Hz, so a live duck answers in 20 ms; the margin is for a slow frame, and
@@ -96,7 +96,11 @@ pub enum Intent {
     /// A phone sensor reading (camera, microphone, depth, IMU).
     Sensor(crate::sensors::Reading),
     /// `robot.flashlight`: the virtual face LED, one of robotd's seven colours.
-    Flashlight { toggle: bool, on: bool, color: String },
+    Flashlight {
+        toggle: bool,
+        on: bool,
+        color: String,
+    },
     /// The held wheee ride: `hold` starts it, releasing ends it.
     Wheee(bool),
     /// A stroke of the hand on the duck.
@@ -163,7 +167,10 @@ pub enum Intent {
     /// How long the duck waits before doing something by itself, in seconds.
     IdleRitual(f64),
     /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
-    Look { target: [f64; 3], neck_pitch: f64 },
+    Look {
+        target: [f64; 3],
+        neck_pitch: f64,
+    },
     /// Recognized speech, as text. The core maps it to one of its own verbs,
     /// so a phone's recognizer, a typed word and an AI client all take the
     /// same path.
@@ -516,11 +523,7 @@ impl IntentQueue {
             return Err("no such peer".to_owned());
         }
         match value["gift"].as_str() {
-            Some("treat") => Ok((
-                id.to_owned(),
-                crate::lan::GiftKind::Treat,
-                String::new(),
-            )),
+            Some("treat") => Ok((id.to_owned(), crate::lan::GiftKind::Treat, String::new())),
             Some("emotion") => {
                 let mood = value["value"].as_str().unwrap_or_default();
                 // Official names only: the same set the runtime loads, so a
@@ -596,7 +599,12 @@ impl IntentQueue {
         let document = self.fingerprint.lock().expect("intent fingerprint");
         serde_json::from_str::<Value>(&document)
             .ok()
-            .and_then(|value| value.get("fingerprint").and_then(Value::as_str).map(str::to_owned))
+            .and_then(|value| {
+                value
+                    .get("fingerprint")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
             .unwrap_or_default()
     }
 
@@ -608,7 +616,8 @@ impl IntentQueue {
 
     pub fn vetbook_json(&self) -> String {
         let book = self.life.lock().expect("intent life").clone();
-        crate::export::json(&book.life, &self.care_snapshot(), &self.build_fingerprint()).to_string()
+        crate::export::json(&book.life, &self.care_snapshot(), &self.build_fingerprint())
+            .to_string()
     }
 }
 
@@ -838,6 +847,40 @@ fn authorised(
     }
 }
 
+/// `POST /config`'s policy half: the official `[policy]` keys, one request.
+///
+/// `walk_policy` is the older mobile spelling of the walk slot: a file name
+/// pins it, an empty string clears the override, and `"none"` is refused
+/// because the walking policy is what every other slot falls back to
+/// (`robotd/src/main.rs`' `load_policy_request`). `slot_overrides` is the general
+/// shape — an object of slot name to file name or `"none"` — and is applied
+/// after `walk_policy`, so a `walk` key there wins. Both leave the overrides
+/// process-global, as the official config keys are one machine-level config;
+/// the reload that follows is what resolves them. Keys are applied in order,
+/// so a refusal names the slot and leaves any earlier key applied.
+fn apply_policy_config(value: &Value) -> Result<(), String> {
+    if let Some(name) = value.get("walk_policy").and_then(Value::as_str) {
+        let name = (!name.is_empty()).then(|| name.to_owned());
+        crate::manifest::set_slot_override("walk", name)
+            .map_err(|error| format!("walk: {error}"))?;
+    }
+    if let Some(overrides) = value.get("slot_overrides") {
+        let overrides = overrides
+            .as_object()
+            .ok_or("slot_overrides must be an object of slot name to file name")?;
+        for (slot, name) in overrides {
+            let name = name.as_str().ok_or_else(|| {
+                format!("{slot}: slot_overrides values are file names or \"none\"")
+            })?;
+            // Empty clears, the same reading `walk_policy` has.
+            let name = (!name.is_empty()).then(|| name.to_owned());
+            crate::manifest::set_slot_override(slot, name)
+                .map_err(|error| format!("{slot}: {error}"))?;
+        }
+    }
+    Ok(())
+}
+
 fn handle(
     mut stream: TcpStream,
     queue: Arc<IntentQueue>,
@@ -867,7 +910,12 @@ fn handle(
     let request_line = lines.next().unwrap_or_default();
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or_default();
-    let path = parts.next().unwrap_or_default().split('?').next().unwrap_or_default();
+    let path = parts
+        .next()
+        .unwrap_or_default()
+        .split('?')
+        .next()
+        .unwrap_or_default();
 
     // The headers, once: the length and the access rules both read them.
     let headers: Vec<(String, String)> = lines
@@ -910,10 +958,9 @@ fn handle(
         buffer.extend_from_slice(&chunk[..read]);
     }
     let body_start = header_end + 4;
-    let body = String::from_utf8_lossy(
-        &buffer[body_start..buffer.len().min(body_start + content_length)],
-    )
-    .into_owned();
+    let body =
+        String::from_utf8_lossy(&buffer[body_start..buffer.len().min(body_start + content_length)])
+            .into_owned();
 
     if method == "OPTIONS" {
         return respond(&mut stream, 204, "No Content", "");
@@ -959,7 +1006,7 @@ fn handle(
                 queue.push(Intent::Sensor(reading));
                 Ok(json!({ "ok": true }).to_string())
             }
-            None => Err("missing sensor"),
+            None => Err("missing sensor".to_owned()),
         },
         ("POST", "/fork") => {
             let label = value["label"]
@@ -975,7 +1022,7 @@ fn handle(
             Some(label) => Ok(queue
                 .request(Intent::DropBranch(label.to_owned()))
                 .to_string()),
-            None => Err("missing label"),
+            None => Err("missing label".to_owned()),
         },
         ("POST", "/branch/select") => {
             let label = value["label"].as_str().unwrap_or("").to_owned();
@@ -985,13 +1032,9 @@ fn handle(
             let paused = value["paused"].as_bool();
             let speed = value["speed"].as_f64();
             match (paused, speed) {
-                (Some(paused), _) => {
-                    Ok(queue.request(Intent::Pause(paused)).to_string())
-                }
-                (None, Some(speed)) => {
-                    Ok(queue.request(Intent::Speed(speed)).to_string())
-                }
-                _ => Err("send {paused:true|false} or {speed:0.05..4}"),
+                (Some(paused), _) => Ok(queue.request(Intent::Pause(paused)).to_string()),
+                (None, Some(speed)) => Ok(queue.request(Intent::Speed(speed)).to_string()),
+                _ => Err("send {paused:true|false} or {speed:0.05..4}".to_owned()),
             }
         }
         ("POST", "/step") => {
@@ -1008,11 +1051,11 @@ fn handle(
         ("POST", "/checkpoint") => Ok(queue.request(Intent::Checkpoint).to_string()),
         ("POST", "/restore") => match value["tick"].as_u64() {
             Some(tick) => Ok(queue.request(Intent::Restore(tick)).to_string()),
-            None => Err("missing tick"),
+            None => Err("missing tick".to_owned()),
         },
         ("POST", "/seek") => match value["ticks"].as_u64() {
             Some(ticks) => Ok(queue.request(Intent::Seek(ticks)).to_string()),
-            None => Err("missing ticks"),
+            None => Err("missing ticks".to_owned()),
         },
         ("POST", "/twist") => {
             queue.push(Intent::Twist([
@@ -1063,17 +1106,16 @@ fn handle(
         }
         ("POST", "/skill") => match value["name"].as_str() {
             Some(name) => Ok(queue.request(Intent::Skill(name.to_owned())).to_string()),
-            None => Err("missing name"),
+            None => Err("missing name".to_owned()),
         },
         ("POST", "/sit") => Ok(queue.request(Intent::Sit).to_string()),
         ("POST", "/posture") => Ok(queue
             .request(Intent::Posture(value["sit"].as_bool().unwrap_or(true)))
             .to_string()),
         ("POST", "/ground_pick") => Ok(queue.request(Intent::GroundPick).to_string()),
-        ("POST", "/shutdown") => Ok(queue.request_within(
-            Intent::Shutdown,
-            Duration::from_secs(15),
-        ).to_string()),
+        ("POST", "/shutdown") => Ok(queue
+            .request_within(Intent::Shutdown, Duration::from_secs(15))
+            .to_string()),
         ("POST", "/power") => Ok(queue.request(Intent::PowerOn).to_string()),
         // The backup document is an idempotent read, so both verbs answer
         // it: the shells GET it, and the boundary probes POST it through
@@ -1095,19 +1137,25 @@ fn handle(
                 _ => Ok(json!({
                     "ok": false,
                     "error": "that file is not a microduck-backup/1",
-                }).to_string()),
+                })
+                .to_string()),
             }
         }
         ("POST", "/floor") => {
             let z = value["z"].as_f64().unwrap_or(0.0);
             if !(0.0..=2.0).contains(&z) {
-                Ok(json!({ "ok": false, "error": "the floor lives between 0 and 2 m" }).to_string())
+                Ok(
+                    json!({ "ok": false, "error": "the floor lives between 0 and 2 m" })
+                        .to_string(),
+                )
             } else {
                 Ok(queue.request(Intent::FloorHeight(z)).to_string())
             }
         }
         ("POST", "/parent") => Ok(queue
-            .request(Intent::ParentBudget(value["minutes"].as_u64().unwrap_or(0).min(600) as u32))
+            .request(Intent::ParentBudget(
+                value["minutes"].as_u64().unwrap_or(0).min(600) as u32,
+            ))
             .to_string()),
         ("POST", "/pad") => Ok(queue
             .request(Intent::PadSwitch(value["on"].as_bool().unwrap_or(false)))
@@ -1118,13 +1166,13 @@ fn handle(
             Some(mode) => Ok(queue
                 .request_within(Intent::Mode(mode.to_owned()), MODE_TIMEOUT)
                 .to_string()),
-            None => Err("missing mode"),
+            None => Err("missing mode".to_owned()),
         },
         // The voice, by tag: `robotctl quack` is a chirp, and the others are
         // the duck's own vocabulary.
         ("POST", "/sound") => match value["tag"].as_str() {
             Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
-            None => Err("missing tag"),
+            None => Err("missing tag".to_owned()),
         },
         // Petting and opening discovery are fire-and-forget: the duck's
         // answer is its coo and the peer list, which /state publishes. A
@@ -1164,11 +1212,14 @@ fn handle(
             let moves = strings("moves");
             let sounds = strings("sounds");
             if moves.is_empty() && sounds.is_empty() {
-                Ok(json!({ "ok": false, "error": "an ensemble needs a move or a sound" }).to_string())
+                Ok(
+                    json!({ "ok": false, "error": "an ensemble needs a move or a sound" })
+                        .to_string(),
+                )
             } else {
                 Ok(queue.request(Intent::Ensemble(moves, sounds)).to_string())
             }
-        },
+        }
         ("POST", "/chorus") => {
             // A body without `moves` sings the default pair. A body *with*
             // `moves` must be a list of names: a malformed list is refused
@@ -1206,15 +1257,13 @@ fn handle(
                     }
                 }
             }
-        },
+        }
         // The companion state is public read / restore-only write: a client
         // can hand back what it saved, but cannot claim the duck loves it.
         ("GET", "/care") => Ok(queue.care_json()),
         ("GET", "/heard") => Ok(queue.heard_json()),
         ("GET", "/rules") => Ok(queue.request(Intent::GetRules).to_string()),
-        ("POST", "/rules") => Ok(queue
-            .request(Intent::SetRules(value.clone()))
-            .to_string()),
+        ("POST", "/rules") => Ok(queue.request(Intent::SetRules(value.clone())).to_string()),
         ("GET", "/peers") => Ok(queue.peers_json()),
         ("POST", "/peers/start") => {
             queue.push(Intent::StartLan(
@@ -1226,14 +1275,20 @@ fn handle(
             Some(code) => Ok(queue
                 .request(Intent::PairPeer(
                     code.to_owned(),
-                    value["id"].as_str().filter(|id| !id.is_empty()).map(str::to_owned),
+                    value["id"]
+                        .as_str()
+                        .filter(|id| !id.is_empty())
+                        .map(str::to_owned),
                 ))
                 .to_string()),
-            None => Err("missing code"),
+            None => Err("missing code".to_owned()),
         },
         ("POST", "/peers/greet") => Ok(queue
             .request(Intent::GreetPeer(
-                value["id"].as_str().filter(|id| !id.is_empty()).map(str::to_owned),
+                value["id"]
+                    .as_str()
+                    .filter(|id| !id.is_empty())
+                    .map(str::to_owned),
             ))
             .to_string()),
         // A gift is fire-and-forget like /pet: the duck answers with its body,
@@ -1256,10 +1311,8 @@ fn handle(
             }
         },
         ("POST", "/peers/name") => match value["name"].as_str() {
-            Some(name) => Ok(queue
-                .request(Intent::PeerName(name.to_owned()))
-                .to_string()),
-            None => Err("missing name"),
+            Some(name) => Ok(queue.request(Intent::PeerName(name.to_owned())).to_string()),
+            None => Err("missing name".to_owned()),
         },
         // The companion state is public read / restore-only write: a client
         // can hand back what it saved, but cannot claim the duck loves it.
@@ -1272,53 +1325,59 @@ fn handle(
             Ok(json!({ "ok": true, "queued": true }).to_string())
         }
         ("POST", "/quests/day") => {
-            let day = value["day"].as_str().unwrap_or("").chars().take(10).collect::<String>();
+            let day = value["day"]
+                .as_str()
+                .unwrap_or("")
+                .chars()
+                .take(10)
+                .collect::<String>();
             let board = value.get("board").cloned().unwrap_or(json!({}));
             queue.set_day(day.clone());
-            Ok(queue
-                .request(Intent::QuestDay(day, board))
-                .to_string())
+            Ok(queue.request(Intent::QuestDay(day, board)).to_string())
         }
         ("POST", "/config") => {
             let idle = value.get("idle_ritual_s").and_then(Value::as_f64);
             let care = value.get("care_time_scale").and_then(Value::as_f64);
-            // Keep the old shape working: /config with only idle_ritual_s.
-            // A care scale travels as its own fire-and-forget intent so one
-            // response still means "the configuration was taken".
-            if let Some(scale) = care {
-                queue.push(Intent::CareScale(scale));
-            }
-            // Which file the walk slot resolves to, the official `[policy]
-            // walk` config key's mobile shape. "none" (or empty) clears the
-            // override; a name pins the walk slot to that file for the next
-            // reload. Same global semantics as the robot's config: it is a
-            // machine-level setting, not a per-branch one.
-            let walk = value.get("walk_policy").and_then(Value::as_str);
-            if let Some(name) = walk {
-                if name.is_empty() || name.eq_ignore_ascii_case("none") {
-                    crate::manifest::set_walk_override(None);
-                } else {
-                    crate::manifest::set_walk_override(Some(name.to_owned()));
+            match apply_policy_config(&value) {
+                Err(error) => Err(error),
+                Ok(()) => {
+                    // Keep the old shape working: /config with only
+                    // idle_ritual_s. A care scale travels as its own
+                    // fire-and-forget intent so one response still means
+                    // "the configuration was taken".
+                    if let Some(scale) = care {
+                        queue.push(Intent::CareScale(scale));
+                    }
+                    // **Idle is only touched when it was named.** A request
+                    // that carries only policy keys (`walk_policy`,
+                    // `slot_overrides`) must not reset the duck's idle
+                    // interval to the historical 30 s default — that would
+                    // turn a policy configuration into an unrelated behaviour
+                    // change.
+                    if let Some(seconds) = idle {
+                        Ok(queue.request(Intent::IdleRitual(seconds)).to_string())
+                    } else {
+                        Ok(json!({ "ok": true }).to_string())
+                    }
                 }
             }
-            Ok(queue
-                .request(Intent::IdleRitual(idle.unwrap_or(30.0)))
-                .to_string())
         }
         ("POST", "/wheee") => Ok(queue
             .request(Intent::Wheee(value["hold"].as_bool().unwrap_or(false)))
             .to_string()),
-        ("POST", "/look") => Ok(queue.request(Intent::Look {
-            target: [
-                value["x"].as_f64().unwrap_or(1.0),
-                value["y"].as_f64().unwrap_or(0.0),
-                value["z"].as_f64().unwrap_or(0.15),
-            ],
-            neck_pitch: value["neck"].as_f64().unwrap_or(0.0),
-        }).to_string()),
+        ("POST", "/look") => Ok(queue
+            .request(Intent::Look {
+                target: [
+                    value["x"].as_f64().unwrap_or(1.0),
+                    value["y"].as_f64().unwrap_or(0.0),
+                    value["z"].as_f64().unwrap_or(0.15),
+                ],
+                neck_pitch: value["neck"].as_f64().unwrap_or(0.0),
+            })
+            .to_string()),
         ("POST", "/heard") => match value["text"].as_str() {
             Some(text) => Ok(queue.request(Intent::Heard(text.to_owned())).to_string()),
-            None => Err("missing text"),
+            None => Err("missing text".to_owned()),
         },
         ("POST", "/flashlight") => Ok(queue
             .request(Intent::Flashlight {
@@ -1344,7 +1403,7 @@ fn handle(
             Some(dir) => Ok(queue
                 .request_within(Intent::Reload(dir.to_owned()), Duration::from_secs(30))
                 .to_string()),
-            None => Err("missing dir"),
+            None => Err("missing dir".to_owned()),
         },
         // A hand on the duck, for the shell's grab gesture and for an agent
         // that wants to pick the robot up. `dx/dy/dz` are metres from where it
@@ -1358,7 +1417,14 @@ fn handle(
             let active = value["active"].as_bool().unwrap_or(true);
             Ok(queue.request(Intent::Carry(offset, active)).to_string())
         }
-        _ => return respond(&mut stream, 404, "Not Found", "{\"ok\":false,\"error\":\"not found\"}"),
+        _ => {
+            return respond(
+                &mut stream,
+                404,
+                "Not Found",
+                "{\"ok\":false,\"error\":\"not found\"}",
+            );
+        }
     };
 
     match result {
@@ -1412,15 +1478,50 @@ mod tests {
         assert!(!authorised(remote, None, Some("wrong"), "t0ken"));
         assert!(!authorised(remote, None, Some("t0ken"), ""));
         // A page is not the owner, even from the phone's own address.
-        assert!(!authorised(loopback, Some("https://example.com"), None, "t0ken"));
-        assert!(authorised(loopback, Some("http://localhost:8000"), None, "t0ken"));
-        assert!(authorised(remote, Some("http://127.0.0.1"), Some("t0ken"), "t0ken"));
+        assert!(!authorised(
+            loopback,
+            Some("https://example.com"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            loopback,
+            Some("http://localhost:8000"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            remote,
+            Some("http://127.0.0.1"),
+            Some("t0ken"),
+            "t0ken"
+        ));
         // The origin match is on the exact host, not a prefix: a page served
         // from a machine merely *named* like ours is not ours.
-        assert!(!authorised(loopback, Some("http://localhost.attacker.tld"), None, "t0ken"));
-        assert!(!authorised(loopback, Some("http://127.0.0.1.evil.example"), None, "t0ken"));
-        assert!(authorised(loopback, Some("http://[::1]:9000"), None, "t0ken"));
-        assert!(authorised(loopback, Some("http://LOCALHOST."), None, "t0ken"));
+        assert!(!authorised(
+            loopback,
+            Some("http://localhost.attacker.tld"),
+            None,
+            "t0ken"
+        ));
+        assert!(!authorised(
+            loopback,
+            Some("http://127.0.0.1.evil.example"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            loopback,
+            Some("http://[::1]:9000"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            loopback,
+            Some("http://LOCALHOST."),
+            None,
+            "t0ken"
+        ));
     }
 
     /// The token is not a constant, and two cores do not share one.
@@ -1481,6 +1582,108 @@ mod tests {
         assert!(response.starts_with("HTTP/1.1 404"), "{response}");
     }
 
+    /// `POST /config` carries the official `[policy]` keys: the older
+    /// `walk_policy` and the per-slot object together, with the same refusal
+    /// for a walking policy switched off. The overrides are process-global,
+    /// so the override tests' lock keeps this out of their way.
+    #[test]
+    fn http_config_takes_walk_and_slot_overrides() {
+        let _lock = crate::manifest::override_test_lock();
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{
+                "idle_ritual_s": 12,
+                "walk_policy": "chosen.onnx",
+                "slot_overrides": { "sitstand": "none", "ground_pick": "pick.onnx" }
+            }"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(
+            crate::manifest::walk_override().as_deref(),
+            Some("chosen.onnx")
+        );
+        assert_eq!(
+            crate::manifest::slot_override("sitstand").as_deref(),
+            Some("none")
+        );
+        assert_eq!(
+            crate::manifest::slot_override("ground_pick").as_deref(),
+            Some("pick.onnx")
+        );
+        let intents = queue.drain();
+        assert!(
+            intents.iter().any(
+                |queued| matches!(&queued.intent, Intent::IdleRitual(seconds) if *seconds == 12.0)
+            ),
+            "{intents:?}"
+        );
+
+        // `walk_policy = "none"` is refused — the official loadPolicy rule —
+        // and the refusal names the slot.
+        let response = request(port, "POST", "/config", r#"{"walk_policy":"none"}"#);
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("walk:"), "{response}");
+        assert!(response.contains("cannot be switched off"), "{response}");
+        // The refused request changed nothing.
+        assert_eq!(
+            crate::manifest::walk_override().as_deref(),
+            Some("chosen.onnx")
+        );
+
+        // An empty string is the official "unset", not a file name.
+        let response = request(port, "POST", "/config", r#"{"walk_policy":""}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(crate::manifest::walk_override(), None);
+        // A policy-only request must not queue an idle change: the old code
+        // fell back to `IdleRitual(30.0)` whenever the key was absent, so a
+        // person configuring a slot reset the duck's idle interval.
+        let intents = queue.drain();
+        assert!(
+            !intents
+                .iter()
+                .any(|queued| matches!(queued.intent, Intent::IdleRitual(_))),
+            "a /config without idle_ritual_s queued an idle change: {intents:?}"
+        );
+
+        // A slot-only request is a policy change and nothing else: it must
+        // not carry an idle side effect either.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"slot_overrides":{"sitstand":"none"}}"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(
+            crate::manifest::slot_override("sitstand").as_deref(),
+            Some("none")
+        );
+        let intents = queue.drain();
+        assert!(
+            !intents
+                .iter()
+                .any(|queued| matches!(queued.intent, Intent::IdleRitual(_))),
+            "a slot-only /config queued an idle change: {intents:?}"
+        );
+
+        // A key that is not one of this core's slots is refused with its name.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"slot_overrides":{"kick_left":"x.onnx"}}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("kick_left"), "{response}");
+    }
+
     /// A painted route is queued with its origin and thinned points, and an
     /// over-cap drawing is refused before anything reaches the queue.
     #[test]
@@ -1490,7 +1693,12 @@ mod tests {
         let port = listener.local_addr().expect("addr").port();
         let _server = start_listener(listener, queue.clone());
 
-        let response = request(port, "POST", "/path", r#"{"points":[[0,0],[0.5,0],[0.5,0.4]]}"#);
+        let response = request(
+            port,
+            "POST",
+            "/path",
+            r#"{"points":[[0,0],[0.5,0],[0.5,0.4]]}"#,
+        );
         assert!(response.contains(r#""ok":true"#), "{response}");
         assert!(response.contains(r#""points":2"#), "{response}");
         let intents = queue.drain();
