@@ -197,7 +197,7 @@ jobs:
           workspaces: core
           prefix-key: duck-core-mujoco
 
-      - name: Build MuJoCo 3.10.0 (static)
+      - name: Build MuJoCo 3.10.0 (shared)
         run: |
           set -euo pipefail
           sudo apt-get update
@@ -208,17 +208,14 @@ jobs:
           LIBDIR="$RUNNER_TEMP/mujoco-lib"
           git clone --depth 1 --branch 3.10.0 https://github.com/google-deepmind/mujoco.git "$SRC"
 
-          # MuJoCo hardcodes `add_library(mujoco SHARED ...)`; the mobile core
-          # links the archive in. Same patch the Android build applies.
-          python3 -c 'import sys; p = sys.argv[1]; t = open(p).read(); n = "add_library(mujoco SHARED ${MUJOCO_RESOURCE_FILES})"; r = "# DUCK_STATIC_MUJOCO: link into the mobile core instead of a .so\nadd_library(mujoco STATIC ${MUJOCO_RESOURCE_FILES})"; sys.exit("static-library patch point not found in " + p) if n not in t else open(p, "w").write(t.replace(n, r, 1))' "$SRC/CMakeLists.txt"
-
-          # The Android script's cmake flags, minus the NDK toolchain. PIC is
-          # explicit: the host test binary is a PIE, while the NDK defaults to
-          # PIC and the host compiler does not.
+          # Build MuJoCo as the shared library it ships as by default: the
+          # static archive path was a dead end on this runner (rust-lld
+          # resolves -l against it but every mj_* stayed undefined, through
+          # both ld -r folding and direct whole-archive). The test binary is
+          # the only consumer; rpath points it at the directory. Mobile keeps
+          # its own static slices via the NDK/XCFramework branches.
           cmake -S "$SRC" -B "$BUILD" -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-            -DBUILD_SHARED_LIBS=OFF \
             -DCMAKE_SKIP_INSTALL_RULES=ON \
             -DMUJOCO_BUILD_EXAMPLES=OFF \
             -DMUJOCO_BUILD_TESTS=OFF \
@@ -228,44 +225,19 @@ jobs:
           cmake --build "$BUILD" --target mujoco -j"$(nproc)"
 
           mkdir -p "$LIBDIR"
-          MUJOCO_ARCHIVE="$(find "$BUILD" -maxdepth 2 -name libmujoco.a -print -quit)"
-          if [ -z "$MUJOCO_ARCHIVE" ]; then
-            echo "::error::libmujoco.a not found under $BUILD" >&2
+          MUJOCO_SO="$(find "$BUILD" -maxdepth 3 -name 'libmujoco.so*' -print -quit)"
+          if [ -z "$MUJOCO_SO" ]; then
+            echo "::error::libmujoco.so not found under $BUILD" >&2
             exit 1
           fi
-          cp "$MUJOCO_ARCHIVE" "$LIBDIR/"
-          echo "mujoco" > "$LIBDIR/libs.txt"
-
-          # A static archive does not absorb its dependencies. Copy each one
-          # and record the link order, using the same candidate names as
-          # android/scripts/build-mujoco-android.sh.
-          dependency_archives=()
-          collect_dep() {
-            local logical="$1"
-            shift
-            for name in "$@"; do
-              local found
-              found="$(find "$BUILD" -name "lib$name.a" -print -quit)"
-              if [ -n "$found" ]; then
-                cp "$found" "$LIBDIR/"
-                echo "$name" >> "$LIBDIR/libs.txt"
-                dependency_archives+=("$LIBDIR/lib$name.a")
-                return 0
-              fi
-            done
-            echo "::warning::no archive for $logical (tried: lib${*}.a)" >&2
-          }
-          collect_dep lodepng lodepng
-          collect_dep miniz miniz
-          collect_dep tinyxml2 tinyxml2
-          collect_dep qhull qhullstatic_r qhull_r
-          collect_dep ccd ccd ccd_static
+          cp -a "$(dirname "$MUJOCO_SO")"/libmujoco.so* "$LIBDIR/"
+          ls -l "$LIBDIR"
 
           {
             echo "MUJOCO_INCLUDE_DIR=$SRC/include"
             echo "MUJOCO_LIB_DIR=$LIBDIR"
           } >> "$GITHUB_ENV"
-          echo "MuJoCo 3.10.0 static library: $LIBDIR"
+          echo "MuJoCo 3.10.0 shared library: $LIBDIR"
           cat "$LIBDIR/libs.txt"
 
       - name: Core MuJoCo tests
@@ -273,6 +245,9 @@ jobs:
           ORT_DYLIB_PATH: ${{ steps.ort.outputs.lib }}
           DUCK_REQUIRE_FIXTURES: "1"
           DUCK_UPSTREAM_FIXTURES: ${{ github.workspace }}/upstream/microduck/duck-control/tests/fixtures
+          # The rpath build.rs adds covers the test binary; this covers any
+          # helper the harness spawns.
+          LD_LIBRARY_PATH: ${{ runner.temp }}/mujoco-lib
         run: |
           set -euo pipefail
           cd core

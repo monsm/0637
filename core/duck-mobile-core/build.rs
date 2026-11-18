@@ -154,17 +154,14 @@ fn main() {
             println!("cargo:rustc-link-lib=framework=CoreGraphics");
         }
         _ => {
-            // A source-built library directory carries libs.txt (the
-            // archives' link order) and links exactly like the Android job
-            // does: whole-archive the MuJoCo archive by absolute path so its
-            // self-registering decoders survive, then the dependency
-            // archives in order. The local dynamic setup has no libs.txt and
-            // keeps the plain `-lmujoco` route.
-            if std::path::Path::new(&libdir).join("libs.txt").exists() {
-                link_mujoco(&libdir, false);
-            } else {
-                println!("cargo:rustc-link-lib=mujoco");
+            // A source-built directory in CI holds the shared MuJoCo; the
+            // test binary needs an rpath to find it at run time. Local
+            // dynamic setups already arrange their own loader path, so the
+            // plain `-lmujoco` route stays for them.
+            if std::path::Path::new(&libdir).join("libmujoco.so").exists() {
+                println!("cargo:rustc-link-arg=-Wl,-rpath,{libdir}");
             }
+            println!("cargo:rustc-link-lib=mujoco");
         }
     }
 }
