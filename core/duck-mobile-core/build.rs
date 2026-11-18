@@ -154,14 +154,14 @@ fn main() {
             println!("cargo:rustc-link-lib=framework=CoreGraphics");
         }
         _ => {
-            // The desktop test job builds MuJoCo from source and folds the
-            // archive and its dependencies into one relocatable object; an
-            // absolute object argument needs no archive search semantics.
-            // A hand-built library directory without that object (the local
-            // dynamic setup) keeps the plain `-lmujoco` route.
-            let combined = std::path::Path::new(&libdir).join("mujoco_combined.o");
-            if combined.exists() {
-                println!("cargo:rustc-link-arg={}", combined.display());
+            // A source-built library directory carries libs.txt (the
+            // archives' link order) and links exactly like the Android job
+            // does: whole-archive the MuJoCo archive by absolute path so its
+            // self-registering decoders survive, then the dependency
+            // archives in order. The local dynamic setup has no libs.txt and
+            // keeps the plain `-lmujoco` route.
+            if std::path::Path::new(&libdir).join("libs.txt").exists() {
+                link_mujoco(&libdir, false);
             } else {
                 println!("cargo:rustc-link-lib=mujoco");
             }

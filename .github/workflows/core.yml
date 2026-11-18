@@ -261,22 +261,6 @@ jobs:
           collect_dep qhull qhullstatic_r qhull_r
           collect_dep ccd ccd ccd_static
 
-          # build.rs's non-Apple/non-Android branch emits only `-lmujoco`: it
-          # does not read libs.txt, and a bare archive would leave the
-          # dependency archives unresolved and drop MuJoCo's self-registering
-          # STL/OBJ decoders. Fold everything into one relocatable object
-          # and then into a real archive, so any linker that resolves
-          # `-lmujoco` pulls the whole object. Only MuJoCo itself is
-          # whole-archived (the Android/iOS branch does the same);
-          # dependencies stay on-demand so nothing is pulled twice.
-          ld -r -o "$LIBDIR/mujoco_combined.o" \
-            --whole-archive "$LIBDIR/libmujoco.a" --no-whole-archive \
-            "${dependency_archives[@]}"
-          # The combined object is linked by absolute path (build.rs sees
-          # `mujoco_combined.o` in the library directory), because a
-          # relocatable object merely named libmujoco.a is treated by
-          # rust-lld as an empty archive and every mj_* stays undefined.
-
           {
             echo "MUJOCO_INCLUDE_DIR=$SRC/include"
             echo "MUJOCO_LIB_DIR=$LIBDIR"
