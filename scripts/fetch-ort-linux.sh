@@ -48,7 +48,8 @@ PY
     echo "error: no linux x86_64 wheel for onnxruntime==$VERSION" >&2
     return 1
   fi
-  local wheel="$wheel_dir/$(basename "$url")"
+  local wheel
+  wheel="$wheel_dir/$(basename "$url")"
   curl -L --fail --retry 3 -o "$wheel" "$url"
   rm -rf "$wheel_dir/extracted"
   unzip -q -o "$wheel" -d "$wheel_dir/extracted"
