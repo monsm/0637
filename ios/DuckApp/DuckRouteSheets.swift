@@ -110,7 +110,7 @@ struct DuckRouteSheets: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         case .dex:
-            DexSheet(controller: controller)
+            CollectionSheet(controller: controller)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         case .modes:

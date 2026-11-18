@@ -375,6 +375,13 @@ enum Copy {
     static var dexMoods: String { pick("Moods", "情绪") }
     static var dexNever: String { pick("not yet", "还没见过") }
     static var dexFirst: String { pick("first", "初次") }
+    // The collection book (F2): the core's /collection page. These keys are
+    // byte-for-byte the same as Android's parallel ticket.
+    static var collectionTitle: String { pick("Mood book", "情绪图鉴") }
+    static var collectionMoods: String { pick("Moods", "情绪") }
+    static var collectionTricks: String { pick("Tricks", "把戏") }
+    static var collectionFirst: String { pick("First unlocked", "首次解锁") }
+    static var collectionLocked: String { pick("Not tried yet", "还没试过") }
     // Daily quests.
     static var quests: String { pick("Today's quests", "今日小挑战") }
     static var questDone: String { pick("Done", "完成") }
@@ -702,6 +709,14 @@ enum Copy {
             "任何兼容 OpenAI 的接口，包括本机的 Ollama 或 LM Studio。"
         )
     }
+    // Voice chat (F2): the same endpoint answers in plain words, and this
+    // phone speaks the reply. Shared byte-for-byte with Android.
+    static var chatTitle: String { pick("Voice chat", "语音闲聊") }
+    static var chatHint: String { pick("Say something to the duck", "对鸭子说点什么") }
+    static var chatSend: String { pick("Send", "发送") }
+    static var chatThinking: String { pick("Thinking…", "思考中…") }
+    static var chatNoModel: String { pick("Set up a model first", "先配置模型") }
+    static var chatLocalVoice: String { pick("The reply is spoken on this phone only", "回复只在手机朗读") }
     static var showMore: String { pick("More", "更多") }
     static var showLess: String { pick("Less", "收起") }
     static var depth: String { pick("depth", "深度") }
@@ -750,10 +765,16 @@ enum LifeEvent {
 /// same wire name in either language.
 enum SkillLabel {
     static func of(_ name: String) -> String {
+        of(name, language: Copy.language)
+    }
+
+    /// The same mapping with the language handed in, so a unit test can pin
+    /// it without touching the app-wide preference.
+    static func of(_ name: String, language: Copy.Language) -> String {
         // English keeps the protocol word, but a wire name is `kick_left`,
         // not a label. The underscore is a protocol detail; the first screen
         // must not show one.
-        guard Copy.language == .chinese else {
+        guard language == .chinese else {
             return name.replacingOccurrences(of: "_", with: " ")
         }
         switch name {

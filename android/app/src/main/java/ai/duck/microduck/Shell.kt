@@ -171,7 +171,6 @@ fun Shell(
     // The drawer's night row follows /state.night, so it can offer
     // good night or good morning honestly.
     var nightActive by remember { mutableStateOf(false) }
-    var dex by remember { mutableStateOf(emptyList<DexEntryUi>()) }
     val dance = remember(context) { DanceStudio(context) }
     var danceShow by remember { mutableStateOf(0) }
     var aiConfig by remember { mutableStateOf(AIStore.load(context)) }
@@ -377,10 +376,6 @@ fun Shell(
             if (peersNow != null) peers = peersNow
             val questsNow = stateText?.let(::parseQuestsFromState)
             if (questsNow != null && questsNow.quests.isNotEmpty()) quests = questsNow
-            val dexNow = stateText?.let {
-                DexStore.build(context, it, skills, Copy.language == Copy.Language.Chinese)
-            }
-            if (dexNow != null && dexNow.isNotEmpty()) dex = dexNow
             val peerEvent = stateText?.let(::parsePeerEvent)
             if (peerEvent != null && peerEvent.tick != lastPeerTick) {
                 lastPeerTick = peerEvent.tick
@@ -1073,7 +1068,7 @@ fun Shell(
     }
 
     if (route == DuckRoute.Dex) {
-        DexSheet(dex, onClose = { closeSheet() })
+        CollectionSheet(onClose = { closeSheet() })
     }
 
     if (route == DuckRoute.Postcards) {
@@ -1395,6 +1390,7 @@ private fun AISheet(
             }
             Text(Copy.aiHint, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
             Text(Copy.aiNote, color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+            VoiceChatSection(config = current())
         }
     }
 }

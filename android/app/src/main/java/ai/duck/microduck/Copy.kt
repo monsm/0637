@@ -352,6 +352,14 @@ val quack get() = pick("Quack", "叫一声")
     val dexMoods get() = pick("Moods", "情绪")
     val dexNever get() = pick("not yet", "还没见过")
     val dexFirst get() = pick("first", "初次")
+    // The collection page (F3): the core's own lifetime record for every
+    // official mood and trick, with the first day it was unlocked. A day the
+    // core does not know stays empty and the page shows —; never a guess.
+    val collectionTitle get() = pick("Mood book", "情绪图鉴")
+    val collectionMoods get() = pick("Moods", "情绪")
+    val collectionTricks get() = pick("Tricks", "把戏")
+    val collectionFirst get() = pick("First unlocked", "首次解锁")
+    val collectionLocked get() = pick("Not tried yet", "还没试过")
     // The vet book, and the file it exports.
     val lifeRecord get() = pick("Life record", "终身记录")
     val walked get() = pick("walked", "走过")
@@ -519,6 +527,14 @@ val quack get() = pick("Quack", "叫一声")
         "Any OpenAI-compatible endpoint, including a local Ollama or LM Studio server.",
         "任何兼容 OpenAI 的接口，包括本机的 Ollama 或 LM Studio。",
     )
+    // Voice chat: one plain sentence to the person's own model, answered in
+    // the duck's voice and read aloud by this phone only.
+    val chatTitle get() = pick("Voice chat", "语音闲聊")
+    val chatHint get() = pick("Say something to the duck", "对鸭子说点什么")
+    val chatSend get() = pick("Send", "发送")
+    val chatThinking get() = pick("Thinking…", "思考中…")
+    val chatNoModel get() = pick("Set up a model first", "先配置模型")
+    val chatLocalVoice get() = pick("The reply is spoken on this phone only", "回复只在手机朗读")
     val aiNote get() = pick(
         "The duck's state and the last words it heard go to the endpoint you choose. Your key stays on this phone.",
         "鸭子的状态和它最后听到的话会发给你填写的接口。密钥只保存在这台手机上。",

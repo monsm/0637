@@ -161,9 +161,11 @@ internal fun MoreSheet(
                     badge = "$postcardCount",
                     tag = "more-postcards",
                 ) { onOpen(DuckRoute.Postcards) }
-                MoreRow(Icons.dex, Copy.dex, note = Copy.dexRowNote, tag = "more-dex") {
-                    onOpen(DuckRoute.Dex)
-                }
+                MoreRow(
+                    Icons.dex, Copy.collectionTitle,
+                    note = Copy.dexRowNote,
+                    tag = "more-dex",
+                ) { onOpen(DuckRoute.Dex) }
             }
             Group(Copy.thisDuck, "duck") {
                 MoreRow(

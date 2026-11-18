@@ -75,6 +75,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         Copy.load(this)
+        // The voice-chat speaker belongs to the activity: its engine is
+        // created here and shut down in onDestroy. A phone without a speech
+        // engine stays silent; the chat bubbles still show the text.
+        ChatVoice.init(this)
         // The growth ledger lives beside the app's other local facts; the
         // first read only sets the walk/roll baselines (no back-filled
         // history, docs/PROGRESS_ANDROID.md).
@@ -307,6 +311,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         companionReady = false
         stopShake()
+        ChatVoice.shutdown()
         voice?.stop()
         voice = null
         loop?.stop()

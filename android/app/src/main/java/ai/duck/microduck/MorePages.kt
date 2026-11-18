@@ -298,6 +298,14 @@ internal fun DuckPanelSheet(
                 compassOn = !compassOn
                 prefs.edit().putBoolean("duck_compass_on", compassOn).apply()
             }
+            // The collection page: every mood and trick with the duck's own
+            // lifetime count and first day. It opens the Dex route, which now
+            // draws the core's /collection record.
+            ControlRow(
+                Copy.collectionTitle,
+                note = Copy.dexRowNote,
+                tag = "collection-open",
+            ) { onOpen(DuckRoute.Dex) }
         }
     }
 }

@@ -858,6 +858,9 @@ pub unsafe extern "C" fn duck_core_new(
             sitstand_loaded,
             ground_pick_loaded,
         ));
+        // The collection page lists the manifest's one-shots as tricks, apart
+        // from the emotions `/skills` folds in with them.
+        intents.set_manifest_skills(runtime.manifest_skill_names());
         intents.set_fingerprint(provenance.to_json());
 
         // The `robot.*` JSON-RPC server, started with the duck. Its handlers
@@ -1419,6 +1422,9 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     // re-attach the emotions, and a switch without them must clear the old
     // names rather than leave a mood the new duck cannot play.
     core.intents.set_emotions(core.runtime.emotion_names());
+    // The tricks are the new bundle's own one-shots; a switch changes them.
+    core.intents
+        .set_manifest_skills(core.runtime.manifest_skill_names());
     // The roller's meshes are its own; the debug name table has to move too.
     core.meshes = (0..core.runtime.io().mesh_count())
         .map(|mesh| {
@@ -1571,7 +1577,7 @@ fn expected_loaded_paths(
 /// published at request time for a `GoingHome` change: the old set is still
 /// the one driving until the ramp finishes.
 fn publish_loaded_skills(core: &mut DuckCore) {
-    let (paths, names) = {
+    let (paths, names, manifest_skills) = {
         let active = active_runtime(core);
         let paths = active.driving_net_paths();
         let sitstand = paths
@@ -1583,7 +1589,7 @@ fn publish_loaded_skills(core: &mut DuckCore) {
             .find(|(slot, _)| slot == "ground_pick")
             .is_some_and(|(_, path)| path.is_some());
         let names = published_skills(active.skill_names(), sitstand, ground_pick);
-        (paths, names)
+        (paths, names, active.manifest_skill_names())
     };
     core.sitstand_loaded = paths
         .iter()
@@ -1598,6 +1604,7 @@ fn publish_loaded_skills(core: &mut DuckCore) {
         .map(|name| CString::new(name.clone()).unwrap_or_default())
         .collect();
     core.intents.set_skills(names);
+    core.intents.set_manifest_skills(manifest_skills);
 }
 
 /// A queued policy change landed on the duck the client is watching: publish
@@ -1738,12 +1745,13 @@ fn reload_policies_inner(
     // own — the same truncation `Controller::skill_names` applies (`take
     // (policy.skill_count())`, and the loaded count is `paths.skills.len()`),
     // with the emotions last, which a reload does not touch.
-    let mut names: Vec<String> = bundle
+    let tricks: Vec<String> = bundle
         .skills
         .iter()
         .take(bundle.paths.skills.len())
         .map(|skill| skill.name.clone())
         .collect();
+    let mut names = tricks.clone();
     names.extend(core.runtime.emotion_names());
     let names = published_skills(names, core.sitstand_loaded, core.ground_pick_loaded);
     core.skills = names
@@ -1751,6 +1759,7 @@ fn reload_policies_inner(
         .map(|name| CString::new(name.clone()).unwrap_or_default())
         .collect();
     core.intents.set_skills(names);
+    core.intents.set_manifest_skills(tricks);
     core.label = "policy reloaded".to_owned();
     Ok(Reloaded::Landed)
 }
@@ -1967,6 +1976,14 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         Intent::GroundPick if core.runtime.shutting_down() => {
             refuse(core, "the duck is powering off".to_owned())
         }
+        // Frozen time freezes the duck: a skill, a sit toggle or a ground pick
+        // accepted while paused would change the body — and a skill would be
+        // counted in the life record — without the simulated tick that
+        // performs it ever running. Refuse them at the door, as the typed C
+        // entry points do.
+        Intent::Skill(_) | Intent::Sit | Intent::GroundPick if core.runtime.clock().paused => {
+            refuse(core, "the duck is paused".to_owned())
+        }
         // The loop's one-shot gate (`robotd/src/main.rs:2768-2775`): a skill,
         // a sit toggle or a ground pick needs a policy that drove last tick
         // and a robot at home, not merely a powered body. A resting duck is
@@ -2133,6 +2150,69 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                     .filter_map(|(k, v)| Some((k.clone(), v.as_u64()?)))
                     .collect();
             }
+            // The collection's first days travel with the same save. An entry
+            // is kept only if the name really exists in the count tables this
+            // restore just rebuilt (with a count above zero) and the value is
+            // an unknown day or a real calendar day. This route answers on the
+            // network, and a first day is shown to a person: a client must not
+            // be able to write a sentence, a made-up date, or a date for a
+            // move the duck never did into it.
+            let mut unlocks = std::collections::BTreeMap::new();
+            if let Some(m) = saved.get("unlocks").and_then(|v| v.as_object()) {
+                for (key, value) in m {
+                    let Some(day) = value.as_str() else {
+                        continue;
+                    };
+                    if !crate::vetbook::is_unlock_day(day) {
+                        continue;
+                    }
+                    let counted = if let Some(name) = key.strip_prefix("emotion:") {
+                        life.emotions.get(name).copied().unwrap_or(0)
+                    } else if let Some(name) = key.strip_prefix("skill:") {
+                        life.skills.get(name).copied().unwrap_or(0)
+                    } else {
+                        0
+                    };
+                    if counted > 0 {
+                        unlocks.insert(key.clone(), day.to_owned());
+                    }
+                }
+            }
+            // The flag is not trusted on its own. A record that claims to be
+            // backfilled but does not cover every count that exists would let
+            // the next tick date the gaps with today — a date that never
+            // happened. Missing entries are history from before the record, so
+            // they are filled with an unknown day here, once, and the record
+            // is left backfilled.
+            let saved_flag = saved
+                .get("unlocks_backfilled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let mut complete = true;
+            for (name, count) in &life.emotions {
+                if *count > 0 && !unlocks.contains_key(&format!("emotion:{name}")) {
+                    complete = false;
+                }
+            }
+            for (name, count) in &life.skills {
+                if *count > 0 && !unlocks.contains_key(&format!("skill:{name}")) {
+                    complete = false;
+                }
+            }
+            if !saved_flag || !complete {
+                for (name, count) in &life.emotions {
+                    if *count > 0 {
+                        unlocks.entry(format!("emotion:{name}")).or_default();
+                    }
+                }
+                for (name, count) in &life.skills {
+                    if *count > 0 {
+                        unlocks.entry(format!("skill:{name}")).or_default();
+                    }
+                }
+            }
+            life.unlocks = unlocks;
+            life.unlocks_backfilled = true;
             if let Some(a) = saved.get("events").and_then(|v| v.as_array()) {
                 // Only the words the core itself writes. The restore route
                 // answers on the network, and the events are what the diary
@@ -2192,6 +2272,9 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             Ok(()) => json!({ "ok": true, "rules": core.runtime.rules_summary() }),
             Err(reason) => refuse(core, format!("rules refused: {reason}")),
         },
+        Intent::Posture(_) if core.runtime.clock().paused => {
+            refuse(core, "the duck is paused".to_owned())
+        }
         Intent::Posture(sit) => {
             if core.runtime.is_sitting() == sit {
                 // Already in the asked-for posture: no move to gate.
@@ -2212,7 +2295,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
         }
         Intent::QuestDay(day, board) => {
-            if day.len() == 10 {
+            if crate::vetbook::is_calendar_day(&day) {
                 // Rehydrating a saved board measures it against the duck the
                 // client is watching, which may be a selected branch.
                 let values = json!({
@@ -2373,7 +2456,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or("")
                 .to_owned();
-            let quests = if day.len() == 10 {
+            let quests = if crate::vetbook::is_calendar_day(&day) {
                 apply_intent_active(
                     core,
                     Intent::QuestDay(day, value.get("quests").cloned().unwrap_or(json!({}))),
@@ -2513,6 +2596,18 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             // Speech reaches the same execution path as a button. A verb that
             // moves the duck waits for the driving robot the official loop
             // requires; a sound does not move anything and stays available.
+            // Frozen time comes first: a move accepted while paused would be
+            // counted in the life record without the tick that performs it.
+            if matches!(
+                &heard,
+                crate::speech::Heard::Skill(_)
+                    | crate::speech::Heard::Sit
+                    | crate::speech::Heard::Stand
+                    | crate::speech::Heard::GroundPick
+            ) && core.runtime.clock().paused
+            {
+                return refuse(core, "the duck is paused".to_owned());
+            }
             if matches!(
                 &heard,
                 crate::speech::Heard::Skill(_)
@@ -2607,7 +2702,10 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         }
         Intent::Step(ticks) => {
             // Advance exactly the requested ticks while frozen; the shell's
-            // timer keeps calling tick(), which respects the pause.
+            // timer keeps calling tick(), which respects the pause. This is
+            // the one deliberate exception to the pause gates: the time
+            // machine unpauses for exactly these ticks, so every skill and
+            // mood it performs is a real, ticked move.
             core.runtime.set_paused(false);
             for _ in 0..ticks {
                 let _ = core.runtime.tick();
@@ -3121,6 +3219,14 @@ fn dispatch_pad_event(core: &mut DuckCore, event: &crate::pad::PadButtonEvent) -
             // remembered in `pad_refused`, which the DKRB report carries).
             let mut refusal = None;
             on_active(core, |runtime| {
+                // Frozen time freezes the duck: a pad skill accepted while
+                // paused would be counted in the life record without the tick
+                // that performs it. The refusal is remembered in `pad_refused`
+                // (the DKRB report carries it), like every other pad refusal.
+                if runtime.clock().paused {
+                    refusal = Some("the duck is paused".to_owned());
+                    return;
+                }
                 if runtime.shutting_down() {
                     refusal = Some("the duck is powering off".to_owned());
                     return;
@@ -3610,7 +3716,7 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     // A new calendar day restarts the parent's allowance: the budget's base
     // re-snapshots the duck's own powered time, so yesterday's play does not
     // eat today's minutes.
-    if quest_day.len() == 10 && quest_day != core.parent_day {
+    if crate::vetbook::is_calendar_day(&quest_day) && quest_day != core.parent_day {
         core.parent_day = quest_day.clone();
         on_active(core, |runtime| {
             runtime.reset_parent_day();
@@ -3619,7 +3725,7 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
             runtime.book_mut().roll_day(&quest_day);
         });
     }
-    if quest_day.len() == 10 {
+    if crate::vetbook::is_calendar_day(&quest_day) {
         // Measure the duck the client is driving: a selected branch's own
         // counters, not the original the branch forked from.
         let values = json!({
@@ -3627,7 +3733,10 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
             "life": active_runtime(core).book().summary(),
         });
         let finished = core.quests.update(&quest_day, &values);
-        if !finished.is_empty() {
+        // The quest completes either way — the goals are real facts. The
+        // celebration is a mood, and a mood played while frozen would be
+        // counted in the life record without the tick that performs it.
+        if !finished.is_empty() && !active_runtime(core).clock().paused {
             on_active(core, |runtime| {
                 let _ = runtime.celebrate_emotion("excited");
             });
@@ -3643,9 +3752,17 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     if let Some(snapshot) = peer_snapshot {
         core.intents.set_peers(snapshot);
     }
+    // A paused duck listens but does not perform: greetings, gifts, choruses
+    // and ensembles are honestly skipped while frozen — no mood is counted
+    // and nothing is queued for later. The peer list above is still
+    // published: hearing the room is not acting in it.
+    let paused_now = active_runtime(core).clock().paused;
     let mut gifts = Vec::new();
     let mut choruses = Vec::new();
     for event in peer_events {
+        if paused_now {
+            continue;
+        }
         match event {
             // A gift is not a greeting: collect it and apply it after the
             // greetings, so a hello's own reaction cannot be mistaken for the
@@ -3766,6 +3883,16 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
     // Frozen time freezes the duck the client is watching, including a branch.
     let active_paused = active_runtime(core).clock().paused;
     if active_paused {
+        // Intents above still applied (a pet, a feed): the paused tick does
+        // not step physics, but the lifetime record it just changed must be
+        // noted and published before this early return, or /life and the
+        // collection would lag behind the book until the next unpaused tick.
+        let unlock_day = core.intents.day();
+        if crate::vetbook::is_calendar_day(&unlock_day) {
+            on_active(core, |runtime| runtime.book_mut().note_unlocks(&unlock_day));
+        }
+        let book = active_runtime(core).book().clone();
+        core.intents.set_life(&book);
         publish_ipc(core);
         publish_state(core);
         return 0;
@@ -3823,6 +3950,17 @@ pub unsafe extern "C" fn duck_core_tick(core: *mut DuckCore) -> c_int {
             core.label = report.label.clone();
             core.last = Some(report);
             settle_policy_swap(core);
+            // The collection: the tick that just counted a move also notes
+            // the day it first happened. The shell's calendar day is the only
+            // clock that can date it, and before one has arrived there is
+            // nothing honest to write. Re-read it after this tick's intents:
+            // a day that rolled over mid-tick dates by the new day. On a
+            // branch session this is the branch's own book, the same one
+            // /quests measures.
+            let unlock_day = core.intents.day();
+            if crate::vetbook::is_calendar_day(&unlock_day) {
+                on_active(core, |runtime| runtime.book_mut().note_unlocks(&unlock_day));
+            }
             // The lifetime record travels with the state: a client reading
             // /state sees the same counters /life serves, for the duck it sees.
             let book = active_runtime(core).book().clone();
@@ -4268,6 +4406,12 @@ pub unsafe extern "C" fn duck_core_trigger_skill(
     let core = &mut *core;
     let mut outcome = None;
     on_active(core, |runtime| {
+        // Frozen time freezes the duck: accepting a move while paused would
+        // count it in the life record without the tick that performs it.
+        if runtime.clock().paused {
+            outcome = Some(Err("the duck is paused".to_owned()));
+            return;
+        }
         if !policy_drives(runtime) {
             outcome = Some(Err(
                 "the policy is not driving — press Start on the pad".to_owned()
@@ -4307,14 +4451,20 @@ pub unsafe extern "C" fn duck_core_sit_toggle(core: *mut DuckCore) -> c_int {
         return -1;
     }
     let core = &mut *core;
+    let mut paused = false;
     let mut allowed = false;
     on_active(core, |runtime| {
-        allowed = policy_drives(runtime) && runtime.sit_toggle().is_ok();
+        paused = runtime.clock().paused;
+        allowed = !paused && policy_drives(runtime) && runtime.sit_toggle().is_ok();
     });
     if allowed {
         0
     } else {
-        core.label = "sit refused: the policy is not driving".to_owned();
+        core.label = if paused {
+            "sit refused: the duck is paused".to_owned()
+        } else {
+            "sit refused: the policy is not driving".to_owned()
+        };
         -1
     }
 }
@@ -4325,14 +4475,20 @@ pub unsafe extern "C" fn duck_core_ground_pick(core: *mut DuckCore) -> c_int {
         return -1;
     }
     let core = &mut *core;
+    let mut paused = false;
     let mut allowed = false;
     on_active(core, |runtime| {
-        allowed = policy_drives(runtime) && runtime.start_ground_pick().is_ok();
+        paused = runtime.clock().paused;
+        allowed = !paused && policy_drives(runtime) && runtime.start_ground_pick().is_ok();
     });
     if allowed {
         0
     } else {
-        core.label = "ground pick refused: the policy is not driving".to_owned();
+        core.label = if paused {
+            "ground pick refused: the duck is paused".to_owned()
+        } else {
+            "ground pick refused: the policy is not driving".to_owned()
+        };
         -1
     }
 }
@@ -4541,6 +4697,8 @@ pub unsafe extern "C" fn duck_core_step(core: *mut DuckCore, ticks: c_int) {
     let core = &mut *core;
     on_active(core, |runtime| {
         let was_paused = runtime.clock().paused;
+        // The time machine's explicit advancement is the one exception to the
+        // pause gates: these ticks are real, so what they perform is counted.
         runtime.set_paused(false);
         for _ in 0..ticks.clamp(1, 500) {
             let _ = runtime.tick();
@@ -4965,6 +5123,606 @@ mod tests {
         stream.read_to_string(&mut response).expect("read");
         assert!(response.contains(r#""bringup":2"#), "{response}");
         assert!(response.contains("\"trunk\""), "{response}");
+
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The collection page is fed by the duck the tick really drove: a mood
+    /// played after the shell's day arrives gets that day as its first day,
+    /// and the flat /life save the shells keep carries it back, so a restart
+    /// does not date it again.
+    #[test]
+    fn the_collection_page_dates_a_mood_with_the_shells_day() {
+        let emotions_dir =
+            crate::fixtures::workspace_root().join("upstream/microduck/robotd/emotions");
+        if !emotions_dir.is_dir() {
+            if crate::fixtures::required() {
+                panic!(
+                    "the official emotions are missing (looked in {})",
+                    emotions_dir.display()
+                );
+            }
+            eprintln!(
+                "skipping: the official emotions are not here ({})",
+                emotions_dir.display()
+            );
+            return;
+        }
+        let (_guard, core) = new_core();
+        let dir = CString::new(emotions_dir.to_string_lossy().into_owned()).unwrap();
+        assert!(unsafe { duck_core_load_emotions(core, dir.as_ptr()) } > 0);
+        tick_until_ready(core);
+
+        let port = 19000 + ((std::process::id() % 1000) + 13) as i32;
+        assert_eq!(unsafe { duck_core_start_intent_server(core, port) }, 0);
+        let http = |method: &str, path: &str, body: &str| -> String {
+            let mut stream = TcpStream::connect(("127.0.0.1", port as u16)).expect("connect");
+            let request = format!(
+                "{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(request.as_bytes()).expect("write");
+            let mut response = String::new();
+            stream.read_to_string(&mut response).expect("read");
+            response
+        };
+        let body_of = |response: &str| -> serde_json::Value {
+            serde_json::from_str(response.split("\r\n\r\n").nth(1).unwrap_or("{}"))
+                .unwrap_or(serde_json::Value::Null)
+        };
+        let mood_row = |page: &serde_json::Value, name: &str| -> (u64, Option<String>) {
+            page["emotions"]
+                .as_array()
+                .expect("emotions")
+                .iter()
+                .find(|row| row["name"] == name)
+                .map(|row| {
+                    (
+                        row["count"].as_u64().expect("count"),
+                        row["first_day"].as_str().map(str::to_owned),
+                    )
+                })
+                .unwrap_or_else(|| panic!("{name} is a loaded official mood"))
+        };
+        let collection = || body_of(&http("GET", "/collection", ""));
+
+        // A mood nobody has played: listed with its real zero and no date.
+        let page = collection();
+        assert_eq!(mood_row(&page, "curious"), (0, None));
+        assert_eq!(page["moods"]["total"], json!(13));
+        assert_eq!(
+            page["tricks"]["total"],
+            json!(page["skills"].as_array().expect("skills").len())
+        );
+
+        // The shell's calendar day, then a real mood through the same /skill
+        // verb the ring posts. The tick answers both.
+        let response = http("POST", "/quests/day", r#"{"day":"2026-11-18"}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        let response = http("POST", "/skill", r#"{"name":"curious"}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let page = collection();
+        assert_eq!(
+            mood_row(&page, "curious"),
+            (1, Some("2026-11-18".to_owned()))
+        );
+        assert_eq!(page["moods"]["unlocked"], json!(1));
+        // A manifest trick that has not happened: count 0, no date at all.
+        let roulade = page["skills"]
+            .as_array()
+            .expect("skills")
+            .iter()
+            .find(|row| row["name"] == "roulade")
+            .expect("roulade is a manifest trick");
+        assert_eq!(roulade["count"], json!(0));
+        assert!(
+            roulade.get("first_day").is_none(),
+            "a trick that never happened has no date to send: {roulade}"
+        );
+
+        // The shells save the flat /life page and hand it back on the next
+        // launch: the first day must ride along and survive the restore.
+        let life = body_of(&http("GET", "/life", ""));
+        assert_eq!(life["unlocks"]["emotion:curious"], json!("2026-11-18"));
+        assert_eq!(life["unlocks_backfilled"], json!(true));
+        let response = http("POST", "/life", &life.to_string());
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        let page = collection();
+        assert_eq!(
+            mood_row(&page, "curious"),
+            (1, Some("2026-11-18".to_owned()))
+        );
+
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker: a save that claims to be backfilled but does not cover a
+    /// count it carries must not have that gap dated "today". The gap is
+    /// history from before the record, so it is filled with an unknown day at
+    /// restore, once, and stays unknown on later days.
+    #[test]
+    fn a_claimed_backfill_cannot_date_a_count_it_does_not_cover() {
+        let (_guard, core) = new_core();
+        unsafe { (*core).intents.set_day("2026-11-19".to_owned()) };
+        let saved = json!({
+            "emotions": { "curious": 2 },
+            "skills": {},
+            "unlocks": {},
+            "unlocks_backfilled": true,
+        });
+        unsafe { (*core).intents.push(Intent::RestoreLife(saved)) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert_eq!(life["emotions"]["curious"], json!(2));
+        assert_eq!(
+            life["unlocks"]["emotion:curious"], "",
+            "the uncovered count is history, not today"
+        );
+        assert_eq!(life["unlocks_backfilled"], json!(true));
+
+        // A later day changes nothing: unknown stays unknown.
+        unsafe { (*core).intents.set_day("2026-11-20".to_owned()) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert_eq!(life["unlocks"]["emotion:curious"], "");
+
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker: a paused duck refuses a real manifest skill at both doors —
+    /// the intent arm and the C ABI — and the refused move never enters the
+    /// book. `roulade` is a loaded one-shot: with the gate removed, both doors
+    /// would accept it (the policy is driving) and the book would count it.
+    #[test]
+    fn a_paused_duck_refuses_a_skill_at_both_doors() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe { duck_core_set_paused(core, 1) };
+        assert_eq!(unsafe { duck_core_paused(core) }, 1);
+
+        let name = CString::new("roulade").unwrap();
+        assert_eq!(unsafe { duck_core_trigger_skill(core, name.as_ptr()) }, 0);
+        assert!(
+            unsafe { (*core).label.contains("paused") },
+            "the refusal names the pause: {}",
+            unsafe { (*core).label.clone() }
+        );
+
+        let refused = unsafe { apply_intent(&mut *core, Intent::Skill("roulade".to_owned())) };
+        assert_eq!(refused["ok"], json!(false));
+        assert!(
+            refused["error"].as_str().unwrap_or("").contains("paused"),
+            "{refused}"
+        );
+        assert!(
+            !unsafe {
+                active_runtime(&*core)
+                    .book()
+                    .life
+                    .skills
+                    .contains_key("roulade")
+            },
+            "a refused skill is not part of the duck's story"
+        );
+
+        // The paused tick still publishes the lifetime record it already has,
+        // and the refused move is not in it.
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert!(
+            life["skills"].get("roulade").is_none(),
+            "the refused move never reached the published record: {life}"
+        );
+
+        unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker: the pad's Skill key is the third door. While paused it is
+    /// refused (remembered in `pad_refused`, the DKRB report's channel) and
+    /// the book never counts the move.
+    #[test]
+    fn a_paused_pad_skill_is_refused_and_not_counted() {
+        use crate::pad::{Buttons, PadFrame};
+
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe { duck_core_set_paused(core, 1) };
+        // Bind a real counting manifest skill to the spare X button.
+        assert!(unsafe { (*core).pad_mapper.bind("x", "roulade") });
+        let press = PadFrame {
+            held: Buttons::X,
+            pressed: Buttons::X,
+            ..Default::default()
+        };
+        let now = Instant::now();
+        unsafe { pad_apply_frame(&mut *core, &press, now) };
+
+        let refusal = unsafe { (*core).pad_refused.refusal(now) }.expect("the pad was refused");
+        assert_eq!(refusal.method, "robot.do");
+        assert!(
+            refusal.reason.contains("paused"),
+            "the refusal names the pause: {}",
+            refusal.reason
+        );
+        assert!(
+            !unsafe {
+                active_runtime(&*core)
+                    .book()
+                    .life
+                    .skills
+                    .contains_key("roulade")
+            },
+            "a refused pad skill is not part of the duck's story"
+        );
+
+        unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker: a spoken move (POST /heard "翻滚" -> roulade) is refused
+    /// while paused — no count, no first day — and the answer says why.
+    #[test]
+    fn a_paused_heard_skill_is_refused_and_not_dated() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe { (*core).intents.set_day("2026-11-19".to_owned()) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        unsafe { duck_core_set_paused(core, 1) };
+
+        let port = 19000 + ((std::process::id() % 1000) + 17) as i32;
+        assert_eq!(unsafe { duck_core_start_intent_server(core, port) }, 0);
+        // The handler enqueues the intent and waits for the tick's verdict.
+        // The paused tick must answer the request itself with the refusal.
+        let heard = std::thread::spawn(move || {
+            let mut stream = TcpStream::connect(("127.0.0.1", port as u16)).expect("connect");
+            let body = r#"{"text":"翻滚"}"#;
+            let request = format!(
+                "POST /heard HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(request.as_bytes()).expect("write");
+            let mut response = String::new();
+            stream.read_to_string(&mut response).expect("read");
+            response
+        });
+        // Tick fast enough to land inside the request's 300 ms budget.
+        for _ in 0..120 {
+            if heard.is_finished() {
+                break;
+            }
+            assert_eq!(unsafe { duck_core_tick(core) }, 0);
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let response = heard.join().expect("the heard request thread");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(
+            response.contains("paused"),
+            "the answer itself says the duck is paused: {response}"
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert!(
+            life["skills"].get("roulade").is_none(),
+            "the spoken move was counted while paused: {life}"
+        );
+        assert!(
+            life["unlocks"].get("skill:roulade").is_none(),
+            "the spoken move was dated while paused: {life}"
+        );
+
+        // The refusal is the pause, not a missing verb.
+        let refused = unsafe { apply_intent(&mut *core, Intent::Heard("翻滚".to_owned())) };
+        assert_eq!(refused["ok"], json!(false));
+        assert!(
+            refused["error"].as_str().unwrap_or("").contains("paused"),
+            "{refused}"
+        );
+
+        unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker, the honest half: a paused tick still applies a hand on the
+    /// duck (a pet is care, not a move), publishes it through `/state`, and
+    /// dates nothing — the refused move leaves the collection locked.
+    #[test]
+    fn a_paused_tick_still_counts_a_pet_but_dates_nothing() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe { (*core).intents.set_day("2026-11-19".to_owned()) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        unsafe { duck_core_set_paused(core, 1) };
+
+        let port = 19000 + ((std::process::id() % 1000) + 21) as i32;
+        assert_eq!(unsafe { duck_core_start_intent_server(core, port) }, 0);
+        let http = |method: &str, path: &str, body: &str| -> String {
+            let mut stream = TcpStream::connect(("127.0.0.1", port as u16)).expect("connect");
+            let request = format!(
+                "{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(request.as_bytes()).expect("write");
+            let mut response = String::new();
+            stream.read_to_string(&mut response).expect("read");
+            response
+        };
+        let body_of = |response: &str| -> serde_json::Value {
+            serde_json::from_str(response.split("\r\n\r\n").nth(1).unwrap_or("{}"))
+                .unwrap_or(serde_json::Value::Null)
+        };
+        let pets_before = unsafe { active_runtime(&*core).book().life.pets };
+
+        unsafe { (*core).intents.push(Intent::Skill("roulade".to_owned())) };
+        unsafe { (*core).intents.push(Intent::Pet) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        // What the shell reads is `/state`, not the queue's internal copy:
+        // this proves the paused branch's note_unlocks/set_life were published.
+        let response = http("GET", "/state", "");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let state = body_of(&response);
+        assert_eq!(
+            state["life"]["pets"],
+            json!(pets_before + 1),
+            "a paused tick still feels the hand and publishes it: {state}"
+        );
+        assert_eq!(
+            state["life"]["unlocks"],
+            json!({}),
+            "nothing was dated in a paused tick: {state}"
+        );
+        assert!(
+            state["life"]["skills"].get("roulade").is_none(),
+            "the paused move was counted: {state}"
+        );
+
+        let page: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.collection_json() })
+                .expect("collection");
+        let roulade = page["skills"]
+            .as_array()
+            .expect("skills")
+            .iter()
+            .find(|row| row["name"] == "roulade")
+            .expect("roulade is a manifest trick");
+        assert_eq!(roulade["count"], json!(0), "{roulade}");
+        assert!(roulade.get("first_day").is_none(), "{roulade}");
+        assert_eq!(page["tricks"]["unlocked"], json!(0), "{page}");
+
+        unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker B1: a child's "when I pet you, roll over" rule fires from
+    /// the pet primitive. A paused duck still feels the pet — that count is
+    /// real — but the rule's skill must not start, count or get a first day.
+    #[test]
+    fn a_paused_pet_rule_cannot_start_or_date_a_skill() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe { (*core).intents.set_day("2026-11-19".to_owned()) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        unsafe {
+            (*core).intents.push(Intent::SetRules(json!({
+                "rules": [{ "trigger": "pet", "action": "skill", "value": "roulade" }]
+            })))
+        };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        unsafe { duck_core_set_paused(core, 1) };
+        let pets_before = unsafe { active_runtime(&*core).book().life.pets };
+
+        unsafe { (*core).intents.push(Intent::Pet) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert_eq!(
+            life["pets"],
+            json!(pets_before + 1),
+            "the pet itself is real even while paused: {life}"
+        );
+        assert!(
+            life["skills"].get("roulade").is_none(),
+            "the paused rule started a skill: {life}"
+        );
+        assert!(
+            life["unlocks"].get("skill:roulade").is_none(),
+            "the paused rule dated a skill: {life}"
+        );
+        assert!(
+            unsafe { (*core).runtime.last_rule().is_none() },
+            "a refused rule step must not be reported as fired"
+        );
+
+        unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker B2: morning's official "yes" is a mood. A paused duck still
+    /// ends the night (the event is real) but must not count or date the wake
+    /// emotion.
+    #[test]
+    fn a_paused_morning_does_not_count_the_wake_emotion() {
+        let emotions_dir =
+            crate::fixtures::workspace_root().join("upstream/microduck/robotd/emotions");
+        if !emotions_dir.is_dir() {
+            if crate::fixtures::required() {
+                panic!(
+                    "the official emotions are missing (looked in {})",
+                    emotions_dir.display()
+                );
+            }
+            eprintln!(
+                "skipping: the official emotions are not here ({})",
+                emotions_dir.display()
+            );
+            return;
+        }
+        let (_guard, core) = new_core();
+        let dir = CString::new(emotions_dir.to_string_lossy().into_owned()).unwrap();
+        assert!(unsafe { duck_core_load_emotions(core, dir.as_ptr()) } > 0);
+        tick_until_ready(core);
+        unsafe { (*core).intents.set_day("2026-11-19".to_owned()) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        unsafe { duck_core_set_paused(core, 1) };
+
+        unsafe { (*core).intents.push(Intent::Night(true)) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        unsafe { (*core).intents.push(Intent::Night(false)) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert!(
+            life["emotions"].get("yes").is_none(),
+            "the paused wake emotion was counted: {life}"
+        );
+        assert!(
+            life["unlocks"].get("emotion:yes").is_none(),
+            "the paused wake emotion was dated: {life}"
+        );
+
+        // The night itself really ended, and the paused tick published it.
+        let state: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.state_json() }).expect("state");
+        assert!(
+            state["life"]["emotions"].get("yes").is_none(),
+            "the paused wake emotion was counted in the published state: {state}"
+        );
+        assert!(
+            state["life"]["unlocks"].get("emotion:yes").is_none(),
+            "the paused wake emotion was dated in the published state: {state}"
+        );
+        assert_eq!(
+            state["night"]["active"],
+            json!(false),
+            "the morning ended the night: {state}"
+        );
+
+        unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA minor: a restore keeps no first day for a move the duck never did
+    /// (count 0) and no date for a key that is not in the count tables at all.
+    #[test]
+    fn a_restore_drops_dates_for_zero_and_unknown_moves() {
+        let (_guard, core) = new_core();
+        unsafe { (*core).intents.set_day("2026-11-19".to_owned()) };
+        unsafe {
+            (*core).intents.push(Intent::RestoreLife(json!({
+                "emotions": { "curious": 0 },
+                "skills": { "roulade": 0 },
+                "unlocks": {
+                    "emotion:curious": "2026-11-18",
+                    "skill:roulade": "2026-11-18",
+                    "skill:nope": "2026-11-18"
+                },
+                "unlocks_backfilled": true,
+            })))
+        };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert_eq!(
+            life["unlocks"],
+            json!({}),
+            "zero and unknown moves keep no date: {life}"
+        );
+        assert_eq!(life["unlocks_backfilled"], json!(true));
+
+        let page: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.collection_json() })
+                .expect("collection");
+        for row in page["emotions"].as_array().expect("emotions") {
+            assert!(row.get("first_day").is_none(), "{row}");
+        }
+        for row in page["skills"].as_array().expect("skills") {
+            assert!(row.get("first_day").is_none(), "{row}");
+        }
+
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA major: the restore keeps an unlock for a name that really exists in
+    /// the count tables, whatever characters it contains. A manifest skill
+    /// with a space or a dot keeps its real first day instead of being
+    /// forgotten and then re-dated as "today" on every launch.
+    #[test]
+    fn an_odd_skill_name_keeps_its_day_across_a_restore() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let life = &mut (*core).runtime.book_mut().life;
+            life.skills.insert("my move.v2".to_owned(), 2);
+            life.unlocks
+                .insert("skill:my move.v2".to_owned(), "2026-11-18".to_owned());
+            life.unlocks_backfilled = true;
+        }
+        unsafe { (*core).intents.set_life((*core).runtime.book()) };
+        let saved: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("saved life");
+        assert_eq!(saved["unlocks"]["skill:my move.v2"], "2026-11-18");
+
+        // What the next launch does: hand the save back, on a later day.
+        unsafe { (*core).intents.set_day("2026-11-19".to_owned()) };
+        unsafe { (*core).intents.push(Intent::RestoreLife(saved)) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert_eq!(life["skills"]["my move.v2"], json!(2));
+        assert_eq!(
+            life["unlocks"]["skill:my move.v2"], "2026-11-18",
+            "the real name keeps its real first day"
+        );
+
+        unsafe { duck_core_free(core) };
+    }
+
+    /// QA blocker: a real restart on a later day must not re-date a first day
+    /// the saved record already knows. The first session plays a manifest
+    /// trick; the second restores its /life save two days later.
+    #[test]
+    fn a_restart_on_a_later_day_does_not_redate_an_unlock() {
+        let (guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe { (*core).intents.set_day("2026-11-18".to_owned()) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        unsafe { (*core).intents.push(Intent::Skill("roulade".to_owned())) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        let saved: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("saved life");
+        assert_eq!(saved["unlocks"]["skill:roulade"], "2026-11-18");
+        unsafe { duck_core_free(core) };
+        drop(guard);
+
+        // A new launch, two days later, with the shell's save handed back.
+        let (_guard, core) = new_core();
+        unsafe { (*core).intents.set_day("2026-11-20".to_owned()) };
+        unsafe { (*core).intents.push(Intent::RestoreLife(saved)) };
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        let life: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.life_json() }).expect("life");
+        assert_eq!(life["unlocks"]["skill:roulade"], "2026-11-18");
+        for (key, day) in life["unlocks"].as_object().expect("unlocks") {
+            assert_ne!(
+                day.as_str(),
+                Some("2026-11-20"),
+                "{key} was re-dated by the restart"
+            );
+        }
 
         unsafe { duck_core_free(core) };
     }

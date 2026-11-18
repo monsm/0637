@@ -69,7 +69,80 @@ data class AIDecision(
     val say: String = "",
 )
 
+/**
+ * The one HTTP call every model path makes. The real implementation is an
+ * HttpURLConnection with the endpoint the person configured; the JVM tests
+ * stand a fake in its place, so the plain-text path is proven without a
+ * network or an emulator.
+ */
+internal fun interface AIModelHttp {
+    fun post(url: URL, key: String, body: String): AIModelReply
+}
+
+internal data class AIModelReply(val code: Int, val text: String)
+
+private object RealAIModelHttp : AIModelHttp {
+    override fun post(url: URL, key: String, body: String): AIModelReply {
+        val connection = url.openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        connection.connectTimeout = 8000
+        connection.readTimeout = 25000
+        connection.setRequestProperty("Content-Type", "application/json")
+        if (key.isNotEmpty()) {
+            connection.setRequestProperty("Authorization", "Bearer $key")
+        }
+        connection.outputStream.use { it.write(body.toByteArray()) }
+        val code = connection.responseCode
+        val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
+            ?.bufferedReader()?.use { it.readText() } ?: ""
+        connection.disconnect()
+        return AIModelReply(code, text)
+    }
+}
+
 object AIBrain {
+    /** Replaced by the unit tests; production keeps the real socket. */
+    @Volatile internal var http: AIModelHttp = RealAIModelHttp
+
+    private fun resolveEndpoint(text: String): URL? = try {
+        val url = URL(text)
+        if (url.path.contains("chat/completions")) url
+        else URL(text.trimEnd('/') + "/chat/completions")
+    } catch (_: Throwable) {
+        null
+    }
+
+    /** The compact real-state snapshot both the acting and talking prompts use. */
+    private fun compactState(stateJson: String, heard: String): String = try {
+        val json = JSONObject(stateJson)
+        val compact = JSONObject()
+        for (key in listOf(
+            "label", "mode", "fallen", "carrying", "powered_off", "care", "life",
+            "emotion", "last_sound", "pose", "peers", "tick",
+        )) {
+            json.opt(key)?.let { compact.put(key, it) }
+        }
+        compact.put("last_heard", heard)
+        compact.toString()
+    } catch (_: Throwable) {
+        "{}"
+    }
+
+    /** choices[0].message.content, with the flat `message` fallback some
+     *  local servers answer with; null when neither shape is there. */
+    private fun answerContent(text: String): String? {
+        val json = JSONObject(text)
+        val choices = json.optJSONArray("choices")
+        if (choices != null) {
+            val content = choices.optJSONObject(0)
+                ?.optJSONObject("message")
+                ?.optString("content")
+            if (content != null) return content
+        }
+        return json.optJSONObject("message")?.optString("content")
+    }
+
     private fun systemPrompt(persona: String, skills: List<String>): String = buildString {
         append("You are the brain of MicroDuck, a small two-legged robot duck living in a phone. ")
         append("The person talks to you; answer them and decide one action at a time from the duck's real state. ")
@@ -97,27 +170,8 @@ object AIBrain {
     ): Pair<AIDecision?, String?> {
         val endpointText = config.endpoint.trim()
         if (endpointText.isEmpty()) return null to "Set a model endpoint first"
-        val endpoint = try {
-            val url = URL(endpointText)
-            if (url.path.contains("chat/completions")) url
-            else URL(endpointText.trimEnd('/') + "/chat/completions")
-        } catch (_: Throwable) {
-            return null to "The endpoint is not a URL"
-        }
-        val state = try {
-            val json = JSONObject(stateJson)
-            val compact = JSONObject()
-            for (key in listOf(
-                "label", "mode", "fallen", "carrying", "powered_off", "care", "life",
-                "emotion", "last_sound", "pose", "peers", "tick",
-            )) {
-                json.opt(key)?.let { compact.put(key, it) }
-            }
-            compact.put("last_heard", heard)
-            compact.toString()
-        } catch (_: Throwable) {
-            "{}"
-        }
+        val endpoint = resolveEndpoint(endpointText) ?: return null to "The endpoint is not a URL"
+        val state = compactState(stateJson, heard)
         val body = JSONObject()
             .put("model", config.model.ifBlank { "gpt-4o-mini" })
             .put("temperature", 0.4)
@@ -136,27 +190,9 @@ object AIBrain {
                     ),
             )
         return try {
-            val connection = endpoint.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.doOutput = true
-            connection.connectTimeout = 8000
-            connection.readTimeout = 25000
-            connection.setRequestProperty("Content-Type", "application/json")
-            if (config.key.isNotEmpty()) {
-                connection.setRequestProperty("Authorization", "Bearer ${config.key}")
-            }
-            connection.outputStream.use { it.write(body.toString().toByteArray()) }
-            val code = connection.responseCode
-            val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
-                ?.bufferedReader()?.use { it.readText() } ?: ""
-            connection.disconnect()
-            if (code !in 200..299) return null to "HTTP $code"
-            val json = JSONObject(text)
-            val content = json.optJSONArray("choices")
-                ?.optJSONObject(0)
-                ?.optJSONObject("message")
-                ?.optString("content")
-                ?: json.optJSONObject("message")?.optString("content")
+            val reply = http.post(endpoint, config.key, body.toString())
+            if (reply.code !in 200..299) return null to "HTTP ${reply.code}"
+            val content = answerContent(reply.text)
                 ?: return null to "The model did not answer with a message"
             val decision = parse(content)
             decision to (
@@ -175,13 +211,7 @@ object AIBrain {
     fun writeDiary(config: AIConfig, dayFacts: String): Pair<String?, String?> {
         val endpointText = config.endpoint.trim()
         if (endpointText.isEmpty()) return null to "Set a model endpoint first"
-        val endpoint = try {
-            val url = URL(endpointText)
-            if (url.path.contains("chat/completions")) url
-            else URL(endpointText.trimEnd('/') + "/chat/completions")
-        } catch (_: Throwable) {
-            return null to "The endpoint is not a URL"
-        }
+        val endpoint = resolveEndpoint(endpointText) ?: return null to "The endpoint is not a URL"
         val system = """
             You write MicroDuck's diary: one short first-person paragraph (2-4
             sentences) in the duck's gentle voice, based ONLY on the real facts
@@ -205,28 +235,58 @@ object AIBrain {
                     ),
             )
         return try {
-            val connection = endpoint.openConnection() as HttpURLConnection
-            connection.requestMethod = "POST"
-            connection.doOutput = true
-            connection.connectTimeout = 8000
-            connection.readTimeout = 25000
-            connection.setRequestProperty("Content-Type", "application/json")
-            if (config.key.isNotEmpty()) {
-                connection.setRequestProperty("Authorization", "Bearer ${config.key}")
-            }
-            connection.outputStream.use { it.write(body.toString().toByteArray()) }
-            val code = connection.responseCode
-            val text = (if (code in 200..299) connection.inputStream else connection.errorStream)
-                ?.bufferedReader()?.use { it.readText() } ?: ""
-            connection.disconnect()
-            if (code !in 200..299) return null to "HTTP $code"
-            val json = JSONObject(text)
-            val content = json.optJSONArray("choices")
-                ?.optJSONObject(0)
-                ?.optJSONObject("message")
-                ?.optString("content")
-                ?: json.optJSONObject("message")?.optString("content")
-            val trimmed = content?.trim().orEmpty()
+            val reply = http.post(endpoint, config.key, body.toString())
+            if (reply.code !in 200..299) return null to "HTTP ${reply.code}"
+            val trimmed = answerContent(reply.text)?.trim().orEmpty()
+            if (trimmed.isEmpty()) null to "The model's answer was empty" else trimmed to null
+        } catch (error: Throwable) {
+            null to (error.message ?: "The model did not answer")
+        }
+    }
+
+    /**
+     * Voice chat: one plain sentence to the same endpoint, answered in plain
+     * text instead of a JSON action. The prompt forbids invented events,
+     * names and numbers; the duck may only repeat the real /state numbers it
+     * was given. Returns (reply, error) and never throws. Call from a worker
+     * thread.
+     */
+    fun chat(
+        config: AIConfig,
+        stateJson: String,
+        heard: String,
+        message: String,
+        chinese: Boolean,
+    ): Pair<String?, String?> {
+        val endpointText = config.endpoint.trim()
+        if (endpointText.isEmpty()) return null to "Set a model endpoint first"
+        val spoken = message.trim()
+        if (spoken.isEmpty()) return null to "Say something first"
+        val endpoint = resolveEndpoint(endpointText) ?: return null to "The endpoint is not a URL"
+        val system = buildString {
+            append("You are MicroDuck, a small two-legged robot duck living in a phone. ")
+            append("The person talks to you; answer in ONE or TWO short sentences of plain text, in the duck's own voice: warm, small vocabulary. ")
+            append("Never invent events, names or numbers. You may only mention the real numbers in the state below; if something is not there, do not claim it happened. ")
+            append("Do not return JSON, markdown, lists or code - just the sentence or two the duck says. ")
+            append(if (chinese) "Write in Chinese." else "Write in English.")
+            if (config.persona.isNotBlank()) append(" The person asks you to behave like: ${config.persona}")
+        }
+        val user = "Current duck state: ${compactState(stateJson, heard)}\n" +
+            "Last words it heard: ${heard.ifBlank { "none" }}\n" +
+            "The person says: $spoken"
+        val body = JSONObject()
+            .put("model", config.model.ifBlank { "gpt-4o-mini" })
+            .put("temperature", 0.7)
+            .put(
+                "messages",
+                JSONArray()
+                    .put(JSONObject().put("role", "system").put("content", system))
+                    .put(JSONObject().put("role", "user").put("content", user)),
+            )
+        return try {
+            val reply = http.post(endpoint, config.key, body.toString())
+            if (reply.code !in 200..299) return null to "HTTP ${reply.code}"
+            val trimmed = answerContent(reply.text)?.trim().orEmpty()
             if (trimmed.isEmpty()) null to "The model's answer was empty" else trimmed to null
         } catch (error: Throwable) {
             null to (error.message ?: "The model did not answer")

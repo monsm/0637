@@ -104,7 +104,7 @@ struct MoreSheet: View {
                     ) {
                         onOpen(.postcards)
                     }
-                    row(Icons.dex, Copy.dex, note: Copy.dexRowNote, id: "more-dex") {
+                    row(Icons.dex, Copy.collectionTitle, note: Copy.dexRowNote, id: "more-dex") {
                         onOpen(.dex)
                     }
                 }

@@ -19,10 +19,15 @@
     <!-- Spoken commands: SpeechRecognizer resolves the device's recognition
          service through package visibility. Without this <queries> entry the
          lookup fails on API 30+ and the "Voice commands" toggle reads
-         unavailable even when a service is installed. -->
+         unavailable even when a service is installed.
+         The voice chat's TextToSpeech engine is discovered and bound the same
+         way; on targetSdk 30+ both services must be declared here. -->
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 
