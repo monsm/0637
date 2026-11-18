@@ -62,7 +62,7 @@
 1. 两台都打开邻居页，点「在 Wi-Fi 里找鸭子」（Android 同时取得 multicast lock）。
 2. 核心在 UDP 8766 上每 2 秒广播自己的名字（iPhone 名称 / Android 机型），8 秒没消息就移除。
 3. 看到对方后点「打招呼」；对方收到后回一声 `hello`，两边鸭子分别用官方 `greet` / `yes` 声音与情绪回应，屏幕上的胶囊显示「X 向你问好！」/「X 回应了！」。
-4. 协议只有 announce / greet / hello 三个动词，不能远程控制鸭子；`/state.peers` 与 `peer_event` 公开。
+4. 协议共七个动词：announce / greet / hello / pair（六位配对码）/ gift（喂一颗、逗逗它）/ chorus（一起唱）/ ensemble（分声部），不能远程控制鸭子；`/state.peers` 与 `peer_event` 公开。
    CI 用宿主机的第二个 UDP 端点模拟另一只鸭子，验证发现、回应和 replied 状态。
 
 ## 7. AI 伙伴（自带模型）

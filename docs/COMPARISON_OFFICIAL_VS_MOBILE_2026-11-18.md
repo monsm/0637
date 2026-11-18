@@ -6,6 +6,37 @@
 - 输入完整性：本轮 8 个维度（body-physics / policy-skill / loop-state / safety-health / protocol / perception-media / companion / shell-parity）数据齐全，共 128 条 item，每维度 16 条。复核员的 `corrected_verdict` 已逐条应用到对应条目（条目判定列标 ⚠ 并在备注注明「复核纠正」）；复核员补漏（missed）逐维度列在该维度末尾，不计入主表六格。
 - 口径说明：总账矩阵与各维度小计的「落表」计数是采纳 10 条复核纠正后的实际条目数；脚本原始清点另行列明。两者差异全部来自 `equivalent → near` 的纠正，偏差、不做、硬件、未验证四格不受影响。
 
+## 0. 修复状态（2026-11-18 第二批：「找到的问题全部修正」）
+
+老板拍板按本报告修全部问题。四个并行工单（runtime / sensors+CI / iOS 壳 / Android 壳 / ffi+ipc / 逐槽覆盖）落地后，又经**三轮对抗复审**（6 维审查 → 双镜头验证 → 定点复核），累计拦下 **2 blocker + 16 major**，全部修复，且每项都有「先红后绿」回归证据。最终本地：默认特性 243+9、mujoco 272+9、Android JVM 70 全绿；六道静态门禁全绿；CI 新增 fmt/clippy/shellcheck/MuJoCo job 待首跑裁决。
+
+### 0.1 §5 偏差 27 条的处置
+
+| # | 偏差 | 处置 |
+|---:|---|---|
+| 1–3 | BAM 执行器路径 / 齿隙编码器读数 / 传感器回报语义 | **保留**：刻意偏离且对齐训练栈/真机（见 §5 各行理由），不属缺陷。 |
+| 4 | walk 覆盖持久性 | **已修**：双端偏好持久化并在核心就绪后重放（含 reload）；核心拒绝 walk=`"none"`；逐槽覆盖表（walk/stand/sitstand/ground_pick，非 walk 槽 `"none"`=禁用，失效覆盖回退并记 degraded）。 |
+| 5 | disturb 门控范围 | **已修**：按官方 `change_disturbs` 逐驱动槽比较（walk/stand/sitstand/ground_pick/技能），Reload 在驱动且非 Seated 时恒扰动。 |
+| 6 | Rest 与 Shutdown 分离 | **已修**：`request_rest` 独立落 AtRest（保持 rest 位姿与力矩、不断电），shutdown 仍走断电；Limp/摔倒/中坡走官方 cannot-sit（切扭矩、forget、不硬坐）。 |
+| 7 | 读取失败无 coast | **已修**：coast 上次样本、连续错误计数、阈值判 unhealthy（首读失败即 Err 并计入启动失败）。 |
+| 8 | health 判定输入面 | **已修**：tick 从未成功读→官方两分支（启动总线失败 degraded / 否则 unhealthy）；policy_error、连续总线错误入 unhealthy；硬件源缺失的 motors/cpu 字段保持空（见 #12）。 |
+| 9–11、16 | Home / BodyPose / sit-stand / pad 四语义 | **已修**：Home=关策略+init（策略关、停 home）；BodyPose 离开时释放；sit/stand 幂等、toggle 翻转；Rest 独立于 Shutdown；pad 与 intent 跨门语义一致。 |
+| 12 | robot.health 字段收窄 | **保留**：手机无舵机/CPU/总线源，报告字段按真实可用源填充；不虚构硬件数据。 |
+| 13、15、17 | DKRB 节奏 / Drive 四轴 | **已修**：DKRB 恢复 1s 窥探式节拍；Drive 用官方四轴（左杆走+侧移、右杆转向），HeadDrive 保持左杆转向。 |
+| 14、22 | robot.* 方法集 / robot.look | **已修**：扩到 21+ 方法（look/pose/mouth/sound/flashlight/stop/enable/init/relax/rest/shutdown/mode/setMode/policies/model/vetbook/skills/loadPolicy/reloadPolicies/safeToRestart/subscribe 身份字段）；thermin/chorale/setSkill/removeSkill 保持 `METHOD_NOT_FOUND`（无对应能力/无 robotd.toml 编辑面，代码注释登记）。 |
+| 18 | 麦克风语义 | **保留**：官方 pet-detect 以触屏 `pet()` 顶替是 BRAINSTORM 登记的设计；RMS/过零用于拍手/口哨事件。 |
+| 19 | Android IMU 扰动 | **已修**：SensorManager 线加速度（缺失时重力分离）+ 与 iOS 逐值相同的 shake 阈值/限频 → `DuckCore.push`，仅前台。 |
+| 20 | to_tof_grid 几何 | **已修**：改走官方 `kinematics::tof::Reprojector`（slant→躯干系、0.85 地板、<10cm 丢弃）；生产仍无深度源，注释如实。 |
+| 21 | frames/skeleton | **已修（skeleton/t_ns）**：按官方骨架逐式填充；`frames` 无相机源保持空并如实注释。 |
+| 23、24 | timer 规则 / 规则分享 | **已修**：timer 触发移出预算分支、睡着不触发；双端分享/粘贴保留 `period_s`、导入词表与核心一致、非法周期按条跳过并提示。 |
+| 25–27 | COMPANION 三动词 / CI 门禁 | **已修**：COMPANION 改七动词；core CI 加 fmt/clippy、新增 MuJoCo 测试 job、contracts 加 shellcheck（存量告警按文件精确豁免）；待 CI 首跑验证。 |
+
+### 0.2 §5.1 复核员补漏的处置
+
+- **已修**：逐槽覆盖、技能元数据（`robot.skills` 带参数/overridden）、manifest 作为下载清单、`robot.enable(false)`/`robot.relax`/`robot.init` 分支、`safe_to_restart`、health 启动 degraded、`robot.subscribe` 身份字段、`robot.sound`、`robot.policies`/`loadPolicy`/`reloadPolicies`、state skeleton/t_ns、C ABI 三入口的驱动门（技能环/大按钮/语音在休息态拒绝而非 accepted-then-frozen）、分支切换重发技能表、swap 落地按 owner 鸭判定。
+- **保留/边界（如实登记，不冒充已修）**：多鸭共享 MuJoCo 世界（官方 sim 测试特性）、头部 ToF 射线场景与 `--cameras` 帧流（真机/相机源）、训练期命令延迟模型（推理默认无延迟）、运行期增删技能（技能集由 manifest 决定）、社区策略门禁（本地用户自装文件语义）、`setMode` 整机重建（换 MJCF 必须重建，官方只换策略槽）、updaterd/configd 方法族与 robotctl CLI（手机无守护进程/CLI）、chorale 乐谱半（BRAINSTORM 登记）、head_imu 流（真机传感器）、vetbook Space traits、API_VERSION 握手（壳与核心同构建，无版本错配面）、coverage 门禁（需先有基线）。
+
+
 ## 1. 头部：直答与 11-16 审计差值
 
 **直答：8 个维度 128 条 item 的脚本清点为 equivalent 51 条、near 29 条、deviation 27 条、not_doing 8 条、hardware 5 条、unverified 8 条；采纳复核员 10 条纠正（全部为 equivalent → near）后，落表口径为 equivalent 41 条、near 39 条、deviation 27 条、not_doing 8 条、hardware 5 条、unverified 8 条。也就是说，128 条中 80 条（62.5%）达到等价或功能近似，27 条（21.1%）存在可指认的语义偏差，其余 21 条（16.4%）是刻意不做、真机硬件边界与静态审读够不到的验证盲区。移动版不是官方功能的残缺复制品：身体物理、策略与技能、控制循环与安全执行层的主体是同一官方源码直接编译或逐式对齐；真正的差距集中在协议长尾、感知与媒体替身、以及 QA 已记录的 5 项语义细节。**
