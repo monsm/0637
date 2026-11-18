@@ -2588,50 +2588,45 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         }
         Intent::Heard(text) => {
             core.runtime.heard(&text);
-            let Some((phrase, heard)) = crate::speech::interpret(&text) else {
+            // The person's taught words and the built-in table contest one
+            // longest match; whichever wins names the verb. The table is
+            // cloned out of the queue so no lock is held while the verb
+            // runs.
+            let aliases = core.intents.voice_aliases();
+            let Some((phrase, heard)) = crate::speech::interpret_with(&aliases, &text) else {
                 // Silence is not an error the client should have to parse:
                 // say what was heard and that nothing matched.
                 return json!({ "ok": false, "heard": text, "reason": "no verb matched" });
             };
-            // Speech reaches the same execution path as a button. A verb that
-            // moves the duck waits for the driving robot the official loop
-            // requires; a sound does not move anything and stays available.
-            // Frozen time comes first: a move accepted while paused would be
-            // counted in the life record without the tick that performs it.
-            if matches!(
-                &heard,
-                crate::speech::Heard::Skill(_)
-                    | crate::speech::Heard::Sit
-                    | crate::speech::Heard::Stand
-                    | crate::speech::Heard::GroundPick
-            ) && core.runtime.clock().paused
-            {
+            // Speech reaches the same execution path as a button, and a verb
+            // that moves the duck walks the same gates the Skill/Sit/
+            // GroundPick intents do: the power-off first — 「press Start on
+            // the pad」 would point at a duck that is going down — then
+            // frozen time, then the driving policy. A sound does not move
+            // anything and stays available through all three.
+            if heard.moves_body() && core.runtime.shutting_down() {
+                return refuse(core, "the duck is powering off".to_owned());
+            }
+            if heard.moves_body() && core.runtime.clock().paused {
                 return refuse(core, "the duck is paused".to_owned());
             }
-            if matches!(
-                &heard,
-                crate::speech::Heard::Skill(_)
-                    | crate::speech::Heard::Sit
-                    | crate::speech::Heard::Stand
-                    | crate::speech::Heard::GroundPick
-            ) && !policy_drives(&core.runtime)
-            {
+            if heard.moves_body() && !policy_drives(&core.runtime) {
                 return refuse(
                     core,
                     "the policy is not driving — press Start on the pad".to_owned(),
                 );
             }
             let result = match heard {
-                crate::speech::Heard::Skill(name) => core
+                crate::speech::HeardWord::Skill(name) => core
                     .runtime
-                    .trigger_skill(name)
+                    .trigger_skill(&name)
                     .map(|started| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": name, "chained": !started }))
                     .map_err(str::to_owned),
-                crate::speech::Heard::Sound(tag) => {
-                    core.runtime.queue_sound(tag);
+                crate::speech::HeardWord::Sound(tag) => {
+                    core.runtime.queue_sound(&tag);
                     Ok(json!({ "ok": true, "heard": text, "phrase": phrase, "sound": tag }))
                 }
-                crate::speech::Heard::Sit => {
+                crate::speech::HeardWord::Sit => {
                     if core.runtime.is_sitting() {
                         Ok(json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "sit", "did": false }))
                     } else {
@@ -2641,7 +2636,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                             .map_err(str::to_owned)
                     }
                 }
-                crate::speech::Heard::Stand => {
+                crate::speech::HeardWord::Stand => {
                     if core.runtime.is_sitting() {
                         core.runtime
                             .sit_toggle()
@@ -2651,7 +2646,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                         Ok(json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "stand", "did": false }))
                     }
                 }
-                crate::speech::Heard::GroundPick => core
+                crate::speech::HeardWord::GroundPick => core
                     .runtime
                     .start_ground_pick()
                     .map(|()| json!({ "ok": true, "heard": text, "phrase": phrase, "skill": "ground_pick" }))
@@ -2659,7 +2654,20 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             };
             match result {
                 Ok(value) => value,
-                Err(error) => refuse(core, error),
+                Err(error) => {
+                    // The verb was understood but did not run — a taught word
+                    // whose skill the last reload dropped, say. This is a
+                    // hearing answer, not a duck state: unlike `refuse`, it
+                    // leaves `core.label` alone, and it keeps `heard` and
+                    // `phrase` so the client can see what was meant.
+                    json!({
+                        "ok": false,
+                        "heard": text,
+                        "phrase": phrase,
+                        "error": error,
+                        "reason": "the verb did not run",
+                    })
+                }
             }
         }
         Intent::Flashlight { toggle, on, color } => {
@@ -5323,6 +5331,143 @@ mod tests {
         );
 
         unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A word the person taught is heard through the same door as a
+    /// built-in one: it reaches the loaded skill and reports the phrase
+    /// that matched.
+    #[test]
+    fn a_taught_word_triggers_the_skill_it_names() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        let aliases =
+            std::collections::BTreeMap::from([("转圈圈".to_owned(), "roulade".to_owned())]);
+        assert!(unsafe { (*core).intents.set_voice_aliases(aliases) }.is_ok());
+
+        let answer = unsafe { apply_intent(&mut *core, Intent::Heard("转圈圈".to_owned())) };
+        assert_eq!(answer["ok"], json!(true), "{answer}");
+        assert_eq!(answer["heard"], json!("转圈圈"), "{answer}");
+        assert_eq!(answer["phrase"], json!("转圈圈"), "{answer}");
+        assert_eq!(answer["skill"], json!("roulade"), "{answer}");
+
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The pause gate is inherited by taught words: an alias is a way of
+    /// hearing, not a way around frozen time.
+    #[test]
+    fn a_paused_duck_refuses_a_taught_word() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        let aliases =
+            std::collections::BTreeMap::from([("转圈圈".to_owned(), "roulade".to_owned())]);
+        assert!(unsafe { (*core).intents.set_voice_aliases(aliases) }.is_ok());
+        unsafe { duck_core_set_paused(core, 1) };
+
+        let answer = unsafe { apply_intent(&mut *core, Intent::Heard("转圈圈".to_owned())) };
+        assert_eq!(answer["ok"], json!(false), "{answer}");
+        assert!(
+            answer["error"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("paused"),
+            "{answer}"
+        );
+        assert!(
+            !unsafe {
+                active_runtime(&*core)
+                    .book()
+                    .life
+                    .skills
+                    .contains_key("roulade")
+            },
+            "a refused alias is not part of the duck's story"
+        );
+
+        unsafe { duck_core_set_paused(core, 0) };
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A taught word whose target the runtime no longer has — the queue's
+    /// skill snapshot and the loaded network diverged, the gap a reload
+    /// leaves behind — is a hearing answer, not a duck state: the reply
+    /// keeps `heard` and `phrase`, and the duck's label is not overwritten
+    /// with the move's own error.
+    #[test]
+    fn a_heard_word_whose_target_vanished_keeps_its_context() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe {
+            let c = &mut *core;
+            // The queue publishes a skill the controller does not have, so
+            // teaching the word passes the door while hearing it fails as
+            // "no such skill".
+            c.intents.set_skills(vec!["ghost_skill".to_owned()]);
+            let aliases =
+                std::collections::BTreeMap::from([("隐身".to_owned(), "ghost_skill".to_owned())]);
+            assert!(c.intents.set_voice_aliases(aliases).is_ok());
+
+            let label_before = c.label.clone();
+            let answer = apply_intent(c, Intent::Heard("隐身".to_owned()));
+            assert_eq!(answer["ok"], json!(false), "{answer}");
+            assert_eq!(answer["heard"], json!("隐身"), "{answer}");
+            assert_eq!(answer["phrase"], json!("隐身"), "{answer}");
+            assert!(
+                answer["error"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("no such skill"),
+                "{answer}"
+            );
+            assert_eq!(answer["reason"], json!("the verb did not run"), "{answer}");
+            assert_eq!(
+                c.label, label_before,
+                "a hearing failure is not the duck's state: {}",
+                c.label
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The power-off is the first gate a spoken move meets: mid shutdown the
+    /// answer names the power-off, not 「press Start on the pad」 pointing at
+    /// a duck that is going down, and a greeting is still just a sound.
+    #[test]
+    fn a_heard_move_during_the_poweroff_names_the_poweroff() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        unsafe {
+            let c = &mut *core;
+            on_active(c, |runtime| runtime.request_shutdown());
+            for _ in 0..20 {
+                duck_core_tick(core);
+                if active_runtime(c).shutting_down() {
+                    break;
+                }
+            }
+            assert!(
+                active_runtime(c).shutting_down(),
+                "the duck is mid power-off"
+            );
+
+            let answer = apply_intent(c, Intent::Heard("sit".to_owned()));
+            assert_eq!(answer["ok"], json!(false), "{answer}");
+            assert!(
+                answer["error"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("powering off"),
+                "{answer}"
+            );
+            // A sound moves nothing: still available on the way down.
+            let answer = apply_intent(c, Intent::Heard("hello".to_owned()));
+            assert_eq!(
+                answer["ok"],
+                json!(true),
+                "a greeting is not a move: {answer}"
+            );
+        }
         unsafe { duck_core_free(core) };
     }
 

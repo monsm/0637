@@ -30,6 +30,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
+use crate::speech::VoiceAliases;
+
 /// How long a one-shot route waits for the tick to decide. The loop runs at
 /// 50 Hz, so a live duck answers in 20 ms; the margin is for a slow frame, and
 /// the timeout is what a backgrounded app looks like.
@@ -207,6 +209,10 @@ pub struct IntentQueue {
     /// The official emotion names this build loaded, as the core last
     /// published them. The gift route refuses a mood that is not in here.
     emotions: Mutex<Vec<String>>,
+    /// The words a person taught the duck: phrase -> a verb it already has.
+    /// Whole-table state the client owns and replays on launch, so nothing
+    /// here is written to disk by the core.
+    voice_aliases: Mutex<VoiceAliases>,
     /// The manifest's one-shot skills, as the core last published them. The
     /// collection page's tricks: `/skills` also carries the emotions and the
     /// loop's own verbs, so that list cannot stand in for this one.
@@ -264,6 +270,7 @@ impl IntentQueue {
             fingerprint: Mutex::new("{}".to_owned()),
             peers: Mutex::new(json!({ "peers": [] })),
             emotions: Mutex::new(Vec::new()),
+            voice_aliases: Mutex::new(VoiceAliases::new()),
             manifest_skills: Mutex::new(Vec::new()),
             gifts_sent: Mutex::new(HashMap::new()),
             gift_event: Mutex::new(Value::Null),
@@ -398,6 +405,38 @@ impl IntentQueue {
 
     pub fn skills_json(&self) -> String {
         json!({ "skills": *self.skills.lock().expect("intent skills") }).to_string()
+    }
+
+    /// Replace the whole taught-word table.
+    ///
+    /// Every target must name something this duck currently has, checked
+    /// against the snapshots the core last published — `sit`/`stand`/
+    /// `ground_pick`, a built-in sound tag, a loaded skill, or a loaded
+    /// emotion. The table is refused whole, with the phrase and target
+    /// named, rather than half applied. An empty map clears it; the shell
+    /// replays the list on launch, so the core keeps it in memory only.
+    pub fn set_voice_aliases(&self, pairs: BTreeMap<String, String>) -> Result<(), String> {
+        let aliases = VoiceAliases::from_pairs(pairs)?;
+        let skills = self.skills.lock().expect("intent skills").clone();
+        let emotions = self.emotions.lock().expect("intent emotions").clone();
+        for (phrase, target) in aliases.iter() {
+            if !crate::speech::target_is_valid(target, &skills, &emotions) {
+                return Err(format!(
+                    "voice alias {phrase:?}: {target:?} is not a loaded skill, emotion, sound or the duck's own sit/stand/ground_pick"
+                ));
+            }
+        }
+        *self.voice_aliases.lock().expect("intent voice aliases") = aliases;
+        Ok(())
+    }
+
+    /// The taught words as `/heard` reads them. Cloned so the caller never
+    /// holds the lock while the verb runs.
+    pub fn voice_aliases(&self) -> VoiceAliases {
+        self.voice_aliases
+            .lock()
+            .expect("intent voice aliases")
+            .clone()
     }
 
     pub fn set_fingerprint(&self, document: String) {
@@ -957,6 +996,32 @@ fn apply_policy_config(value: &Value) -> Result<(), String> {
     Ok(())
 }
 
+/// `POST /config`'s voice half: the person's whole taught-word table.
+///
+/// `voice_aliases` is an object of phrase to target — a sibling of the
+/// policy keys, not a policy — and an empty object clears the table.
+/// Targets are checked against the snapshots the core last published, so a
+/// word can only name a move the duck really has. A table with one bad word
+/// is refused whole; the table already in force stays.
+fn apply_voice_aliases(queue: &IntentQueue, value: &Value) -> Result<(), String> {
+    let Some(table) = value.get("voice_aliases") else {
+        return Ok(());
+    };
+    let table = table
+        .as_object()
+        .ok_or("voice_aliases must be an object of phrase to target")?;
+    let pairs = table
+        .iter()
+        .map(|(phrase, target)| {
+            target
+                .as_str()
+                .map(|target| (phrase.clone(), target.to_owned()))
+                .ok_or_else(|| format!("voice alias {phrase:?}: the target must be a name"))
+        })
+        .collect::<Result<BTreeMap<String, String>, String>>()?;
+    queue.set_voice_aliases(pairs)
+}
+
 fn handle(
     mut stream: TcpStream,
     queue: Arc<IntentQueue>,
@@ -1422,7 +1487,10 @@ fn handle(
         ("POST", "/config") => {
             let idle = value.get("idle_ritual_s").and_then(Value::as_f64);
             let care = value.get("care_time_scale").and_then(Value::as_f64);
-            match apply_policy_config(&value) {
+            // The taught words go first: their validation reads the loaded
+            // skill/emotion snapshots, and a refused table must leave the
+            // policy keys untouched.
+            match apply_voice_aliases(&queue, &value).and_then(|()| apply_policy_config(&value)) {
                 Err(error) => Err(error),
                 Ok(()) => {
                     // Keep the old shape working: /config with only
@@ -1956,6 +2024,92 @@ mod tests {
         );
         assert!(response.contains("400 Bad Request"), "{response}");
         assert!(response.contains("kick_left"), "{response}");
+    }
+
+    /// The person's own words, taught through `/config`: a phrase names a
+    /// verb the duck really has, and the duck hears it through the same
+    /// `/heard` path as a built-in one. A bad table is refused whole, and
+    /// an empty object clears it back to the built-in words.
+    #[test]
+    fn http_config_takes_taught_voice_words() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_skills(vec!["roulade".to_owned(), "sit".to_owned()]);
+        queue.set_emotions(vec!["excited".to_owned()]);
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"voice_aliases":{"转圈圈":"roulade","开心极了":"excited","蹲下":"sit","打招呼":"greet"}}"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let aliases = queue.voice_aliases();
+        assert_eq!(aliases.get("转圈圈"), Some("roulade"));
+        assert_eq!(aliases.get("开心极了"), Some("excited"));
+        assert_eq!(aliases.get("蹲下"), Some("sit"));
+        assert_eq!(aliases.get("打招呼"), Some("greet"));
+        assert_eq!(aliases.len(), 4);
+        // Teaching words is neither a policy change nor an idle reset.
+        assert!(queue.drain().is_empty());
+
+        // The taught word is heard like a built-in one; the phrase reported
+        // is the one that matched, and the target is the person's skill.
+        let (phrase, heard) = crate::speech::interpret_with(&aliases, "转圈圈！").expect("taught");
+        assert_eq!(phrase, "转圈圈");
+        assert_eq!(heard, crate::speech::HeardWord::Skill("roulade".to_owned()));
+
+        // Nothing about the table leaks into /state. The pipe is proven
+        // first: a marker put in the state comes back out, so the no-leak
+        // assertions below could actually fail if a phrase ever leaked.
+        queue.set_state(json!({ "label": "state-leak-marker" }));
+        let response = request(port, "GET", "/state", "");
+        assert!(response.contains("state-leak-marker"), "{response}");
+        for phrase in ["转圈圈", "开心极了", "蹲下", "打招呼"] {
+            assert!(!response.contains(phrase), "{phrase} leaked: {response}");
+        }
+
+        // A target the duck does not have refuses the whole table, naming
+        // the phrase and the target; the table already in force stays.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"voice_aliases":{"转圈圈":"backflip"}}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("转圈圈"), "{response}");
+        assert!(response.contains("backflip"), "{response}");
+        assert_eq!(queue.voice_aliases().get("转圈圈"), Some("roulade"));
+
+        // A phrase that is empty after trimming is refused.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"voice_aliases":{"   ":"roulade"}}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("empty"), "{response}");
+        assert_eq!(queue.voice_aliases().len(), 4);
+
+        // A target that is not even a string is refused at the door.
+        let response = request(port, "POST", "/config", r#"{"voice_aliases":{"转":7}}"#);
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("must be a name"), "{response}");
+        assert_eq!(queue.voice_aliases().len(), 4);
+
+        // An empty object is the person clearing the list; the built-in
+        // words are all that is left.
+        let response = request(port, "POST", "/config", r#"{"voice_aliases":{}}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(queue.voice_aliases().is_empty());
+        let cleared = queue.voice_aliases();
+        let (phrase, heard) = crate::speech::interpret_with(&cleared, "翻滚").expect("built in");
+        assert_eq!(phrase, "翻滚");
+        assert_eq!(heard, crate::speech::HeardWord::Skill("roulade".to_owned()));
     }
 
     /// A painted route is queued with its origin and thinned points, and an
