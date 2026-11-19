@@ -331,6 +331,7 @@ internal fun DuckPanelSheet(
 @Composable
 internal fun ToolsSheet(
     input: DuckInput,
+    depth: DepthScan?,
     onOpen: (DuckRoute) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -433,9 +434,31 @@ internal fun ToolsSheet(
                     backupPicker.launch(arrayOf("application/json", "text/plain"))
                 }
             }
+            // The depth sensor rides the existing ToF row, the same line iOS shows:
+            // the core's grid when it publishes one, then the one-shot scan's
+            // honest note and box count, then "no depth sensor" or "denied".
+            // No new control, no fabricated room.
+            val depthNote = when {
+                tofStrip != "—" -> tofStrip
+                depth == null -> "—"
+                depth.floorDistance != null -> if (
+                    depth.boxes.isEmpty() || DepthStatus.obstaclesWritten == false
+                ) {
+                    // The scan note is still true when staging failed; the
+                    // box count would claim furniture the core never loaded.
+                    Copy.depthScanNote
+                } else {
+                    "${Copy.depthScanNote} · ${depth.boxes.size}"
+                }
+                depth.sensorPresent && depth.reason == DepthScan.PERMISSION ->
+                    Copy.denied
+                !depth.sensorPresent && depth.reason == DepthScan.NO_SENSOR ->
+                    Copy.depthUnsupported
+                else -> "—"
+            }
             ControlRow(
                 Copy.tof,
-                note = tofStrip,
+                note = depthNote,
                 tag = "tools-tof",
             ) {
                 scope.launch {

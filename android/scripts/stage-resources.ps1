@@ -18,6 +18,12 @@ $manifest = Join-Path $root 'policies\manifest.json'
 if (Test-Path $manifest) { Copy-Item $manifest (Join-Path $dst 'policies') -Force }
 $pickup = Join-Path $root 'upstream\microduck\duck-control\models\pickup_detector.onnx'
 if (Test-Path $pickup) { Copy-Item $pickup (Join-Path $dst 'models\pickup_detector.onnx') -Force }
+# The official scratch-sound classifier for POST /sensor pcm16 (J3/J1).
+$pet = Join-Path $root 'upstream\microduck\pet-detect\models\pet_detect.onnx'
+if (Test-Path $pet) {
+  New-Item -ItemType Directory -Force (Join-Path $dst 'pet-detect') | Out-Null
+  Copy-Item $pet (Join-Path $dst 'pet-detect\pet_detect.onnx') -Force
+}
 # `robotd/emotions/`: thirteen keyframe timelines and their 48 kHz voices.
 $emotions = Join-Path $root 'upstream\microduck\robotd\emotions'
 if (Test-Path $emotions) {

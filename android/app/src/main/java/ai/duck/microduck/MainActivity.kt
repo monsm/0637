@@ -151,7 +151,14 @@ class MainActivity : ComponentActivity() {
                         // gives up rather than throwing.
                         Thread {
                             for (attempt in 0 until 40) {
-                                if (created.startIntentServer(8765) == 0) return@Thread
+                                if (created.startIntentServer(8765) == 0) {
+                                    // The depth scan's floor estimate goes to
+                                    // the core once the server answers. No
+                                    // depth source, no post: the core keeps
+                                    // its own floor.
+                                    postFloorIfKnown()
+                                    return@Thread
+                                }
                                 try {
                                     Thread.sleep(50)
                                 } catch (_: InterruptedException) {
@@ -214,6 +221,17 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    /**
+     * The floor intent for the scan, if it found the plane the duck stands
+     * on. The body is `{"z":0.0}`: the core's z is an offset from the scene's
+     * default ground (it accepts -0.1..0.3 and moves plane and duck
+     * together). A scan that saw no plane, or none ran, posts nothing.
+     */
+    private fun postFloorIfKnown() {
+        val body = floorPostBody(DepthStatus.last) ?: return
+        postDuckCommand("/floor", body)
     }
 
     companion object {
@@ -365,7 +383,45 @@ private fun DuckScreen(
         error = null
         val created = withContext(Dispatchers.IO) {
             runCatching {
+                // Depth obstacles (#4) must be on disk before the core
+                // compiles the scene; the floor (#20) rides DepthStatus and
+                // posts the contract's zero offset once the intent server
+                // answers. The scan starts before the asset copy so it costs
+                // the launch's first second, not the copy's. A scan failure
+                // is a state, not a crash: nothing is written, nothing posts.
+                val scan = try {
+                    DepthScanner(context).scan()
+                } catch (_: Throwable) {
+                    DepthScan(false, false, null, emptyList(), DepthScan.LOOKUP)
+                }
                 val root = AssetStager.stage(context)
+                DepthStatus.last = scan
+                // The obstacle file is written or removed here, before the
+                // core compiles the scene. It is staged on its own: a full
+                // or read-only filesDir degrades this launch's furniture,
+                // but must never stop DuckCore below ("scan never affects
+                // startup"). The Tools row checks obstaclesWritten so it
+                // does not count furniture the core did not load.
+                val obstacles = File(root, "robot/microduck/obstacles.xml")
+                val staged = stageObstacles(obstacles, scan)
+                when (val stage = staged.getOrNull()) {
+                    ObstacleStage.WRITTEN -> {
+                        DepthStatus.obstaclesWritten = true
+                        android.util.Log.i(
+                            "duck",
+                            "depth: ground plane ${scan.floorDistance} m away, ${scan.boxes.size} obstacle(s)",
+                        )
+                    }
+                    ObstacleStage.ABSENT -> DepthStatus.obstaclesWritten = null
+                    null, ObstacleStage.DEGRADED -> {
+                        DepthStatus.obstaclesWritten = false
+                        android.util.Log.w(
+                            "duck",
+                            "depth: obstacles.xml not staged; starting without this scan's furniture",
+                            staged.exceptionOrNull(),
+                        )
+                    }
+                }
                 val core = DuckCore(
                     File(root, "robot/microduck/scene_backlash.xml").path,
                     File(root, "policies").path,

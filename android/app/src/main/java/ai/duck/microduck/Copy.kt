@@ -604,6 +604,22 @@ val quack get() = pick("Quack", "叫一声")
         "同框：${names.joinToString(", ")}",
     )
     val tof get() = pick("Head ToF", "头部 ToF")
+    // J3 SENSORS: the two keys are word for word with the parallel iOS
+    // ticket. A phone with no depth camera hides the obstacle and floor
+    // capabilities and says this instead of drawing an invented room.
+    val depthUnsupported get() = pick(
+        "This device has no depth sensor",
+        "这台设备没有深度传感器",
+    )
+    // The scan is one shot at launch; the furniture cannot follow the room.
+    val depthScanNote get() = pick(
+        "Furniture was scanned at launch; it does not follow the room",
+        "启动时扫的家具,不会随房间变化",
+    )
+    val petSoundNote get() = pick(
+        "Scratch sounds are detected by the official model, on this phone only",
+        "摸摸声由官方模型识别,只在手机",
+    )
     val padSender get() = pick("Be the pad", "当手柄")
     val padTarget get() = pick("Driving", "驾驶中")
     val abTry get() = pick("Policy A/B", "策略 AB 试穿")
