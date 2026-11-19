@@ -44,7 +44,7 @@ IOS_MORE = "ios/DuckApp/MoreSheet.swift"
 DRAWER_BUDGET = 16
 PAGE_CAP = 6
 GROUP_COUNT = 4
-LEDGER_TOTAL = 43  # 22 + extensions + 2 no-ui（2026-11-19 H2 增「教它说话」）
+LEDGER_TOTAL = 44  # 22 + extensions + 2 no-ui（2026-11-19 H2 增「教它说话」、K2 增「日子」）
 TIME_BAR_ID = "rewind-play"
 NEIGHBOUR_GATED = {"ensemble", "chorus", "gifts"}
 
@@ -159,7 +159,10 @@ def check_ui_matches(cfg, root):
         # H2 2026-11-19: the destination pages and the collection sheet
         # joined the scan so the alias / badges / collection-open anchors
         # are actually verified, not skipped as "outside the scanned set".
+        # K2 2026-11-19: the days board joined the scan so its ids (title,
+        # week card, rows, empty state, share) are verified too.
         "ios/DuckApp/MorePages.swift", "ios/DuckApp/CollectionSheet.swift",
+        "ios/DuckApp/DaysSheet.swift",
         "android/app/src/main/java/ai/duck/microduck/Shell.kt",
         "android/app/src/main/java/ai/duck/microduck/MoreSheet.kt",
         "android/app/src/main/java/ai/duck/microduck/Companion.kt",

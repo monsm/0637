@@ -712,6 +712,15 @@ COMPANION 头脑风暴里仅剩未做的两项落地：
 - **验证**：核心 265+9 / mujoco 307+9（新增 10 条别名测试）；Android 106 JVM（新增 18）；iOS 新增 23 单测；六道契约门禁绿（Copy 336=336）。Swift/真机由 CI 与真机裁决。
 - **QA**：3 维对抗审查 + 双镜头验证，结论与修复记录见 `docs/QA_BADGES_ALIASES_2026-11-18.md`。
 
+### 四之三十一、技能热插拔 + 家长看板「日子」（2026-11-19）
+
+第四批功能点，两个真缺口（对比报告 §5.1 与已拍板池的残余）：
+
+- **技能热插拔**：`POST /config {"custom_skills":[...]}` 与 IPC `robot.setSkill/removeSkill`（参数逐字对齐官方 `SkillParams`）。整表校验：只收 `kind=episodic`、`name` 为裸文件名（拒绝 `/ \ ..`、前导 `/`、盘符前缀）、文件必须存在于策略目录；`path:"none"` 按官方语义关闭同名套装技能；accepting 前跑官方 `duck_control::policy::validate`。load 时合并、同名覆盖；坏条目不入表；文件暂时缺失只跳过本次并告警，表保留。下一次 reload 生效，`/skills`、`robot.skills`（`overridden` 标记）、vetbook 同步。
+- **日子（家长看板）**：`DayRecord` 补齐八项真实每日增量（被摸/被抱起/摔倒/被喂/拍手/口哨/捡拾/坐下；旧存档缺字段=0），`GET /days` 返回已完成日、今天实时增量与本周合计（最近 7 天+today，全部同口径相减，钳零）。`sit_downs` 按官方 vetbook 的 label 边沿在运行时累加。恢复闭环携带 `days` 与 `day_started`：没有可信基线时重设为当前 life 并盖上今天，**绝不把终身计数算进今天**。双端「日子」页（工具页，2 跳）：本周卡 + 每日九项 + 今天行 + 空态 + 双语分享；离线与真空态分开。
+- **验证**：核心 290+9 / mujoco 341+9（本批修复新增 13 条测试，含 6 处先红后绿）；Android JVM 全绿（DaysSheetTest 10）；六道契约门禁绿（台账 44 行/50 条目，Copy 350=350）。Swift/真机与真实 ONNX 热插拔由 CI 与真机裁决。
+- **QA**：3 维对抗审查 28 agent，拦下 2 blocker（setSkill 路径穿越；冷启动把终身计数当今天）+ 4 major，全部修复并带红绿证据，见 `docs/QA_SKILLS_DAYS_2026-11-19.md`。
+
 ---
 
 ## 八、仓库与复现

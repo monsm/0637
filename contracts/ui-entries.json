@@ -728,6 +728,26 @@
       }
     },
     {
+      "id": "days",
+      "zh": "日子",
+      "conform_b4": "extension",
+      "note": "2026-11-19 K2 家长看板；工具页内行（本地 sheet，不新增路由），点开「日子」：GET /days 的今天/本周/已完成日，缺字段=0、today 缺失不补行、空就是空。锚点取工具页行（两端同 id days-open）",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/MorePages.swift",
+          "days-open"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
+          "days-open"
+        ]
+      }
+    },
+    {
       "id": "ab-try",
       "zh": "AB 试穿",
       "conform_b4": "extension",

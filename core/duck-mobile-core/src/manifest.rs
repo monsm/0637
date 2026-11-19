@@ -73,6 +73,38 @@ static SLOT_OVERRIDES: Mutex<BTreeMap<&'static str, String>> = Mutex::new(BTreeM
 /// here, so it leaves them in this queue for the shell's reload hook.
 static OVERRIDE_WARNINGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
+/// The directory of the most recent policy load. The custom skill table has
+/// no per-call directory of its own — `POST /config custom_skills` and
+/// `robot.setSkill` edit a process global — but its entries' `file` fields
+/// are names in a policies directory, so the set-time existence check has to
+/// know which one. `load_mode` remembers the directory it was given, and the
+/// set-time check resolves against it; the load-time check uses the actual
+/// directory each load is given (which can differ after a `/reload`).
+static POLICIES_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// The custom skill table: the phone's twin of the official `[[policy.skill]]`
+/// config entries. The official daemon edits a config file and reloads; a
+/// phone edits this table (`/config custom_skills`, `robot.setSkill`,
+/// `robot.removeSkill`) and reloads. It is a process global because the
+/// official keys are one machine-level config, exactly like the slot table.
+static SKILL_OVERRIDES: Mutex<BTreeMap<String, SkillDef>> = Mutex::new(BTreeMap::new());
+
+/// The directory of the most recent load attempt, for the custom-skill
+/// table's set-time file checks.
+fn policies_dir() -> Option<PathBuf> {
+    POLICIES_DIR
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
+/// Record which directory the next load resolution runs against.
+fn remember_policies_dir(dir: &Path) {
+    *POLICIES_DIR
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(dir.to_path_buf());
+}
+
 /// The canonical spelling of an overridable slot, or the official
 /// `robot.loadPolicy` refusal: the names this core does know. Official
 /// `Slot::parse` matches the wire spelling exactly, so this does too.
@@ -167,6 +199,234 @@ pub fn take_override_warnings() -> Vec<String> {
     )
 }
 
+/// The name checks every way of adding a skill goes through, in the official
+/// `robot.setSkill`'s own order and words (`robotd/src/main.rs`'s
+/// `set_skill_request`): a blank name is not something `robot.do` can be
+/// asked for, and a name the daemon drives itself is unreachable as a table
+/// entry (the ground pick and the sit toggle live in their own arm of the
+/// cascade).
+pub fn validate_skill_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("a skill needs a name; it is what `robot.do` asks for".to_owned());
+    }
+    if robotd_params::DAEMON_OWNED_SKILLS.contains(&name) {
+        return Err(format!(
+            "{name} is driven by the robot itself and cannot be a table entry"
+        ));
+    }
+    // A skill's name is also its `<name>.onnx` file stem when the entry names
+    // no file, so it obeys the same bare-file-name rule as a slot override: a
+    // name like `../../evil` (or an absolute path) would otherwise resolve
+    // outside the policies directory at the next load — and load a stranger's
+    // `.onnx` under the duck's own name. A colon is refused with the
+    // separators because on Windows `C:x.onnx` is a drive prefix, and
+    // `Path::join` would replace the base with it.
+    validate_override_name(name)?;
+    if name.contains(':') {
+        return Err(format!(
+            "{name:?} is not a file name in the policies directory"
+        ));
+    }
+    Ok(())
+}
+
+/// A skill's file: a bare name in the policies directory that directory
+/// currently resolves against — the same rule the slot override uses (a name
+/// is not a route out of the directory), plus the existence check the slot
+/// override leaves to the load (`load_mode` warns and skips a file that
+/// vanished after it was set, but a name that was never there is refused at
+/// the door so nobody is told a skill was added and finds out by pressing the
+/// button).
+fn validate_skill_file(file: &str, dir: &Path) -> Result<(), String> {
+    if !bare_file_name(file) {
+        return Err(format!(
+            "{file:?} is not a file name in the policies directory"
+        ));
+    }
+    if !dir.join(file).is_file() {
+        return Err(format!("no such file: {}", dir.join(file).display()));
+    }
+    Ok(())
+}
+
+/// Whether `file` is a bare file name in a policies directory: no
+/// separators, no `..`, and no colon (on Windows `C:x.onnx` is a drive
+/// prefix, and `Path::join` would replace the base with it). The load's
+/// merge applies this to every derived `<name>.onnx` too, so a table written
+/// by an older build cannot walk out either.
+fn bare_file_name(file: &str) -> bool {
+    validate_override_name(file).is_ok() && !file.contains(':')
+}
+
+/// Parse and validate one `custom_skills` entry — the official manifest
+/// policy-entry shape, read the same way [`skills_from`] reads it. Returns
+/// the skill's name and the entry as a `SkillDef` whose `path` is the bare
+/// file name (the load resolves it against its own directory). A refusal
+/// names the entry and the reason, in the official words where the official
+/// code has words.
+fn parse_custom_skill_entry(
+    entry: &serde_json::Value,
+    index: usize,
+) -> Result<(String, SkillDef), String> {
+    let identify = || {
+        entry
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .or_else(|| entry.get("file").and_then(serde_json::Value::as_str))
+            .map(str::to_owned)
+    };
+    let wrap = |reason: String| match identify() {
+        Some(name) => format!("custom_skills[{index}] ({name:?}): {reason}"),
+        None => format!("custom_skills[{index}]: {reason}"),
+    };
+    let policy: SetPolicy = serde_json::from_value(entry.clone())
+        .map_err(|error| wrap(format!("not a manifest policy entry: {error}")))?;
+    // A custom entry must name itself: the table is keyed by name, and unlike
+    // the set's own entries there is no file-stem fallback a client asked for.
+    let Some(name) = policy
+        .name
+        .as_deref()
+        .filter(|name| !name.trim().is_empty())
+    else {
+        return Err(wrap(
+            "a skill needs a name; it is what `robot.do` asks for".to_owned(),
+        ));
+    };
+    validate_skill_name(name).map_err(wrap)?;
+    let daemon_driven = policy.is_phase() || policy.is_posture_flag();
+    if !policy.is_episodic() {
+        return Err(wrap(
+            "not a skill: `kind` must be \"episodic\" — a perpetual entry has no \
+             length of its own, and a scripted one is the sit↔stand"
+                .to_owned(),
+        ));
+    }
+    if daemon_driven {
+        return Err(wrap(
+            "not a skill: a phase command is the ground pick and a posture flag \
+             is the sit↔stand, which the daemon drives itself"
+                .to_owned(),
+        ));
+    }
+    let dir = policies_dir().ok_or_else(|| {
+        wrap("the policies directory is not known yet; load a policy set first".to_owned())
+    })?;
+    if policy.file.is_empty() {
+        return Err(wrap(
+            "a skill needs a file — the `.onnx`, named in the policies directory".to_owned(),
+        ));
+    }
+    validate_skill_file(&policy.file, &dir).map_err(wrap)?;
+    let duration = match policy.duration_s {
+        Some(duration) if duration > 0.0 => duration,
+        Some(_) => {
+            return Err(wrap("a skill's duration must be more than zero".to_owned()));
+        }
+        None => {
+            return Err(wrap(format!(
+                "{name:?} is new here, so it needs a duration — how long it runs, \
+                 in seconds"
+            )));
+        }
+    };
+    let def = SkillDef {
+        name: name.to_owned(),
+        // Bare: the entry's file is relative to the policies directory, and a
+        // load's own directory is where it is resolved (and where a file that
+        // went away since is caught).
+        path: Some(PathBuf::from(&policy.file)),
+        duration,
+        chain: policy.chain,
+        unwind: policy
+            .command
+            .as_ref()
+            .and_then(|command| command.idle)
+            .unwrap_or_default(),
+        unwind_s: policy.unwind_s.unwrap_or(0.0),
+        params: SkillOverrides {
+            action_scale: policy.action_scale,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    Ok((name.to_owned(), def))
+}
+
+/// Replace the whole custom skill table — `POST /config custom_skills`.
+/// An empty array clears it. Each entry is a manifest policy entry; a parse
+/// failure or an invalid shape refuses the **whole** request, with the entry
+/// and the reason, before anything is stored (a table with a bad row is not
+/// half applied). A later entry with the same name overwrites an earlier one.
+pub fn set_custom_skills(entries: Vec<serde_json::Value>) -> Result<(), String> {
+    let mut table = BTreeMap::new();
+    for (index, entry) in entries.iter().enumerate() {
+        let (name, def) = parse_custom_skill_entry(entry, index)?;
+        table.insert(name, def);
+    }
+    *SKILL_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = table;
+    Ok(())
+}
+
+/// Add or replace one custom skill — `robot.setSkill`'s half. The IPC
+/// handler does the official per-field merge against whatever the duck
+/// already had; this validates the merged entry and stores it. A `path`
+/// the caller did not name resolves to `<name>.onnx` by convention at the
+/// next load (the wire's absent `path`), so only a path that *is* named is
+/// checked here — the exact line `robotd`'s `set_skill_request` draws. The
+/// official `"none"` sentinel is the exception on that line: it names no
+/// file (it switches the same-named skill off, `SkillDef::resolved_path`
+/// resolving it to nothing), so it is stored as-is and never checked.
+pub fn upsert_custom_skill(def: SkillDef) -> Result<(), String> {
+    validate_skill_name(&def.name)?;
+    if def.duration <= 0.0 {
+        return Err("a skill's duration must be more than zero".to_owned());
+    }
+    if let Some(path) = &def.path {
+        let file = path.to_string_lossy().into_owned();
+        if !is_none_sentinel(&file) {
+            let dir = policies_dir().ok_or_else(|| {
+                "the policies directory is not known yet; load a policy set first".to_owned()
+            })?;
+            validate_skill_file(&file, &dir)?;
+        }
+    }
+    SKILL_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(def.name.clone(), def);
+    Ok(())
+}
+
+/// Take one custom skill out — `robot.removeSkill`'s half. False when the
+/// table has no such entry; the caller answers that "already", the official
+/// `edit::remove_skill`'s `Ok(false)`.
+pub fn remove_custom_skill(name: &str) -> bool {
+    SKILL_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .remove(name)
+        .is_some()
+}
+
+/// The whole custom table, for readers (echoing a table back over `robot.*`,
+/// the IPC merge's existing-entry lookup) and for tests.
+pub fn custom_skills() -> BTreeMap<String, SkillDef> {
+    SKILL_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
+/// Clear every custom skill, the official `policy reset` with no slot.
+pub fn clear_custom_skills() {
+    SKILL_OVERRIDES
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clear();
+}
+
 /// The override table is a process global. Tests that resolve a slot or
 /// change an override take this lock so a parallel test never reads another
 /// test's state. The intent tests' `/config` route shares the table, so the
@@ -175,13 +435,20 @@ pub fn take_override_warnings() -> Vec<String> {
 pub(crate) static OVERRIDE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 /// Hold [`OVERRIDE_TEST_LOCK`] with the table clear and no warnings left
-/// over — the state every override test assumes.
+/// over — the state every override test assumes. The custom-skill table and
+/// the remembered policies directory are part of the same global state, so
+/// they are cleared here too: a parallel test must not resolve a load
+/// through another test's custom skill.
 #[cfg(test)]
 pub(crate) fn override_test_lock() -> std::sync::MutexGuard<'static, ()> {
     let guard = OVERRIDE_TEST_LOCK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     clear_slot_overrides();
+    clear_custom_skills();
+    *POLICIES_DIR
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
     let _ = take_override_warnings();
     guard
 }
@@ -395,6 +662,10 @@ pub fn load(dir: &Path) -> Result<PolicyBundle, String> {
 /// standing network, and drives the crouch where the walking set has the
 /// ground pick.
 pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
+    // The directory this load runs against is what the custom-skill table's
+    // set-time file checks resolve against (`set_custom_skills`,
+    // `upsert_custom_skill`); remember it before anything can fail.
+    remember_policies_dir(dir);
     let manifest = read_manifest(dir);
 
     // The set's own claims about itself, before any file is opened: a policy
@@ -513,6 +784,12 @@ pub fn load_mode(dir: &Path, mode: Mode) -> Result<PolicyBundle, String> {
         ),
         None => (fallback_skills(dir), None, None),
     };
+    // The person's own skill table rides over the set's: a same-named entry
+    // replaces it in place, a new name joins at the end, and an entry whose
+    // file is gone is dropped with the same unloadable warning a slot
+    // override leaves. `/skills`, MCP and the skill trigger all read the
+    // merged table after this.
+    let skills = merge_custom_skills(dir, skills);
 
     // Per-mode fallbacks, as `ResolvedPolicy` resolves them: the roller runs
     // at a smaller action scale and its crouch is a different length.
@@ -695,6 +972,109 @@ fn skills_from(manifest: &SetManifest, dir: &Path) -> Vec<SkillDef> {
         .collect()
 }
 
+/// Merge the custom skill table into a resolved skill list, the way the
+/// official config's `[[policy.skill]]` entries ride over the set's own
+/// (`robotd-params`' `builtin_skills` + config overlay): a same-named entry
+/// replaces the set's in place, a new name joins at the end (`robot.do`
+/// tries skills in order, and the set's own priority stands), and a mode
+/// filter there is none — skills are deliberately not filtered by mode.
+///
+/// An entry whose file is gone costs itself and nothing else, **for this load
+/// only**: it is skipped, a warning names it for [`take_override_warnings`],
+/// and the table keeps it — a load from a directory that still has the file
+/// brings the skill back, and a directory switch cannot destroy a
+/// registration the person made. (The official `drop_unloadable_overrides`
+/// rule drops a *config key* because a file left behind by a deleted policy is
+/// stale config; a custom skill is a live request, so here it is only the load
+/// that skips it.)
+///
+/// The `"none"` path is the official switch-off (`SkillDef::resolved_path`
+/// resolving it to no file): the entry removes the same-named skill —
+/// built-in or set-declared — from the table and adds nothing itself, which is
+/// how a person takes a shipped skill out without a second mechanism.
+///
+/// **Order caveat, recorded honestly.** The official table is the manifest's
+/// entry order followed by config entries in file order; this table is a
+/// `BTreeMap`, so custom skills are appended in *name* order. `/skills` (and
+/// `robot.skills`) therefore lists custom skills in a different order than a
+/// `robotd` would, and `robot.do` tries them in that order. `robot.do` is
+/// addressed by exact name, so a request is unaffected; only a client that
+/// reads priority off the listing would be.
+fn merge_custom_skills(dir: &Path, mut skills: Vec<SkillDef>) -> Vec<SkillDef> {
+    let mut switched_off: Vec<String> = Vec::new();
+    let mut merged: Vec<(String, SkillDef)> = Vec::new();
+    let mut warnings: Vec<(String, PathBuf)> = Vec::new();
+    {
+        // One critical section for the whole read, and **no write**: a
+        // concurrent `setSkill` must never have an entry this load could
+        // remove from under it (the two-phase version did exactly that).
+        let table = SKILL_OVERRIDES
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for (name, def) in table.iter() {
+            if def
+                .path
+                .as_ref()
+                .is_some_and(|path| is_none_sentinel(&path.to_string_lossy()))
+            {
+                switched_off.push(name.clone());
+                continue;
+            }
+            // A path the entry did not name is the wire's absent `path`: the
+            // file this convention ships under `<name>.onnx`.
+            let file = def
+                .path
+                .clone()
+                .unwrap_or_else(|| PathBuf::from(format!("{name}.onnx")));
+            // Both doors validate a name as a file stem (`validate_skill_name`);
+            // this is the same rule as defence in depth for a table written by
+            // an older build — the load is where a derived `<name>.onnx` would
+            // actually be opened.
+            if !bare_file_name(&file.to_string_lossy()) {
+                warnings.push((name.clone(), dir.join(&file)));
+                continue;
+            }
+            let path = dir.join(&file);
+            if !path.is_file() {
+                warnings.push((name.clone(), path));
+                continue;
+            }
+            let resolved = SkillDef {
+                path: Some(path),
+                ..def.clone()
+            };
+            merged.push((name.clone(), resolved));
+        }
+    }
+    for (name, path) in warnings {
+        warn_skill_override_unloadable(&name, &path);
+    }
+    // The switch-offs first: an entry that turns a skill off must win over a
+    // set entry of that name even when the set is what is in `skills` here.
+    for name in switched_off {
+        skills.retain(|skill| skill.name != name);
+    }
+    for (name, def) in merged {
+        match skills.iter().position(|skill| skill.name == name) {
+            Some(index) => skills[index] = def,
+            None => skills.push(def),
+        }
+    }
+    skills
+}
+
+/// Record why a custom skill was skipped for one load, in the same spirit as
+/// a slot's: the override will not load and the set's own skills stand.
+fn warn_skill_override_unloadable(name: &str, path: &Path) {
+    OVERRIDE_WARNINGS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push(format!(
+            "the {name} skill override {} will not load; the set's own skills stand",
+            path.display()
+        ));
+}
+
 /// The three skills every robot has had since the prototype, for a set with no
 /// manifest.
 fn fallback_skills(dir: &Path) -> Vec<SkillDef> {
@@ -866,6 +1246,9 @@ mod tests {
     /// manifest's claim and what this robot actually is.
     #[test]
     fn a_manifest_lying_about_the_model_api_is_refused() {
+        // The load writes the process-global policies directory, so this
+        // test takes the same lock every other load test does.
+        let _lock = walk_test_lock();
         let dir = write_set(
             "model-api",
             &["velstand.onnx"],
@@ -880,6 +1263,7 @@ mod tests {
 
     #[test]
     fn a_manifest_for_another_robot_is_refused() {
+        let _lock = walk_test_lock();
         let dir = write_set(
             "robot-model",
             &["velstand.onnx"],
@@ -894,6 +1278,7 @@ mod tests {
 
     #[test]
     fn a_manifest_lying_about_the_observation_width_is_refused() {
+        let _lock = walk_test_lock();
         let dir = write_set(
             "obs-len",
             &["velstand.onnx"],
@@ -1219,5 +1604,549 @@ mod tests {
 
     fn walker_walk(bundle: &PolicyBundle) -> bool {
         bundle.paths.walk.ends_with("velstand.onnx")
+    }
+
+    /// The person's own skill: an episodic entry pointed at a file in the
+    /// policies directory rides the next load — in the bundle's skill list
+    /// (what `/skills` and MCP publish) and in the paths the policy actually
+    /// loads (what the trigger runs).
+    #[test]
+    fn a_custom_skill_rides_the_next_load() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-skill",
+            &["velstand.onnx", "spin.onnx"],
+            Some(
+                r#"{ "policies": [ { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" } ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+
+        set_custom_skills(vec![serde_json::json!({
+            "file": "spin.onnx",
+            "name": "spin_left",
+            "kind": "episodic",
+            "duration_s": 1.5,
+            "chain": true,
+            "action_scale": 0.9,
+            "command": { "idle": [0.0, 0.0, 0.0] },
+        })])
+        .expect("the entry is a skill");
+
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set loads");
+        let skill = bundle
+            .skills
+            .iter()
+            .find(|skill| skill.name == "spin_left")
+            .expect("the custom skill is in the merged table");
+        assert_eq!(skill.duration, 1.5);
+        assert!(skill.chain);
+        assert_eq!(skill.params.action_scale, Some(0.9));
+        assert!(
+            skill
+                .path
+                .as_ref()
+                .is_some_and(|path| path.ends_with("spin.onnx")),
+            "{:?}",
+            skill.path
+        );
+        assert!(
+            bundle
+                .paths
+                .skills
+                .iter()
+                .any(|path| path.ends_with("spin.onnx")),
+            "the policy loads the file too: {:?}",
+            bundle.paths.skills
+        );
+        clear_custom_skills();
+    }
+
+    /// A custom entry with the same name as a set skill replaces it in place
+    /// — the config overlay's rule, and the way a person re-times a built-in
+    /// one-shot without renaming anything.
+    #[test]
+    fn a_custom_skill_overrides_a_same_named_manifest_skill() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-override",
+            &["velstand.onnx", "roulade.onnx"],
+            Some(
+                r#"{ "policies": [
+                    { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" },
+                    { "file": "roulade.onnx", "kind": "episodic", "duration_s": 1.0, "chain": true }
+                ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set loads");
+        let roulade = bundle
+            .skills
+            .iter()
+            .find(|skill| skill.name == "roulade")
+            .expect("the set's roulade");
+        assert_eq!(roulade.duration, 1.0);
+
+        set_custom_skills(vec![serde_json::json!({
+            "file": "roulade.onnx",
+            "name": "roulade",
+            "kind": "episodic",
+            "duration_s": 2.5,
+        })])
+        .expect("the re-timed entry");
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set loads");
+        let roulade = bundle
+            .skills
+            .iter()
+            .find(|skill| skill.name == "roulade")
+            .expect("roulade is still there");
+        assert_eq!(roulade.duration, 2.5, "the custom timing wins");
+        assert_eq!(
+            bundle
+                .skills
+                .iter()
+                .filter(|skill| skill.name == "roulade")
+                .count(),
+            1,
+            "replaced in place, not added a second time"
+        );
+        clear_custom_skills();
+    }
+
+    /// A file that was never there is refused at the door (the same
+    /// existence check the slot override defers to the load — deferred
+    /// there because the override rides an existing config; a skill
+    /// someone is adding right now must not be answered "accepted" and
+    /// then silently skipped). A file that *went away* after being set is
+    /// skipped **for that load only**, with a warning: the table keeps the
+    /// entry, so a directory that still has the file (or the file coming
+    /// back) restores the skill instead of losing the registration.
+    #[test]
+    fn an_unknown_file_is_refused_and_a_vanished_one_is_skipped_but_kept() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-vanish",
+            &["velstand.onnx", "spin.onnx"],
+            Some(
+                r#"{ "policies": [ { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" } ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+
+        let error = set_custom_skills(vec![serde_json::json!({
+            "file": "gone.onnx",
+            "name": "phantom",
+            "kind": "episodic",
+            "duration_s": 1.0,
+        })])
+        .expect_err("gone.onnx is not in the directory");
+        assert!(error.contains("no such file"), "{error}");
+        assert!(
+            error.contains("phantom"),
+            "the refusal names the entry: {error}"
+        );
+        assert!(
+            custom_skills().is_empty(),
+            "the refused table is not stored"
+        );
+
+        // The entry that was really there rides the load, then its file is
+        // deleted: the next load skips it with a warning, and the table
+        // keeps it — a registration is not destroyed by a directory that
+        // happened to be mid-copy.
+        set_custom_skills(vec![serde_json::json!({
+            "file": "spin.onnx",
+            "name": "spin_left",
+            "kind": "episodic",
+            "duration_s": 1.0,
+        })])
+        .expect("the entry is a skill");
+        std::fs::remove_file(dir.join("spin.onnx")).expect("the file goes away");
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set still loads");
+        assert!(
+            !bundle.skills.iter().any(|skill| skill.name == "spin_left"),
+            "the vanished skill is skipped"
+        );
+        let warnings = take_override_warnings();
+        assert!(
+            warnings
+                .iter()
+                .any(|warning| warning.contains("spin_left") && warning.contains("spin.onnx")),
+            "no spin_left warning in {warnings:?}"
+        );
+        assert!(
+            custom_skills().contains_key("spin_left"),
+            "the entry survives the load that could not use it"
+        );
+
+        // The file comes back (a copy finishing, or the same directory next
+        // launch): so does the skill, with no re-registration.
+        std::fs::write(dir.join("spin.onnx"), b"stub").expect("the file returns");
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set still loads");
+        assert!(
+            bundle.skills.iter().any(|skill| skill.name == "spin_left"),
+            "the kept entry loads again: {:?}",
+            bundle.skills
+        );
+        assert!(take_override_warnings().is_empty());
+    }
+
+    /// A skill's name doubles as its `<name>.onnx` file stem when the entry
+    /// names no file. A name that could walk out of the policies directory —
+    /// `..`, an absolute path, either separator — is refused at every door,
+    /// and the load never brings in an `.onnx` from outside the directory.
+    #[test]
+    fn a_skill_name_that_could_leave_the_directory_is_refused() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-name",
+            &["velstand.onnx"],
+            Some(
+                r#"{ "policies": [ { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" } ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+
+        // A real `.onnx` one level above the policies directory, so "nothing
+        // outside was loaded" is an assertion about a file that exists.
+        let outside = dir
+            .parent()
+            .expect("a temp parent")
+            .join(format!("outside-{}.onnx", std::process::id()));
+        std::fs::write(&outside, b"stub").expect("a file outside the directory");
+        let escape_name = format!("../{}", outside.file_stem().unwrap().to_string_lossy());
+        for bad in [
+            escape_name.as_str(),
+            "../../evil",
+            "../evil",
+            "sub/evil",
+            "sub\\evil",
+            "/abs/evil",
+            "C:evil",
+            "..",
+        ] {
+            // `robot.setSkill`'s door (a new skill with no path: `<name>.onnx`).
+            let error = upsert_custom_skill(SkillDef {
+                name: bad.to_owned(),
+                path: None,
+                duration: 1.0,
+                ..SkillDef::default()
+            })
+            .expect_err(bad);
+            assert!(
+                error.contains("not a file name"),
+                "{bad:?} must be refused as a file name: {error}"
+            );
+            // `/config`'s door.
+            let error = set_custom_skills(vec![serde_json::json!({
+                "file": "velstand.onnx",
+                "name": bad,
+                "kind": "episodic",
+                "duration_s": 1.0,
+            })])
+            .expect_err(bad);
+            assert!(
+                error.contains("not a file name"),
+                "{bad:?} must be refused as a file name: {error}"
+            );
+            assert!(custom_skills().is_empty(), "{bad:?} was stored: {error}");
+        }
+
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set loads");
+        assert!(
+            bundle.skills.iter().all(|skill| skill
+                .path
+                .as_ref()
+                .is_none_or(|path| path.starts_with(&dir))),
+            "nothing outside the policies directory was loaded: {:?}",
+            bundle.skills
+        );
+        let _ = std::fs::remove_file(&outside);
+    }
+
+    /// `path: "none"` is the official switch-off: the entry names no file, so
+    /// it is stored without a file check, and the next load removes the
+    /// same-named skill from the table instead of adding one. Removing the
+    /// table entry brings the set's own skill back.
+    #[test]
+    fn the_none_path_switches_a_set_skill_off_and_back() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-off",
+            &["velstand.onnx", "roulade.onnx"],
+            Some(
+                r#"{ "policies": [
+                    { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" },
+                    { "file": "roulade.onnx", "kind": "episodic", "duration_s": 1.0 }
+                ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set loads");
+        assert!(
+            bundle.skills.iter().any(|skill| skill.name == "roulade"),
+            "the set has roulade to switch off"
+        );
+
+        upsert_custom_skill(SkillDef {
+            name: "roulade".to_owned(),
+            path: Some(PathBuf::from("none")),
+            duration: 1.0,
+            ..SkillDef::default()
+        })
+        .expect("the sentinel names no file, so there is nothing to check");
+
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set loads");
+        assert!(
+            !bundle.skills.iter().any(|skill| skill.name == "roulade"),
+            "the switched-off skill is out of the table: {:?}",
+            bundle.skills
+        );
+        assert!(
+            !bundle
+                .paths
+                .skills
+                .iter()
+                .any(|path| path.ends_with("roulade.onnx")),
+            "and the policy does not load its file: {:?}",
+            bundle.paths.skills
+        );
+
+        // The official rule: a skill the release ships comes back when the
+        // override is removed.
+        assert!(remove_custom_skill("roulade"));
+        let bundle = load_mode(&dir, Mode::Walk).expect("the set loads");
+        assert!(
+            bundle.skills.iter().any(|skill| skill.name == "roulade"),
+            "removing the switch-off restores the set's skill"
+        );
+    }
+
+    /// The whole-table semantics: an empty array clears, a later entry with
+    /// the same name overwrites an earlier one, and a rejected table leaves
+    /// the previous one in force.
+    #[test]
+    fn the_custom_skill_table_replaces_and_clears_whole() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-replace",
+            &["velstand.onnx", "spin.onnx", "bow.onnx"],
+            Some(
+                r#"{ "policies": [ { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" } ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+
+        set_custom_skills(vec![
+            serde_json::json!({
+                "file": "spin.onnx", "name": "spin_left",
+                "kind": "episodic", "duration_s": 1.0,
+            }),
+            serde_json::json!({
+                "file": "bow.onnx", "name": "polite_bow",
+                "kind": "episodic", "duration_s": 4.0,
+            }),
+        ])
+        .expect("two entries");
+        assert_eq!(custom_skills().len(), 2);
+
+        // Same name, new numbers: the later entry wins.
+        set_custom_skills(vec![serde_json::json!({
+            "file": "spin.onnx", "name": "spin_left",
+            "kind": "episodic", "duration_s": 2.0,
+        })])
+        .expect("the replaced entry");
+        let table = custom_skills();
+        assert_eq!(table.len(), 1, "the table is replaced, not appended to");
+        assert_eq!(table["spin_left"].duration, 2.0);
+
+        // An empty array is the official reset.
+        set_custom_skills(Vec::new()).expect("the clear");
+        assert!(custom_skills().is_empty());
+
+        // One bad row refuses the whole request, and the table already in
+        // force stays.
+        set_custom_skills(vec![serde_json::json!({
+            "file": "bow.onnx", "name": "polite_bow",
+            "kind": "episodic", "duration_s": 4.0,
+        })])
+        .expect("back in force");
+        let error = set_custom_skills(vec![
+            serde_json::json!({
+                "file": "bow.onnx", "name": "polite_bow",
+                "kind": "episodic", "duration_s": 4.0,
+            }),
+            serde_json::json!({
+                "file": "spin.onnx", "name": "spin_left",
+                "kind": "perpetual",
+            }),
+        ])
+        .expect_err("a perpetual entry is not a skill");
+        assert!(error.contains("spin_left"), "{error}");
+        assert_eq!(custom_skills().len(), 1, "the old table stands");
+        clear_custom_skills();
+    }
+
+    /// Every shape the door refuses, each with the entry named and the
+    /// reason said: the daemon-driven names, a non-episodic kind, a phase
+    /// command, a missing name, a missing file, a path out of the
+    /// directory, a missing and a non-positive duration, and an entry that
+    /// is not an object at all.
+    #[test]
+    fn bad_custom_skill_entries_are_refused_with_entry_and_reason() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-bad",
+            &["velstand.onnx", "spin.onnx"],
+            Some(
+                r#"{ "policies": [ { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" } ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+
+        for (entry, expected) in [
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "name": "ground_pick",
+                    "kind": "episodic", "duration_s": 1.0,
+                }),
+                "driven by the robot itself",
+            ),
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "name": "sit_toggle",
+                    "kind": "episodic", "duration_s": 1.0,
+                }),
+                "driven by the robot itself",
+            ),
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "name": "hold_still",
+                    "kind": "perpetual", "duration_s": 1.0,
+                }),
+                "`kind` must be \"episodic\"",
+            ),
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "name": "crouch",
+                    "kind": "episodic", "duration_s": 3.5,
+                    "command": { "encoding": "phase", "period_s": 4.0, "end_phase": 0.7 },
+                }),
+                "the daemon drives itself",
+            ),
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "kind": "episodic", "duration_s": 1.0,
+                }),
+                "a skill needs a name",
+            ),
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "name": "   ",
+                    "kind": "episodic", "duration_s": 1.0,
+                }),
+                "a skill needs a name",
+            ),
+            (
+                serde_json::json!({
+                    "name": "no_file", "kind": "episodic", "duration_s": 1.0,
+                }),
+                "a skill needs a file",
+            ),
+            (
+                serde_json::json!({
+                    "file": "gone.onnx", "name": "phantom",
+                    "kind": "episodic", "duration_s": 1.0,
+                }),
+                "no such file",
+            ),
+            (
+                serde_json::json!({
+                    "file": "../escape.onnx", "name": "escape",
+                    "kind": "episodic", "duration_s": 1.0,
+                }),
+                "not a file name",
+            ),
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "name": "lengthless", "kind": "episodic",
+                }),
+                "needs a duration",
+            ),
+            (
+                serde_json::json!({
+                    "file": "spin.onnx", "name": "instant",
+                    "kind": "episodic", "duration_s": 0.0,
+                }),
+                "must be more than zero",
+            ),
+            (serde_json::json!("a bow"), "not a manifest policy entry"),
+        ] {
+            let error = set_custom_skills(vec![entry]).expect_err("refused");
+            assert!(
+                error.contains("custom_skills[0]"),
+                "the refusal names the entry: {error}"
+            );
+            assert!(error.contains(expected), "{expected}: {error}");
+            assert!(custom_skills().is_empty(), "nothing was stored: {error}");
+        }
+    }
+
+    /// `robot.setSkill`'s single-entry half: a merged `SkillDef` upserts by
+    /// name, and a missing file or a zero duration is refused with the
+    /// official sentences.
+    #[test]
+    fn upsert_adds_and_replaces_one_custom_skill() {
+        let _lock = walk_test_lock();
+        let dir = write_set(
+            "custom-upsert",
+            &["velstand.onnx", "spin.onnx"],
+            Some(
+                r#"{ "policies": [ { "file": "velstand.onnx", "kind": "perpetual", "slot": "walk" } ] }"#,
+            ),
+        );
+        load_mode(&dir, Mode::Walk).expect("the set loads");
+
+        upsert_custom_skill(SkillDef {
+            name: "spin_left".to_owned(),
+            path: Some(PathBuf::from("spin.onnx")),
+            duration: 1.5,
+            chain: true,
+            ..SkillDef::default()
+        })
+        .expect("the entry upserts");
+        assert_eq!(custom_skills()["spin_left"].duration, 1.5);
+        upsert_custom_skill(SkillDef {
+            name: "spin_left".to_owned(),
+            path: Some(PathBuf::from("spin.onnx")),
+            duration: 2.5,
+            ..SkillDef::default()
+        })
+        .expect("the entry replaces");
+        let table = custom_skills();
+        assert_eq!(table.len(), 1);
+        assert_eq!(table["spin_left"].duration, 2.5);
+        assert!(!table["spin_left"].chain, "the replacement is whole");
+
+        let error = upsert_custom_skill(SkillDef {
+            name: "phantom".to_owned(),
+            path: Some(PathBuf::from("gone.onnx")),
+            duration: 1.0,
+            ..SkillDef::default()
+        })
+        .expect_err("the file is not there");
+        assert!(error.contains("no such file"), "{error}");
+        let error = upsert_custom_skill(SkillDef {
+            name: "instant".to_owned(),
+            path: Some(PathBuf::from("spin.onnx")),
+            duration: 0.0,
+            ..SkillDef::default()
+        })
+        .expect_err("no duration, no skill");
+        assert!(error.contains("more than zero"), "{error}");
+
+        assert!(remove_custom_skill("spin_left"), "the entry came out");
+        assert!(!remove_custom_skill("spin_left"), "and only once");
+        assert!(custom_skills().is_empty());
     }
 }

@@ -591,6 +591,23 @@ enum Copy {
             "今天的游玩时间用完，鸭子就自己睡觉。"
         )
     }
+    // The days board (K2, 2026-11-19): the parent's real day record from
+    // GET /days. These are labels only; every number on the page is the
+    // core's. Key parity with Android is checked by check-copy-keys.py.
+    static var daysTitle: String { pick("Days", "日子") }
+    static var daysWeek: String { pick("This week", "这一周") }
+    static var daysToday: String { pick("Today", "今天") }
+    static var daysEmpty: String { pick("No full days yet", "还没有一整天的记录") }
+    static var daysShare: String { pick("Share", "分享") }
+    static var daysPowered: String { pick("Time together", "陪伴") }
+    static var daysMetres: String { pick("Metres", "米") }
+    static var daysRolls: String { pick("Rolls", "翻滚") }
+    static var daysPets: String { pick("Pets", "被摸") }
+    static var daysPickups: String { pick("Picked up", "被抱起") }
+    static var daysFalls: String { pick("Falls", "摔倒") }
+    static var daysFed: String { pick("Fed", "被喂") }
+    static var daysClaps: String { pick("Claps", "拍手") }
+    static var daysWhistles: String { pick("Whistles", "口哨") }
     static var pairCode: String { pick("Pair code", "配对码") }
     static var pairNote: String {
         pick(

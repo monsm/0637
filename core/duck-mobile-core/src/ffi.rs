@@ -215,6 +215,12 @@ enum ControlCommand {
     /// the tick thread with the official *slot change* disturb rule, not the
     /// reload-always-disturbs one.
     ReloadSlot,
+    /// `robot.setSkill`/`robot.removeSkill`: the table entry is already
+    /// edited; re-read the set on the tick thread with the official *reload*
+    /// disturb rule — the official request triggers a `PolicyChange::Reload`
+    /// (`robotd/src/main.rs`'s `set_skill_request`), and a skill-table change
+    /// has no per-slot reading in `change_disturbs`.
+    ReloadSkills,
 }
 
 /// Which official `PolicyChange` a re-read stands for
@@ -578,6 +584,189 @@ impl crate::ipc::RobotHandlers for RobotHandlers {
         self.intents
             .push(Intent::Reload(dir.to_string_lossy().into_owned()));
         duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn set_skill(&self, params: duck_ipc_proto::SkillParams) -> duck_ipc_proto::IntentResult {
+        use robotd_params::{SkillDef, SkillOverrides};
+
+        // The official door, in its own order and words (`robotd/src/main.rs`'s
+        // `set_skill_request`): the name first — it is what `robot.do` asks for,
+        // and the two names the daemon drives itself cannot be table entries.
+        if let Err(error) = crate::manifest::validate_skill_name(&params.name) {
+            return duck_ipc_proto::IntentResult::refused(error);
+        }
+        // An existing entry supplies whatever this call leaves out, so a
+        // client may send one field: the table's own entry with that name
+        // first, then the entry the duck is running — a set skill re-timed
+        // stays a set skill (same file, new length).
+        let table_entry = crate::manifest::custom_skills().get(&params.name).cloned();
+        let running = self.snapshot(
+            |snapshot| {
+                snapshot
+                    .skills
+                    .skills
+                    .iter()
+                    .find(|skill| skill.name == params.name)
+                    .cloned()
+            },
+            None,
+        );
+        let existing_duration = table_entry
+            .as_ref()
+            .map(|skill| skill.duration)
+            .or_else(|| running.as_ref().and_then(|skill| skill.duration));
+        // The resolved table's `path` is a display path; the table stores the
+        // bare name the policies directory resolves.
+        let bare = |path: &str| {
+            std::path::Path::new(path)
+                .file_name()
+                .map(|file| PathBuf::from(file.to_string_lossy().into_owned()))
+        };
+        let existing = table_entry.or_else(|| {
+            running.map(|skill| SkillDef {
+                name: skill.name.clone(),
+                // The duration is merged separately (below); a running entry
+                // that names no duration contributes none.
+                duration: 0.0,
+                path: skill.path.as_deref().and_then(bare),
+                command: skill.command.unwrap_or_default(),
+                unwind: skill.unwind.unwrap_or_default(),
+                unwind_s: skill.unwind_s.unwrap_or(0.0),
+                chain: skill.chain.unwrap_or(false),
+                params: SkillOverrides {
+                    action_scale: skill.action_scale,
+                    gain_ratio: skill.gain_ratio,
+                },
+            })
+        });
+        let duration = match params.duration.or(existing_duration) {
+            Some(duration) if duration > 0.0 => duration,
+            Some(_) => {
+                return duck_ipc_proto::IntentResult::refused(
+                    "a skill's duration must be more than zero",
+                );
+            }
+            None => {
+                return duck_ipc_proto::IntentResult::refused(format!(
+                    "{:?} is new here, so it needs a duration — how long it runs, in seconds",
+                    params.name
+                ));
+            }
+        };
+        // The `.onnx`. The official wire takes an absolute path; a phone has
+        // one policies directory and no config file, so the same request takes
+        // a bare file name resolved against it — the same reading
+        // `robot.loadPolicy` gets here. An absent path falls back to the
+        // entry's own (or, for a new entry, to the `<name>.onnx` convention
+        // the loader resolves). The `"none"` sentinel is the official
+        // switch-off, not a file: the merge removes the same-named skill
+        // instead of loading anything, so it is stored unchecked. A colon is
+        // refused with the separators: on Windows `C:x.onnx` is a drive
+        // prefix, and `Path::join` would replace the base with it.
+        let path = match &params.path {
+            Some(given) => {
+                if crate::manifest::is_none_sentinel(given) {
+                    Some(PathBuf::from(given))
+                } else if given.contains('\\')
+                    || given.contains('/')
+                    || given.contains(':')
+                    || given.contains("..")
+                {
+                    return duck_ipc_proto::IntentResult::refused(format!(
+                        "{given:?} is not a file name in the policies directory"
+                    ));
+                } else {
+                    let dir =
+                        self.snapshot(|snapshot| snapshot.policies_dir.clone(), PathBuf::new());
+                    if dir.as_os_str().is_empty() {
+                        return duck_ipc_proto::IntentResult::refused(
+                            "the policies directory is not known yet",
+                        );
+                    }
+                    if !dir.join(given).is_file() {
+                        return duck_ipc_proto::IntentResult::refused(format!(
+                            "no such file: {}",
+                            dir.join(given).display()
+                        ));
+                    }
+                    Some(PathBuf::from(given))
+                }
+            }
+            None => existing.as_ref().and_then(|skill| skill.path.clone()),
+        };
+        // **Through the same gate `robot.loadPolicy` puts a slot's file
+        // through** (`duck_control::policy::validate`, which is what the
+        // official `set_skill_request` calls before writing): a file that will
+        // not open is refused here, while the caller is listening, instead of
+        // surfacing later as a reload that kept the old set. Only when the
+        // error is about the *file*: a board with no ONNX runtime validates
+        // nothing, and refusing a config edit on those grounds would send
+        // somebody to replace a policy that is fine.
+        if let Some(file) = &path
+            && !crate::manifest::is_none_sentinel(&file.to_string_lossy())
+        {
+            let dir = self.snapshot(|snapshot| snapshot.policies_dir.clone(), PathBuf::new());
+            if let Err(error) = duck_control::policy::validate(&dir.join(file))
+                && error.path().is_some()
+            {
+                return duck_ipc_proto::IntentResult::refused(error.to_string());
+            }
+        }
+        let skill = SkillDef {
+            name: params.name.clone(),
+            path,
+            duration,
+            command: params
+                .command
+                .or(existing.as_ref().map(|skill| skill.command))
+                .unwrap_or_default(),
+            unwind: params
+                .unwind
+                .or(existing.as_ref().map(|skill| skill.unwind))
+                .unwrap_or_default(),
+            unwind_s: params
+                .unwind_s
+                .or(existing.as_ref().map(|skill| skill.unwind_s))
+                .unwrap_or(0.0),
+            chain: params
+                .chain
+                .or(existing.as_ref().map(|skill| skill.chain))
+                .unwrap_or(false),
+            params: SkillOverrides {
+                action_scale: params.action_scale.or(existing
+                    .as_ref()
+                    .and_then(|skill| skill.params.action_scale)),
+                gain_ratio: params
+                    .gain_ratio
+                    .or(existing.as_ref().and_then(|skill| skill.params.gain_ratio)),
+            },
+        };
+        if let Err(error) = crate::manifest::upsert_custom_skill(skill) {
+            return duck_ipc_proto::IntentResult::refused(error);
+        }
+        // **Written and reloaded here**, one call the whole operation: the
+        // official request triggers `PolicyChange::Reload` after the write, so
+        // a client never holds a robot whose table and behaviour disagree.
+        self.queue_control(ControlCommand::ReloadSkills);
+        duck_ipc_proto::IntentResult::accepted()
+    }
+
+    fn remove_skill(
+        &self,
+        params: duck_ipc_proto::SkillNameParams,
+    ) -> duck_ipc_proto::IntentResult {
+        if crate::manifest::remove_custom_skill(&params.name) {
+            // The same reload the official request queues after the edit.
+            self.queue_control(ControlCommand::ReloadSkills);
+            duck_ipc_proto::IntentResult::accepted()
+        } else {
+            // `edit::remove_skill`'s `Ok(false)`: an acceptance that changes
+            // nothing, saying so.
+            duck_ipc_proto::IntentResult::already(format!(
+                "no configured skill called {:?}",
+                params.name
+            ))
+        }
     }
 
     fn safe_to_restart(&self) -> duck_ipc_proto::SafeToRestartResult {
@@ -1887,12 +2076,18 @@ fn set_policy_enabled_mirror(core: &DuckCore, enabled: bool) {
 fn apply_control(core: &mut DuckCore, command: ControlCommand) -> bool {
     let selected = core.selected;
     // `robot.loadPolicy` re-reads through the same disturb gate as the HTTP
-    // reload, but as a slot change. The directory is the one this core runs,
-    // read on the tick thread so it cannot race a concurrent `Intent::Reload`.
+    // reload, but as a slot change; `robot.setSkill`/`removeSkill` re-read as
+    // the official reload. Both run on the tick thread so they cannot race a
+    // concurrent `Intent::Reload`; the directory is the one this core runs.
+    let kind = match command {
+        ControlCommand::ReloadSlot => Some(ReloadKind::SlotChange),
+        ControlCommand::ReloadSkills => Some(ReloadKind::Reload),
+        _ => None,
+    };
     let run = |core: &mut DuckCore| -> bool {
-        if matches!(command, ControlCommand::ReloadSlot) {
+        if let Some(kind) = kind {
             let dir = core.policies.to_string_lossy().into_owned();
-            if let Err(reason) = reload_policies(core, &dir, ReloadKind::SlotChange, selected) {
+            if let Err(reason) = reload_policies(core, &dir, kind, selected) {
                 core.label = format!("reload failed: {reason}");
                 core.notice = Some((core.runtime.clock().tick, core.label.clone()));
             }
@@ -1927,9 +2122,9 @@ fn apply_control_to(runtime: &mut DuckRuntime<MujocoIo>, command: ControlCommand
         ControlCommand::Rest => runtime.request_rest(),
         // `robot.shutdown`: sit, rest, torque off, power-off latch.
         ControlCommand::Shutdown => runtime.request_shutdown(),
-        // Handled by `apply_control` before it reaches the runtime: it needs
-        // the core's manifest and slot table, not a runtime method.
-        ControlCommand::ReloadSlot => {}
+        // Handled by `apply_control` before it reaches the runtime: a reload
+        // needs the core's manifest and slot table, not a runtime method.
+        ControlCommand::ReloadSlot | ControlCommand::ReloadSkills => {}
     }
     runtime_policy_enabled(runtime)
 }
@@ -2077,7 +2272,9 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         Intent::RestoreLife(saved) => {
             // The shell saved the flat /life summary, not the Book's nested
             // shape: rebuild it field by field rather than silently dropping
-            // an unmatched deserialization to an empty history.
+            // an unmatched deserialization to an empty history. The parent's
+            // day view (`days` + `day_started`) travels in the same summary;
+            // it is restored last, below, where the whole life is known.
             let book = core.runtime.book_mut();
             let life = &mut book.life;
             let num = |key: &str| -> Option<f64> { saved.get(key).and_then(|v| v.as_f64()) };
@@ -2225,6 +2422,14 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                     .map(str::to_owned)
                     .collect();
             }
+            // The parent's day view, after the life it must agree with is in
+            // place. `restore_days` keeps the saved baseline only when it is
+            // today's and re-bases otherwise — so a save restored after the
+            // day rolled over can never have the duck's whole lifetime read
+            // as today's play. The completed rows are history and survive the
+            // restart as rows.
+            let today = core.intents.day();
+            book.restore_days(&saved, &today);
             core.intents.set_life(core.runtime.book());
             json!({ "ok": true })
         }
@@ -4082,9 +4287,10 @@ fn refresh_robot_snapshot(
 
     // `robot.skills`: every loaded one-shot with the parameters the manifest
     // declared for that name, plus the two names the daemon owns itself. A
-    // skill entry is never "overridden" here — the phone has no skill
-    // override table (`robot.setSkill`/`removeSkill` are deliberately not
-    // served).
+    // skill entry says `overridden` when the person's own table carries that
+    // name — the same reading the official report gives a `[[policy.skill]]`
+    // entry (config has an opinion about this skill).
+    let custom_skills = crate::manifest::custom_skills();
     let skill_params: Vec<duck_ipc_proto::SkillParams> = loaded_skills
         .iter()
         .map(|(name, path)| {
@@ -4107,7 +4313,7 @@ fn refresh_robot_snapshot(
                     chain: Some(skill.chain),
                     action_scale: skill.params.action_scale,
                     gain_ratio: skill.params.gain_ratio,
-                    overridden: false,
+                    overridden: custom_skills.contains_key(name),
                 },
                 // A loaded skill the core-level table does not name (the
                 // selected branch runs another set): report what is true —
@@ -4115,7 +4321,7 @@ fn refresh_robot_snapshot(
                 None => duck_ipc_proto::SkillParams {
                     name: name.clone(),
                     path: path.as_ref().map(|path| path.display().to_string()),
-                    overridden: false,
+                    overridden: custom_skills.contains_key(name),
                     ..Default::default()
                 },
             }
@@ -6802,13 +7008,7 @@ mod tests {
                 duck_ipc_proto::code::METHOD_NOT_FOUND,
                 "{reply}"
             );
-            let reply = call(
-                &mut stream,
-                &mut reader,
-                29,
-                "robot.setSkill",
-                "{\"name\":\"roulade\"}",
-            );
+            let reply = call(&mut stream, &mut reader, 29, "update.status", "{}");
             assert_eq!(
                 reply["error"]["code"],
                 duck_ipc_proto::code::METHOD_NOT_FOUND,
@@ -7536,6 +7736,609 @@ mod tests {
             assert_eq!(c.label, "policy reloaded");
         }
         let _ = std::fs::remove_dir_all(&dir);
+        unsafe { duck_core_free(core) };
+    }
+
+    /// `robot.setSkill`/`robot.removeSkill`, end to end over the real socket:
+    /// one call writes the table entry and reloads, the reloaded duck runs
+    /// the skill under its new name, the vet book counts it, and the removal
+    /// takes it back out. The official refusals — an unknown file, a
+    /// daemon-driven name, a new skill without a duration — are answered at
+    /// the door, and a remove of nothing is the official already-answer.
+    #[test]
+    fn robot_set_skill_hot_plugs_a_skill_end_to_end() {
+        use std::io::{BufRead, BufReader};
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            // The day the duck lives by: the trigger below dates its unlock.
+            c.intents.set_day("2026-11-19".to_owned());
+            tick_until_ready(core);
+            if c.ipc.is_none() {
+                // Fixed port taken by another test process: the socket face
+                // cannot be exercised here, and the core itself is fine.
+                duck_core_free(core);
+                return;
+            }
+        }
+        let stream = TcpStream::connect(("127.0.0.1", crate::ipc::ROBOT_IPC_PORT))
+            .expect("connect robot ipc");
+        let mut reader = BufReader::new(stream.try_clone().expect("dup"));
+        let mut stream = stream;
+
+        fn call(
+            stream: &mut TcpStream,
+            reader: &mut BufReader<TcpStream>,
+            id: u64,
+            method: &str,
+            params: &str,
+        ) -> serde_json::Value {
+            let line = format!(
+                "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"method\":\"{method}\",\"params\":{params}}}\n"
+            );
+            stream.write_all(line.as_bytes()).expect("write");
+            stream.flush().expect("flush");
+            let mut reply = String::new();
+            reader.read_line(&mut reply).expect("reply");
+            serde_json::from_str(&reply).expect("json reply")
+        }
+        let result = |reply: &serde_json::Value| reply["result"].clone();
+        let wait_for_swap = |core: *mut DuckCore| {
+            for _ in 0..800 {
+                unsafe { duck_core_tick(core) };
+                if unsafe { (*core).runtime.swap_pending() } {
+                    continue;
+                }
+                return;
+            }
+            panic!("the reload never landed");
+        };
+
+        unsafe {
+            // roulade.onnx under a new name: the official one-shot with a new
+            // identity. The answer is the official acceptance; the reload it
+            // queued walks the driving duck home first and lands there.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                1,
+                "robot.setSkill",
+                r#"{"name":"spin_left","path":"roulade.onnx","duration":1.5}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            wait_for_swap(core);
+
+            // `robot.skills` lists it with the parameters it was set with,
+            // marked as a table override.
+            let reply = call(&mut stream, &mut reader, 2, "robot.skills", "{}");
+            let skills = result(&reply);
+            let row = skills["skills"]
+                .as_array()
+                .and_then(|rows| rows.iter().find(|row| row["name"] == "spin_left"))
+                .unwrap_or_else(|| panic!("no spin_left in {skills}"));
+            assert_eq!(row["duration"], json!(1.5), "{skills}");
+            assert!(
+                row["path"]
+                    .as_str()
+                    .is_some_and(|path| path.ends_with("roulade.onnx")),
+                "{skills}"
+            );
+            assert_eq!(row["overridden"], json!(true), "{skills}");
+
+            // /skills advertises it too, so a taught word and an MCP call can
+            // reach the same skill.
+            assert!(
+                (*core).intents.skills_json().contains("spin_left"),
+                "{}",
+                (*core).intents.skills_json()
+            );
+
+            // The trigger runs the reloaded network, and the vet book counts
+            // it under its own name, dated by the day the shell posted.
+            let answer = apply_intent(&mut *core, Intent::Skill("spin_left".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            duck_core_tick(core);
+            let book = active_runtime(&*core).book().clone();
+            assert_eq!(book.life.skills.get("spin_left"), Some(&1));
+            assert_eq!(
+                book.life.unlocks.get("skill:spin_left").map(String::as_str),
+                Some("2026-11-19")
+            );
+
+            // removeSkill takes it back out; the reloaded duck does not list
+            // it and refuses it by name.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                3,
+                "robot.removeSkill",
+                r#"{"name":"spin_left"}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            wait_for_swap(core);
+            let reply = call(&mut stream, &mut reader, 4, "robot.skills", "{}");
+            let skills = result(&reply);
+            let names: Vec<&str> = skills["skills"]
+                .as_array()
+                .expect("skill table")
+                .iter()
+                .filter_map(|skill| skill["name"].as_str())
+                .collect();
+            assert!(!names.contains(&"spin_left"), "{names:?}");
+            let answer = apply_intent(&mut *core, Intent::Skill("spin_left".to_owned()));
+            assert_eq!(answer["ok"], json!(false), "{answer}");
+
+            // Removing a name the table does not carry: the official
+            // already-answer, word for word.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                5,
+                "robot.removeSkill",
+                r#"{"name":"spin_left"}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            assert_eq!(
+                result(&reply)["reason"],
+                json!("no configured skill called \"spin_left\""),
+                "{reply}"
+            );
+
+            // The door refusals, in the official words: a file that is not
+            // there, a name the daemon drives, and a new skill with no
+            // duration.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                6,
+                "robot.setSkill",
+                r#"{"name":"phantom","path":"gone.onnx","duration":1.0}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], false, "{reply}");
+            assert!(
+                result(&reply)["reason"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("no such file"),
+                "{reply}"
+            );
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                7,
+                "robot.setSkill",
+                r#"{"name":"ground_pick","duration":1.0}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], false, "{reply}");
+            assert!(
+                result(&reply)["reason"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("driven by the robot itself"),
+                "{reply}"
+            );
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                8,
+                "robot.setSkill",
+                r#"{"name":"lengthless","path":"roulade.onnx"}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], false, "{reply}");
+            assert!(
+                result(&reply)["reason"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("needs a duration"),
+                "{reply}"
+            );
+
+            // A name that could walk out of the policies directory is refused
+            // at the door: the name is also the `<name>.onnx` file stem when
+            // an entry names no file, so it obeys the bare-file-name rule.
+            for bad in ["../../evil", "../evil", "sub/evil", "sub\\evil", "C:evil"] {
+                let params = json!({ "name": bad, "duration": 1.0 }).to_string();
+                let reply = call(&mut stream, &mut reader, 9, "robot.setSkill", &params);
+                assert_eq!(result(&reply)["accepted"], false, "{bad}: {reply}");
+                assert!(
+                    result(&reply)["reason"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .contains("not a file name"),
+                    "{bad}: {reply}"
+                );
+            }
+            assert!(
+                crate::manifest::custom_skills().is_empty(),
+                "no escaping name was stored"
+            );
+
+            // `path: "none"` is the official switch-off: the same-named set
+            // skill leaves the table and `robot.do` stops answering to it —
+            // and removing the entry brings it back.
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                10,
+                "robot.setSkill",
+                r#"{"name":"roulade","path":"none","duration":1.0}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            wait_for_swap(core);
+            let reply = call(&mut stream, &mut reader, 11, "robot.skills", "{}");
+            let skills = result(&reply);
+            let names: Vec<&str> = skills["skills"]
+                .as_array()
+                .expect("skill table")
+                .iter()
+                .filter_map(|skill| skill["name"].as_str())
+                .collect();
+            assert!(
+                !names.contains(&"roulade"),
+                "the switched-off set skill is gone: {names:?}"
+            );
+            assert!(
+                !(*core).intents.skills_json().contains("roulade"),
+                "{}",
+                (*core).intents.skills_json()
+            );
+            let answer = apply_intent(&mut *core, Intent::Skill("roulade".to_owned()));
+            assert_eq!(answer["ok"], json!(false), "{answer}");
+
+            let reply = call(
+                &mut stream,
+                &mut reader,
+                12,
+                "robot.removeSkill",
+                r#"{"name":"roulade"}"#,
+            );
+            assert_eq!(result(&reply)["accepted"], true, "{reply}");
+            wait_for_swap(core);
+            let reply = call(&mut stream, &mut reader, 13, "robot.skills", "{}");
+            let skills = result(&reply);
+            let names: Vec<&str> = skills["skills"]
+                .as_array()
+                .expect("skill table")
+                .iter()
+                .filter_map(|skill| skill["name"].as_str())
+                .collect();
+            assert!(
+                names.contains(&"roulade"),
+                "removing the switch-off restores the set's skill: {names:?}"
+            );
+            assert!(crate::manifest::custom_skills().is_empty(), "nothing stuck");
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The person's own skill through the config face: a table entry rides
+    /// the next reload, `/skills` advertises it, the trigger runs it, and the
+    /// vet book counts it under its own name.
+    #[test]
+    fn a_custom_skill_from_the_config_face_rides_the_reload() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            c.intents.set_day("2026-11-19".to_owned());
+            tick_until_ready(core);
+            crate::manifest::set_custom_skills(vec![json!({
+                "file": "roulade.onnx",
+                "name": "spin_left",
+                "kind": "episodic",
+                "duration_s": 1.5,
+            })])
+            .expect("the entry is a skill");
+
+            let dir = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, dir.as_ptr()), 0);
+            for _ in 0..800 {
+                duck_core_tick(core);
+                if !c.runtime.swap_pending() {
+                    break;
+                }
+            }
+            assert!(!c.runtime.swap_pending(), "the reload landed");
+            assert!(
+                c.intents.skills_json().contains("spin_left"),
+                "{}",
+                c.intents.skills_json()
+            );
+
+            let answer = apply_intent(&mut *core, Intent::Skill("spin_left".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            duck_core_tick(core);
+            let book = active_runtime(&*core).book().clone();
+            assert_eq!(book.life.skills.get("spin_left"), Some(&1));
+            assert_eq!(
+                book.life.unlocks.get("skill:spin_left").map(String::as_str),
+                Some("2026-11-19")
+            );
+            crate::manifest::clear_custom_skills();
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The parent's day board, end to end: the shell posts its calendar day,
+    /// the duck really counts a day's play, the next day's tick closes the
+    /// row — and `/days` serves the row, today's fresh deltas and the week,
+    /// exactly what `roll_day` wrote.
+    #[test]
+    fn the_parent_day_board_serves_what_the_days_really_did() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            // The first tick with a day starts the baseline; nothing is
+            // claimed by a day that had not begun.
+            c.intents.set_day("2026-11-19".to_owned());
+            assert_eq!(duck_core_tick(core), 0);
+            let before: serde_json::Value =
+                serde_json::from_str(&c.intents.days_json()).expect("days JSON");
+            assert!(
+                before["days"].as_array().expect("rows").is_empty(),
+                "{before}"
+            );
+            assert!(
+                before.get("today").is_some(),
+                "the day is running: {before}"
+            );
+
+            // The day's play: three hands on the duck.
+            for _ in 0..3 {
+                apply_intent(&mut *core, Intent::Pet);
+            }
+            assert_eq!(duck_core_tick(core), 0);
+
+            // The next calendar day: the rollover snapshots 11-19's row.
+            c.intents.set_day("2026-11-20".to_owned());
+            assert_eq!(duck_core_tick(core), 0);
+            let report: serde_json::Value =
+                serde_json::from_str(&c.intents.days_json()).expect("days JSON");
+            assert_eq!(report["ok"], json!(true));
+            let rows = report["days"].as_array().expect("rows");
+            assert_eq!(rows.len(), 1, "{report}");
+            assert_eq!(rows[0]["day"], json!("2026-11-19"));
+            assert_eq!(rows[0]["pets"], json!(3), "{report}");
+
+            let today = &report["today"];
+            assert_eq!(today["day"], json!("2026-11-20"));
+            assert_eq!(
+                today["pets"],
+                json!(0),
+                "the fresh day claims nothing: {report}"
+            );
+            assert_eq!(
+                report["week"]["pets"],
+                json!(3),
+                "the row plus today: {report}"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The cold-start order QA found: the shell posts its day (and the tick
+    /// rolls a near-zero baseline) *before* the saved life arrives at the end
+    /// of the tick. The restore must not let `restore_days` read the lifetime
+    /// as today's play, in either arrival order — and the save/restore cycle
+    /// must keep the completed rows and the same-day baseline.
+    #[test]
+    fn the_restored_lifetime_is_never_counted_as_today() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            let historical = json!({
+                "powered_s": 5000.0, "metres": 800.0, "torqued_s": 4000.0,
+                "pets": 100, "fed": 40, "claps": 12, "whistles": 3,
+                "pickups": 9, "falls": 2, "ground_picks": 7, "sit_downs": 5,
+                "skills": { "roulade": 12 },
+            });
+
+            // Order A: the day lands first, the restore afterwards — the
+            // order that used to count the whole lifetime as today.
+            c.intents.set_day("2026-11-19".to_owned());
+            assert_eq!(duck_core_tick(core), 0);
+            c.intents.push(Intent::RestoreLife(historical.clone()));
+            assert_eq!(duck_core_tick(core), 0);
+            let report: serde_json::Value =
+                serde_json::from_str(&c.intents.days_json()).expect("days JSON");
+            assert_eq!(report["today"]["day"], json!("2026-11-19"), "{report}");
+            assert_eq!(
+                report["today"]["pets"],
+                json!(0),
+                "the restored lifetime is not today's play: {report}"
+            );
+            assert_eq!(report["today"]["metres"], json!(0.0), "{report}");
+            assert_eq!(report["today"]["rolls"], json!(0), "{report}");
+            assert!(
+                report["days"].as_array().expect("rows").is_empty(),
+                "{report}"
+            );
+
+            // Order B: the restore lands before any day is posted; the day
+            // that arrives next starts from the life at that moment.
+            c.intents.set_day(String::new());
+            c.intents.push(Intent::RestoreLife(json!({ "pets": 200 })));
+            assert_eq!(duck_core_tick(core), 0);
+            c.intents.set_day("2026-11-21".to_owned());
+            assert_eq!(duck_core_tick(core), 0);
+            let report: serde_json::Value =
+                serde_json::from_str(&c.intents.days_json()).expect("days JSON");
+            assert_eq!(report["today"]["day"], json!("2026-11-21"), "{report}");
+            assert_eq!(report["today"]["pets"], json!(0), "{report}");
+
+            // A real save/restore cycle on the running day: today's play is
+            // part of the saved life *and* its saved baseline, so handing the
+            // summary back keeps today's delta exactly right.
+            for _ in 0..3 {
+                apply_intent(&mut *core, Intent::Pet);
+            }
+            assert_eq!(duck_core_tick(core), 0);
+            let saved: serde_json::Value =
+                serde_json::from_str(&c.intents.life_json()).expect("life JSON");
+            assert_eq!(
+                saved["day_started"]["day"],
+                json!("2026-11-21"),
+                "the summary publishes the baseline: {saved}"
+            );
+            c.intents.push(Intent::RestoreLife(saved.clone()));
+            assert_eq!(duck_core_tick(core), 0);
+            let report: serde_json::Value =
+                serde_json::from_str(&c.intents.days_json()).expect("days JSON");
+            assert_eq!(
+                report["today"]["pets"],
+                json!(3),
+                "the same-day baseline keeps today's real play: {report}"
+            );
+
+            // The day closes, then the save of that state is handed back the
+            // way a relaunch would: the row and the baseline survive, and
+            // nothing is double counted.
+            c.intents.set_day("2026-11-22".to_owned());
+            assert_eq!(duck_core_tick(core), 0);
+            let saved: serde_json::Value =
+                serde_json::from_str(&c.intents.life_json()).expect("life JSON");
+            assert_eq!(saved["days"].as_array().expect("rows").len(), 1);
+            c.intents.push(Intent::RestoreLife(saved.clone()));
+            assert_eq!(duck_core_tick(core), 0);
+            let report: serde_json::Value =
+                serde_json::from_str(&c.intents.days_json()).expect("days JSON");
+            let rows = report["days"].as_array().expect("rows");
+            assert_eq!(rows.len(), 1, "the completed day survived: {report}");
+            assert_eq!(rows[0]["day"], json!("2026-11-21"));
+            assert_eq!(rows[0]["pets"], json!(3), "{report}");
+            assert_eq!(
+                report["today"]["pets"],
+                json!(0),
+                "the restored baseline makes today start from zero: {report}"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// `robot.setSkill` puts a file through the same ONNX gate
+    /// `robot.loadPolicy`/the official daemon do: a non-policy file is refused
+    /// while the caller is listening, the table is not polluted, and the duck
+    /// still reloads a good set afterwards.
+    #[test]
+    fn set_skill_refuses_a_file_that_is_not_a_policy() {
+        use std::io::{BufRead, BufReader};
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            tick_until_ready(core);
+            if c.ipc.is_none() {
+                duck_core_free(core);
+                return;
+            }
+            // The duck runs from a copy of the set, so the bogus file is not
+            // written into the shared fixtures.
+            let dir = copy_policies_dir(&c.policies, &[]);
+            std::fs::write(dir.join("broken.onnx"), b"this is not an onnx file")
+                .expect("a file that will not open");
+            let dir_c = CString::new(dir.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, dir_c.as_ptr()), 0);
+            for _ in 0..800 {
+                duck_core_tick(core);
+                if !c.runtime.swap_pending() {
+                    break;
+                }
+            }
+            assert_eq!(c.policies, dir, "the duck now runs the copy");
+        }
+        let stream = TcpStream::connect(("127.0.0.1", crate::ipc::ROBOT_IPC_PORT))
+            .expect("connect robot ipc");
+        let mut reader = BufReader::new(stream.try_clone().expect("dup"));
+        let mut stream = stream;
+        let line = format!(
+            "{}\n",
+            json!({
+                "jsonrpc": "2.0", "id": 1, "method": "robot.setSkill",
+                "params": { "name": "broken", "path": "broken.onnx", "duration": 1.0 }
+            })
+        );
+        stream.write_all(line.as_bytes()).expect("write");
+        stream.flush().expect("flush");
+        let mut reply = String::new();
+        reader.read_line(&mut reply).expect("reply");
+        let reply: serde_json::Value = serde_json::from_str(&reply).expect("json reply");
+        assert_eq!(reply["result"]["accepted"], json!(false), "{reply}");
+        assert!(
+            reply["result"]["reason"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("broken.onnx"),
+            "the refusal names the file: {reply}"
+        );
+        assert!(
+            crate::manifest::custom_skills().is_empty(),
+            "the refused skill did not enter the table"
+        );
+        unsafe {
+            let c = &mut *core;
+            // The duck is unharmed: a reload still loads the set.
+            let dir_c = CString::new(c.policies.to_string_lossy().into_owned()).unwrap();
+            assert_eq!(duck_core_reload_policies(core, dir_c.as_ptr()), 0);
+            for _ in 0..800 {
+                duck_core_tick(core);
+                if !c.runtime.swap_pending() {
+                    break;
+                }
+            }
+            assert!(
+                c.intents.skills_json().contains("roulade"),
+                "the good set still runs: {}",
+                c.intents.skills_json()
+            );
+            let _ = std::fs::remove_dir_all(&c.policies);
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The official vet book's label edge: the tick `sit` becomes the driving
+    /// label is one sit-down — not one per tick of the seat — and the day's
+    /// row carries the count (no longer a hard-wired zero).
+    #[test]
+    fn sitting_counts_one_sit_down_and_the_day_row_carries_it() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            c.intents.set_day("2026-11-19".to_owned());
+            tick_until_ready(core);
+            let answer = apply_intent(&mut *core, Intent::Sit);
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            for _ in 0..400 {
+                duck_core_tick(core);
+                if active_runtime(&*core).book().life.sit_downs > 0 {
+                    break;
+                }
+            }
+            assert_eq!(
+                active_runtime(&*core).book().life.sit_downs,
+                1,
+                "one sit is one sit-down"
+            );
+            // Still in the seat: the label stays "sit" and does not count
+            // again.
+            for _ in 0..100 {
+                duck_core_tick(core);
+            }
+            assert_eq!(
+                active_runtime(&*core).book().life.sit_downs,
+                1,
+                "a held seat is not a new sit"
+            );
+
+            c.intents.set_day("2026-11-20".to_owned());
+            assert_eq!(duck_core_tick(core), 0);
+            let report: serde_json::Value =
+                serde_json::from_str(&c.intents.days_json()).expect("days JSON");
+            let rows = report["days"].as_array().expect("rows");
+            assert_eq!(rows.len(), 1, "{report}");
+            assert_eq!(
+                rows[0]["sit_downs"],
+                json!(1),
+                "the day's row counts the sit: {report}"
+            );
+        }
         unsafe { duck_core_free(core) };
     }
 

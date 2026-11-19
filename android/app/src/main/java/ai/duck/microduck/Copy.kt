@@ -644,6 +644,23 @@ val quack get() = pick("Quack", "叫一声")
         "Both phones type the same six digits before gifts or songs.",
         "两台手机输入同一个 6 位数字，才能互送礼物或一起唱。",
     )
+    // 日子 (K3): the parent's board of the duck's real days, from the core's
+    // GET /days. The fourteen keys are carried verbatim from the iOS ticket's
+    // set, word for word, so the two phones say the same things.
+    val daysTitle get() = pick("Days", "日子")
+    val daysWeek get() = pick("This week", "这一周")
+    val daysToday get() = pick("Today", "今天")
+    val daysEmpty get() = pick("No full days yet", "还没有一整天的记录")
+    val daysShare get() = pick("Share", "分享")
+    val daysPowered get() = pick("Time together", "陪伴")
+    val daysMetres get() = pick("Metres", "米")
+    val daysRolls get() = pick("Rolls", "翻滚")
+    val daysPets get() = pick("Pets", "被摸")
+    val daysPickups get() = pick("Picked up", "被抱起")
+    val daysFalls get() = pick("Falls", "摔倒")
+    val daysFed get() = pick("Fed", "被喂")
+    val daysClaps get() = pick("Claps", "拍手")
+    val daysWhistles get() = pick("Whistles", "口哨")
     val heart get() = pick("Heartbeat", "手心心跳")
     val heartRowNote get() = pick("feel its heart — a reading of its mood", "感受它的心——由心情推出来的读数")
 

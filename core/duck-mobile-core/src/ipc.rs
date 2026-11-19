@@ -46,17 +46,16 @@
 //! `robot.rest`, `robot.shutdown`, `robot.do`, `robot.pose`, `robot.mouth`,
 //! `robot.sound`, `robot.flashlight`, `robot.mode`, `robot.setMode`,
 //! `robot.policies`, `robot.model`, `robot.vetbook`, `robot.skills`,
-//! `robot.loadPolicy`, `robot.reloadPolicies` and `robot.subscribe`.
+//! `robot.loadPolicy`, `robot.reloadPolicies`, `robot.setSkill`,
+//! `robot.removeSkill` and `robot.subscribe`.
 //!
 //! Deliberately not served, and refused with `METHOD_NOT_FOUND` and the
 //! official "is not served by robotd" sentence: `robot.theremin` and
-//! `robot.chorale` (no ToF depth source, no chorale score player),
-//! `robot.setSkill`/`robot.removeSkill` (the phone's skill set is the
-//! manifest's; there is no `robotd.toml` edit surface), and the updaterd /
-//! configd namespaces. That is the same refusal a `robotd` missing a route
-//! gives, which is the designed skew behaviour rather than a parse error.
-//! Extending the served set is a `dispatch` arm plus a [`RobotHandlers`]
-//! method, not a protocol change.
+//! `robot.chorale` (no ToF depth source, no chorale score player), and the
+//! updaterd / configd namespaces. That is the same refusal a `robotd` missing
+//! a route gives, which is the designed skew behaviour rather than a parse
+//! error. Extending the served set is a `dispatch` arm plus a
+//! [`RobotHandlers`] method, not a protocol change.
 //!
 //! What this module does **not** do: it owns no runtime. Where the health verdict, the
 //! twist and the per-tick state frames come from is [`RobotHandlers`] and
@@ -236,6 +235,21 @@ pub trait RobotHandlers: Send + Sync + 'static {
     /// `robot.reloadPolicies` — re-read every slot from disk.
     fn reload_policies(&self) -> proto::IntentResult {
         proto::IntentResult::accepted()
+    }
+
+    /// `robot.setSkill` — add a skill to the table or change one, then
+    /// reload, the whole operation in one call (the official dispatch's own
+    /// words for why it reloads inside the request).
+    fn set_skill(&self, _params: proto::SkillParams) -> proto::IntentResult {
+        proto::IntentResult::refused("skill editing is not wired")
+    }
+
+    /// `robot.removeSkill` — take a skill out of the table, then reload.
+    /// A name the table does not carry is an `already`, not a refusal: the
+    /// official `edit::remove_skill` says "no configured skill called" and
+    /// changes nothing.
+    fn remove_skill(&self, _params: proto::SkillNameParams) -> proto::IntentResult {
+        proto::IntentResult::refused("skill editing is not wired")
     }
 
     /// `robot.safeToRestart` — whether restarting motor control now would drop the duck.
@@ -800,15 +814,19 @@ fn dispatch(
         proto::Call::RobotReloadPolicies => {
             proto::Response::ok(Some(id), &handlers.reload_policies())
         }
+        proto::Call::RobotSetSkill(p) => {
+            proto::Response::ok(Some(id), &handlers.set_skill(p.clone()))
+        }
+        proto::Call::RobotRemoveSkill(p) => {
+            proto::Response::ok(Some(id), &handlers.remove_skill(p.clone()))
+        }
         // Deliberately still `METHOD_NOT_FOUND`:
         // - `robot.theremin` / `robot.chorale` / `chorale.*`: the phone has no ToF
         //   depth source and no chorale score player (docs/COMPARISON… §5.1), so
         //   answering "accepted" would promise an instrument or a song that cannot play.
-        // - `robot.setSkill` / `robot.removeSkill`: the phone's skill set is the
-        //   manifest's; there is no `robotd.toml` edit surface to persist a named skill
-        //   into, so the official write path has no honest mobile twin.
-        // - `robot.setSkill` callers get the same official refusal a `robotd` without
-        //   the route gives, which is the designed skew behaviour.
+        // - the updaterd / configd namespaces: a phone edits its own skill table
+        //   (`robot.setSkill`/`robot.removeSkill` above) but installs policy
+        //   sets through Reload AI, not the updater.
         other => proto::Response::err(
             Some(id),
             proto::Error::new(
@@ -842,6 +860,8 @@ mod tests {
         mouths: Mutex<Vec<proto::MouthParams>>,
         sounds: Mutex<Vec<proto::SoundParams>>,
         skills: Mutex<Vec<String>>,
+        set_skills: Mutex<Vec<proto::SkillParams>>,
+        removed_skills: Mutex<Vec<String>>,
         refuse_do: AtomicBool,
     }
 
@@ -854,6 +874,8 @@ mod tests {
                 mouths: Mutex::new(Vec::new()),
                 sounds: Mutex::new(Vec::new()),
                 skills: Mutex::new(Vec::new()),
+                set_skills: Mutex::new(Vec::new()),
+                removed_skills: Mutex::new(Vec::new()),
                 refuse_do: AtomicBool::new(false),
             })
         }
@@ -903,6 +925,19 @@ mod tests {
             }
             self.skills.lock().unwrap().push(params.skill);
             proto::IntentResult::accepted()
+        }
+
+        fn set_skill(&self, params: proto::SkillParams) -> proto::IntentResult {
+            self.set_skills.lock().unwrap().push(params);
+            proto::IntentResult::accepted()
+        }
+
+        fn remove_skill(&self, params: proto::SkillNameParams) -> proto::IntentResult {
+            self.removed_skills
+                .lock()
+                .unwrap()
+                .push(params.name.clone());
+            proto::IntentResult::already(format!("no configured skill called {:?}", params.name))
         }
 
         fn subscribe_info(&self) -> proto::SubscribeResult {
@@ -1223,6 +1258,76 @@ mod tests {
         let verdict: proto::IntentResult = reply.result_as().expect("IntentResult");
         assert!(!verdict.accepted);
         assert!(verdict.reason.unwrap().contains("backflip"));
+
+        server.stop();
+    }
+
+    /// `robot.setSkill` and `robot.removeSkill` ride the same dispatch as every
+    /// other served method: the params are the official wire types (unknown
+    /// members refused by `deny_unknown_fields`), the verdict is the handler's,
+    /// and a remove of nothing is the official `already` answer.
+    #[test]
+    fn set_skill_and_remove_skill_reach_the_handlers() {
+        let handlers = TestHandlers::new();
+        let (server, port) = start_test_server(handlers.clone());
+        let mut client = Client::connect(port);
+
+        client.request(
+            1,
+            "robot.setSkill",
+            r#"{"name":"spin_left","path":"roulade.onnx","duration":1.5,"chain":true}"#,
+        );
+        let reply = parse(
+            client
+                .read_line(Duration::from_secs(2))
+                .expect("setSkill reply"),
+        );
+        assert_eq!(reply.id, Some(proto::Id::Number(1)));
+        let verdict: proto::IntentResult = reply.result_as().expect("IntentResult");
+        assert!(verdict.accepted);
+        let sent = handlers.set_skills.lock().unwrap();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].name, "spin_left");
+        assert_eq!(sent[0].path.as_deref(), Some("roulade.onnx"));
+        assert_eq!(sent[0].duration, Some(1.5));
+        assert_eq!(sent[0].chain, Some(true));
+        drop(sent);
+
+        client.request(2, "robot.removeSkill", r#"{"name":"spin_left"}"#);
+        let reply = parse(
+            client
+                .read_line(Duration::from_secs(2))
+                .expect("removeSkill reply"),
+        );
+        let verdict: proto::IntentResult = reply.result_as().expect("IntentResult");
+        assert_eq!(
+            handlers
+                .removed_skills
+                .lock()
+                .unwrap()
+                .last()
+                .map(String::as_str),
+            Some("spin_left")
+        );
+        assert!(verdict.accepted, "{verdict:?}");
+        assert_eq!(
+            verdict.reason.as_deref(),
+            Some("no configured skill called \"spin_left\""),
+            "the official already-answer names the absent skill"
+        );
+
+        // The wire's own refusals: an unknown member on SkillParams (deny_unknown_fields)
+        // and a missing name on SkillNameParams, both INVALID_PARAMS naming the member.
+        client.request(3, "robot.setSkill", r#"{"name":"x","zzz":1}"#);
+        let reply = parse(client.read_line(Duration::from_secs(2)).expect("reply"));
+        let error = reply.error.expect("error");
+        assert_eq!(error.code, proto::code::INVALID_PARAMS);
+        assert!(error.message.contains("zzz"), "{}", error.message);
+        client.request(4, "robot.removeSkill", "{}");
+        let reply = parse(client.read_line(Duration::from_secs(2)).expect("reply"));
+        let error = reply.error.expect("error");
+        assert_eq!(error.code, proto::code::INVALID_PARAMS);
+        assert!(error.message.contains("name"), "{}", error.message);
 
         server.stop();
     }

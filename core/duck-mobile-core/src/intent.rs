@@ -16,7 +16,13 @@
 //! POST /reload      {"dir":"/path/to/policies"}
 //! GET  /state
 //! GET  /skills
+//! GET  /days                                           the parent's day view
 //! ```
+//!
+//! `POST /config` also takes `custom_skills` — an array of manifest policy
+//! entries (file, name, kind, duration_s, …) that replaces the duck's own
+//! skill table, exactly what `robot.setSkill`/`robot.removeSkill` serve over
+//! the `robot.*` face. The next `/reload` is what loads the files.
 //!
 //! No authentication: it binds to the local network for a phone or a desktop
 //! agent. Treat it as a development API, not an internet-facing service.
@@ -472,6 +478,17 @@ impl IntentQueue {
     /// The lifetime record, as the core last published it.
     pub fn life_json(&self) -> String {
         self.life.lock().expect("intent life").summary().to_string()
+    }
+
+    /// The parent's day view, from the same snapshot `/life` serves: the
+    /// completed rows the rollover wrote, today's deltas so far, and the
+    /// week's totals. The day is the quest day the shell posted — the same
+    /// day the roll and the unlocks date by; with no day posted there is no
+    /// `today`, and the book's own emptiness is served as it is (no rows, no
+    /// invented zeros).
+    pub fn days_json(&self) -> String {
+        let book = self.life.lock().expect("intent life").clone();
+        book.days_report(&self.day()).to_string()
     }
 
     /// Hand the loop's book over, so a client sees the same numbers the
@@ -969,10 +986,15 @@ fn authorised(
 /// because the walking policy is what every other slot falls back to
 /// (`robotd/src/main.rs`' `load_policy_request`). `slot_overrides` is the general
 /// shape — an object of slot name to file name or `"none"` — and is applied
-/// after `walk_policy`, so a `walk` key there wins. Both leave the overrides
-/// process-global, as the official config keys are one machine-level config;
-/// the reload that follows is what resolves them. Keys are applied in order,
-/// so a refusal names the slot and leaves any earlier key applied.
+/// after `walk_policy`, so a `walk` key there wins. `custom_skills` is the
+/// skill table: an array of manifest policy entries, replacing the whole
+/// table (an empty array clears it), validated per entry — kind episodic, a
+/// name, a positive duration, and a file that is a bare name and really in
+/// the policies directory — the same door `robot.setSkill`'s merged entries
+/// go through. Both leave the overrides process-global, as the official
+/// config keys are one machine-level config; the reload that follows is what
+/// resolves them. Keys are applied in order, so a refusal names the slot and
+/// leaves any earlier key applied.
 fn apply_policy_config(value: &Value) -> Result<(), String> {
     if let Some(name) = value.get("walk_policy").and_then(Value::as_str) {
         let name = (!name.is_empty()).then(|| name.to_owned());
@@ -992,6 +1014,12 @@ fn apply_policy_config(value: &Value) -> Result<(), String> {
             crate::manifest::set_slot_override(slot, name)
                 .map_err(|error| format!("{slot}: {error}"))?;
         }
+    }
+    if let Some(entries) = value.get("custom_skills") {
+        let entries = entries
+            .as_array()
+            .ok_or("custom_skills must be an array of manifest policy entries")?;
+        crate::manifest::set_custom_skills(entries.clone())?;
     }
     Ok(())
 }
@@ -1118,6 +1146,9 @@ fn handle(
         ("GET", "/sensors") => Ok(queue.sensors_json()),
         // The lifetime record, the same counters the shell keeps in storage.
         ("GET", "/life") => Ok(queue.life_json()),
+        // The parent's day view: one row per closed day, today's deltas so
+        // far, the week's totals. A read, like /life: nothing is queued.
+        ("GET", "/days") => Ok(queue.days_json()),
         // The collection page: every loaded mood and manifest trick with its
         // real count and first day. A read, like /life: nothing is queued.
         ("GET", "/collection") => Ok(queue.collection_json()),
@@ -1848,6 +1879,86 @@ mod tests {
         assert_eq!(value["moods"], json!({ "unlocked": 1, "total": 13 }));
     }
 
+    /// The parent's day view over HTTP: the rows the rollover wrote, today's
+    /// deltas against the day the shell posted, and the week's totals. With
+    /// no day posted there is no `today` at all, and a book without rows is
+    /// an empty array — never a zero-filled row.
+    #[test]
+    fn http_days_serves_the_rows_today_and_the_week() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        // Nothing published yet: an empty array and no today.
+        let response = request(port, "GET", "/days", "");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let empty: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("days JSON");
+        assert_eq!(empty["ok"], json!(true));
+        assert_eq!(empty["days"], json!([]));
+        assert!(empty.get("today").is_none(), "{empty}");
+        assert!(empty["week"].is_object(), "{empty}");
+
+        // A book with two closed days and a live third: today is the deltas
+        // since the day_started baseline, the week is the rows plus today.
+        let book: crate::vetbook::Book = serde_json::from_str(
+            &json!({
+                "days": [
+                    {"day": "2026-11-17", "metres": 12.3, "powered_s": 600.0, "rolls": 2,
+                     "pets": 5, "pickups": 1, "falls": 0, "fed": 2, "claps": 3,
+                     "whistles": 1, "ground_picks": 0, "sit_downs": 1},
+                    {"day": "2026-11-18", "metres": 1.4, "powered_s": 240.5, "rolls": 0,
+                     "pets": 1, "pickups": 0, "falls": 1, "fed": 0, "claps": 0,
+                     "whistles": 0, "ground_picks": 2, "sit_downs": 0}
+                ],
+                "day_started": {"day": "2026-11-19", "metres": 0.2, "powered_s": 60.0,
+                     "rolls": 0, "pets": 0, "pickups": 0, "falls": 0, "fed": 0,
+                     "claps": 0, "whistles": 0, "ground_picks": 0, "sit_downs": 0},
+                "life": {"metres": 1.5, "powered_s": 120.0, "skills": {}, "pets": 1}
+            })
+            .to_string(),
+        )
+        .expect("book");
+        queue.set_life(&book);
+        queue.set_day("2026-11-19".to_owned());
+
+        let response = request(port, "GET", "/days", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("days JSON");
+        let rows = value["days"].as_array().expect("rows");
+        assert_eq!(rows.len(), 2, "{value}");
+        assert_eq!(rows[0]["day"], json!("2026-11-17"));
+        assert_eq!(rows[0]["pets"], json!(5));
+        assert_eq!(rows[0]["sit_downs"], json!(1));
+        assert_eq!(rows[1]["ground_picks"], json!(2));
+
+        let today = &value["today"];
+        assert_eq!(today["day"], json!("2026-11-19"));
+        assert_eq!(today["metres"], json!(1.3), "{value}");
+        assert_eq!(today["powered_s"], json!(60.0), "{value}");
+        assert_eq!(today["pets"], json!(1), "{value}");
+
+        // The week: the two rows plus today, every field summed.
+        let week = &value["week"];
+        assert_eq!(week["metres"], json!(15.0), "{value}");
+        assert_eq!(week["powered_s"], json!(900.5), "{value}");
+        assert_eq!(week["rolls"], json!(2), "{value}");
+        assert_eq!(week["pets"], json!(7), "{value}");
+        assert_eq!(week["pickups"], json!(1), "{value}");
+        assert_eq!(week["falls"], json!(1), "{value}");
+        assert_eq!(week["ground_picks"], json!(2), "{value}");
+
+        // The day the shell posts is what dates today; no day, no today key,
+        // and the rows stand alone.
+        queue.set_day(String::new());
+        let response = request(port, "GET", "/days", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("days JSON");
+        assert!(value.get("today").is_none(), "{value}");
+        assert_eq!(value["days"].as_array().expect("rows").len(), 2);
+    }
+
     /// A date that never existed is never served, even if a book carries one
     /// (an old save, a hostile POST). The row keeps its real count and says
     /// the day is unknown.
@@ -2024,6 +2135,79 @@ mod tests {
         );
         assert!(response.contains("400 Bad Request"), "{response}");
         assert!(response.contains("kick_left"), "{response}");
+    }
+
+    /// The skill table through `/config`: each entry is validated against the
+    /// policies directory the last load ran against — a file that was never
+    /// there is refused with the entry and the reason, one bad row refuses
+    /// the whole request and leaves the table in force, and the reload that
+    /// follows (not this route) is what loads the files.
+    #[test]
+    fn http_config_takes_custom_skills() {
+        let _lock = crate::manifest::override_test_lock();
+        // The set-time file checks resolve against the directory of the most
+        // recent load; the tests' lock cleared that state, so give it one
+        // here — the same setup the manifest tests' `write_set` builds.
+        let dir = std::env::temp_dir().join(format!("duck-intent-custom-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp policies dir");
+        std::fs::write(dir.join("velstand.onnx"), b"stub").expect("stub walk file");
+        std::fs::write(dir.join("spin.onnx"), b"stub").expect("stub skill file");
+        crate::manifest::load_mode(&dir, robotd_params::Mode::Walk).expect("the set loads");
+
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"custom_skills":[{"file":"spin.onnx","name":"spin_left","kind":"episodic","duration_s":1.5,"chain":true}]}"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let table = crate::manifest::custom_skills();
+        assert_eq!(table["spin_left"].duration, 1.5);
+        assert!(table["spin_left"].chain);
+        // Configuring the table queues no intent: the reload is a separate
+        // route, the same way a slot override waits for one.
+        assert!(queue.drain().is_empty());
+
+        // A file that was never there: 400, the entry named, the table in
+        // force unchanged.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"custom_skills":[{"file":"gone.onnx","name":"phantom","kind":"episodic","duration_s":1.0}]}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("phantom"), "{response}");
+        assert!(response.contains("no such file"), "{response}");
+        assert_eq!(crate::manifest::custom_skills()["spin_left"].duration, 1.5);
+
+        // A shape the door refuses: not episodic, not even an array.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"custom_skills":[{"file":"spin.onnx","name":"hold_still","kind":"perpetual","duration_s":1.0}]}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("episodic"), "{response}");
+        let response = request(port, "POST", "/config", r#"{"custom_skills":{}}"#);
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("array"), "{response}");
+        assert_eq!(crate::manifest::custom_skills()["spin_left"].duration, 1.5);
+
+        // An empty array is the whole-table reset.
+        let response = request(port, "POST", "/config", r#"{"custom_skills":[]}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(crate::manifest::custom_skills().is_empty());
+
+        crate::manifest::clear_custom_skills();
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The person's own words, taught through `/config`: a phrase names a

@@ -101,7 +101,11 @@ pub struct Book {
     pub day_started: DayStarted,
 }
 
-/// One calendar day's honest deltas, snapshotted at the rollover.
+/// One calendar day's honest deltas, snapshotted at the rollover. The eight
+/// counters ride beside the seconds and the rolls so the parent's day view
+/// can show what kind of day it was, not only how long it lasted. `default`
+/// keeps rows an older save wrote loading as zeros: a day that happened
+/// before the fields existed happened without them.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DayRecord {
     pub day: String,
@@ -111,6 +115,30 @@ pub struct DayRecord {
     pub powered_s: f64,
     /// Roulades that day.
     pub rolls: u64,
+    /// Hands on the duck that day.
+    #[serde(default)]
+    pub pets: u64,
+    /// Pick-ups the detector saw that day.
+    #[serde(default)]
+    pub pickups: u64,
+    /// Falls that day.
+    #[serde(default)]
+    pub falls: u64,
+    /// Breadcrumb feeds that day.
+    #[serde(default)]
+    pub fed: u64,
+    /// Claps answered that day.
+    #[serde(default)]
+    pub claps: u64,
+    /// Whistles answered that day.
+    #[serde(default)]
+    pub whistles: u64,
+    /// Ground picks that day.
+    #[serde(default)]
+    pub ground_picks: u64,
+    /// Sits that day.
+    #[serde(default)]
+    pub sit_downs: u64,
 }
 
 /// Where the current day's counters started. Values the duck already had
@@ -121,6 +149,22 @@ pub struct DayStarted {
     pub metres: f64,
     pub powered_s: f64,
     pub rolls: u64,
+    #[serde(default)]
+    pub pets: u64,
+    #[serde(default)]
+    pub pickups: u64,
+    #[serde(default)]
+    pub falls: u64,
+    #[serde(default)]
+    pub fed: u64,
+    #[serde(default)]
+    pub claps: u64,
+    #[serde(default)]
+    pub whistles: u64,
+    #[serde(default)]
+    pub ground_picks: u64,
+    #[serde(default)]
+    pub sit_downs: u64,
 }
 
 /// How many events are kept.
@@ -218,39 +262,224 @@ pub fn is_unlock_day(value: &str) -> bool {
 }
 
 impl Book {
+    /// One day's honest deltas against the day_started baseline — the single
+    /// arithmetic both readers share: [`Book::roll_day`] writes it as a
+    /// `DayRecord` at the rollover, and [`Book::today_record`] serves the same
+    /// numbers before it, so the two can never drift. Every field saturates
+    /// at zero: a restore can leave older totals under a fresh baseline, and
+    /// a day never claims counts — or metres, or seconds — it did not happen
+    /// on.
+    fn day_delta(&self, day: &str) -> DayRecord {
+        DayRecord {
+            day: day.to_owned(),
+            metres: ((self.life.metres - self.day_started.metres) * 10.0)
+                .round()
+                .max(0.0)
+                / 10.0,
+            powered_s: ((self.life.powered_s - self.day_started.powered_s) * 10.0)
+                .round()
+                .max(0.0)
+                / 10.0,
+            rolls: self
+                .life
+                .skills
+                .get("roulade")
+                .copied()
+                .unwrap_or(0)
+                .saturating_sub(self.day_started.rolls),
+            pets: self.life.pets.saturating_sub(self.day_started.pets),
+            pickups: self.life.pickups.saturating_sub(self.day_started.pickups),
+            falls: self.life.falls.saturating_sub(self.day_started.falls),
+            fed: self.life.fed.saturating_sub(self.day_started.fed),
+            claps: self.life.claps.saturating_sub(self.day_started.claps),
+            whistles: self.life.whistles.saturating_sub(self.day_started.whistles),
+            ground_picks: self
+                .life
+                .ground_picks
+                .saturating_sub(self.day_started.ground_picks),
+            sit_downs: self
+                .life
+                .sit_downs
+                .saturating_sub(self.day_started.sit_downs),
+        }
+    }
+
+    /// Today's honest deltas, with the day the shell says it is. `None` when
+    /// the book has no day to count against — `day_started` still empty means
+    /// no day has been posted yet, and an increment without a baseline is a
+    /// guess, not a fact.
+    pub fn today_record(&self, day: &str) -> Option<DayRecord> {
+        if self.day_started.day.is_empty() {
+            return None;
+        }
+        Some(self.day_delta(day))
+    }
+
+    /// The last seven completed days plus today, summed per field. Metres and
+    /// powered seconds keep the rows' own 0.1 rounding; the counts are
+    /// integers and add exactly.
+    fn week_totals(days: &[DayRecord], today: Option<&DayRecord>) -> serde_json::Value {
+        let mut rows: Vec<&DayRecord> = days.iter().rev().take(7).collect();
+        if let Some(today) = today {
+            rows.push(today);
+        }
+        let mut metres = 0.0;
+        let mut powered_s = 0.0;
+        let mut totals = [0u64; 9];
+        for row in &rows {
+            metres += row.metres;
+            powered_s += row.powered_s;
+            for (slot, count) in totals.iter_mut().zip([
+                row.rolls,
+                row.pets,
+                row.pickups,
+                row.falls,
+                row.fed,
+                row.claps,
+                row.whistles,
+                row.ground_picks,
+                row.sit_downs,
+            ]) {
+                *slot += count;
+            }
+        }
+        let [
+            rolls,
+            pets,
+            pickups,
+            falls,
+            fed,
+            claps,
+            whistles,
+            ground_picks,
+            sit_downs,
+        ] = totals;
+        serde_json::json!({
+            "metres": (metres * 10.0).round() / 10.0,
+            "powered_s": (powered_s * 10.0).round() / 10.0,
+            "rolls": rolls,
+            "pets": pets,
+            "pickups": pickups,
+            "falls": falls,
+            "fed": fed,
+            "claps": claps,
+            "whistles": whistles,
+            "ground_picks": ground_picks,
+            "sit_downs": sit_downs,
+        })
+    }
+
+    /// The parent's day view: the completed rows, today's deltas so far, and
+    /// the week's totals. Nothing is invented here: a day that never rolled
+    /// over has no row, today appears only while a day is actually being
+    /// counted **and** the shell has named one (`day` empty means there is
+    /// no day to label the deltas with — an unlabeled today is a guess), and
+    /// the week sums exactly those.
+    pub fn days_report(&self, day: &str) -> serde_json::Value {
+        let today = self.today_record(day).filter(|today| !today.day.is_empty());
+        let mut report = serde_json::json!({ "ok": true, "days": self.days });
+        if let Some(today) = &today {
+            report["today"] = serde_json::json!(today);
+        }
+        report["week"] = Self::week_totals(&self.days, today.as_ref());
+        report
+    }
+
     /// One tick's facts. The loop calls this every tick: no lock, no
     /// allocation beyond the counters themselves.
     /// The calendar day rolled over (the shell posts the day it lives by):
     /// snapshot yesterday's deltas and start counting from now.
     pub fn roll_day(&mut self, day: &str) {
-        let metres = self.life.metres - self.day_started.metres;
-        let powered = self.life.powered_s - self.day_started.powered_s;
-        let rolls = self
-            .life
-            .skills
-            .get("roulade")
-            .copied()
-            .unwrap_or(0)
-            .saturating_sub(self.day_started.rolls);
         if self.day_started.day == *day {
             return;
         }
         if !self.day_started.day.is_empty() {
-            self.days.push(DayRecord {
-                day: self.day_started.day.clone(),
-                metres: (metres * 10.0).round() / 10.0,
-                powered_s: (powered * 10.0).round() / 10.0,
-                rolls,
-            });
+            let record = self.day_delta(&self.day_started.day);
+            self.days.push(record);
             if self.days.len() > 30 {
                 self.days.remove(0);
             }
         }
-        self.day_started = DayStarted {
-            day: day.to_owned(),
+        self.day_started = self.started_now();
+        self.day_started.day = day.to_owned();
+    }
+
+    /// The day's baseline taken from the life counters as they are now. The
+    /// day label is the caller's business: [`Book::roll_day`] stamps the day
+    /// it is counting, [`Book::restore_days`] stamps today only when the save
+    /// cannot carry a trustworthy one.
+    fn started_now(&self) -> DayStarted {
+        DayStarted {
+            day: String::new(),
             metres: self.life.metres,
             powered_s: self.life.powered_s,
             rolls: self.life.skills.get("roulade").copied().unwrap_or(0),
+            pets: self.life.pets,
+            pickups: self.life.pickups,
+            falls: self.life.falls,
+            fed: self.life.fed,
+            claps: self.life.claps,
+            whistles: self.life.whistles,
+            ground_picks: self.life.ground_picks,
+            sit_downs: self.life.sit_downs,
+        }
+    }
+
+    /// Restore the parent's day view from a saved `/life` summary, and settle
+    /// the day the restored life is being counted against.
+    ///
+    /// The save carries `days` (the completed rows) and `day_started` (the
+    /// baseline those rows were counted from). Both are sanitised the way
+    /// every restore-route value is: a row must deserialize and carry a real
+    /// calendar day (a made-up date is worse than no date), the record keeps
+    /// its 30-row cap, and the baseline's counters are clamped to the
+    /// restored life — a baseline above what the duck has is not a baseline it
+    /// can have.
+    ///
+    /// **The saved baseline is kept only when it is today's.** A save written
+    /// yesterday, or one with no baseline at all, cannot tell history from
+    /// today's play: keeping it would put the duck's whole lifetime into
+    /// today's row. Then the baseline is simply re-set to the restored life
+    /// and stamped `today`, so the day starts counting from the moment of the
+    /// restore and the completed rows stay what they are — history.
+    pub fn restore_days(&mut self, saved: &serde_json::Value, today: &str) {
+        if let Some(rows) = saved.get("days").and_then(serde_json::Value::as_array) {
+            self.days = rows
+                .iter()
+                .filter_map(|row| serde_json::from_value::<DayRecord>(row.clone()).ok())
+                .filter(|row| is_calendar_day(&row.day))
+                .collect();
+            let excess = self.days.len().saturating_sub(30);
+            if excess > 0 {
+                self.days.drain(0..excess);
+            }
+        }
+        let saved_baseline = saved
+            .get("day_started")
+            .and_then(|value| serde_json::from_value::<DayStarted>(value.clone()).ok())
+            .filter(|baseline| is_calendar_day(&baseline.day));
+        self.day_started = match saved_baseline.filter(|baseline| baseline.day == today) {
+            Some(mut baseline) => {
+                baseline.metres = baseline.metres.clamp(0.0, self.life.metres);
+                baseline.powered_s = baseline.powered_s.clamp(0.0, self.life.powered_s);
+                baseline.rolls = baseline.rolls.min(self.started_now().rolls);
+                baseline.pets = baseline.pets.min(self.life.pets);
+                baseline.pickups = baseline.pickups.min(self.life.pickups);
+                baseline.falls = baseline.falls.min(self.life.falls);
+                baseline.fed = baseline.fed.min(self.life.fed);
+                baseline.claps = baseline.claps.min(self.life.claps);
+                baseline.whistles = baseline.whistles.min(self.life.whistles);
+                baseline.ground_picks = baseline.ground_picks.min(self.life.ground_picks);
+                baseline.sit_downs = baseline.sit_downs.min(self.life.sit_downs);
+                baseline
+            }
+            None => {
+                let mut baseline = self.started_now();
+                if is_calendar_day(today) {
+                    baseline.day = today.to_owned();
+                }
+                baseline
+            }
         };
     }
 
@@ -367,6 +596,11 @@ impl Book {
             "pickups": self.life.pickups,
             "ground_picks": self.life.ground_picks,
             "days": self.days,
+            // The day the rows are counted against. Published so the shell's
+            // saved copy can hand it back on the next launch (`RestoreLife`
+            // reads it): a baseline that never left the process would make
+            // today start from zero after every restart.
+            "day_started": self.day_started,
             "sit_downs": self.life.sit_downs,
             "stand_ups": self.life.stand_ups,
             "wake_ups": self.life.wake_ups,
@@ -632,5 +866,396 @@ mod tests {
         ] {
             assert!(!is_known_event(event), "{event} is not the core's word");
         }
+    }
+
+    /// A cross-day simulation with real counting: what the loop counted
+    /// between the two day posts is exactly what the rollover writes into the
+    /// row, in all ten fields.
+    #[test]
+    fn a_day_row_carries_the_counts_its_day_happened() {
+        let mut book = Book::default();
+        book.roll_day("2026-11-18");
+
+        // The day's play: hands, a roll, a treat, the room answering, the
+        // duck's own verdicts. The life counters are the loop's own book —
+        // runtime.rs bumps these same fields — and the seconds come from
+        // ticks, as always.
+        for _ in 0..3 {
+            book.life.pets += 1;
+        }
+        book.skill("roulade");
+        book.life.pickups += 1;
+        book.life.falls += 1;
+        book.life.fed += 2;
+        book.life.claps += 3;
+        book.life.whistles += 1;
+        book.life.ground_picks += 1;
+        book.life.sit_downs += 1;
+        for _ in 0..50 {
+            book.tick(Facts {
+                powered: true,
+                walking: true,
+                dt: 0.02,
+                ..Facts::default()
+            });
+        }
+
+        book.roll_day("2026-11-19");
+        assert_eq!(book.days.len(), 1, "one day closed");
+        let row = &book.days[0];
+        assert_eq!(row.day, "2026-11-18");
+        assert_eq!(row.rolls, 1);
+        assert_eq!(row.pets, 3);
+        assert_eq!(row.pickups, 1);
+        assert_eq!(row.falls, 1);
+        assert_eq!(row.fed, 2);
+        assert_eq!(row.claps, 3);
+        assert_eq!(row.whistles, 1);
+        assert_eq!(row.ground_picks, 1);
+        assert_eq!(row.sit_downs, 1);
+        assert!((row.powered_s - 1.0).abs() < 1e-9, "{}", row.powered_s);
+        assert_eq!(row.metres, 0.0, "the odometry never moved in this test");
+
+        // The fresh baseline: nothing of yesterday is carried into today.
+        // Whatever today counts starts from zero deltas again.
+        let today = book.today_record("2026-11-19").expect("a day is running");
+        assert_eq!(today.day, "2026-11-19");
+        assert_eq!(today.pets, 0);
+        assert_eq!(today.rolls, 0);
+        assert_eq!(today.fed, 0);
+    }
+
+    /// A save written before the eight counters existed still loads: rows and
+    /// baselines without the fields deserialize as zeros, and the next
+    /// rollover writes a row that carries all ten fields.
+    #[test]
+    fn an_old_day_row_loads_and_the_next_rollover_writes_full_rows() {
+        let old = r#"{
+            "days": [{"day": "2026-11-17", "metres": 12.3, "powered_s": 600.0, "rolls": 2}],
+            "day_started": {"day": "2026-11-18", "metres": 1.0, "powered_s": 60.0, "rolls": 0}
+        }"#;
+        let mut book: Book = serde_json::from_str(old).expect("an old save still loads");
+        assert_eq!(book.days[0].pets, 0);
+        assert_eq!(book.days[0].falls, 0);
+        assert_eq!(book.day_started.pets, 0);
+        assert_eq!(book.day_started.sit_downs, 0);
+
+        // The old row survives untouched, and the new row has every field.
+        book.life.pets = 4;
+        book.roll_day("2026-11-19");
+        assert_eq!(book.days.len(), 2);
+        assert_eq!(book.days[0].pets, 0, "the old row keeps its zeros");
+        assert_eq!(book.days[1].day, "2026-11-18");
+        assert_eq!(book.days[1].pets, 4);
+        assert_eq!(
+            book.days[1].pickups, 0,
+            "a field the save never had counts as zero, not as invented"
+        );
+    }
+
+    /// One arithmetic, two readers: today's deltas computed before the
+    /// rollover are exactly the row the rollover writes. If these ever
+    /// drift, the parent's board contradicts the rows it shows yesterday.
+    #[test]
+    fn today_matches_the_record_the_rollover_writes() {
+        let mut book = Book::default();
+        book.roll_day("2026-11-18");
+        book.life.pets += 1;
+        book.life.pets += 1;
+        book.skill("roulade");
+        book.life.fed += 1;
+        book.life.whistles += 2;
+        for _ in 0..100 {
+            book.tick(Facts {
+                powered: true,
+                dt: 0.02,
+                ..Facts::default()
+            });
+        }
+
+        let today = book.today_record("2026-11-19").expect("a day is running");
+        book.roll_day("2026-11-19");
+        let record = book.days.last().expect("the rollover wrote the row");
+        assert_ne!(
+            today.day, record.day,
+            "the labels differ; the numbers may not"
+        );
+        assert_eq!(today.metres, record.metres);
+        assert_eq!(today.powered_s, record.powered_s);
+        assert_eq!(today.rolls, record.rolls);
+        assert_eq!(today.pets, record.pets);
+        assert_eq!(today.pickups, record.pickups);
+        assert_eq!(today.falls, record.falls);
+        assert_eq!(today.fed, record.fed);
+        assert_eq!(today.claps, record.claps);
+        assert_eq!(today.whistles, record.whistles);
+        assert_eq!(today.ground_picks, record.ground_picks);
+        assert_eq!(today.sit_downs, record.sit_downs);
+    }
+
+    /// A restore can leave older totals under a fresh baseline. The day then
+    /// counts only what happened after it began: a negative increment is a
+    /// day claiming work it did not do, so it saturates at zero.
+    #[test]
+    fn a_day_never_claims_counts_from_before_its_baseline() {
+        let mut book = Book::default();
+        book.day_started = DayStarted {
+            day: "2026-11-18".to_owned(),
+            metres: 40.0,
+            powered_s: 900.0,
+            rolls: 5,
+            pets: 10,
+            falls: 3,
+            ..DayStarted::default()
+        };
+        book.life.metres = 12.0;
+        book.life.powered_s = 100.0;
+        book.life.skills.insert("roulade".to_owned(), 2);
+        book.life.pets = 3;
+        book.roll_day("2026-11-19");
+        let row = book.days.last().expect("the day closed");
+        assert_eq!(row.rolls, 0, "two rolls cannot un-happen five");
+        assert_eq!(row.pets, 0);
+        assert_eq!(row.falls, 0);
+        assert_eq!(row.metres, 0.0, "a negative delta is not a fact either");
+    }
+
+    /// No day has ever been posted: there is no baseline, so there is no
+    /// today — the report omits the key rather than guessing one.
+    #[test]
+    fn no_day_posted_no_today() {
+        let book = Book::default();
+        assert!(book.today_record("2026-11-19").is_none());
+        let report = book.days_report("2026-11-19");
+        assert!(report.get("today").is_none(), "{report}");
+    }
+
+    /// The parent's board shape: the completed rows in order, today's deltas
+    /// beside them, and the week summing the last seven rows plus today.
+    /// Days without records stay an empty array — no zero-filled rows.
+    #[test]
+    fn the_days_report_is_the_rows_today_and_the_week() {
+        let mut book = Book::default();
+        assert_eq!(
+            book.days_report("2026-11-19")["days"],
+            serde_json::json!([])
+        );
+
+        // Two closed days, then a live third one with today's counts so far.
+        book.roll_day("2026-11-16");
+        book.life.pets += 1;
+        book.roll_day("2026-11-17");
+        book.life.pets += 1;
+        book.life.pets += 1;
+        book.skill("roulade");
+        book.roll_day("2026-11-18");
+        book.life.pets += 1;
+        let report = book.days_report("2026-11-18");
+        assert_eq!(report["ok"], serde_json::json!(true));
+        let rows = report["days"].as_array().expect("rows");
+        assert_eq!(rows.len(), 2, "the live day has no row yet");
+        assert_eq!(rows[0]["day"], serde_json::json!("2026-11-16"));
+        assert_eq!(rows[0]["pets"], serde_json::json!(1));
+        assert_eq!(rows[1]["pets"], serde_json::json!(2));
+        assert_eq!(rows[1]["rolls"], serde_json::json!(1));
+
+        let today = &report["today"];
+        assert_eq!(today["day"], serde_json::json!("2026-11-18"));
+        assert_eq!(today["pets"], serde_json::json!(1));
+        assert_eq!(today["rolls"], serde_json::json!(0));
+
+        // The week: the two rows plus today. Every field the rows carry is
+        // summed, so a shell can show a week without re-reading the rows.
+        let week = &report["week"];
+        assert_eq!(week["pets"], serde_json::json!(4), "{report}");
+        assert_eq!(week["rolls"], serde_json::json!(1));
+        assert_eq!(week["metres"], serde_json::json!(0.0));
+        for key in [
+            "metres",
+            "powered_s",
+            "rolls",
+            "pets",
+            "pickups",
+            "falls",
+            "fed",
+            "claps",
+            "whistles",
+            "ground_picks",
+            "sit_downs",
+        ] {
+            assert!(week.get(key).is_some(), "the week carries {key}: {report}");
+        }
+
+        // Older rows fall out of the week but stay in the record: seven days
+        // plus today is the window, not the whole history.
+        for day in [
+            "2026-11-19",
+            "2026-11-20",
+            "2026-11-21",
+            "2026-11-22",
+            "2026-11-23",
+            "2026-11-24",
+            "2026-11-25",
+        ] {
+            book.roll_day(day);
+            book.life.pets += 1;
+        }
+        let report = book.days_report("2026-11-25");
+        assert_eq!(
+            report["days"].as_array().expect("rows").len(),
+            9,
+            "the record keeps 30 days; the week reads only its own window"
+        );
+        assert_eq!(
+            report["week"]["pets"],
+            serde_json::json!(8),
+            "the last seven rows (7 pets) plus today (1), not all ten: {report}"
+        );
+    }
+
+    /// The save's day view survives a restart: the completed rows come back
+    /// (impossible dates and garbage rows dropped, the 30-row cap kept), and a
+    /// baseline that says it is *today* is kept — so today's delta after the
+    /// restore is the play that really happened today, not the lifetime.
+    #[test]
+    fn a_restore_brings_back_the_rows_and_a_today_baseline() {
+        let mut book = Book::default();
+        book.life.pets = 12;
+        book.life.metres = 40.0;
+        let saved = serde_json::json!({
+            "days": [
+                {"day": "2026-11-17", "metres": 12.3, "powered_s": 600.0, "rolls": 2, "pets": 5},
+                {"day": "2026-11-18", "metres": 1.4, "powered_s": 240.5, "rolls": 0, "pets": 4},
+                {"day": "2026-02-30", "metres": 9.9, "powered_s": 9.9, "rolls": 9},
+                {"day": "yesterday", "metres": 9.9, "powered_s": 9.9, "rolls": 9},
+                "not a row"
+            ],
+            "day_started": {"day": "2026-11-19", "metres": 30.0, "powered_s": 300.0,
+                            "rolls": 0, "pets": 9}
+        });
+        book.restore_days(&saved, "2026-11-19");
+        assert_eq!(
+            book.days.len(),
+            2,
+            "only real days survive: {:?}",
+            book.days
+        );
+        assert_eq!(book.days[0].day, "2026-11-17");
+        assert_eq!(book.days[1].pets, 4);
+        let today = book.today_record("2026-11-19").expect("today is running");
+        assert_eq!(today.pets, 3, "12 - 9");
+        assert_eq!(today.metres, 10.0, "40 - 30");
+        assert_eq!(
+            today.powered_s, 0.0,
+            "a baseline above the restored life is clamped"
+        );
+
+        // The summary carries what the save needs: feed it back the way
+        // `RestoreLife` does and the board is the same board.
+        let summary = book.summary();
+        assert_eq!(
+            summary["day_started"]["day"],
+            serde_json::json!("2026-11-19")
+        );
+        let mut restored = Book::default();
+        restored.life = book.life.clone();
+        restored.restore_days(&summary, "2026-11-19");
+        assert_eq!(restored.days, book.days);
+        assert_eq!(
+            restored.today_record("2026-11-19"),
+            book.today_record("2026-11-19")
+        );
+
+        // The 30-row cap holds across a restore.
+        let mut rows: Vec<serde_json::Value> = Vec::new();
+        for day_of_month in 1..=30 {
+            rows.push(serde_json::json!({
+                "day": format!("2026-09-{day_of_month:02}"),
+                "metres": 1.0, "powered_s": 1.0, "rolls": 0
+            }));
+        }
+        for day_of_month in 1..=5 {
+            rows.push(serde_json::json!({
+                "day": format!("2026-10-{day_of_month:02}"),
+                "metres": 1.0, "powered_s": 1.0, "rolls": 0
+            }));
+        }
+        book.restore_days(&serde_json::json!({ "days": rows }), "2026-11-19");
+        assert_eq!(book.days.len(), 30);
+        assert_eq!(
+            book.days[0].day, "2026-09-06",
+            "the oldest rows fall off the front"
+        );
+        assert_eq!(book.days[29].day, "2026-10-05");
+    }
+
+    /// The cold-start trap: the restore lands after the day rolled, and a save
+    /// with no baseline (or one stamped with an earlier day) cannot tell
+    /// history from today. The baseline is re-set to the restored life and
+    /// stamped today, so today's deltas start at zero instead of claiming the
+    /// duck's whole lifetime.
+    #[test]
+    fn a_stale_or_missing_baseline_is_rebased_so_today_claims_nothing() {
+        for baseline in [
+            None,
+            Some(serde_json::json!({
+                "day": "2026-11-18", "metres": 0.0, "powered_s": 0.0, "rolls": 0,
+            })),
+        ] {
+            let mut book = Book::default();
+            book.life.pets = 100;
+            book.life.metres = 500.0;
+            book.life.skills.insert("roulade".to_owned(), 12);
+            let mut saved = serde_json::json!({ "days": [] });
+            if let Some(baseline) = baseline {
+                saved["day_started"] = baseline;
+            }
+            book.restore_days(&saved, "2026-11-19");
+            assert_eq!(book.day_started.day, "2026-11-19");
+            let today = book.today_record("2026-11-19").expect("a day is running");
+            assert_eq!(today.pets, 0, "the lifetime is not today's play");
+            assert_eq!(today.metres, 0.0);
+            assert_eq!(today.rolls, 0);
+            assert_eq!(today.fed, 0);
+        }
+
+        // No day posted yet: the rebased baseline is unstamped, and the day
+        // that arrives later re-bases again from the life at that moment.
+        let mut book = Book::default();
+        book.life.pets = 7;
+        book.restore_days(&serde_json::json!({}), "");
+        assert_eq!(book.day_started.day, "");
+        assert!(book.today_record("").is_none());
+        book.roll_day("2026-11-19");
+        assert_eq!(book.today_record("2026-11-19").expect("today").pets, 0);
+    }
+
+    /// A saved baseline above the restored life (a truncated save, a hostile
+    /// client) is clamped: a baseline the duck cannot have would otherwise
+    /// make today's counts negative — or, from a negative number, inflate
+    /// them.
+    #[test]
+    fn a_restored_baseline_is_clamped_to_the_life_it_counts_against() {
+        let mut book = Book::default();
+        book.life.pets = 3;
+        book.life.metres = 5.0;
+        book.restore_days(
+            &serde_json::json!({
+                "day_started": {"day": "2026-11-19", "metres": -20.0, "powered_s": 1e9,
+                                "rolls": 99, "pets": 500}
+            }),
+            "2026-11-19",
+        );
+        assert_eq!(
+            book.day_started.metres, 0.0,
+            "a negative baseline clamps to zero"
+        );
+        assert_eq!(book.day_started.powered_s, book.life.powered_s);
+        assert_eq!(book.day_started.rolls, 0);
+        assert_eq!(book.day_started.pets, 3);
+        let today = book.today_record("2026-11-19").expect("today");
+        assert_eq!(today.metres, 5.0);
+        assert_eq!(today.pets, 0);
+        assert_eq!(today.powered_s, 0.0);
     }
 }
