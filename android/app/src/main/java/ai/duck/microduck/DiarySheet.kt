@@ -128,13 +128,13 @@ fun DiarySheet(onClose: () -> Unit) {
         busy = false
     }
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(DuckTheme.Space.xl), verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     Copy.diary,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("diary-title"),
@@ -170,19 +170,19 @@ fun DiarySheet(onClose: () -> Unit) {
             Text(
                 Copy.diaryFactsTitle,
                 color = Color.White.copy(alpha = 0.55f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
                 fontWeight = FontWeight.SemiBold,
             )
             if (lines.isEmpty()) {
-                Text(Copy.diaryEmpty, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                Text(Copy.diaryEmpty, color = Color.White.copy(alpha = 0.6f), fontSize = DuckTheme.Type.Caption)
             } else {
                 LazyColumn(Modifier.height(160.dp)) {
                     items(lines) { line ->
                         Text(
                             "· $line",
                             color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(vertical = 2.dp),
+                            fontSize = DuckTheme.Type.Label,
+                            modifier = Modifier.padding(vertical = DuckTheme.Space.xxs),
                         )
                     }
                 }
@@ -190,32 +190,32 @@ fun DiarySheet(onClose: () -> Unit) {
             Text(
                 Copy.diaryModelTitle,
                 color = Color.White.copy(alpha = 0.55f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
                 fontWeight = FontWeight.SemiBold,
             )
             when {
-                busy -> Text(Copy.diaryBusy, color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                busy -> Text(Copy.diaryBusy, color = Color.White.copy(alpha = 0.6f), fontSize = DuckTheme.Type.Caption)
                 modelText.isNotEmpty() -> Text(
                     modelText,
                     color = Color.White,
-                    fontSize = 14.sp,
+                    fontSize = DuckTheme.Type.Label,
                     modifier = Modifier.testTag("diary-model-text"),
                 )
                 modelError != null -> Text(
                     modelError.orEmpty(),
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
                 else -> Text(
                     Copy.diaryNeedModel,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
             }
             Text(
                 Copy.speakNote,
                 color = Color.White.copy(alpha = 0.55f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
             )
         }
     }

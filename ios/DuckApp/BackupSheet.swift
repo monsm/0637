@@ -14,17 +14,17 @@ struct BackupSheet: View {
     @State private var showingImporter = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DuckSpace.lg) {
             HStack {
                 Text(Copy.backup)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("backup-title")
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -35,14 +35,14 @@ struct BackupSheet: View {
                 .accessibilityIdentifier("backup-close")
             }
             Text(Copy.backupNote)
-                .font(.system(size: 12, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
 
             Button {
                 export()
             } label: {
                 Label(Copy.backupExport, systemImage: "square.and.arrow.up")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.duckBody.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.borderedProminent)
@@ -52,7 +52,7 @@ struct BackupSheet: View {
                 showingImporter = true
             } label: {
                 Label(Copy.backupImport, systemImage: "square.and.arrow.down")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.duckBody.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.bordered)
@@ -60,13 +60,13 @@ struct BackupSheet: View {
 
             if let status {
                 Text(status)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("backup-status")
             }
             Spacer()
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .fileImporter(
             isPresented: $showingImporter,
             allowedContentTypes: [.json, .data],

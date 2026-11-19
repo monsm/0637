@@ -55,7 +55,7 @@ private fun PageHeader(title: String, closeTag: String, onClose: () -> Unit) {
             title,
             color = Color.White,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 20.sp,
+            fontSize = DuckTheme.Type.Title,
             modifier = Modifier.weight(1f).testTag("$closeTag-title"),
         )
         CloseChip(closeTag, onClose)
@@ -75,20 +75,20 @@ private fun ControlRow(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(DuckTheme.Radius.thumb))
             .clickable { onTap() }
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = DuckTheme.Space.md)
             .testTag(tag),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(title, color = Color.White, fontSize = DuckTheme.Type.Body, fontWeight = FontWeight.Medium)
             if (note != null) {
                 Text(
                     note,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     maxLines = 2,
                 )
             }
@@ -97,7 +97,7 @@ private fun ControlRow(
             Text(
                 state,
                 color = Color.White.copy(alpha = 0.7f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
                 fontWeight = FontWeight.SemiBold,
             )
         }
@@ -127,12 +127,12 @@ internal fun PlayMoreSheet(
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = DuckTheme.Space.xl)
+                .padding(bottom = DuckTheme.Space.xxl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             PageHeader(Copy.playMore, "play-more-close", onClose)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 listOf("drive", "head", "body").forEach { mode ->
                     ButtonChip(
                         Copy.stick(mode),
@@ -141,8 +141,8 @@ internal fun PlayMoreSheet(
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
-                Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
+                Column(Modifier.weight(1f).padding(horizontal = DuckTheme.Space.sm)) {
                     OutlinedTextField(
                         value = abFolder,
                         onValueChange = { abFolder = it.take(64) },
@@ -166,7 +166,7 @@ internal fun PlayMoreSheet(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 ButtonChip(Copy.pushCompare, "play-more-push") {
                     core?.fork()
                     postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
@@ -179,12 +179,12 @@ internal fun PlayMoreSheet(
                     "play-more-hud",
                 ) { input.hudOn = !input.hudOn }
             }
-            Text(Copy.abNote, color = Color.White.copy(alpha = 0.55f), fontSize = 10.sp)
+            Text(Copy.abNote, color = Color.White.copy(alpha = 0.55f), fontSize = DuckTheme.Type.Micro)
             if (stick.isNotBlank()) {
                 Text(
                     Copy.stick(stick),
                     color = Color.White.copy(alpha = 0.55f),
-                    fontSize = 10.sp,
+                    fontSize = DuckTheme.Type.Micro,
                 )
             }
         }
@@ -273,9 +273,9 @@ internal fun DuckPanelSheet(
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = DuckTheme.Space.xl)
+                .padding(bottom = DuckTheme.Space.xxl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             PageHeader(Copy.thisDuck, "duck-panel-close", onClose)
             ControlRow(
@@ -376,9 +376,9 @@ internal fun ToolsSheet(
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = DuckTheme.Space.xl)
+                .padding(bottom = DuckTheme.Space.xxl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             PageHeader(Copy.tools, "tools-close", onClose)
             ControlRow(
@@ -412,17 +412,17 @@ internal fun ToolsSheet(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
-                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 12.dp),
+                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(DuckTheme.Radius.thumb))
+                    .padding(horizontal = DuckTheme.Space.md),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
             ) {
                 Column(Modifier.weight(1f)) {
-                    Text(Copy.backup, color = Color.White, fontSize = 15.sp)
+                    Text(Copy.backup, color = Color.White, fontSize = DuckTheme.Type.Body)
                     Text(
                         backupStatus ?: Copy.backupNote,
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 10.sp,
+                        fontSize = DuckTheme.Type.Micro,
                         maxLines = 2,
                     )
                 }

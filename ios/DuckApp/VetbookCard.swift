@@ -118,19 +118,19 @@ struct VetbookCardContent: View {
     var width: CGFloat = 390
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             HStack(alignment: .firstTextBaseline) {
                 Text(Copy.name)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .font(.duckDisplay.weight(.semibold))
                     .foregroundStyle(Color.duckTextPrimary)
                 Spacer()
                 Text(Copy.lifeRecord)
-                    .font(.system(size: 13, design: .rounded))
+                    .font(.duckLabel)
                     .foregroundStyle(Color.duckTextSecondary)
             }
             if model.isEmpty {
                 Text(Copy.vetbookCardNone)
-                    .font(.system(size: 14, design: .rounded))
+                    .font(.duckLabel)
                     .foregroundStyle(Color.duckTextSecondary)
                     .frame(maxWidth: .infinity, minHeight: 96, alignment: .center)
             } else {
@@ -139,25 +139,25 @@ struct VetbookCardContent: View {
                 if let hours = model.poweredHours {
                     HStack {
                         Text(Copy.vetbookCardPowered)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(Color.duckTextSecondary)
                         Spacer()
                         Text(String(format: "%.2f h", hours))
-                            .font(.system(size: 15, design: .monospaced))
+                            .font(.duckData)
                             .foregroundStyle(Color.duckTextPrimary)
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, DuckSpace.sm)
                 }
             }
             if let fingerprint = model.fingerprint {
                 Text("build \(fingerprint)")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.duckMicro)
                     .foregroundStyle(Color.duckTextTertiary)
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .frame(width: width, alignment: .leading)
-        .background(Color.duckBgSurface, in: RoundedRectangle(cornerRadius: 24))
+        .background(Color.duckBgSurface, in: RoundedRectangle(cornerRadius: DuckRadius.panel))
     }
 
     /// The eight highlights, in the life record's own order, four to a
@@ -166,9 +166,9 @@ struct VetbookCardContent: View {
     /// rows here are plain HStacks of fixed-width tiles, so the preview
     /// and the PNG cannot disagree.
     private var highlightGrid: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DuckSpace.sm) {
             ForEach(highlightRows) { row in
-                HStack(spacing: 10) {
+                HStack(spacing: DuckSpace.sm) {
                     ForEach(row.cells) { item in
                         cell(item.value, item.label, width: highlightCellWidth)
                     }
@@ -209,7 +209,7 @@ struct VetbookCardContent: View {
 
     @ViewBuilder private var careRow: some View {
         if model.fullness != nil || model.mood != nil || model.bond != nil {
-            HStack(spacing: 10) {
+            HStack(spacing: DuckSpace.sm) {
                 if let fullness = model.fullness {
                     cell("\(fullness)%", Copy.fullness, width: (width - 60) / 3)
                 }
@@ -225,17 +225,17 @@ struct VetbookCardContent: View {
 
     /// The lifeStat tile from the instrument sheet, at card scale.
     private func cell(_ value: String, _ label: String, width: CGFloat) -> some View {
-        VStack(spacing: 3) {
+        VStack(spacing: DuckSpace.xxs) {
             Text(value)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(Color.duckTextPrimary)
             Text(label)
-                .font(.system(size: 10, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(Color.duckTextSecondary)
         }
         .frame(width: width)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, DuckSpace.sm)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: DuckRadius.thumb))
     }
 }
 
@@ -255,17 +255,17 @@ struct VetbookCardSheet: View {
     @State private var saveFailed = false
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DuckSpace.lg) {
             HStack {
                 Text(Copy.vetbookCardShare)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("vetbook-card-title")
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -284,7 +284,7 @@ struct VetbookCardSheet: View {
                         )
                     }
                 }
-                HStack(spacing: 12) {
+                HStack(spacing: DuckSpace.md) {
                     Button {
                         saveCard()
                     } label: {
@@ -292,7 +292,7 @@ struct VetbookCardSheet: View {
                             saved ? Copy.saved : (saveFailed ? Copy.saveFailed : Copy.savePhoto),
                             systemImage: saved ? "checkmark.circle.fill" : "square.and.arrow.down"
                         )
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.bordered)
@@ -303,7 +303,7 @@ struct VetbookCardSheet: View {
                         shareCard()
                     } label: {
                         Label(Copy.share, systemImage: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .font(.duckLabel.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.borderedProminent)
@@ -311,17 +311,17 @@ struct VetbookCardSheet: View {
                 }
             } else if failed {
                 Text(Copy.rulesNotReady)
-                    .font(.system(size: 13, design: .rounded))
+                    .font(.duckLabel)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 96, alignment: .center)
             } else {
                 Text("…")
-                    .font(.system(size: 14, design: .rounded))
+                    .font(.duckLabel)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 96, alignment: .center)
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .task {
             load()
         }

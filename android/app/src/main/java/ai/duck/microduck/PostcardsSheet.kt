@@ -45,8 +45,8 @@ fun PostcardsSheet(onClose: () -> Unit) {
     val cards = remember { PostcardShelf.load(context) }
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(
-            Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -56,7 +56,7 @@ fun PostcardsSheet(onClose: () -> Unit) {
                     Copy.postcardShelf,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("postcards-title"),
@@ -67,14 +67,14 @@ fun PostcardsSheet(onClose: () -> Unit) {
                 Text(
                     Copy.postcardNone,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     modifier = Modifier.testTag("postcards-empty"),
                 )
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 150.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                     modifier = Modifier.height(420.dp),
                 ) {
                     items(cards, key = { it.file }) { card ->
@@ -83,7 +83,7 @@ fun PostcardsSheet(onClose: () -> Unit) {
                                 File(PostcardShelf.dir(context), card.file).path
                             )
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
                             bitmap?.let {
                                 Image(
                                     bitmap = it.asImageBitmap(),
@@ -93,7 +93,7 @@ fun PostcardsSheet(onClose: () -> Unit) {
                                         .height(150.dp)
                                         .background(
                                             Color.White.copy(alpha = 0.06f),
-                                            RoundedCornerShape(12.dp),
+                                            RoundedCornerShape(DuckTheme.Radius.thumb),
                                         )
                                         .testTag("postcard-${card.file}"),
                                     contentScale = ContentScale.Crop,
@@ -102,7 +102,7 @@ fun PostcardsSheet(onClose: () -> Unit) {
                             Text(
                                 card.caption,
                                 color = Color.White.copy(alpha = 0.8f),
-                                fontSize = 11.sp,
+                                fontSize = DuckTheme.Type.Caption,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -113,7 +113,7 @@ fun PostcardsSheet(onClose: () -> Unit) {
                                 Text(
                                     card.day,
                                     color = Color.White.copy(alpha = 0.5f),
-                                    fontSize = 9.sp,
+                                    fontSize = DuckTheme.Type.Micro,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                 )
                                 androidx.compose.foundation.layout.Spacer(

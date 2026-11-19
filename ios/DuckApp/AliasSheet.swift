@@ -249,19 +249,19 @@ struct AliasSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             header
             Text(Copy.aliasLocalOnly)
-                .font(.system(.caption2, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.tertiary)
                 .accessibilityIdentifier("alias-local-only")
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DuckSpace.lg) {
                     list
                     addRow
                     if !error.isEmpty {
                         Text(error)
-                            .font(.system(.caption2, design: .monospaced))
+                            .font(.duckCaption)
                             .foregroundStyle(.orange)
                             .lineLimit(4)
                             .accessibilityIdentifier("alias-error")
@@ -269,7 +269,7 @@ struct AliasSheet: View {
                     Button {
                         save()
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: DuckSpace.sm) {
                             if busy {
                                 ProgressView()
                             }
@@ -277,7 +277,7 @@ struct AliasSheet: View {
                             // word; a new Copy key would break the two
                             // dictionaries' key parity.
                             Text(saved ? Copy.saved : Copy.aiSave)
-                                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                                .font(.duckBody.weight(.semibold))
                         }
                         .frame(maxWidth: .infinity, minHeight: 48)
                     }
@@ -285,10 +285,10 @@ struct AliasSheet: View {
                     .disabled(busy)
                     .accessibilityIdentifier("alias-save")
                 }
-                .padding(.bottom, 8)
+                .padding(.bottom, DuckSpace.sm)
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .background(Color.duckStageInstrument)
         .onAppear {
             if !options.contains(target) {
@@ -300,7 +300,7 @@ struct AliasSheet: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(Copy.aliasTitle)
-                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .font(.duckTitle.weight(.semibold))
                 .accessibilityIdentifier("alias-title")
             Spacer()
             SheetCloseButton(identifier: "alias-close")
@@ -310,12 +310,12 @@ struct AliasSheet: View {
     @ViewBuilder private var list: some View {
         if draft.isEmpty {
             Text(Copy.aliasEmpty)
-                .font(.system(.subheadline, design: .rounded))
+                .font(.duckBody)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .accessibilityIdentifier("alias-empty")
         } else {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 ForEach(phrases, id: \.self) { phrase in
                     row(phrase, target: draft[phrase] ?? "")
                 }
@@ -326,27 +326,27 @@ struct AliasSheet: View {
     /// One learned pair. The target is the official label, not the wire
     /// spelling; an unknown manifest skill keeps its real name.
     private func row(_ phrase: String, target: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
             Text(phrase)
-                .font(.system(.subheadline, design: .rounded, weight: .medium))
+                .font(.duckBody.weight(.medium))
                 .foregroundStyle(.white)
                 .lineLimit(1)
             Image(systemName: "arrow.right")
-                .font(.system(.caption2, design: .rounded))
+                .font(DuckIcon.xs)
                 .foregroundStyle(.tertiary)
             Text(SkillLabel.of(target))
-                .font(.system(.subheadline, design: .rounded))
+                .font(.duckBody)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-            Spacer(minLength: 8)
+            Spacer(minLength: DuckSpace.sm)
             Button {
                 draft.removeValue(forKey: phrase)
                 saved = false
                 error = ""
             } label: {
                 Image(systemName: "trash")
-                    .font(.system(.caption, design: .rounded))
+                    .font(DuckIcon.xs)
                     .foregroundStyle(.secondary)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -363,9 +363,9 @@ struct AliasSheet: View {
     }
 
     private var addRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             Text(Copy.aliasHint)
-                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .font(.duckCaption.weight(.semibold))
                 .foregroundStyle(.secondary)
             TextField(Copy.aliasHint, text: $phrase)
                 .textFieldStyle(.roundedBorder)
@@ -374,12 +374,12 @@ struct AliasSheet: View {
                 .accessibilityIdentifier("alias-phrase")
             if VoiceAliasStore.phraseLength(phrase) > VoiceAliasStore.maxPhraseLength {
                 Text(Copy.aliasTooLong)
-                    .font(.system(.caption2, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier("alias-too-long")
             }
             Text(Copy.aliasDoes)
-                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .font(.duckCaption.weight(.semibold))
                 .foregroundStyle(.secondary)
             Picker(Copy.aliasDoes, selection: $target) {
                 ForEach(options, id: \.self) { name in
@@ -392,15 +392,15 @@ struct AliasSheet: View {
                 add()
             } label: {
                 Text(Copy.aliasAdd)
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    .font(.duckBody.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
             .disabled(!VoiceAliasStore.isValidPhrase(phrase))
             .accessibilityIdentifier("alias-add")
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     private func add() {

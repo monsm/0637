@@ -10,17 +10,17 @@ struct ABSheet: View {
     @State private var status: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DuckSpace.lg) {
             HStack {
                 Text(Copy.abTry)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("ab-title")
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -31,7 +31,7 @@ struct ABSheet: View {
                 .accessibilityIdentifier("ab-close")
             }
             Text(Copy.abNote)
-                .font(.system(size: 12, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
 
             TextField(Copy.abTry, text: $folder)
@@ -52,7 +52,7 @@ struct ABSheet: View {
                 }
             } label: {
                 Label(Copy.backupImport, systemImage: "arrow.triangle.branch")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.duckBody.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.borderedProminent)
@@ -60,12 +60,12 @@ struct ABSheet: View {
 
             if let status {
                 Text(status)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("ab-status")
             }
             Spacer()
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
     }
 }

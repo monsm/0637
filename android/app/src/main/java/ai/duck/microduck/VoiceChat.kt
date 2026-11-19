@@ -211,7 +211,7 @@ internal fun VoiceChatSection(config: AIConfig) {
     }
     Column(
         Modifier.fillMaxWidth().testTag("chat-section"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -247,9 +247,9 @@ internal fun VoiceChatSection(config: AIConfig) {
                         .background(
                             if (line.fromDuck) Color.White.copy(alpha = 0.10f)
                             else DuckTheme.AccentAction.copy(alpha = 0.30f),
-                            RoundedCornerShape(10.dp),
+                            RoundedCornerShape(DuckTheme.Radius.thumb),
                         )
-                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                        .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.sm)
                         .testTag("chat-line-$index"),
                 )
             }
@@ -280,7 +280,7 @@ internal fun VoiceChatSection(config: AIConfig) {
         )
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             ChatSendChip(
                 label = Copy.chatSend,
@@ -314,11 +314,11 @@ private fun ChatSendChip(
             .heightIn(min = 48.dp)
             .background(
                 Color.White.copy(alpha = if (enabled) 0.10f else 0.05f),
-                RoundedCornerShape(10.dp),
+                RoundedCornerShape(DuckTheme.Radius.thumb),
             )
             .clickable(enabled = enabled, onClickLabel = label) { onClick() }
             .testTag(testTag)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = DuckTheme.Space.md, vertical = DuckTheme.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
         Text(

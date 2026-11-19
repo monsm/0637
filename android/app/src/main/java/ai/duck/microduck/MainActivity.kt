@@ -538,10 +538,10 @@ private fun DuckScreen(
                 Text(
                     Copy.waking,
                     color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 15.sp,
+                    fontSize = DuckTheme.Type.Body,
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .padding(24.dp)
+                        .padding(DuckTheme.Space.xxl)
                         .testTag("waking-label"),
                 )
             }
@@ -587,21 +587,21 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .background(DuckTheme.BgRoot, RoundedCornerShape(20.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .background(DuckTheme.BgRoot, RoundedCornerShape(DuckTheme.Radius.card))
+                .padding(DuckTheme.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             if (family.isNotEmpty()) {
                 Text(
                     Copy.photoFamily(family),
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
             }
             Text(
                 Copy.photoTitle,
                 color = Color.White,
-                fontSize = 16.sp,
+                fontSize = DuckTheme.Type.Body,
                 fontWeight = FontWeight.SemiBold,
             )
             Image(
@@ -616,12 +616,12 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
             Text(
                 caption,
                 color = Color.White.copy(alpha = 0.75f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("postcard-caption"),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 Button(
                     onClick = {
                         saved = savePhoto(context, photo)
@@ -634,7 +634,7 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
                 ) {
                     Text(
                         if (saved) Copy.saved else if (saveFailed) Copy.saveFailed else Copy.savePhoto,
-                        fontSize = 13.sp,
+                        fontSize = DuckTheme.Type.Label,
                         maxLines = 1,
                     )
                 }
@@ -671,7 +671,7 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
                 ) {
                     Text(
                         if (kept) Copy.postcardSaved else Copy.postcardKeep,
-                        fontSize = 13.sp,
+                        fontSize = DuckTheme.Type.Label,
                         maxLines = 1,
                     )
                 }
@@ -681,7 +681,7 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
                         .weight(1f)
                         .testTag("photo-share"),
                 ) {
-                    Text(Copy.share, fontSize = 13.sp)
+                    Text(Copy.share, fontSize = DuckTheme.Type.Label)
                 }
             }
             Button(
@@ -690,7 +690,7 @@ private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
                     .fillMaxWidth()
                     .testTag("photo-close"),
             ) {
-                Text(Copy.close, fontSize = 13.sp)
+                Text(Copy.close, fontSize = DuckTheme.Type.Label)
             }
         }
     }
@@ -707,30 +707,30 @@ private fun FailureCard(
 ) {
     Column(
         modifier
-            .padding(24.dp)
-            .background(DuckTheme.BgSurface, RoundedCornerShape(18.dp))
-            .padding(20.dp)
+            .padding(DuckTheme.Space.xxl)
+            .background(DuckTheme.BgSurface, RoundedCornerShape(DuckTheme.Radius.card))
+            .padding(DuckTheme.Space.xl)
             .testTag("failure-card"),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
     ) {
         Text(
             Copy.couldNotStart,
             color = Color.White,
-            fontSize = 18.sp,
+            fontSize = DuckTheme.Type.Title,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             Copy.humanError(message),
             color = Color.White.copy(alpha = 0.72f),
-            fontSize = 13.sp,
+            fontSize = DuckTheme.Type.Label,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         Button(
             onClick = onRetry,
             modifier = Modifier.testTag("retry"),
         ) {
-            Text(Copy.retry, fontSize = 13.sp)
+            Text(Copy.retry, fontSize = DuckTheme.Type.Label)
         }
     }
 }

@@ -33,7 +33,7 @@ struct MoreSheet: View {
     var body: some View {
         let _ = languageTick
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: DuckSpace.lg) {
                 header
                 group(Copy.groupPlay, id: "play") {
                     row(
@@ -142,9 +142,9 @@ struct MoreSheet: View {
                     }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 28)
+            .padding(.horizontal, DuckSpace.xl)
+            .padding(.top, DuckSpace.md)
+            .padding(.bottom, DuckSpace.xxl)
         }
         .background(Color.duckBgSurface)
     }
@@ -154,7 +154,7 @@ struct MoreSheet: View {
     private var header: some View {
         HStack {
             Text(Copy.more)
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("more-title")
             Spacer()
@@ -167,13 +167,13 @@ struct MoreSheet: View {
         id: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: DuckSpace.xs) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.duckLabel.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .padding(.leading, 4)
-                .padding(.bottom, 2)
-            VStack(spacing: 2) { content() }
+                .padding(.leading, DuckSpace.xs)
+                .padding(.bottom, DuckSpace.xxs)
+            VStack(spacing: DuckSpace.xxs) { content() }
         }
     }
 
@@ -192,26 +192,26 @@ struct MoreSheet: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: DuckSpace.md) {
                 Image(systemName: icon)
-                    .font(.system(size: 20))
+                    .font(DuckIcon.md)
                     .foregroundStyle(.white.opacity(0.85))
                     .frame(width: 28)
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                     Text(title)
-                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .font(.duckBody.weight(.medium))
                         .foregroundStyle(.white)
                     if let note {
                         Text(note)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
-                Spacer(minLength: 8)
+                Spacer(minLength: DuckSpace.sm)
                 if check {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(Color.duckAction)
                 }
                 if dot {
@@ -221,12 +221,12 @@ struct MoreSheet: View {
                 }
                 if let badge {
                     Text(badge)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.duckCaption.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
                 if showsChevron {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -266,9 +266,9 @@ struct ModeSheet: View {
     private let modes: [StickMode] = [.drive, .head, .body]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: DuckSpace.xs) {
             Text(Copy.stickModes)
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(.white)
             ForEach(modes, id: \.self) { mode in
                 Button {
@@ -277,18 +277,18 @@ struct ModeSheet: View {
                     controller.releaseBody()
                     dismiss()
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: DuckSpace.md) {
                         Image(systemName: Icons.stick(mode))
-                            .font(.system(size: 18))
+                            .font(DuckIcon.md)
                             .foregroundStyle(.white.opacity(0.85))
                             .frame(width: 26)
                         Text(Copy.stick(mode.rawValue))
-                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .font(.duckBody.weight(.medium))
                             .foregroundStyle(.white)
                         Spacer()
                         if stickMode == mode {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(DuckIcon.xs)
                                 .foregroundStyle(Color.duckAction)
                         }
                     }
@@ -299,7 +299,7 @@ struct ModeSheet: View {
                 .accessibilityIdentifier("mode-option-\(mode.rawValue)")
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.duckBgSurface)
     }

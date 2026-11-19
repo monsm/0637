@@ -316,9 +316,9 @@ internal fun VetbookCardDialog(onClose: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .background(DuckTheme.BgRoot, RoundedCornerShape(20.dp))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .background(DuckTheme.BgRoot, RoundedCornerShape(DuckTheme.Radius.card))
+                .padding(DuckTheme.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -328,7 +328,7 @@ internal fun VetbookCardDialog(onClose: () -> Unit) {
                     Copy.vetbookCardShare,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp,
+                    fontSize = DuckTheme.Type.Body,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("vetbook-title"),
@@ -345,7 +345,7 @@ internal fun VetbookCardDialog(onClose: () -> Unit) {
                             .testTag("vetbook-preview"),
                         contentScale = ContentScale.Fit,
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                         androidx.compose.material3.Button(
                             onClick = {
                                 val bitmap = card ?: return@Button
@@ -360,7 +360,7 @@ internal fun VetbookCardDialog(onClose: () -> Unit) {
                         ) {
                             Text(
                                 if (saved) Copy.saved else if (saveFailed) Copy.saveFailed else Copy.savePhoto,
-                                fontSize = 13.sp,
+                                fontSize = DuckTheme.Type.Label,
                                 maxLines = 1,
                             )
                         }
@@ -373,14 +373,14 @@ internal fun VetbookCardDialog(onClose: () -> Unit) {
                                 .weight(1f)
                                 .testTag("vetbook-share"),
                         ) {
-                            Text(Copy.share, fontSize = 13.sp, maxLines = 1)
+                            Text(Copy.share, fontSize = DuckTheme.Type.Label, maxLines = 1)
                         }
                     }
                 }
                 failed -> Text(
                     Copy.rulesNotReady,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     modifier = Modifier.testTag("vetbook-failed"),
                 )
             }

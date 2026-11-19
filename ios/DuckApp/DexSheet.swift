@@ -8,15 +8,15 @@ struct DexSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             HStack {
                 Text(Copy.dex)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("dex-title")
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -27,37 +27,37 @@ struct DexSheet: View {
                 .accessibilityIdentifier("dex-close")
             }
             ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DuckSpace.sm) {
                     section(Copy.dexMoves, entries: controller.dex.filter { !$0.isEmotion })
                     section(Copy.dexMoods, entries: controller.dex.filter { $0.isEmotion })
                 }
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
     }
 
     @ViewBuilder
     private func section(_ title: String, entries: [DuckController.DexEntry]) -> some View {
         Text(title)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .font(.duckCaption.weight(.semibold))
             .foregroundStyle(.secondary)
-            .padding(.top, 6)
+            .padding(.top, DuckSpace.xs)
         ForEach(entries) { entry in
-            HStack(spacing: 10) {
+            HStack(spacing: DuckSpace.sm) {
                 Text(entry.count > 0 ? "✓" : "·")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.duckCaption.weight(.bold))
                     .foregroundStyle(entry.count > 0 ? .green : .secondary)
                     .frame(width: 16)
                 Text(SkillLabel.of(entry.id))
-                    .font(.system(size: 13, design: .rounded))
+                    .font(.duckLabel)
                     .foregroundStyle(entry.count > 0 ? .white : .secondary)
                 Spacer()
                 Text(entry.count > 0 ? "× \(entry.count)" : Copy.dexNever)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.duckData)
                     .foregroundStyle(.secondary)
                 if let first = entry.firstSeen {
                     Text("\(Copy.dexFirst) \(first)")
-                        .font(.system(size: 9, design: .monospaced))
+                        .font(.duckMicro)
                         .foregroundStyle(.tertiary)
                 }
             }

@@ -28,6 +28,10 @@ def read_all(root, directory, suffix):
 def collect(root):
     swift = read_all(root, IOS_DIR, ".swift")
     kt = read_all(root, KT_DIR, ".kt")
+    # The theme files are where literals are allowed to live (UI_TOKENS §7).
+    swift_ui = {p: t for p, t in swift.items()
+                if not p.endswith(f"{IOS_DIR}/Design/DuckTheme.swift")}
+    kt_ui = {p: t for p, t in kt.items() if not p.endswith(f"{KT_DIR}/DuckTheme.kt")}
 
     def total(files, pattern, flags=0):
         rx = re.compile(pattern, flags)
@@ -37,21 +41,35 @@ def collect(root):
         rx = re.compile(pattern)
         return sum(1 for text in files.values() if rx.search(text))
 
+    def count_lines(files, pattern):
+        rx = re.compile(pattern)
+        return sum(1 for text in files.values() for line in text.splitlines() if rx.search(line))
+
     shell = kt.get(f"{KT_DIR}/Shell.kt", "")
     more_kt = kt.get(f"{KT_DIR}/MoreSheet.kt", "")
     controller = swift.get(f"{IOS_DIR}/DuckController.swift", "")
 
     return {
         # Fixed-size font literals (dynamic type still broken outside first screen)
-        "ios_font_literals": (total(swift, r"\.system\(size:"), "max"),
-        "ios_missing_rounded": (sum(1 for t in swift.values()
+        "ios_font_literals": (total(swift_ui, r"\.system\(size:"), "max"),
+        "ios_missing_rounded": (sum(1 for t in swift_ui.values()
                                     for line in t.splitlines()
                                     if ".system(size:" in line and "design:" not in line), "max"),
-        "android_font_literals": (total(kt, r"fontSize\s*="), "max"),
+        "android_font_literals": (total(kt_ui, r"fontSize\s*=\s*[0-9]"), "max"),
+        # Space and radius literals outside the token layer (0 is a layout
+        # decision, not a hand-tuned value).
+        "ios_offgrid_spacing": (count_lines(swift_ui, r"\.padding\(\s*(?:\.\w+\s*,\s*)?[1-9]")
+                                + count_lines(swift_ui, r"spacing:\s*[1-9]")
+                                + count_lines(swift_ui, r"Spacer\(minLength:\s*[1-9]"), "max"),
+        "android_offgrid_spacing": (count_lines(kt_ui, r"padding\([^)]*[1-9][0-9]*\.dp")
+                                    + count_lines(kt_ui, r"spacedBy\([^)]*[1-9][0-9]*\.dp")
+                                    + count_lines(kt_ui, r"Spacer\(Modifier\.height\(\s*[1-9][0-9]*\.dp"), "max"),
+        "ios_radius_literals": (count_lines(swift_ui, r"cornerRadius:\s*[0-9]"), "max"),
+        "android_radius_literals": (count_lines(kt_ui, r"RoundedCornerShape\(\s*[0-9]"), "max"),
         # Dark mode declared per-view instead of once
-        "ios_dark_hardwrites": (total(swift, r"\.preferredColorScheme\(\.dark\)"), "max"),
+        "ios_dark_hardwrites": (total(swift_ui, r"\.preferredColorScheme\(\.dark\)"), "max"),
         # Press feedback suppressed
-        "android_press_no_feedback": (total(kt, r"indication\s*=\s*null"), "max"),
+        "android_press_no_feedback": (total(kt_ui, r"indication\s*=\s*null"), "max"),
         # Scattered modal booleans (Android), roll-call scope: shell + more drawer
         "android_modal_bools": (len(re.findall(r"var\s+show\w+\s+by\s+remember", shell)
                                     + re.findall(r"var\s+show\w+\s+by\s+remember", more_kt)), "max"),
@@ -62,8 +80,8 @@ def collect(root):
         # Hand-copied close buttons (iOS only; Android has shared CloseChip)
         "ios_close_button_files": (count_files(swift, r'Image\(systemName: "xmark"\)'), "max"),
         # Colour literals outside a theme file
-        "android_color_literals": (total(kt, r"Color\(0x"), "max"),
-        "ios_color_literals": (total(swift, r"Color\(red:"), "max"),
+        "android_color_literals": (total(kt_ui, r"Color\(0x"), "max"),
+        "ios_color_literals": (total(swift_ui, r"Color\(red:"), "max"),
         # Guard metrics: these may only grow (a11y, state restoration, back handling)
         "android_remember_saveable": (total(kt, r"rememberSaveable"), "min"),
         "android_back_handler": (total(kt, r"BackHandler"), "min"),

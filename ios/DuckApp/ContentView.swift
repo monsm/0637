@@ -305,21 +305,21 @@ struct ContentView: View {
                 if controller.hudOn {
                     VStack(alignment: .leading) {
                         Text("tick \(controller.simTick) · \(controller.label)")
-                            .font(.system(size: 11, design: .monospaced))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 8))
+                            .font(.duckData)
+                            .padding(.horizontal, DuckSpace.sm)
+                            .padding(.vertical, DuckSpace.xs)
+                            .background(Color.black.opacity(0.45), in: RoundedRectangle(cornerRadius: DuckRadius.tiny))
                             .accessibilityIdentifier("hud-overlay")
                         Spacer()
                     }
-                    .padding(.top, 8)
-                    .padding(.horizontal, 16)
+                    .padding(.top, DuckSpace.sm)
+                    .padding(.horizontal, DuckSpace.lg)
                     .allowsHitTesting(false)
                 }
                 // The second player: the right edge belongs to them - three
                 // verbs at arm's length while player one keeps the joystick.
                 if controller.p2On {
-                    VStack(spacing: 10) {
+                    VStack(spacing: DuckSpace.sm) {
                         bigP2(0, icon: "hand.raised.fill") { controller.pet() }
                         bigP2(2, icon: Icons.quack) {
                             if let core = controller.core {
@@ -329,7 +329,7 @@ struct ContentView: View {
                         bigP2(3, icon: "figure.wave") { controller.sit() }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                    .padding(.trailing, 10)
+                    .padding(.trailing, DuckSpace.sm)
                 }
             }
             .onAppear { controller.setDirector(surface == .director) }
@@ -431,13 +431,13 @@ struct ContentView: View {
     /// area would otherwise move it onto a button.
     private var hintCapsule: some View {
         Text(Copy.firstLaunchHint)
-            .font(.system(.caption, design: .rounded, weight: .medium))
+            .font(.duckCaption.weight(.medium))
             .foregroundStyle(.white.opacity(0.85))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, DuckSpace.md)
+            .padding(.vertical, DuckSpace.sm)
             .background(.ultraThinMaterial, in: Capsule())
             .allowsHitTesting(false)
-            .padding(.bottom, 6)
+            .padding(.bottom, DuckSpace.xs)
             .transition(.opacity)
             .accessibilityIdentifier("first-launch-hint")
     }
@@ -513,14 +513,14 @@ struct ContentView: View {
                     // that really reached AVAudioEngine. It is absent from
                     // the product UI and takes no touches.
                     Text(controller.voiceLine)
-                        .font(.system(size: 6, weight: .regular, design: .monospaced))
+                        .font(.duckMicro.weight(.regular))
                         .foregroundStyle(.white.opacity(0.55))
                         .lineLimit(1)
                         .minimumScaleFactor(0.2)
                         .allowsHitTesting(false)
                         .accessibilityIdentifier("duck-voice-state")
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .padding(2)
+                        .padding(DuckSpace.xxs)
                         .zIndex(4)
                 }
             }
@@ -549,9 +549,9 @@ struct ContentView: View {
         return VStack(spacing: 0) {
             titleBar()
             if let failure {
-                Spacer(minLength: 12)
+                Spacer(minLength: DuckSpace.md)
                 failureCard(failure)
-                Spacer(minLength: 12)
+                Spacer(minLength: DuckSpace.md)
             } else {
                 Spacer(minLength: 0)
                     // The stage keeps the drive gesture; the chrome above it
@@ -583,24 +583,24 @@ struct ContentView: View {
                 .disabled(!usable)
                 .opacity(usable ? 1 : 0.4)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
+        .padding(.horizontal, DuckSpace.lg)
+        .padding(.top, DuckSpace.sm)
+        .padding(.bottom, DuckSpace.sm)
     }
 
     /// The whole story layer from the companion direction, reduced to one
     /// line: what happened while you were away, or what the duck feels now.
     private func moodPill(_ text: String) -> some View {
         Text(text)
-            .font(.system(.caption, design: .rounded, weight: .medium))
+            .font(.duckCaption.weight(.medium))
             .foregroundStyle(.white.opacity(0.85))
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .multilineTextAlignment(.center)
+            .lineLimit(2)
+            .padding(.horizontal, DuckSpace.md)
+            .padding(.vertical, DuckSpace.xs)
             .background(.ultraThinMaterial, in: Capsule())
             .allowsHitTesting(false)
-            .padding(.bottom, 6)
+            .padding(.bottom, DuckSpace.xs)
             .transition(.opacity)
             .accessibilityIdentifier("mood-pill")
     }
@@ -610,13 +610,13 @@ struct ContentView: View {
     /// quick freeze, so freeze and resume live in the time machine and one
     /// hold away.
     private var timeRail: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DuckSpace.sm) {
             Button {
                 openInstrument()
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: DuckSpace.sm) {
                     Image(systemName: Icons.time)
-                        .font(.system(size: 18, weight: .medium))
+                        .font(DuckIcon.md)
                     GeometryReader { proxy in
                         // 历史条只占约 60% 宽，右侧留白：它读起来是"进度"，
                         // 不是一条把时间钮和取景钮分开的分割线。
@@ -635,7 +635,7 @@ struct ContentView: View {
                     }
                     .frame(height: 18)
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, DuckSpace.md)
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .contentShape(Rectangle())
             }
@@ -652,9 +652,9 @@ struct ContentView: View {
                 toggleSurface()
             }
         }
-        .frame(height: 48)
-        .padding(.top, 6)
-        .padding(.bottom, 8)
+        .frame(minHeight: 48)
+        .padding(.top, DuckSpace.xs)
+        .padding(.bottom, DuckSpace.sm)
     }
 
     /// The time button opens the time machine — unless the press was a hold,
@@ -730,7 +730,7 @@ struct ContentView: View {
     /// icon and an 11 pt label — so the deck and (later) both platforms
     /// cannot drift apart.
     private var thumbDeck: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DuckSpace.sm) {
             primaryButton("duck-feed", Copy.feed, Icons.feed) { controller.feed() }
             primaryButton("duck-skills", Copy.skills, Icons.skills) { setRing(true) }
             primaryButton("duck-quack", Copy.quack, Icons.quack) { quackTapped() }
@@ -749,14 +749,14 @@ struct ContentView: View {
             }
             primaryButton("duck-more", Copy.more, Icons.more) { open(.more) }
         }
-        .frame(height: 82)
-        .padding(.horizontal, 10)
+        .frame(minHeight: 82)
+        .padding(.horizontal, DuckSpace.sm)
         .background(
             Color.duckBgSurface.opacity(0.94),
-            in: RoundedRectangle(cornerRadius: 28)
+            in: RoundedRectangle(cornerRadius: DuckRadius.panel)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 28)
+            RoundedRectangle(cornerRadius: DuckRadius.panel)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }
@@ -771,9 +771,9 @@ struct ContentView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: DuckSpace.xxs) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(DuckIcon.md)
                     .frame(width: 52, height: 52)
                     .background(
                         selected
@@ -783,10 +783,11 @@ struct ContentView: View {
                     )
                     .contentShape(Circle())
                 Text(label)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.duckCaption.weight(.medium))
                     .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 52)
+                    .lineLimit(2)
             }
         }
         .buttonStyle(.plain)
@@ -804,7 +805,7 @@ struct ContentView: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
+                .font(DuckIcon.md)
                 .frame(width: 48, height: 48)
                 .background(.ultraThinMaterial, in: Circle())
                 .contentShape(Circle())
@@ -1012,7 +1013,7 @@ struct ContentView: View {
         let canWalk = kept.count >= 2 && kept.metres <= 20
         // One-based: the child is walking the (reached+1)-st of total steps.
         let progress = Copy.pathStep(controller.pathReached + 1, controller.pathTotal)
-        return HStack(spacing: 8) {
+        return HStack(spacing: DuckSpace.sm) {
             pathChip("path-go", Copy.pathGo, "figure.walk", enabled: canWalk) {
                 let points = pathBodyPoints(in: size)
                 guard !points.isEmpty else { return }
@@ -1026,10 +1027,9 @@ struct ContentView: View {
             Spacer(minLength: 0)
             if controller.pathActive {
                 Text(progress)
-                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .font(.duckCaption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .lineLimit(2)
                     .accessibilityLabel(progress)
                     .accessibilityIdentifier("path-progress")
                 pathChip("path-cancel", Copy.pathCancel, "xmark", enabled: true) {
@@ -1037,17 +1037,17 @@ struct ContentView: View {
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, DuckSpace.sm)
+        .padding(.vertical, DuckSpace.xs)
         .background(
             Color.duckBgSurface.opacity(0.94),
-            in: RoundedRectangle(cornerRadius: 22)
+            in: RoundedRectangle(cornerRadius: DuckRadius.panel)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 22)
+            RoundedRectangle(cornerRadius: DuckRadius.panel)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
-        .padding(.bottom, 6)
+        .padding(.bottom, DuckSpace.xs)
     }
 
     private func pathChip(
@@ -1058,15 +1058,15 @@ struct ContentView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: DuckSpace.xs) {
                 Image(systemName: icon)
-                    .font(.caption.weight(.semibold))
+                    .font(DuckIcon.xs)
                 Text(label)
-                    .font(.system(.caption, design: .rounded, weight: .semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .font(.duckCaption.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, DuckSpace.md)
             .frame(minHeight: 44)
             .background(.ultraThinMaterial, in: Capsule())
             .contentShape(Capsule())
@@ -1105,9 +1105,9 @@ struct ContentView: View {
                 .disabled(!usable)
                 .opacity(usable ? 1 : 0.4)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.horizontal, DuckSpace.lg)
+        .padding(.top, DuckSpace.sm)
+        .padding(.bottom, DuckSpace.md)
         .allowsHitTesting(true)
     }
 
@@ -1132,27 +1132,27 @@ struct ContentView: View {
     /// it is doing, in words rather than numbers. Every menu that used to
     /// hide in the right-hand corner moved into the More drawer.
     private func titleBar() -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: DuckSpace.xxs) {
             Text(Copy.name)
-                .font(.system(.headline, design: .rounded))
+                .font(.duckBody.weight(.semibold))
             Text(statusLine)
-                .font(.system(.caption, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("duck-label")
             if !controller.lastSkill.isEmpty {
                 Text(SkillLabel.of(controller.lastSkill))
-                    .font(.system(.caption2, design: .monospaced))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("duck-last-skill")
             }
             if controller.fallen {
                 Text(Copy.fell)
-                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .font(.duckCaption.weight(.semibold))
                     .foregroundStyle(.orange)
             }
             if controller.pickedUp && !controller.carrying {
                 Text(Copy.held)
-                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .font(.duckCaption.weight(.semibold))
                     .foregroundStyle(.cyan)
             }
         }
@@ -1162,31 +1162,31 @@ struct ContentView: View {
     private func topBar(showSurface: Bool = true, showProgress: Bool = false) -> some View {
         HStack(alignment: .top) {
             // The duck's name and what it is doing, in words rather than numbers.
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 Text(Copy.name)
-                    .font(.system(.headline, design: .rounded))
+                    .font(.duckBody.weight(.semibold))
                 // 核的 label 是协议原文（`held`、`limp_fall`、`mode: walk`）；
                 // 人读翻译，不读 wire。仪表盘里还留着原话。
                 Text(statusLine)
-                    .font(.system(.caption, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("duck-label")
                 // The ring's verdict outlives the skill's brief label. A slow
                 // CI runner must be able to read it after the move finishes.
                 if !controller.lastSkill.isEmpty {
                     Text(SkillLabel.of(controller.lastSkill))
-                        .font(.system(.caption2, design: .monospaced))
+                        .font(.duckCaption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("duck-last-skill")
                 }
                 if controller.fallen {
                     Text(Copy.fell)
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .font(.duckCaption.weight(.semibold))
                         .foregroundStyle(.orange)
                 }
                 if controller.pickedUp && !controller.carrying {
                     Text(Copy.held)
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .font(.duckCaption.weight(.semibold))
                         .foregroundStyle(.cyan)
                 }
             }
@@ -1202,7 +1202,7 @@ struct ContentView: View {
                     }
                 } label: {
                     Image(systemName: surface == .live ? "viewfinder" : "circle.dashed")
-                        .font(.body.weight(.semibold))
+                        .font(DuckIcon.md)
                         .frame(width: 48, height: 48)
                         .background(.ultraThinMaterial, in: Circle())
                         .contentShape(Circle())
@@ -1221,7 +1221,7 @@ struct ContentView: View {
                     open(.progress)
                 } label: {
                     Image(systemName: "flame")
-                        .font(.body)
+                        .font(DuckIcon.md)
                         .frame(width: 48, height: 48)
                         .background(.ultraThinMaterial, in: Circle())
                         .contentShape(Circle())
@@ -1237,7 +1237,7 @@ struct ContentView: View {
                 onOpen: { open($0) }
             )
         }
-        .padding(10)
+        .padding(DuckSpace.sm)
         // No full-width material panel: it painted a light band across the
         // top ~16% of the stage and broke the room's vertical gradient
         // (review 2026-11-13, 打回 1). The title is white on the dark room;
@@ -1245,14 +1245,14 @@ struct ContentView: View {
     }
 
     private var bottomBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: DuckSpace.sm) {
             // The time machine lives one pull away, not on the screen.
             Button {
                 open(.instrument)
             } label: {
                 Label(Copy.time, systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
-                    .font(.title3)
+                    .font(.duckTitle)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1266,7 +1266,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.skills, systemImage: "sparkles")
                     .labelStyle(.iconOnly)
-                    .font(.title3)
+                    .font(.duckTitle)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1284,7 +1284,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.quack, systemImage: "waveform")
                     .labelStyle(.iconOnly)
-                    .font(.title3)
+                    .font(.duckTitle)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1300,7 +1300,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.progress, systemImage: "flame")
                     .labelStyle(.iconOnly)
-                    .font(.title3)
+                    .font(.duckTitle)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1315,7 +1315,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.feed, systemImage: "fork.knife")
                     .labelStyle(.iconOnly)
-                    .font(.title3)
+                    .font(.duckTitle)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1331,7 +1331,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.flashlight, systemImage: "flashlight.on.fill")
                     .labelStyle(.iconOnly)
-                    .font(.title3)
+                    .font(.duckTitle)
                     .frame(width: 48, height: 48)
                     .background(
                         controller.flashlightColor == nil
@@ -1357,7 +1357,7 @@ struct ContentView: View {
                     systemImage: controller.carrying ? "hand.raised.slash.fill" : "hand.draw.fill"
                 )
                 .labelStyle(.iconOnly)
-                .font(.title3)
+                .font(.duckTitle)
                 .frame(width: 48, height: 48)
                 .background(
                     controller.carrying
@@ -1378,7 +1378,7 @@ struct ContentView: View {
             } label: {
                 Label(Copy.blocks, systemImage: "square.grid.2x2.fill")
                     .labelStyle(.iconOnly)
-                    .font(.body)
+                    .font(DuckIcon.md)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())
@@ -1390,7 +1390,7 @@ struct ContentView: View {
             Spacer()
 
             Text(controller.carrying ? Copy.held : Copy.tapHint)
-                .font(.system(.caption2, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
                 .opacity(controller.ready ? 1 : 0)
                 .allowsHitTesting(false)
@@ -1429,30 +1429,30 @@ struct ContentView: View {
     /// 唯一的失败出口，横竖屏共用。诊断信息要翻成人话：一个人对
     /// "Bundle resources not found" 做不了任何事，读懂了也唤不醒鸭子。
     private func failureCard(_ message: String) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: DuckSpace.sm) {
             Image(systemName: "exclamationmark.bubble.fill")
-                .font(.title2)
+                .font(DuckIcon.lg)
                 .foregroundStyle(.orange.opacity(0.9))
             Text(Copy.couldNotStart)
-                .font(.system(.headline, design: .rounded))
+                .font(.duckBody.weight(.semibold))
             Text(Copy.humanError(raw: message))
-                .font(.system(.footnote, design: .rounded))
+                .font(.duckLabel)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
             Button {
                 controller.retryStartup()
             } label: {
                 Label(Copy.retry, systemImage: "arrow.clockwise")
-                    .font(.system(.footnote, design: .rounded, weight: .semibold))
+                    .font(.duckLabel.weight(.semibold))
                     .frame(minWidth: 96, minHeight: 44)
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("failure-retry")
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .frame(maxWidth: 360)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .padding(.vertical, 24)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DuckRadius.card))
+        .padding(.vertical, DuckSpace.xxl)
         // Contain, not combine: the retry button must stay its own element.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("failure-card")
@@ -1468,7 +1468,7 @@ struct WakingView: View {
     @State private var breathing = false
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: DuckSpace.lg) {
             ZStack {
                 // 它将站上的影子，跟着一起呼吸。
                 Ellipse()
@@ -1503,7 +1503,7 @@ struct WakingView: View {
             )
 
             Text(Copy.waking)
-                .font(.system(.callout, design: .rounded))
+                .font(.duckBody)
                 .foregroundStyle(.white.opacity(0.75))
         }
         .onAppear { breathing = true }
@@ -1597,17 +1597,17 @@ struct SkillRing: View {
     }
 
     private var picker: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
+            HStack(spacing: DuckSpace.sm) {
                 Image(systemName: "sparkles")
-                    .font(.subheadline.weight(.semibold))
+                    .font(DuckIcon.sm)
                     .foregroundStyle(.secondary)
                 Text(Copy.skills)
-                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    .font(.duckBody.weight(.semibold))
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.footnote.weight(.semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         // 48 pt, the same floor as every other control; the
                         // 28 pt icon-only target was the smallest thing in
@@ -1621,7 +1621,7 @@ struct SkillRing: View {
                 .accessibilityIdentifier("ring-close")
             }
             ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DuckSpace.lg) {
                     if !actions.isEmpty {
                         section(Copy.actions, names: actions)
                     }
@@ -1629,42 +1629,42 @@ struct SkillRing: View {
                         section(Copy.emotions, names: emotions)
                     }
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, DuckSpace.xs)
             }
             // Landscape's safe height is about 372 pt; the old fixed 360 pt
             // scroll plus header and padding clipped both ends. Portrait has
             // room for the whole palette.
             .frame(maxHeight: bottomAnchored ? 430 : 240)
         }
-        .padding(16)
+        .padding(DuckSpace.lg)
         .frame(maxWidth: 360)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22))
-        .padding(.horizontal, 24)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DuckRadius.panel))
+        .padding(.horizontal, DuckSpace.xxl)
     }
 
     /// One group of capsules: a small heading, then an adaptive grid so the
     /// English wire names still fit three to a row.
     private func section(_ title: String, names: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             Text(title)
-                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                .font(.duckCaption.weight(.semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 88), spacing: 8)],
+                columns: [GridItem(.adaptive(minimum: 88), spacing: DuckSpace.sm)],
                 alignment: .leading,
-                spacing: 8
+                spacing: DuckSpace.sm
             ) {
                 ForEach(names, id: \.self) { name in
                     Button {
                         onPick(name)
                     } label: {
                         Text(SkillLabel.of(name))
-                            .font(.system(.footnote, design: .rounded, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 9)
+                            .font(.duckLabel.weight(.medium))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, DuckSpace.sm)
+                            .padding(.vertical, DuckSpace.sm)
                             .frame(maxWidth: .infinity, minHeight: 48)
                             .background(.ultraThinMaterial, in: Capsule())
                     }
@@ -1697,7 +1697,7 @@ struct DirectorOverlay: View {
                     .frame(height: bar)
             }
             .overlay(alignment: .topLeading) {
-                HStack(spacing: 6) {
+                HStack(spacing: DuckSpace.xs) {
                     Circle()
                         .fill(controller.cameraActive ? Color.red : Color.orange)
                         .frame(width: 7, height: 7)
@@ -1705,20 +1705,20 @@ struct DirectorOverlay: View {
                     // without one) Director is a dark studio, not a room.
                     // Say that instead of drawing a viewfinder over it.
                     Text(controller.cameraActive ? Copy.viewfinder : Copy.cameraUnavailable)
-                        .font(.system(.caption2, design: .monospaced, weight: .semibold))
+                        .font(.duckCaption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.85))
                 }
                 .padding(.top, bar / 2 - 5)
-                .padding(.leading, 14)
+                .padding(.leading, DuckSpace.md)
             }
             .overlay(alignment: .bottomTrailing) {
                 // 取景器的时间码，不是仿真的 tick：构图的人要的是几点，
                 // 不是引擎数到哪了。
                 Text(Date.now, style: .time)
-                    .font(.system(.caption2, design: .monospaced))
+                    .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.7))
                     .padding(.bottom, bar / 2 - 5)
-                    .padding(.trailing, 14)
+                    .padding(.trailing, DuckSpace.md)
             }
             .overlay(alignment: .trailing) {
                 // The one shutter: the frame already on the screen is the photo.
@@ -1737,7 +1737,7 @@ struct DirectorOverlay: View {
                             .stroke(Color.black.opacity(0.18), lineWidth: 2)
                             .frame(width: 52, height: 52)
                         Image(systemName: "camera.fill")
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(DuckIcon.md)
                             .foregroundStyle(.black)
                     }
                     .contentShape(Circle())
@@ -1745,7 +1745,7 @@ struct DirectorOverlay: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(Copy.photoTake)
                 .accessibilityIdentifier("duck-photo")
-                .padding(.trailing, 16)
+                .padding(.trailing, DuckSpace.lg)
             }
         }
     }
@@ -1759,7 +1759,7 @@ fileprivate extension ContentView {
             action()
         } label: {
             Image(systemName: icon)
-                .font(.system(size: 22))
+                .font(DuckIcon.lg)
                 .frame(width: 56, height: 56)
                 .background(Color.black.opacity(0.45), in: Circle())
                 .contentShape(Circle())

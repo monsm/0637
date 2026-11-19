@@ -11,17 +11,17 @@ struct BigButtonsSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: DuckSpace.lg) {
             HStack {
                 Text(Copy.bigButtons)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("big-title")
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -32,10 +32,10 @@ struct BigButtonsSheet: View {
                 .accessibilityIdentifier("big-close")
             }
             Text(Copy.bigButtonsNote)
-                .font(.system(size: 13, design: .rounded))
+                .font(.duckLabel)
                 .foregroundStyle(.secondary)
 
-            VStack(spacing: 12) {
+            VStack(spacing: DuckSpace.md) {
                 bigButton(0, icon: "hand.raised.fill") { controller.pet() }
                 bigButton(1, icon: Icons.feed) { controller.feed() }
                 bigButton(2, icon: Icons.quack) {
@@ -46,7 +46,7 @@ struct BigButtonsSheet: View {
                 bigButton(3, icon: "figure.wave") { controller.sit() }
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
     }
 
     /// One verb: a full-width 72 pt button, 20 pt words, the accent colour
@@ -55,17 +55,17 @@ struct BigButtonsSheet: View {
         Button {
             action()
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: DuckSpace.md) {
                 Image(systemName: icon)
-                    .font(.system(size: 26))
+                    .font(DuckIcon.lg)
                     .frame(width: 40)
                 Text(Copy.bigButtonAction(index))
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                 Spacer()
             }
-            .padding(.horizontal, 18)
+            .padding(.horizontal, DuckSpace.lg)
             .frame(minHeight: 72)
-            .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
+            .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: DuckRadius.control))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

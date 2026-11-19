@@ -855,4 +855,47 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// D1: the first screen at the largest accessibility text size. The deck
+    /// labels grow (two lines allowed), their containers grow with them, and
+    /// nothing leaves the screen or overlaps a neighbour.
+    func testFirstScreenSurvivesAccessibilityXXXL() throws {
+        app.terminate()
+        app = XCUIApplication()
+        app.launchArguments += [
+            "-duck.language", "EN",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+        ]
+        app.launch()
+        let ids = ["duck-feed", "duck-skills", "duck-quack", "duck-grab", "duck-more"]
+        var frames: [CGRect] = []
+        for id in ids {
+            let button = app.buttons[id]
+            XCTAssertTrue(button.waitForExistence(timeout: 30), "\(id) is missing at Accessibility XXXL")
+            XCTAssertTrue(button.isHittable, "\(id) is not tappable at Accessibility XXXL")
+            frames.append(button.frame)
+        }
+        let screen = app.frame.insetBy(dx: -1, dy: -1)
+        for (index, frame) in frames.enumerated() {
+            XCTAssertTrue(screen.contains(frame), "\(ids[index]) leaves the screen: \(frame) in \(app.frame)")
+        }
+        for i in frames.indices {
+            for j in frames.indices where j > i {
+                XCTAssertFalse(frames[i].intersects(frames[j]), "\(ids[i]) overlaps \(ids[j])")
+            }
+        }
+        XCTAssertTrue(
+            app.buttons["duck-time"].waitForExistence(timeout: 10),
+            "the time rail vanished at Accessibility XXXL"
+        )
+        openMore()
+        XCTAssertTrue(
+            app.staticTexts["more-title"].exists,
+            "the drawer title vanished at Accessibility XXXL"
+        )
+        XCTAssertTrue(
+            app.buttons["more-close"].isHittable,
+            "the drawer close is unreachable at Accessibility XXXL"
+        )
+    }
+
 }

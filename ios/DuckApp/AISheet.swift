@@ -100,17 +100,17 @@ struct AISheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             HStack {
                 Text(Copy.ai)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("ai-title")
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -122,9 +122,9 @@ struct AISheet: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: DuckSpace.md) {
                     Toggle(Copy.ai, isOn: $enabled)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .accessibilityIdentifier("ai-enable")
 
                     field(Copy.aiEndpoint, text: $endpoint, id: "ai-endpoint", url: true)
@@ -142,10 +142,10 @@ struct AISheet: View {
                         in: 10...300,
                         step: 5
                     )
-                    .font(.system(size: 13, design: .rounded))
+                    .font(.duckLabel)
                     .accessibilityIdentifier("ai-interval")
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: DuckSpace.sm) {
                         Button(Copy.aiSave) {
                             controller.saveAIConfig(config())
                         }
@@ -164,34 +164,34 @@ struct AISheet: View {
 
                     if !controller.aiStatus.isEmpty {
                         Text(controller.aiStatus)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("ai-status")
                     }
                     if let error = controller.aiError {
                         Text(error)
-                            .font(.system(size: 11, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.orange)
                     }
                     if !controller.aiDecision.isEmpty {
                         Text(controller.aiDecision)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.duckCaption.weight(.medium))
                             .foregroundStyle(.cyan)
                             .accessibilityIdentifier("ai-decision")
                     }
 
                     Text(Copy.aiHint)
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.duckCaption)
                         .foregroundStyle(.secondary)
                     Text(Copy.aiNote)
-                        .font(.system(size: 10, design: .rounded))
+                        .font(.duckCaption)
                         .foregroundStyle(.tertiary)
                     Divider().overlay(Color.white.opacity(0.12))
                     chatSection
                 }
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .onAppear {
             guard !loaded else { return }
             loaded = true
@@ -209,12 +209,12 @@ struct AISheet: View {
     /// aloud on this phone. Send stays disabled until an endpoint is entered,
     /// and the hint says why instead of failing silently.
     private var chatSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             Text(Copy.chatTitle)
-                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .font(.duckBody.weight(.semibold))
                 .accessibilityIdentifier("chat-title")
 
-            HStack(spacing: 8) {
+            HStack(spacing: DuckSpace.sm) {
                 TextField(Copy.chatHint, text: $composer.draft)
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
@@ -234,7 +234,7 @@ struct AISheet: View {
                 Button(controller.heardText) {
                     composer.draft = controller.heardText
                 }
-                .font(.system(.caption, design: .rounded))
+                .font(.duckCaption)
                 .buttonStyle(.bordered)
                 .lineLimit(1)
                 .accessibilityIdentifier("chat-heard")
@@ -242,36 +242,36 @@ struct AISheet: View {
 
             if !configured {
                 Text(Copy.chatNoModel)
-                    .font(.system(.caption, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier("chat-no-model")
             }
             if chat.busy {
                 Text(Copy.chatThinking)
-                    .font(.system(.caption, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("chat-thinking")
             }
             if !chat.reply.isEmpty {
                 Text(chat.reply)
-                    .font(.system(.footnote, design: .rounded))
+                    .font(.duckLabel)
                     .foregroundStyle(.white)
-                    .padding(10)
+                    .padding(DuckSpace.sm)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
                         Color.white.opacity(0.10),
-                        in: RoundedRectangle(cornerRadius: 12)
+                        in: RoundedRectangle(cornerRadius: DuckRadius.thumb)
                     )
                     .accessibilityIdentifier("chat-reply")
             }
             if let error = chat.error, !error.isEmpty {
                 Text(error)
-                    .font(.system(.caption, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier("chat-error")
             }
             Text(Copy.chatLocalVoice)
-                .font(.system(.caption2, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
         }
     }
@@ -305,9 +305,9 @@ struct AISheet: View {
         id: String,
         url: Bool
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: DuckSpace.xs) {
             Text(label)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(.duckCaption.weight(.medium))
                 .foregroundStyle(.secondary)
             TextField(label, text: text)
                 .textFieldStyle(.roundedBorder)

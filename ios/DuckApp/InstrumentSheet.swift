@@ -28,7 +28,7 @@ struct InstrumentSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: DuckSpace.lg) {
                 header
                 timeMachine
                 face
@@ -41,7 +41,7 @@ struct InstrumentSheet: View {
                     onOpen(.dex)
                 } label: {
                     Label(Copy.collectionTitle, systemImage: "square.grid.3x3.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.bordered)
@@ -53,7 +53,7 @@ struct InstrumentSheet: View {
                         "\(Copy.postcardShelf) · \(controller.postcards.cards.count)",
                         systemImage: "photo.on.rectangle.angled"
                     )
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.duckLabel.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.bordered)
@@ -62,7 +62,7 @@ struct InstrumentSheet: View {
                     onOpen(.diary)
                 } label: {
                     Label(Copy.diary, systemImage: "book.closed.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.bordered)
@@ -73,7 +73,7 @@ struct InstrumentSheet: View {
                     onOpen(.ai)
                 } label: {
                     Label(Copy.ai, systemImage: "brain.head.profile")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.bordered)
@@ -88,7 +88,7 @@ struct InstrumentSheet: View {
                         showDetails ? Copy.showLess : Copy.showMore,
                         systemImage: showDetails ? "chevron.up" : "chevron.down"
                     )
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                 }
                 .buttonStyle(.bordered)
                 if showDetails {
@@ -98,7 +98,7 @@ struct InstrumentSheet: View {
                 }
                 footer
             }
-            .padding(20)
+            .padding(DuckSpace.xl)
         }
         .background(Color.duckStageInstrument)
         .id(languageTick)
@@ -117,9 +117,9 @@ struct InstrumentSheet: View {
     /// The lifetime record's three headline numbers, and the file. The numbers
     /// are the core's own counters; the button writes the core's own document.
     private var lifeRecord: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.lifeRecord, detail: nil)
-            HStack(spacing: 10) {
+            HStack(spacing: DuckSpace.sm) {
                 lifeStat("\(Int(controller.vetbookMetres.rounded())) m", Copy.walked)
                 lifeStat("\(controller.vetbookRolls)", Copy.rolls)
                 lifeStat("\(controller.vetbookPickups)", Copy.pickups)
@@ -129,7 +129,7 @@ struct InstrumentSheet: View {
             // since batch six; this is the view that was missing (FE-3).
             if !controller.vetbookDays.isEmpty {
                 Text(controller.vetbookDays.suffix(7).joined(separator: " | "))
-                    .font(.system(.caption2, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
                     .accessibilityIdentifier("day-rows")
@@ -138,7 +138,7 @@ struct InstrumentSheet: View {
                 shareURL = controller.vetbookFile()
             } label: {
                 Label(Copy.exportVetbook, systemImage: "square.and.arrow.up")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.duckLabel.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
@@ -149,7 +149,7 @@ struct InstrumentSheet: View {
                 vetbookCardOpen = true
             } label: {
                 Label(Copy.vetbookCardShare, systemImage: "square.and.arrow.up.on.square")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.duckLabel.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.bordered)
@@ -161,17 +161,17 @@ struct InstrumentSheet: View {
     }
 
     private func lifeStat(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 3) {
+        VStack(spacing: DuckSpace.xxs) {
             Text(value)
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(.white)
             Text(label)
-                .font(.system(size: 10, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.vertical, DuckSpace.sm)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: DuckRadius.thumb))
     }
 
     /// The companion's three numbers. Fullness, not hunger, fills the bar:
@@ -181,38 +181,38 @@ struct InstrumentSheet: View {
     /// progress meter: the text and x/y numbers carry the meaning, not colour,
     /// and completion has a checkmark as well as the word "Done".
     private var questCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             HStack {
                 Text(Copy.quests)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.duckLabel.weight(.semibold))
                     .accessibilityIdentifier("quests-title")
                 Spacer()
                 if controller.questStreak > 0 {
                     Text(Copy.questStreak(controller.questStreak))
-                        .font(.system(size: 11, design: .rounded))
+                        .font(.duckCaption)
                         .foregroundStyle(.orange)
                 }
             }
             if controller.quests.isEmpty {
                 Text("…")
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(Array(controller.quests.enumerated()), id: \.element.id) { index, quest in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: DuckSpace.xs) {
+                        HStack(spacing: DuckSpace.xs) {
                             Text(quest.done ? "✓" : "\(index + 1)")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .font(.duckCaption.weight(.bold))
                                 .foregroundStyle(quest.done ? .green : .secondary)
                                 .frame(width: 16)
                             Text(quest.title)
-                                .font(.system(size: 12, design: .rounded))
+                                .font(.duckCaption)
                                 .foregroundStyle(.white.opacity(0.85))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                             Spacer()
                             Text(quest.done ? Copy.questDone : "\(Int(quest.progress * 100))%")
-                                .font(.system(size: 10, design: .monospaced))
+                                .font(.duckMicro)
                                 .foregroundStyle(.secondary)
                         }
                         ProgressView(value: quest.progress)
@@ -222,20 +222,20 @@ struct InstrumentSheet: View {
                 }
                 if controller.quests.allSatisfy({ $0.done }) {
                     Text(Copy.questAllDone)
-                        .font(.system(size: 11, design: .rounded))
+                        .font(.duckCaption)
                         .foregroundStyle(.green)
                         .accessibilityIdentifier("quest-all-done")
                 }
             }
         }
-        .padding(12)
-        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     private var careCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.care, detail: controller.careAsleep ? Copy.dozing : nil)
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .top, spacing: DuckSpace.md) {
                 careBar(
                     Copy.fullness,
                     value: 1 - controller.careHunger,
@@ -262,7 +262,7 @@ struct InstrumentSheet: View {
                     bond: controller.careBond,
                     asleep: true
                 ))
-                .font(.system(size: 11, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
             }
             nightRow
@@ -276,9 +276,9 @@ struct InstrumentSheet: View {
     /// morning is the same chip in reverse.
     @ViewBuilder private var nightRow: some View {
         if controller.nightActive {
-            HStack(spacing: 10) {
+            HStack(spacing: DuckSpace.sm) {
                 Text(Copy.nightQuiet(nightMinutes))
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -308,18 +308,18 @@ struct InstrumentSheet: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: DuckSpace.xs) {
                 Image(systemName: icon)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DuckIcon.xs)
                 Text(title)
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.duckCaption.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, DuckSpace.md)
             .frame(minHeight: 44)
-            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
-            .contentShape(RoundedRectangle(cornerRadius: 10))
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: DuckRadius.thumb))
+            .contentShape(RoundedRectangle(cornerRadius: DuckRadius.thumb))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
@@ -333,15 +333,15 @@ struct InstrumentSheet: View {
     }
 
     private func careBar(_ label: String, value: Double, tint: Color, id: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: DuckSpace.xs) {
             Text(label)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .font(.duckCaption.weight(.medium))
                 .foregroundStyle(.secondary)
             ProgressView(value: min(max(value, 0), 1))
                 .tint(tint)
                 .accessibilityIdentifier(id)
             Text("\(Int((min(max(value, 0), 1) * 100).rounded()))%")
-                .font(.system(size: 11, design: .monospaced))
+                .font(.duckData)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -369,16 +369,16 @@ struct InstrumentSheet: View {
         HStack(alignment: .firstTextBaseline) {
             Text(Copy.thisDuck)
                 .accessibilityIdentifier("sheet-title")
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .font(.duckTitle.weight(.semibold))
             Spacer()
             Button(Copy.language.rawValue) {
                 Copy.language = Copy.language == .english ? .chinese : .english
                 languageTick &+= 1
             }
-            .font(.system(size: 11, design: .rounded))
+            .font(.duckCaption)
             .buttonStyle(.bordered)
             Text(controller.label)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.duckData)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("sheet-label")
             // A deterministic dismissal: the UI test used to swipe the sheet
@@ -387,7 +387,7 @@ struct InstrumentSheet: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DuckIcon.xs)
                     .foregroundStyle(.secondary)
                     .frame(width: 48, height: 48)
                     .background(Color.white.opacity(0.10), in: Circle())
@@ -402,11 +402,11 @@ struct InstrumentSheet: View {
     // MARK: - Time machine
 
     private var timeMachine: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.timeMachine, detail: "tick \(controller.simTick)")
 
             // The scrubber spans the checkpoints the core actually kept.
-            VStack(spacing: 6) {
+            VStack(spacing: DuckSpace.xs) {
                 GeometryReader { geometry in
                     let width = geometry.size.width
                     // The share of history still retained, matching the
@@ -431,11 +431,11 @@ struct InstrumentSheet: View {
                     Spacer()
                     Text("\(controller.simTick)")
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(.duckMicro)
                 .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: DuckSpace.sm) {
                 timeButton(
                     controller.paused ? "play.fill" : "pause.fill",
                     controller.paused ? Copy.resume : Copy.freeze
@@ -473,21 +473,21 @@ struct InstrumentSheet: View {
             }
             .pickerStyle(.segmented)
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     private func timeButton(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 4) {
+            VStack(spacing: DuckSpace.xs) {
                 Image(systemName: icon)
-                    .font(.system(size: 15))
+                    .font(DuckIcon.sm)
                 Text(title)
-                    .font(.system(size: 9, design: .rounded))
+                    .font(.duckCaption)
             }
             .frame(maxWidth: .infinity, minHeight: 48)
-            .padding(.vertical, 9)
-            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.vertical, DuckSpace.sm)
+            .background(Color.white.opacity(0.07), in: RoundedRectangle(cornerRadius: DuckRadius.thumb))
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("time-\(icon)")
@@ -496,7 +496,7 @@ struct InstrumentSheet: View {
     // MARK: - Telemetry
 
     private var telemetry: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.state, detail: nil)
             row(Copy.bringup, controller.bringupText)
             row(Copy.gain, "\(controller.gain)")
@@ -506,7 +506,7 @@ struct InstrumentSheet: View {
             row(Copy.branches, "\(controller.branchCount)")
             HStack {
                 Text(Copy.drive)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Picker(Copy.drive, selection: Binding(
@@ -534,8 +534,8 @@ struct InstrumentSheet: View {
                 row("fps / Hz", String(format: "%.0f / %.1f", controller.fps, controller.ticksPerSecond))
             }
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     // MARK: - Face
@@ -544,7 +544,7 @@ struct InstrumentSheet: View {
     /// battery gauge, the flashlight. A phone has no LEDs, so the sheet is
     /// where the face lives.
     private var face: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.face, detail: nil)
             row(Copy.ledStatus, Copy.faceStatus(controller.faceStatus))
             // The gauge as its four LEDs: filled bars, then hollow ones, the
@@ -552,23 +552,23 @@ struct InstrumentSheet: View {
             // every other value in the sheet.
             HStack {
                 Text(Copy.gauge)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(gaugeBars)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.duckData)
                     .foregroundStyle(.white)
                     .accessibilityIdentifier("sheet-gauge-bars")
                 Text(Copy.faceGauge(controller.faceGauge))
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.duckData)
                     .foregroundStyle(.secondary)
             }
             row(Copy.battery, controller.faceBattery)
             flashlightRow
             tiltRow
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     /// Tilt-to-look is a drive mode, not a separate feature: it belongs with
@@ -577,7 +577,7 @@ struct InstrumentSheet: View {
     private var tiltRow: some View {
         HStack {
             Text(Copy.tiltLook)
-                .font(.system(size: 12, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
             Spacer()
             Toggle("", isOn: $controller.tiltLook)
@@ -600,23 +600,23 @@ struct InstrumentSheet: View {
     private var flashlightRow: some View {
         HStack {
             Text(Copy.flashlight)
-                .font(.system(size: 12, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
             Spacer()
             if let color = controller.flashlightColor {
                 Text("\(Copy.faceColor(color)) · \(Copy.stateOn)")
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.duckData)
                     .foregroundStyle(.white)
             } else {
                 Text(Copy.stateOff)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.duckData)
                     .foregroundStyle(.secondary)
             }
             Button {
                 controller.toggleFlashlight()
             } label: {
                 Image(systemName: "flashlight.on.fill")
-                    .font(.system(size: 14))
+                    .font(DuckIcon.sm)
                     .frame(width: 48, height: 48)
                     .background(Color.white.opacity(0.10), in: Circle())
                     .contentShape(Circle())
@@ -630,10 +630,10 @@ struct InstrumentSheet: View {
     // MARK: - Sensors
 
     private var sensors: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.whatPhoneSenses, detail: controller.sensorMode)
             Text(Copy.sensorNote)
-                .font(.system(size: 10, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
             // A refused camera has no reading, so "—" must not hide the denial.
             // The launch LiDAR scan has its own line below the depth row:
@@ -645,7 +645,7 @@ struct InstrumentSheet: View {
             // row is the sound switch on this phone; no second control.
             if controller.petSoundAvailable {
                 Text(Copy.petSoundNote)
-                    .font(.caption2)
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("sheet-pet-sound-note")
             }
@@ -654,13 +654,13 @@ struct InstrumentSheet: View {
             // refused permission, or the one-shot scan's real result. The
             // scan never runs again until the next launch.
             Text(controller.depthScanLine)
-                .font(.caption2)
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("sheet-depth-scan")
             row("IMU", controller.imuSummary)
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     /// The microphone is the one sensor the user switches on. Off shows "—";
@@ -669,11 +669,11 @@ struct InstrumentSheet: View {
     private var micRow: some View {
         HStack {
             Text(Copy.microphone)
-                .font(.system(size: 12, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
             Spacer()
             Text(controller.micSummary)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.duckData)
                 .accessibilityIdentifier("sheet-mic-summary")
             Toggle("", isOn: Binding(
                 get: { controller.micEnabled },
@@ -695,18 +695,18 @@ struct InstrumentSheet: View {
     /// skill in the core), so this has its own section rather than living
     /// with the room's sensors.
     private var voiceCommands: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.voiceCommands, detail: nil)
             Text(Copy.voiceNote)
-                .font(.system(size: 10, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
             HStack {
                 Text(Copy.voiceEar)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(speechStatus)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.duckData)
                     .accessibilityIdentifier("sheet-voice-status")
                 Toggle("", isOn: Binding(
                     get: { controller.voiceCommandsEnabled },
@@ -720,17 +720,17 @@ struct InstrumentSheet: View {
             // transcript is one line and truncates.
             HStack {
                 Text(Copy.heard)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text(controller.heardText.isEmpty ? "—" : controller.heardText)
-                    .font(.system(size: 12, design: .monospaced))
+                    .font(.duckData)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     /// What the ear is doing, in words. A refused permission and a device
@@ -746,10 +746,10 @@ struct InstrumentSheet: View {
     }
 
     private var provenance: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.provenance, detail: "SHA-256")
             Text(controller.fingerprint)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.duckMicro)
                 .foregroundStyle(.secondary)
                 .lineLimit(3)
                 .textSelection(.enabled)
@@ -757,18 +757,18 @@ struct InstrumentSheet: View {
             // apps never need it, so it is here rather than in the way.
             if !controller.intentToken.isEmpty {
                 Text(Copy.apiToken)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.duckMicro)
                     .foregroundStyle(.secondary)
                 Text(controller.intentToken)
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.duckMicro)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .textSelection(.enabled)
             }
         }
-        .padding(14)
+        .padding(DuckSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     private var footer: some View {
@@ -777,7 +777,7 @@ struct InstrumentSheet: View {
                 .buttonStyle(.bordered)
             Spacer()
             Text(Copy.api)
-                .font(.system(size: 10, design: .monospaced))
+                .font(.duckMicro)
                 .foregroundStyle(.secondary)
         }
     }
@@ -787,11 +787,11 @@ struct InstrumentSheet: View {
     private func sectionTitle(_ title: String, detail: String?) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.duckLabel.weight(.semibold))
             Spacer()
             if let detail {
                 Text(detail)
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.duckMicro)
                     .foregroundStyle(.secondary)
             }
         }
@@ -800,11 +800,11 @@ struct InstrumentSheet: View {
     private func row(_ key: String, _ value: String) -> some View {
         HStack {
             Text(key)
-                .font(.system(size: 12, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
             Spacer()
             Text(value)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.duckData)
         }
     }
 }
