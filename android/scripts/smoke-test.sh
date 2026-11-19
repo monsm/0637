@@ -1754,31 +1754,32 @@ try:
 except Exception as exc:
     raise SystemExit(f"::error::cannot read the large-type dump: {exc}")
 groups = [
-    {'喂食', 'Feed'}, {'技能', 'Skills'}, {'叫一声', 'Quack'},
-    {'拎起', 'Grab'}, {'更多', 'More'}, {'时间', 'Time'},
+    ('feed', ('喂食', 'Feed')), ('skills', ('技能', 'Skills')),
+    ('quack', ('叫一声', 'Quack')), ('grab', ('拎起', 'Grab')),
+    ('more', ('更多', 'More')), ('time', ('时间', 'Time')),
 ]
 nodes = [node for node in root.iter('node')
          if node.get('package') == 'ai.duck.microduck']
 found = {}
-for group in groups:
+for key, names in groups:
     for node in nodes:
         for attr in ('text', 'content-desc'):
             value = node.get(attr) or ''
-            if value in group and group not in found:
-                found[group] = node
-missing = [sorted(group)[0] for group in groups if group not in found]
+            if value in names and key not in found:
+                found[key] = node
+missing = [key for key, _ in groups if key not in found]
 if missing:
     seen = sorted({(n.get('text') or n.get('content-desc') or '') for n in nodes})
     raise SystemExit(f"::error::large type lost: {missing}; screen held {seen[:24]}")
 boxes = []
-for group, node in found.items():
+for key, node in found.items():
     parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
     if len(parts) != 4:
-        raise SystemExit(f"::error::unreadable bounds for {sorted(group)[0]}: {node.get('bounds')}")
+        raise SystemExit(f"::error::unreadable bounds for {key}: {node.get('bounds')}")
     left, top, right, bottom = map(int, parts)
     if left < 0 or top < 0 or right > width or bottom > height:
-        raise SystemExit(f"::error::{sorted(group)[0]} leaves the screen at font scale 2.0")
-    boxes.append((sorted(group)[0], (left, top, right, bottom)))
+        raise SystemExit(f"::error::{key} leaves the screen at font scale 2.0")
+    boxes.append((key, (left, top, right, bottom)))
 for i, (name_a, a) in enumerate(boxes):
     for name_b, b in boxes[i + 1:]:
         if a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]:
