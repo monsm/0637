@@ -128,7 +128,7 @@ pages:
     entries: [rewind-play]
 
 # 功能台账：22 项 + 2 项 no-ui；另加 iOS 独有的成长手册/成就墙与倾斜看、
-# 以及 定时器/大字/日子行/教它说话/日子 等扩展项，共 44 行。
+# 以及 定时器/大字/日子行/教它说话/日子、深度障碍/声音摸摸 等扩展项，共 46 行。
 # enabled_when: 门控（无邻居时 ensemble/合唱/礼物 可见但禁用，不是消失）。
 # data_chain: 只改入口不改账的边界声明。
 features:
@@ -488,7 +488,7 @@ features:
     page: tools
     hops: 2
     conform_b4: extension
-    note: 8×8 降采样进 /state.sensors，两端无深度数据源时标 not-implemented（FIDELITY §0.1）
+    note: 8×8 降采样进 /state.sensors；2026-11-19 S1 的 AR 深度扫描只喂 obstacles.xml 与 POST /floor，未上报 depth 读数——tof_grid 仍为空即空，不渲染假数（FIDELITY §0.1）
     ios: implemented
     android: implemented
     data_chain: none
@@ -546,6 +546,28 @@ features:
     android: implemented
     data_chain: none
 
+  # —— 自动能力（无 UI 入口，2026-11-19 S1 SENSORS 线）——
+  - id: depth-obstacles
+    zh: 深度障碍
+    group: none
+    page: none
+    hops: null
+    conform_b4: extension
+    note: 启动时 AR 深度扫描→≤3 个静态 AABB 写入 obstacles.xml，核心载入时并入 MuJoCo 世界（iOS LiDAR / Android Camera2 DEPTH16，真机限定）；只改世界不改 61 维观测与安全层；模拟器/无深度整体隐藏并如实提示
+    ios: implemented
+    android: implemented
+    data_chain: none
+  - id: pet-sound
+    zh: 声音摸摸
+    group: none
+    page: none
+    hops: null
+    conform_b4: extension
+    note: 官方 pet_detect.onnx（upstream 原模型，非自训）经 /sensor pcm16 → 核心 log-mel+CNN 识别摸摸声；麦克风开启且模型随包才启用，无模型静默；只进陪伴层/声音通道，永不进 61 维观测
+    ios: implemented
+    android: implemented
+    data_chain: none
+
   # —— 22+2 的 +2：核心有路由、UI 无入口 ——
   - id: floor-height
     zh: 地面高度
@@ -553,10 +575,10 @@ features:
     page: none
     hops: null
     conform_b4: extension
-    note: 核心 POST /floor 已有（intent.rs:1083），两端 UI 0 命中——22+2 起账标 no-ui
-    ios: not-implemented
-    android: not-implemented
-    reason: "无 UI；台账记 no-ui，ARKit/ARCore 接线待真机"
+    note: 核心 POST /floor（intent.rs）；2026-11-19 S1 起双端 AR 深度扫描在启动时自动调用（z=相对默认地面偏移 -0.1…0.3 m；检测面即鸭脚地面时发 0）。自动能力、无 UI 入口，22+2 起账仍标 no-ui
+    ios: implemented
+    android: implemented
+    reason: "无 UI（自动能力）；ARKit/ARCore 深度接线已落，真机限定——模拟器/无深度设备不发"
     data_chain: none
   - id: trajectory-export
     zh: 轨迹导出
