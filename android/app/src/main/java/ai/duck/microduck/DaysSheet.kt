@@ -250,8 +250,8 @@ internal fun DaysSheet(onClose: () -> Unit) {
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -290,7 +290,7 @@ internal fun DaysSheet(onClose: () -> Unit) {
                 )
                 else -> LazyColumn(
                     modifier = Modifier.heightIn(max = 460.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
                 ) {
                     data.week?.let { week ->
                         item { DaysWeekCard(week) }
@@ -322,10 +322,10 @@ private fun DaysWeekCard(week: DaysDay) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(14.dp))
-            .padding(14.dp)
+            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(DuckTheme.Radius.control))
+            .padding(DuckTheme.Space.md)
             .testTag("days-week"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
     ) {
         Text(
             Copy.daysWeek,
@@ -347,9 +347,9 @@ private fun DaysDayCard(day: DaysDay, title: String) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
+            .padding(vertical = DuckTheme.Space.sm)
             .testTag("days-row-${day.day}"),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
     ) {
         Text(
             title,

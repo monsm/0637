@@ -91,16 +91,16 @@ internal fun MoreSheet(
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(top = 4.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = DuckTheme.Space.xl)
+                .padding(top = DuckTheme.Space.xs, bottom = DuckTheme.Space.xxl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.lg),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     Copy.more,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 20.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("more-title"),
@@ -221,16 +221,16 @@ internal fun QuestsSheet(board: QuestBoardUi, onClose: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = DuckTheme.Space.xl)
+                .padding(bottom = DuckTheme.Space.xxl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     Copy.dailyQuests,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 20.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("quests-sheet-title"),
@@ -252,7 +252,7 @@ internal fun QuestsSheet(board: QuestBoardUi, onClose: () -> Unit) {
 private fun GrowthCard(growth: ProgressSnapshot, dayRows: List<String>) {
     Column(
         Modifier.fillMaxWidth().testTag("growth-book"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
     ) {
         Text(
             Copy.growthBook,
@@ -267,7 +267,7 @@ private fun GrowthCard(growth: ProgressSnapshot, dayRows: List<String>) {
                 modifier = Modifier.testTag("growth-empty"),
             )
         } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md)) {
                 Text(
                     Copy.growthStreak(growth.streak),
                     color = ActionAccent,
@@ -290,7 +290,7 @@ private fun GrowthCard(growth: ProgressSnapshot, dayRows: List<String>) {
                 color = Color.White.copy(alpha = 0.55f),
                 style = MaterialTheme.typography.labelSmall,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
                 growth.week.forEach { tile ->
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -332,7 +332,7 @@ private fun GrowthCard(growth: ProgressSnapshot, dayRows: List<String>) {
                     .fillMaxWidth()
                     .testTag("growth-achievement-${entry.id}"),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
             ) {
                 Box(
                     Modifier
@@ -367,18 +367,18 @@ private fun Group(
     id: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs)) {
         Text(
             title,
             color = Color.White.copy(alpha = 0.6f),
-            fontSize = 13.sp,
+            fontSize = DuckTheme.Type.Label,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier
-                .padding(start = 4.dp)
-                .padding(bottom = 2.dp)
+                .padding(start = DuckTheme.Space.xs)
+                .padding(bottom = DuckTheme.Space.xxs)
                 .testTag("more-group-$id"),
         )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp), content = content)
+        Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs), content = content)
     }
 }
 
@@ -410,9 +410,9 @@ private fun MoreRow(
                 onClick = onClick,
             )
             .testTag(tag)
-            .padding(horizontal = 4.dp),
+            .padding(horizontal = DuckTheme.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
     ) {
         Icon(
             icon,
@@ -422,19 +422,19 @@ private fun MoreRow(
         )
         Column(
             Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
         ) {
             Text(
                 title,
                 color = Color.White,
-                fontSize = 15.sp,
+                fontSize = DuckTheme.Type.Body,
                 fontWeight = FontWeight.Medium,
             )
             if (note != null) {
                 Text(
                     note,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -455,7 +455,7 @@ private fun MoreRow(
             Text(
                 badge,
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
             )
         }
         if (showsChevron) {
@@ -479,16 +479,16 @@ internal fun ModeDialog(
     Dialog(onDismissRequest = onClose) {
         Column(
             Modifier
-                .background(ShellSurface, RoundedCornerShape(20.dp))
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+                .background(ShellSurface, RoundedCornerShape(DuckTheme.Radius.card))
+                .padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
         ) {
             Text(
                 Copy.stickModes,
                 color = Color.White,
-                fontSize = 18.sp,
+                fontSize = DuckTheme.Type.Title,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 4.dp),
+                modifier = Modifier.padding(bottom = DuckTheme.Space.xs),
             )
             listOf("drive", "head", "body").forEach { mode ->
                 Row(
@@ -502,9 +502,9 @@ internal fun ModeDialog(
                             role = Role.Button,
                         ) { onPick(mode) }
                         .testTag("mode-option-$mode")
-                        .padding(horizontal = 4.dp),
+                        .padding(horizontal = DuckTheme.Space.xs),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
                 ) {
                     Icon(
                         Icons.stick(mode),
@@ -515,7 +515,7 @@ internal fun ModeDialog(
                     Text(
                         Copy.stick(mode),
                         color = Color.White,
-                        fontSize = 15.sp,
+                        fontSize = DuckTheme.Type.Body,
                         fontWeight = FontWeight.Medium,
                         modifier = Modifier.weight(1f),
                     )

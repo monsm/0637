@@ -329,9 +329,9 @@ internal fun AliasSheet(onClose: () -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(horizontal = DuckTheme.Space.xl)
+                .padding(bottom = DuckTheme.Space.xxl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -428,10 +428,10 @@ internal fun AliasSheet(onClose: () -> Unit) {
                         Modifier
                             .fillMaxWidth()
                             .heightIn(min = 48.dp)
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = DuckTheme.Space.xs)
                             .testTag("alias-row-${row.phrase}"),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(

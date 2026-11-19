@@ -49,6 +49,11 @@
 - **`Intent::Step`** 的暂停-恢复会清 pet ring（每次 step 视为新收听会话；时间机器例外）。
 - **#21 自愈爬起**：仍 blocked——官方未发布 `standup.onnx` 权重，不自训、不编造。
 
-## CI 首跑
+## CI 首跑（2026-11-19）
 
-由四工作流裁决（Core / Contracts / Android / iOS）。
+- `ece665e`（本批四提交）：**Contracts ✅、iOS ✅、Android ✅**；**Core ❌**——blocking fmt：QA 修复的几处换行未过 `rustfmt --check`。修复（同配置本地 `FMT-OK`）后推送。
+- `6dc7ed9`：**Core ❌**——clippy `dead_code`：测试支撑 API `load_pet_detector_with_config` 在默认 profile（`ffi.rs` 不编译）无调用者。修复方向先误删，随后确认 `ffi.rs` 测试实际调用它。
+- `7622469`：**Core ❌**——mujoco job 编译失败（E0599，方法被删）；同轮 `tests`/clippy 已绿。
+- `ea4b904`：**Core ✅、iOS ✅、Android ✅**。方法改为 `#[cfg(all(test, feature = "mujoco"))]`（默认无此方法=无 dead code；mujoco 测试可用），并清掉 ABI 测试里的 4 处嵌套 `unsafe` 警告。
+- **Contracts** 于 `ece665e` ✅；后续 core-only 提交按 `paths` 过滤不触发（本批契约/文档改动已在 `ece665e` 验证）。最终四工作流按其路径触发全绿。
+- CI 结论：Swift 编译/模拟器冒烟、Android 模拟器冒烟、Core 默认 + mujoco + fmt + clippy 均通过；真机 LiDAR/DEPTH16/麦克风灵敏度仍由真机验收。

@@ -122,7 +122,7 @@ struct LandscapeMenu: View {
                 .accessibilityIdentifier("surface-director")
         } label: {
                 Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
+                    .font(DuckIcon.sm)
                     .frame(width: 48, height: 48)
                     .background(.ultraThinMaterial, in: Circle())
                     .contentShape(Circle())

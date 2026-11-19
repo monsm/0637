@@ -94,8 +94,8 @@ fun DanceSheet(
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -105,7 +105,7 @@ fun DanceSheet(
                     Copy.dance,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("dance-title"),
@@ -115,12 +115,12 @@ fun DanceSheet(
             Text(
                 Copy.danceHint,
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
             )
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 88.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
@@ -131,7 +131,7 @@ fun DanceSheet(
                         Text(
                             Copy.danceEmpty,
                             color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 12.sp,
+                            fontSize = DuckTheme.Type.Caption,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 64.dp),
@@ -153,28 +153,28 @@ fun DanceSheet(
                             .background(
                                 if (active) Color(DanceContrast.ACTIVE_BACKGROUND)
                                 else Color.White.copy(alpha = 0.08f),
-                                RoundedCornerShape(12.dp),
+                                RoundedCornerShape(DuckTheme.Radius.thumb),
                             )
                             .border(
                                 width = 1.5.dp,
                                 color = if (active) Color.Black.copy(alpha = 0.55f)
                                 else Color.Transparent,
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(DuckTheme.Radius.thumb),
                             )
-                            .padding(8.dp),
+                            .padding(DuckTheme.Space.sm),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
                     ) {
                         Text(
                             "${index + 1}",
                             color = ink.copy(alpha = if (active) 1f else 0.55f),
-                            fontSize = 9.sp,
+                            fontSize = DuckTheme.Type.Micro,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
                         )
                         Text(
                             step.label.ifEmpty { step.value },
                             color = ink,
-                            fontSize = 11.sp,
+                            fontSize = DuckTheme.Type.Caption,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -185,11 +185,11 @@ fun DanceSheet(
             Text(
                 Copy.danceTry,
                 color = Color.White.copy(alpha = 0.55f),
-                fontSize = 10.sp,
+                fontSize = DuckTheme.Type.Micro,
             )
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
             ) {
                 listOf("roulade", "kick_left", "laugh", "yes").forEach { name ->
                     ButtonChip(skillLabel(name), "dance-try-$name") {
@@ -210,7 +210,7 @@ fun DanceSheet(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 ButtonChip(
                     if (recording) Copy.danceStopRecord else Copy.danceRecord,
                     "dance-record",

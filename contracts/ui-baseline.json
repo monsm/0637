@@ -12,19 +12,27 @@
     "direction": "min"
   },
   "android_color_literals": {
-    "count": 10,
+    "count": 0,
     "direction": "max"
   },
   "android_font_literals": {
-    "count": 143,
+    "count": 0,
     "direction": "max"
   },
   "android_modal_bools": {
     "count": 0,
     "direction": "max"
   },
+  "android_offgrid_spacing": {
+    "count": 0,
+    "direction": "max"
+  },
   "android_press_no_feedback": {
     "count": 13,
+    "direction": "max"
+  },
+  "android_radius_literals": {
+    "count": 0,
     "direction": "max"
   },
   "android_remember_saveable": {
@@ -44,7 +52,7 @@
     "direction": "max"
   },
   "ios_color_literals": {
-    "count": 15,
+    "count": 4,
     "direction": "max"
   },
   "ios_dark_hardwrites": {
@@ -52,11 +60,19 @@
     "direction": "max"
   },
   "ios_font_literals": {
-    "count": 207,
+    "count": 0,
     "direction": "max"
   },
   "ios_missing_rounded": {
-    "count": 39,
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_offgrid_spacing": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_radius_literals": {
+    "count": 0,
     "direction": "max"
   },
   "ios_reduce_motion": {

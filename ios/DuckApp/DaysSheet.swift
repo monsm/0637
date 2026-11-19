@@ -198,13 +198,13 @@ struct DaysSheet: View {
     @State private var shareText = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             header
             if let board {
                 content(board)
             } else if failed {
                 Text(Copy.aiOffline)
-                    .font(.system(.subheadline, design: .rounded))
+                    .font(.duckBody)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                     .accessibilityIdentifier("days-offline")
@@ -213,7 +213,7 @@ struct DaysSheet: View {
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color.duckStageInstrument)
         .onAppear(perform: fetch)
@@ -222,7 +222,7 @@ struct DaysSheet: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(Copy.daysTitle)
-                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("days-title")
             Spacer()
@@ -235,7 +235,7 @@ struct DaysSheet: View {
             empty
         } else {
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: DuckSpace.md) {
                     if let week = board.week {
                         weekCard(week)
                     }
@@ -250,13 +250,13 @@ struct DaysSheet: View {
                         shareOpen = true
                     } label: {
                         Label(Copy.daysShare, systemImage: "square.and.arrow.up")
-                            .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                            .font(.duckBody.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier("days-share")
                 }
-                .padding(.bottom, 8)
+                .padding(.bottom, DuckSpace.sm)
             }
             .sheet(isPresented: $shareOpen) {
                 ShareSheet(items: [shareText])
@@ -267,25 +267,25 @@ struct DaysSheet: View {
     /// The week's true totals, one card: 陪伴小时、米数、翻滚、被摸、被抱起、
     /// 摔倒、被喂、拍手、口哨 — the counters the core sums itself.
     private func weekCard(_ week: DaysDay) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
             Text(Copy.daysWeek)
-                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .font(.duckBody.weight(.semibold))
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("days-week")
             ForEach(week.lines) { line in
                 HStack {
                     Text(line.label)
-                        .font(.system(.caption, design: .rounded))
+                        .font(.duckCaption)
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(line.value)
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .font(.duckCaption.weight(.semibold))
                         .foregroundStyle(.white)
                 }
             }
         }
-        .padding(14)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14))
+        .padding(DuckSpace.md)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
     }
 
     /// One day: the date (or the Today word for the core's running row) and
@@ -293,18 +293,18 @@ struct DaysSheet: View {
     /// share document (and Android's day rows). A row exists only when the
     /// core sent it; the shell never lays out a zero day.
     private func dayRow(_ day: DaysDay, title: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: DuckSpace.xxs) {
             Text(title)
-                .font(.system(.subheadline, design: .rounded, weight: .medium))
+                .font(.duckBody.weight(.medium))
                 .foregroundStyle(.white)
             Text(day.summary)
-                .font(.system(.caption2, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
                 .lineLimit(3)
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 6)
+        .padding(.vertical, DuckSpace.xs)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("days-row-\(day.day)")
     }
@@ -312,7 +312,7 @@ struct DaysSheet: View {
     /// No finished day and no today: one true sentence, no zero table.
     private var empty: some View {
         Text(Copy.daysEmpty)
-            .font(.system(.subheadline, design: .rounded))
+            .font(.duckBody)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .accessibilityIdentifier("days-empty")

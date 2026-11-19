@@ -11,15 +11,15 @@ struct PeersSheet: View {
     @State private var pairCode = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                     Text(Copy.peers)
-                        .font(.system(size: 20, weight: .semibold, design: .rounded))
+                        .font(.duckTitle.weight(.semibold))
                         .accessibilityIdentifier("peers-title")
                     if !controller.peerName.isEmpty {
                         Text("\(Copy.name) · \(controller.peerName)")
-                            .font(.system(size: 11, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -28,7 +28,7 @@ struct PeersSheet: View {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -41,19 +41,19 @@ struct PeersSheet: View {
 
             // Pairing: a stranger on the Wi-Fi is visible but cannot send
             // gifts or start a chorus until both sides typed this code.
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DuckSpace.xs) {
                 TextField(Copy.pairCode, text: $pairCode)
                     .keyboardType(.numberPad)
                     .textFieldStyle(.roundedBorder)
                     .accessibilityIdentifier("peers-pair-code")
                 Text(Copy.pairNote)
-                    .font(.system(size: 10, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
             }
 
             if controller.peers.isEmpty {
                 Text(Copy.peersEmpty)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("peers-empty")
                 if controller.peerName.isEmpty {
@@ -61,7 +61,7 @@ struct PeersSheet: View {
                         controller.startPeers()
                     } label: {
                         Label(Copy.peerFind, systemImage: "wifi")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.duckLabel.weight(.semibold))
                             .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.bordered)
@@ -69,16 +69,16 @@ struct PeersSheet: View {
                 }
             } else {
                 ForEach(Array(controller.peers.enumerated()), id: \.element.id) { index, peer in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: DuckSpace.sm) {
+                        HStack(spacing: DuckSpace.sm) {
                             Circle()
                                 .fill(peer.replied ? Color.green : Color.cyan)
                                 .frame(width: 8, height: 8)
-                            VStack(alignment: .leading, spacing: 1) {
+                            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                                 Text(peer.name)
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    .font(.duckLabel.weight(.semibold))
                                 Text(peer.replied ? Copy.peerRepliedLabel : Copy.peerNew)
-                                    .font(.system(size: 10, design: .rounded))
+                                    .font(.duckCaption)
                                     .foregroundStyle(.secondary)
                             }
                             Spacer()
@@ -96,7 +96,7 @@ struct PeersSheet: View {
                         // Gifts in the greeting's own chip language: a treat
                         // feeds through the real peck, a cheer runs the
                         // official excited timeline on the other duck.
-                        HStack(spacing: 8) {
+                        HStack(spacing: DuckSpace.sm) {
                             chip(Copy.giftTreat, id: "gift-treat-\(peer.id)") {
                                 controller.giftPeer(peer.id, gift: "treat", value: "")
                             }
@@ -115,10 +115,10 @@ struct PeersSheet: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, DuckSpace.md)
+                    .padding(.vertical, DuckSpace.sm)
                     .frame(minHeight: 56)
-                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                    .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: DuckRadius.thumb))
                     // No identifier here: one on a container reaches into the
                     // tree and overwrites every child's identifier (the chips
                     // below all vanished under "peer-row-N" in a CI dump).
@@ -129,14 +129,14 @@ struct PeersSheet: View {
                     controller.greetPeer(nil)
                 } label: {
                     Label(Copy.peerSayAll, systemImage: "hand.wave.fill")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("peer-greet-all")
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: DuckSpace.sm) {
                 chip(Copy.formation, id: "ensemble-formation", enabled: !controller.peers.isEmpty) {
                     controller.startEnsemble(moves: ["laugh", "yes_fast", "excited", "curious"])
                 }
@@ -164,18 +164,18 @@ struct PeersSheet: View {
                 set: { controller.setNetPad(on: $0) }
             )) {
                 Text(Copy.netPad)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
             }
             .accessibilityIdentifier("peers-netpad")
             Text(Copy.netPadNote)
-                .font(.system(size: 10, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
 
             Text(Copy.voiceNote)
-                .font(.system(size: 10, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
     }
 
     /// The sheet's one chip shape: the greeting's capsule, reused by gifts
@@ -189,8 +189,8 @@ struct PeersSheet: View {
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .padding(.horizontal, 14)
+                .font(.duckCaption.weight(.semibold))
+                .padding(.horizontal, DuckSpace.md)
                 .frame(minHeight: 44)
                 .background(Color.white.opacity(0.12), in: Capsule())
                 .contentShape(Capsule())

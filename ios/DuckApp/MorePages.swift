@@ -21,19 +21,19 @@ private struct PageChrome<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: DuckSpace.sm) {
                 HStack {
                     Text(title)
-                        .font(.system(.title3, design: .rounded).weight(.semibold))
+                        .font(.duckTitle)
                         .foregroundStyle(.white)
                     Spacer()
                     SheetCloseButton()
                 }
                 content
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 14)
-            .padding(.bottom, 28)
+            .padding(.horizontal, DuckSpace.xl)
+            .padding(.top, DuckSpace.md)
+            .padding(.bottom, DuckSpace.xxl)
         }
         .background(Color.duckBgSurface)
     }
@@ -48,19 +48,19 @@ private struct PageRow: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: DuckSpace.md) {
                 Text(title)
-                    .font(.system(.subheadline, design: .rounded).weight(.medium))
+                    .font(.duckBody.weight(.medium))
                     .foregroundStyle(.white)
                 Spacer()
                 if let note {
                     Text(note)
-                        .font(.system(.caption, design: .rounded))
+                        .font(.duckCaption)
                         .foregroundStyle(.white.opacity(0.6))
                         .lineLimit(1)
                 }
                 Text(selected ? Copy.stateOn : Copy.stateOff)
-                    .font(.system(.caption, design: .rounded).weight(.semibold))
+                    .font(.duckCaption.weight(.semibold))
                     .foregroundStyle(selected ? Color.duckAction : .white.opacity(0.55))
             }
             .frame(minHeight: 48)
@@ -80,7 +80,7 @@ struct PlayMoreSheet: View {
 
     var body: some View {
         PageChrome(title: Copy.playMore) {
-            HStack(spacing: 8) {
+            HStack(spacing: DuckSpace.sm) {
                 ForEach(StickMode.allCases, id: \.self) { mode in
                     Button {
                         stickMode = mode
@@ -88,9 +88,9 @@ struct PlayMoreSheet: View {
                         controller.releaseBody()
                     } label: {
                         Text(Copy.stick(mode.rawValue))
-                            .font(.system(.caption, design: .rounded).weight(.semibold))
+                            .font(.duckCaption.weight(.semibold))
                             .foregroundStyle(stickMode == mode ? .white : .white.opacity(0.7))
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, DuckSpace.md)
                             .frame(minHeight: 48)
                             .background(
                                 stickMode == mode

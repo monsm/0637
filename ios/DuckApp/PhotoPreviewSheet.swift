@@ -21,16 +21,16 @@ struct PhotoPreviewSheet: View {
     @State private var caption = ""
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: DuckSpace.lg) {
             HStack {
                 Text(Copy.photoTitle)
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -43,11 +43,11 @@ struct PhotoPreviewSheet: View {
             Image(uiImage: photo.image)
                 .resizable()
                 .scaledToFit()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipShape(RoundedRectangle(cornerRadius: DuckRadius.control))
                 .accessibilityIdentifier("photo-preview")
             if !caption.isEmpty {
                 Text(caption)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.75))
                     .lineLimit(2)
                     .accessibilityIdentifier("postcard-caption")
@@ -58,12 +58,12 @@ struct PhotoPreviewSheet: View {
             // company.
             if let controller, !controller.peers.filter(\.paired).isEmpty {
                 Text(Copy.photoFamily(controller.peers.filter(\.paired).map(\.name)))
-                    .font(.system(size: 11, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
                     .accessibilityIdentifier("photo-family")
             }
-            HStack(spacing: 12) {
+            HStack(spacing: DuckSpace.md) {
                 Button {
                     // 货架里存成片（字幕 + 日期），原帧由货架另存一份并在元数据里区分。
                     kept = shelf.keep(image: photo.image, caption: caption)
@@ -72,7 +72,7 @@ struct PhotoPreviewSheet: View {
                         kept ? Copy.postcardSaved : Copy.postcardKeep,
                         systemImage: kept ? "checkmark.circle.fill" : "square.on.square"
                     )
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.duckLabel.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.bordered)
@@ -86,7 +86,7 @@ struct PhotoPreviewSheet: View {
                         saved ? Copy.saved : (saveFailed ? Copy.saveFailed : Copy.savePhoto),
                         systemImage: saved ? "checkmark.circle.fill" : "square.and.arrow.down"
                     )
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .font(.duckLabel.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.bordered)
@@ -97,14 +97,14 @@ struct PhotoPreviewSheet: View {
                     sharePostcard()
                 } label: {
                     Label(Copy.share, systemImage: "square.and.arrow.up")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("photo-share")
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .onDisappear {
             // A preview is not a keepsake: an un-kept shot's raw PNG (a cache
             // file) goes with it. Keep has already copied the composed card

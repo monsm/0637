@@ -21,17 +21,17 @@ struct RulesSheet: View {
     private let kinds = ["skill", "emotion", "sound"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             HStack {
                 Text(Copy.blocks)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("rules-title")
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -43,21 +43,21 @@ struct RulesSheet: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DuckSpace.lg) {
                     if controller.rules.isEmpty {
                         Text(Copy.rulesEmpty)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(Array(controller.rules.enumerated()), id: \.offset) { index, rule in
-                            HStack(spacing: 8) {
+                            HStack(spacing: DuckSpace.sm) {
                                 Text("\(Copy.ruleWhen) \(Copy.ruleTrigger(rule.trigger))")
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .font(.duckLabel.weight(.semibold))
                                 Image(systemName: "arrow.right")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(DuckIcon.xs)
                                     .foregroundStyle(.secondary)
                                 Text(label(for: rule.value, kind: rule.action))
-                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    .font(.duckLabel.weight(.semibold))
                                 Spacer()
                                 Button {
                                     var next = controller.rules
@@ -65,7 +65,7 @@ struct RulesSheet: View {
                                     controller.saveRules(next)
                                 } label: {
                                     Image(systemName: "trash")
-                                        .font(.system(size: 13))
+                                        .font(DuckIcon.xs)
                                         .frame(width: 44, height: 44)
                                         .contentShape(Rectangle())
                                 }
@@ -73,11 +73,11 @@ struct RulesSheet: View {
                                 .foregroundStyle(.red.opacity(0.85))
                                 .accessibilityLabel(Copy.deleteRule)
                             }
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, DuckSpace.md)
                             .frame(minHeight: 48)
                             .background(
                                 Color.duckBgSurface,
-                                in: RoundedRectangle(cornerRadius: 12)
+                                in: RoundedRectangle(cornerRadius: DuckRadius.thumb)
                             )
                             .accessibilityIdentifier("rule-\(index)")
                         }
@@ -88,11 +88,11 @@ struct RulesSheet: View {
                     // A program travels between phones as text: the share
                     // sheet carries the versioned document, paste reads one
                     // back and merges it into what the child already built.
-                    HStack(spacing: 10) {
+                    HStack(spacing: DuckSpace.sm) {
                         if !controller.rules.isEmpty {
                             ShareLink(item: controller.rulesShareText) {
                                 Label(Copy.rulesShare, systemImage: "square.and.arrow.up")
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .font(.duckCaption.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
                             .accessibilityIdentifier("rules-share")
@@ -122,7 +122,7 @@ struct RulesSheet: View {
                             }
                         } label: {
                             Label(Copy.rulesPaste, systemImage: "doc.on.clipboard")
-                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .font(.duckCaption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
                         .accessibilityIdentifier("rules-paste")
@@ -130,13 +130,13 @@ struct RulesSheet: View {
                     }
                     if !importNote.isEmpty {
                         Text(importNote)
-                            .font(.system(size: 11, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.secondary)
                             .accessibilityIdentifier("rules-import-note")
                     }
                     if !controller.rulesError.isEmpty {
                         Text(controller.rulesError)
-                            .font(.system(size: 11, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.orange)
                             .accessibilityIdentifier("rules-error")
                     }
@@ -144,18 +144,18 @@ struct RulesSheet: View {
                     Divider()
 
                     Text(Copy.ruleWhen)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                     chipRow(triggers, selected: trigger, kind: "trigger") { trigger = $0 }
             if trigger == "timer" {
                 // The WHEN, in the duck's own clock: four honest beats.
-                HStack(spacing: 6) {
+                HStack(spacing: DuckSpace.xs) {
                     ForEach([30, 60, 120, 300], id: \.self) { seconds in
                         Button {
                             timerPeriod = seconds
                         } label: {
                             Text("\(seconds)s")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .padding(.horizontal, 10)
+                                .font(.duckCaption.weight(.semibold))
+                                .padding(.horizontal, DuckSpace.sm)
                                 .frame(minHeight: 32)
                                 .background(
                                     timerPeriod == seconds
@@ -171,10 +171,10 @@ struct RulesSheet: View {
             }
 
                     Text(Copy.ruleThen)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                     chipRow(kinds, selected: action, kind: "action") { action = $0 }
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: DuckSpace.sm) {
                             ForEach(valueOptions, id: \.self) { option in
                                 chip(
                                     label(for: option),
@@ -183,14 +183,14 @@ struct RulesSheet: View {
                                 ) { value = option }
                             }
                         }
-                        .padding(.vertical, 2)
+                        .padding(.vertical, DuckSpace.xxs)
                     }
 
                     // Chain: stage follow-up blocks in order. A child can
                     // build "clap -> roll -> laugh -> chirp" without typing.
-                    HStack(spacing: 8) {
+                    HStack(spacing: DuckSpace.sm) {
                         Text(Copy.ruleChain)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .font(.duckCaption.weight(.medium))
                             .foregroundStyle(.secondary)
                         Spacer()
                         Button {
@@ -198,21 +198,21 @@ struct RulesSheet: View {
                             chainDraft.append((action, value))
                         } label: {
                             Label(Copy.ruleChainAdd, systemImage: "plus")
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                .font(.duckCaption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
                         .disabled(chainDraft.count >= 4)
                         .accessibilityIdentifier("rule-chain-add")
                     }
                     if !chainDraft.isEmpty {
-                        HStack(spacing: 6) {
+                        HStack(spacing: DuckSpace.xs) {
                             ForEach(Array(chainDraft.enumerated()), id: \.offset) { index, step in
                                 Button {
                                     chainDraft.remove(at: index)
                                 } label: {
                                     Text(label(for: step.1, kind: step.0))
-                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                        .padding(.horizontal, 10)
+                                        .font(.duckCaption.weight(.semibold))
+                                        .padding(.horizontal, DuckSpace.sm)
                                         .frame(minHeight: 48)
                                         .background(Color.white.opacity(0.10), in: Capsule())
                                         .contentShape(Capsule())
@@ -243,7 +243,7 @@ struct RulesSheet: View {
                                 ? "checkmark.circle"
                                 : "plus.circle.fill"
                         )
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.duckLabel.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 50)
                     }
                     .buttonStyle(.borderedProminent)
@@ -252,7 +252,7 @@ struct RulesSheet: View {
                 }
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .onAppear { controller.loadRules() }
         .onChange(of: action) { _, _ in value = valueOptions.first ?? "" }
     }
@@ -263,7 +263,7 @@ struct RulesSheet: View {
         kind: String,
         onPick: @escaping (String) -> Void
     ) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DuckSpace.sm) {
             ForEach(options, id: \.self) { option in
                 chip(
                     kind == "trigger" ? Copy.ruleTrigger(option) : Copy.ruleKind(option),
@@ -282,9 +282,9 @@ struct RulesSheet: View {
     ) -> some View {
         Button(action: onPick) {
             Text(label)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(.duckCaption.weight(.semibold))
                 .foregroundStyle(selected ? .black : .white.opacity(0.85))
-                .padding(.horizontal, 14)
+                .padding(.horizontal, DuckSpace.md)
                 .frame(minHeight: 44)
                 .background(
                     selected ? Color.white.opacity(0.92) : Color.white.opacity(0.10),

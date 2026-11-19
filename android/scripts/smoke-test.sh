@@ -1699,4 +1699,71 @@ PY
 adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
 sleep 1
 
+# ------------------------------------------------------------------ D1 type
+# The first screen at the largest system font scale: every verb and the time
+# rail stay on screen and the five labels do not overlap. The containers use
+# heightIn(min) and the labels may wrap to two lines; scaling text down with
+# minimumScaleFactor would be cheating, not a pass.
+echo "--- first screen at font scale 2.0 ---"
+FONT_SIZE=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1)
+FONT_W=${FONT_SIZE%x*}
+FONT_H=${FONT_SIZE#*x}
+[ -n "$FONT_W" ] || FONT_W=320
+[ -n "$FONT_H" ] || FONT_H=640
+adb shell settings put system font_scale 2.0 > /dev/null 2>&1 || true
+adb shell am force-stop ai.duck.microduck > /dev/null 2>&1 || true
+sleep 1
+adb shell am start -n ai.duck.microduck/.MainActivity --ef daylight_hour 12 > /dev/null 2>&1 || true
+FONT_STATE=""
+for _ in $(seq 1 90); do
+  FONT_STATE=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
+  [ -n "$FONT_STATE" ] && break
+  sleep 2
+done
+[ -n "$FONT_STATE" ] || { echo "::error::the core did not come back for the large-type check"; exit 1; }
+sleep 3
+rm -f font-ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > font-ui.xml 2>/dev/null || true
+python3 - "$FONT_W" "$FONT_H" <<'PY' || exit 1
+import sys, xml.etree.ElementTree as ET
+width, height = int(sys.argv[1]), int(sys.argv[2])
+try:
+    root = ET.parse('font-ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the large-type dump: {exc}")
+groups = [
+    {'喂食', 'Feed'}, {'技能', 'Skills'}, {'叫一声', 'Quack'},
+    {'拎起', 'Grab'}, {'更多', 'More'}, {'时间', 'Time'},
+]
+nodes = [node for node in root.iter('node')
+         if node.get('package') == 'ai.duck.microduck']
+found = {}
+for group in groups:
+    for node in nodes:
+        for attr in ('text', 'content-desc'):
+            value = node.get(attr) or ''
+            if value in group and group not in found:
+                found[group] = node
+missing = [sorted(group)[0] for group in groups if group not in found]
+if missing:
+    seen = sorted({(n.get('text') or n.get('content-desc') or '') for n in nodes})
+    raise SystemExit(f"::error::large type lost: {missing}; screen held {seen[:24]}")
+boxes = []
+for group, node in found.items():
+    parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
+    if len(parts) != 4:
+        raise SystemExit(f"::error::unreadable bounds for {sorted(group)[0]}: {node.get('bounds')}")
+    left, top, right, bottom = map(int, parts)
+    if left < 0 or top < 0 or right > width or bottom > height:
+        raise SystemExit(f"::error::{sorted(group)[0]} leaves the screen at font scale 2.0")
+    boxes.append((sorted(group)[0], (left, top, right, bottom)))
+for i, (name_a, a) in enumerate(boxes):
+    for name_b, b in boxes[i + 1:]:
+        if a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]:
+            raise SystemExit(f"::error::large type overlaps {name_a} and {name_b}")
+print("large type: every verb and the time rail are on screen, no overlap")
+PY
+adb shell settings put system font_scale 1.0 > /dev/null 2>&1 || true
+
 echo "smoke test passed"

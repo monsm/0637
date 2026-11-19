@@ -330,10 +330,10 @@ struct CollectionSheet: View {
     @StateObject private var store = CollectionStore()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             header
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DuckSpace.lg) {
                     if let book = store.book {
                         totals(book)
                         badgeSection(book)
@@ -342,7 +342,7 @@ struct CollectionSheet: View {
                     } else if store.busy {
                         ProgressView()
                             .frame(maxWidth: .infinity)
-                            .padding(.top, 24)
+                            .padding(.top, DuckSpace.xxl)
                     } else {
                         Button(Copy.retry) {
                             store.load()
@@ -352,30 +352,30 @@ struct CollectionSheet: View {
                         .accessibilityIdentifier("collection-retry")
                         if !store.error.isEmpty {
                             Text(store.error)
-                                .font(.system(.caption2, design: .monospaced))
+                                .font(.duckCaption)
                                 .foregroundStyle(.tertiary)
                                 .accessibilityIdentifier("collection-error")
                         }
                     }
                 }
-                .padding(.bottom, 8)
+                .padding(.bottom, DuckSpace.sm)
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .onAppear { store.load() }
     }
 
     private var header: some View {
         HStack {
             Text(Copy.collectionTitle)
-                .font(.system(.title3, design: .rounded, weight: .semibold))
+                .font(.duckTitle.weight(.semibold))
                 .accessibilityIdentifier("collection-title")
             Spacer()
             Button {
                 store.load()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .font(DuckIcon.xs)
                     .foregroundStyle(.secondary)
                     .frame(width: 48, height: 48)
                     .background(Color.white.opacity(0.10), in: Circle())
@@ -389,7 +389,7 @@ struct CollectionSheet: View {
     }
 
     private func totals(_ book: CollectionBook) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: DuckSpace.sm) {
             total(
                 "\(Copy.collectionMoods) \(book.moodsUnlocked)/\(book.moodsTotal)",
                 id: "collection-moods-total"
@@ -404,10 +404,10 @@ struct CollectionSheet: View {
 
     private func total(_ text: String, id: String) -> some View {
         Text(text)
-            .font(.system(.caption, design: .rounded, weight: .semibold))
+            .font(.duckCaption.weight(.semibold))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.horizontal, DuckSpace.sm)
+            .padding(.vertical, DuckSpace.xs)
             .background(Color.white.opacity(0.08), in: Capsule())
             .accessibilityIdentifier(id)
     }
@@ -416,11 +416,11 @@ struct CollectionSheet: View {
     /// the core's; a locked badge is dimmed and shows exactly how far away
     /// its threshold still is.
     private func badgeSection(_ book: CollectionBook) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: DuckSpace.xxs) {
             Text(Copy.badgeSection)
-                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .font(.duckCaption.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .padding(.bottom, 4)
+                .padding(.bottom, DuckSpace.xs)
             ForEach(CollectionBadges.evaluate(book: book)) { badge in
                 badgeRow(badge)
             }
@@ -429,27 +429,27 @@ struct CollectionSheet: View {
     }
 
     private func badgeRow(_ badge: CollectionBadge) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
             Image(systemName: badge.icon)
-                .font(.system(.subheadline))
+                .font(DuckIcon.sm)
                 .foregroundStyle(
                     badge.unlocked ? Color.duckData : Color.white.opacity(0.4)
                 )
                 .frame(width: 22)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 Text(badge.title)
-                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                    .font(.duckBody.weight(.medium))
                     .foregroundStyle(Color.white.opacity(badge.unlocked ? 1 : 0.4))
                 // The unlock condition is the row's second line, in the
                 // collection's own nouns: "Moods 7/13" is the state, and
                 // "Moods 13/13" (or "≥ 10") is the threshold.
                 Text(badge.conditionText)
-                    .font(.system(.caption2, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.tertiary)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: DuckSpace.sm)
             Text(badge.progressText)
-                .font(.system(.caption2, design: .monospaced))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
         }
         .frame(minHeight: 44)
@@ -463,11 +463,11 @@ struct CollectionSheet: View {
         tag: String,
         entries: [CollectionEntry]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: DuckSpace.xxs) {
             Text(title)
-                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .font(.duckCaption.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .padding(.bottom, 4)
+                .padding(.bottom, DuckSpace.xs)
             ForEach(entries) { entry in
                 Button {
                     // "Go practice": the skill ring's own trigger, so the
@@ -490,18 +490,18 @@ struct CollectionSheet: View {
     }
 
     private func row(_ entry: CollectionEntry) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 Text(SkillLabel.of(entry.name))
-                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                    .font(.duckBody.weight(.medium))
                     .foregroundStyle(Color.white.opacity(entry.isLocked ? 0.4 : 1))
                 Text(firstDayLine(entry))
-                    .font(.system(.caption2, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.tertiary)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: DuckSpace.sm)
             Text(entry.countText)
-                .font(.system(.caption2, design: .monospaced))
+                .font(.duckCaption)
                 .foregroundStyle(.secondary)
         }
         .frame(minHeight: 44)

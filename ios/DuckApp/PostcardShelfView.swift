@@ -9,17 +9,17 @@ struct PostcardShelfView: View {
     @State private var shareURL: URL?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             HStack {
                 Text(Copy.postcardShelf)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("postcards-title")
                 Spacer()
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -31,17 +31,17 @@ struct PostcardShelfView: View {
             }
             if shelf.cards.isEmpty {
                 Text(Copy.postcardNone)
-                    .font(.system(size: 12, design: .rounded))
+                    .font(.duckCaption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("postcards-empty")
             } else {
                 ScrollView {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 150), spacing: 10)],
-                        spacing: 10
+                        columns: [GridItem(.adaptive(minimum: 150), spacing: DuckSpace.sm)],
+                        spacing: DuckSpace.sm
                     ) {
                         ForEach(shelf.cards) { card in
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: DuckSpace.xs) {
                                 if let image = UIImage(
                                     contentsOfFile: shelf.url(for: card).path
                                 ) {
@@ -50,15 +50,15 @@ struct PostcardShelfView: View {
                                         .scaledToFill()
                                         .frame(height: 150)
                                         .clipped()
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .clipShape(RoundedRectangle(cornerRadius: DuckRadius.thumb))
                                 }
                                 Text(card.caption)
-                                    .font(.system(size: 11, design: .rounded))
+                                    .font(.duckCaption)
                                     .foregroundStyle(.white.opacity(0.8))
                                     .lineLimit(2)
                                 HStack {
                                     Text(card.day)
-                                        .font(.system(size: 9, design: .monospaced))
+                                        .font(.duckMicro)
                                         .foregroundStyle(.secondary)
                                     Spacer()
                                     Button {
@@ -77,7 +77,7 @@ struct PostcardShelfView: View {
                 }
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .sheet(
             isPresented: Binding(
                 get: { shareURL != nil },

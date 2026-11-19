@@ -50,15 +50,15 @@ fun BigButtonsSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(
-            Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     Copy.bigButtons,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 20.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("big-title"),
@@ -68,7 +68,7 @@ fun BigButtonsSheet(
             Text(
                 Copy.bigButtonsNote,
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 13.sp,
+                fontSize = DuckTheme.Type.Label,
             )
             bigButton(0, Icons.pet) { onPet() }
             bigButton(1, Icons.feed) { onFeed() }
@@ -89,14 +89,14 @@ private fun bigButton(
         Modifier
             .fillMaxWidth()
             .heightIn(min = 72.dp)
-            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(DuckTheme.Radius.control))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClickLabel = Copy.bigButtonAction(index),
                 role = Role.Button,
             ) { onClick() }
-            .padding(horizontal = 18.dp)
+            .padding(horizontal = DuckTheme.Space.lg)
             .testTag("big-action-$index"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -111,7 +111,7 @@ private fun bigButton(
             Copy.bigButtonAction(index),
             color = Color.White,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 20.sp,
+            fontSize = DuckTheme.Type.Title,
         )
     }
 }

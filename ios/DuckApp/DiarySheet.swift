@@ -8,10 +8,10 @@ struct DiarySheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             HStack {
                 Text(Copy.diary)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("diary-title")
                 Spacer()
                 if !shareText.isEmpty {
@@ -26,7 +26,7 @@ struct DiarySheet: View {
                         }
                     } label: {
                         Image(systemName: controller.ttsSpeaking ? "stop.fill" : "speaker.wave.2.fill")
-                            .font(.system(size: 16))
+                            .font(DuckIcon.sm)
                             .frame(width: 48, height: 48)
                             .contentShape(Rectangle())
                     }
@@ -35,7 +35,7 @@ struct DiarySheet: View {
                     .accessibilityIdentifier("diary-speak")
                     ShareLink(item: shareText) {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 16))
+                            .font(DuckIcon.sm)
                             .frame(width: 48, height: 48)
                             .contentShape(Rectangle())
                     }
@@ -47,7 +47,7 @@ struct DiarySheet: View {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(.secondary)
                         .frame(width: 48, height: 48)
                         .background(Color.white.opacity(0.10), in: Circle())
@@ -59,22 +59,22 @@ struct DiarySheet: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: DuckSpace.lg) {
                     Text(Copy.diaryFactsTitle)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.duckCaption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     if controller.diaryLines.isEmpty {
                         Text(Copy.diaryEmpty)
-                            .font(.system(size: 13, design: .rounded))
+                            .font(.duckLabel)
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(Array(controller.diaryLines.enumerated()), id: \.offset) { _, line in
-                            HStack(spacing: 8) {
+                            HStack(spacing: DuckSpace.sm) {
                                 Circle()
                                     .fill(Color.accentColor.opacity(0.7))
                                     .frame(width: 5, height: 5)
                                 Text(line)
-                                    .font(.system(size: 13, design: .rounded))
+                                    .font(.duckLabel)
                             }
                         }
                     }
@@ -82,36 +82,36 @@ struct DiarySheet: View {
                     Divider()
 
                     Text(Copy.diaryModelTitle)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.duckCaption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     if controller.diaryBusy {
                         Text(Copy.diaryBusy)
-                            .font(.system(size: 13, design: .rounded))
+                            .font(.duckLabel)
                             .foregroundStyle(.secondary)
                     } else if !controller.diaryModelText.isEmpty {
                         Text(controller.diaryModelText)
-                            .font(.system(size: 14, design: .serif))
+                            .font(.duckLabel)
                             .lineSpacing(3)
                             .accessibilityIdentifier("diary-model-text")
                     } else if let error = controller.diaryError {
                         Text(error)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.secondary)
                     } else {
                         Text(Copy.diaryNeedModel)
-                            .font(.system(size: 12, design: .rounded))
+                            .font(.duckCaption)
                             .foregroundStyle(.secondary)
                     }
 
                     Text(Copy.speakNote)
-                        .font(.system(size: 11, design: .rounded))
+                        .font(.duckCaption)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("diary-speak-note")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(20)
+        .padding(DuckSpace.xl)
         .onAppear { controller.loadDiary() }
         .onDisappear {
             // The synthesizer outlives the sheet; a duck that keeps reading

@@ -90,6 +90,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import java.io.File
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
@@ -591,7 +592,7 @@ fun Shell(
                         behaviourRaw = behaviourRaw,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = DuckTheme.Space.lg, vertical = DuckTheme.Space.sm),
                     )
                     // The stage. Steering is translation-based from wherever
                     // the thumb lands: a hidden centre-origin joystick makes
@@ -637,8 +638,8 @@ fun Shell(
                         Text(
                             Copy.firstLaunchHint,
                             color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(bottom = 6.dp),
+                            fontSize = DuckTheme.Type.Caption,
+                            modifier = Modifier.padding(bottom = DuckTheme.Space.xs),
                         )
                     }
                     // Once the hint is gone, the same slot answers "how is it
@@ -651,9 +652,9 @@ fun Shell(
                         Text(
                             pill,
                             color = Color.White.copy(alpha = 0.72f),
-                            fontSize = 11.sp,
+                            fontSize = DuckTheme.Type.Caption,
                             modifier = Modifier
-                                .padding(bottom = 6.dp)
+                                .padding(bottom = DuckTheme.Space.xs)
                                 .testTag(if (soundLine != null) "sound-pill" else "care-pill"),
                         )
                     }
@@ -675,7 +676,7 @@ fun Shell(
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(horizontal = DuckTheme.Space.lg),
                     )
                     // The observation HUD: a few REAL numbers the stage is
                     // running with - the same /state the instrument sheet
@@ -686,12 +687,12 @@ fun Shell(
                                 core.status().getOrNull(12) ?: 0.0,
                             ),
                             color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 11.sp,
+                            fontSize = DuckTheme.Type.Caption,
                             fontFamily = FontFamily.Monospace,
                             modifier = Modifier
-                                .padding(horizontal = 16.dp)
-                                .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .padding(horizontal = DuckTheme.Space.lg)
+                                .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(DuckTheme.Radius.tiny))
+                                .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.xs)
                                 .testTag("hud-overlay"),
                         )
                     }
@@ -700,8 +701,8 @@ fun Shell(
                     if (input.p2On && core != null) {
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterEnd) {
                         Row(
-                            Modifier.padding(end = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            Modifier.padding(end = DuckTheme.Space.sm),
+                            horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
                         ) {
                             ButtonChip(Copy.bigButtonAction(0), "p2-pet") {
                             DuckProgress.record(ProgressEvent.Pet)
@@ -719,7 +720,7 @@ fun Shell(
                         onOpenSheet = { open(DuckRoute.Instrument) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp),
+                            .padding(horizontal = DuckTheme.Space.sm),
                     )
                     ThumbDeck(
                         core = duck,
@@ -735,7 +736,7 @@ fun Shell(
                         onMore = { open(DuckRoute.More) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
+                            .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.sm),
                     )
                 }
             }
@@ -867,7 +868,7 @@ fun Shell(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .systemBarsPadding()
-                    .padding(top = 76.dp, start = 12.dp, end = 12.dp)
+                    .padding(top = DuckTheme.Space.xxxl, start = DuckTheme.Space.md, end = DuckTheme.Space.md)
                     .fillMaxWidth(),
             )
 
@@ -903,7 +904,7 @@ fun Shell(
                     .align(Alignment.TopStart)
                     // Fullscreen theme: keep the menu out of the display cutout.
                     .systemBarsPadding()
-                    .padding(12.dp),
+                    .padding(DuckTheme.Space.md),
             )
 
         // Bottom bar: the duck itself is the primary control, so the one
@@ -913,8 +914,8 @@ fun Shell(
             Modifier
                 .align(Alignment.BottomStart)
                 .systemBarsPadding()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(DuckTheme.Space.md),
+            horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             RoundChip(Copy.time, size = 48.dp, testTag = "duck-time") { open(DuckRoute.Instrument) }
             RoundChip(Copy.skills, size = 48.dp, testTag = "duck-skills") { setRing(true) }
@@ -937,7 +938,7 @@ fun Shell(
                 Modifier
                     .align(Alignment.BottomEnd)
                     .systemBarsPadding()
-                    .padding(12.dp),
+                    .padding(DuckTheme.Space.md),
             ) {
                 RoundChip(
                     if (carrying) Copy.putDown else Copy.grab,
@@ -959,12 +960,12 @@ fun Shell(
             visible = hintDismiss && core != null,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 92.dp),
+                .padding(bottom = DuckTheme.Space.xxxl),
         ) {
             Text(
                 Copy.firstLaunchHint,
                 color = Color.White.copy(alpha = 0.7f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
             )
         }
 
@@ -979,7 +980,7 @@ fun Shell(
                 Modifier
                     .align(Alignment.TopEnd)
                     .systemBarsPadding()
-                    .padding(top = 72.dp, end = 16.dp),
+                    .padding(top = DuckTheme.Space.xxxl, end = DuckTheme.Space.lg),
             ) {
                 RoundChip(
                     Copy.photoShort,
@@ -1303,8 +1304,8 @@ private fun AISheet(
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+                .padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -1314,7 +1315,7 @@ private fun AISheet(
                     Copy.ai,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("ai-title"),
@@ -1325,7 +1326,7 @@ private fun AISheet(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(Copy.ai, color = Color.White, fontSize = 13.sp)
+                Text(Copy.ai, color = Color.White, fontSize = DuckTheme.Type.Label)
                 Spacer(Modifier.weight(1f))
                 Switch(checked = enabled, onCheckedChange = { enabled = it })
             }
@@ -1374,7 +1375,7 @@ private fun AISheet(
                     .fillMaxWidth()
                     .testTag("ai-interval"),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 ButtonChip(Copy.aiSave, "ai-save") { onSave(current()) }
                 ButtonChip(Copy.aiThinkNow, "ai-think") { onThink(current()) }
             }
@@ -1382,23 +1383,23 @@ private fun AISheet(
                 Text(
                     status,
                     color = Color.White.copy(alpha = 0.65f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     modifier = Modifier.testTag("ai-status"),
                 )
             }
             if (error != null) {
-                Text(error, color = DuckTheme.StateWarn, fontSize = 11.sp)
+                Text(error, color = DuckTheme.StateWarn, fontSize = DuckTheme.Type.Caption)
             }
             if (decision.isNotEmpty()) {
                 Text(
                     decision,
                     color = DuckTheme.AccentData,
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     modifier = Modifier.testTag("ai-decision"),
                 )
             }
-            Text(Copy.aiHint, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
-            Text(Copy.aiNote, color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp)
+            Text(Copy.aiHint, color = Color.White.copy(alpha = 0.5f), fontSize = DuckTheme.Type.Micro)
+            Text(Copy.aiNote, color = Color.White.copy(alpha = 0.4f), fontSize = DuckTheme.Type.Micro)
             VoiceChatSection(config = current())
         }
     }
@@ -1459,8 +1460,8 @@ private fun PeersSheet(
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -1471,14 +1472,14 @@ private fun PeersSheet(
                         Copy.peers,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp,
+                        fontSize = DuckTheme.Type.Title,
                         modifier = Modifier.testTag("peers-title"),
                     )
                     if (peers.name.isNotEmpty()) {
                         Text(
                             "${Copy.name} · ${peers.name}",
                             color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 11.sp,
+                            fontSize = DuckTheme.Type.Caption,
                         )
                     }
                 }
@@ -1496,10 +1497,10 @@ private fun PeersSheet(
     Text(
         Copy.pairNote,
         color = Color.White.copy(alpha = 0.6f),
-        fontSize = 10.sp,
+        fontSize = DuckTheme.Type.Micro,
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(Copy.netPad, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+        Text(Copy.netPad, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
         Spacer(Modifier.size(8.dp))
         ButtonChip(
             if (netPadOn) Copy.stateOn else Copy.stateOff,
@@ -1512,14 +1513,14 @@ private fun PeersSheet(
     Text(
         Copy.netPadNote,
         color = Color.White.copy(alpha = 0.6f),
-        fontSize = 10.sp,
+        fontSize = DuckTheme.Type.Micro,
     )
 
     if (peers.peers.isEmpty()) {
         Text(
             Copy.peersEmpty,
             color = Color.White.copy(alpha = 0.6f),
-            fontSize = 12.sp,
+            fontSize = DuckTheme.Type.Caption,
             modifier = Modifier.testTag("peers-empty"),
         )
     } else {
@@ -1527,14 +1528,14 @@ private fun PeersSheet(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(DuckTheme.Radius.thumb))
+                    .padding(horizontal = DuckTheme.Space.md, vertical = DuckTheme.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
             ) {
                 Row(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 ) {
                     Box(
                         Modifier
@@ -1548,14 +1549,14 @@ private fun PeersSheet(
                         Text(
                             peer.name,
                             color = Color.White,
-                            fontSize = 14.sp,
+                            fontSize = DuckTheme.Type.Label,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.testTag("peer-row-$index"),
                         )
                         Text(
                             if (peer.replied) Copy.peerRepliedLabel else Copy.peerNew,
                             color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 10.sp,
+                            fontSize = DuckTheme.Type.Micro,
                         )
                     }
                     if (!peer.paired) {
@@ -1568,7 +1569,7 @@ private fun PeersSheet(
                 // Gifts in the greeting's own chip language: a treat
                 // feeds through the real peck, a cheer runs the
                 // official excited timeline on the other duck.
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                     ButtonChip(Copy.giftTreat, "gift-treat-${peer.id}") {
                         sendGift(peer.id, "treat", "")
                     }
@@ -1602,7 +1603,7 @@ private fun PeersSheet(
             .put("sounds", org.json.JSONArray(sounds))
         Thread { postDuckCommand("/ensemble", body.toString()) }.start()
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
         PathChip(Copy.formation, enabled = canEnsemble, testTag = "ensemble-formation") {
             sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious"), emptyList())
         }
@@ -1681,8 +1682,8 @@ private fun RulesSheet(onClose: () -> Unit) {
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -1692,7 +1693,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                     Copy.blocks,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("rules-title"),
@@ -1703,13 +1704,13 @@ private fun RulesSheet(onClose: () -> Unit) {
                 Text(
                     Copy.rulesEmpty,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
             }
             // A program travels between phones as text: the share sheet
             // carries the versioned document, paste reads one back and
             // merges it into what the child already built.
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 ButtonChip(Copy.rulesShare, "rules-share") {
                     if (rules.isNotEmpty()) {
                         val send = android.content.Intent(android.content.Intent.ACTION_SEND)
@@ -1737,20 +1738,20 @@ private fun RulesSheet(onClose: () -> Unit) {
                         .fillMaxWidth()
                         .background(
                             DuckTheme.BgSurface,
-                            RoundedCornerShape(12.dp),
+                            RoundedCornerShape(DuckTheme.Radius.thumb),
                         )
-                        .padding(horizontal = 12.dp),
+                        .padding(horizontal = DuckTheme.Space.md),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 ) {
                     Text(
                         "${Copy.ruleWhen} ${Copy.ruleTrigger(rule.trigger)} → " +
                             if (rule.action == "sound") rule.value else skillLabel(rule.value),
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = DuckTheme.Type.Label,
                         modifier = Modifier
                             .weight(1f)
-                            .padding(vertical = 12.dp)
+                            .padding(vertical = DuckTheme.Space.md)
                             .testTag("rule-$index"),
                     )
                     CloseChip("rule-delete-$index", {
@@ -1758,10 +1759,10 @@ private fun RulesSheet(onClose: () -> Unit) {
                     })
                 }
             }
-            Text(Copy.ruleWhen, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+            Text(Copy.ruleWhen, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Label)
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
             ) {
                 triggers.forEach { option ->
                     RuleChip(
@@ -1775,7 +1776,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                 // The WHEN, in the duck's own clock: four honest beats.
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 ) {
                     listOf(30, 60, 120, 300).forEach { seconds ->
                         RuleChip(
@@ -1786,10 +1787,10 @@ private fun RulesSheet(onClose: () -> Unit) {
                     }
                 }
             }
-            Text(Copy.ruleThen, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+            Text(Copy.ruleThen, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Label)
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
             ) {
                 kinds.forEach { option ->
                     RuleChip(
@@ -1801,7 +1802,7 @@ private fun RulesSheet(onClose: () -> Unit) {
             }
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
             ) {
                 values.forEach { option ->
                     RuleChip(
@@ -1819,7 +1820,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                 Text(
                     Copy.ruleChain,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
                 Spacer(Modifier.weight(1f))
                 ButtonChip(Copy.ruleChainAdd, "rule-chain-add") {
@@ -1829,7 +1830,7 @@ private fun RulesSheet(onClose: () -> Unit) {
             if (chain.isNotEmpty()) {
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
                 ) {
                     chain.forEachIndexed { index, step ->
                         RuleChip(
@@ -1847,7 +1848,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                 Text(
                     "${rules.size}/8",
                     color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 10.sp,
+                    fontSize = DuckTheme.Type.Micro,
                     fontFamily = FontFamily.Monospace,
                 )
                 Spacer(Modifier.weight(1f))
@@ -1878,7 +1879,7 @@ private fun RuleChip(
             .background(
                 if (selected) Color.White.copy(alpha = 0.92f)
                 else Color.White.copy(alpha = 0.10f),
-                RoundedCornerShape(22.dp),
+                RoundedCornerShape(DuckTheme.Radius.panel),
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -1887,13 +1888,13 @@ private fun RuleChip(
                 role = Role.Button,
             ) { onPick() }
             .testTag(tag)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = DuckTheme.Space.md, vertical = DuckTheme.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
             color = if (selected) Color.Black else Color.White.copy(alpha = 0.85f),
-            fontSize = 12.sp,
+            fontSize = DuckTheme.Type.Caption,
             fontWeight = FontWeight.SemiBold,
         )
     }
@@ -1928,10 +1929,10 @@ private fun TopBar(
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Column(
             Modifier
-                .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                .padding(horizontal = 12.dp, vertical = 7.dp),
+                .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(DuckTheme.Radius.control))
+                .padding(horizontal = DuckTheme.Space.md, vertical = DuckTheme.Space.sm),
         ) {
-            Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = DuckTheme.Type.Body)
             Text(
                 when {
                     core == null -> Copy.waking
@@ -1945,7 +1946,7 @@ private fun TopBar(
                     else -> Copy.behaviourOf(behaviourRaw)
                 },
                 color = Color.White.copy(alpha = 0.7f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
                 modifier = Modifier.testTag("duck-label"),
             )
             if (lastSkill.isNotEmpty()) {
@@ -1954,7 +1955,7 @@ private fun TopBar(
                     // is `kick_left`; the shell says what a person calls it.
                     skillLabel(lastSkill),
                     color = Color.White.copy(alpha = 0.55f),
-                    fontSize = 10.sp,
+                    fontSize = DuckTheme.Type.Micro,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("duck-last-skill"),
@@ -2040,10 +2041,10 @@ private fun PortraitTitleBar(
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Column(
             Modifier
-                .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
-                .padding(horizontal = 12.dp, vertical = 7.dp),
+                .background(Color.Black.copy(alpha = 0.35f), RoundedCornerShape(DuckTheme.Radius.control))
+                .padding(horizontal = DuckTheme.Space.md, vertical = DuckTheme.Space.sm),
         ) {
-            Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(Copy.name, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = DuckTheme.Type.Body)
             Text(
                 when {
                     core == null -> Copy.waking
@@ -2053,14 +2054,14 @@ private fun PortraitTitleBar(
                     else -> Copy.behaviourOf(behaviourRaw)
                 },
                 color = Color.White.copy(alpha = 0.7f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
                 modifier = Modifier.testTag("duck-label"),
             )
             if (lastSkill.isNotEmpty()) {
                 Text(
                     skillLabel(lastSkill),
                     color = Color.White.copy(alpha = 0.55f),
-                    fontSize = 10.sp,
+                    fontSize = DuckTheme.Type.Micro,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("duck-last-skill"),
@@ -2101,15 +2102,15 @@ private fun PortraitTimeRail(
         (newest - oldestClamped).toDouble() / newest.coerceAtLeast(1L).toDouble()
         ).coerceIn(0.0, 1.0)
     Row(
-        modifier.height(48.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier.heightIn(min = 48.dp),
+        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(14.dp))
+                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(DuckTheme.Radius.control))
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -2120,9 +2121,9 @@ private fun PortraitTimeRail(
                     onLongClick = { core.setPaused(true) },
                 )
                 .testTag("duck-time")
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = DuckTheme.Space.md),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             Icon(
                 Icons.time,
@@ -2182,11 +2183,11 @@ private fun ThumbDeck(
 ) {
     Row(
         modifier
-            .height(90.dp)
-            .background(DuckTheme.BgSurface.copy(alpha = 0.94f), RoundedCornerShape(28.dp))
-            .padding(horizontal = 6.dp),
+            .heightIn(min = 90.dp)
+            .background(DuckTheme.BgSurface.copy(alpha = 0.94f), RoundedCornerShape(DuckTheme.Radius.panel))
+            .padding(horizontal = DuckTheme.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
     ) {
         Spacer(Modifier.weight(1f))
         PrimaryVerb(Copy.feed, Icons.feed, "duck-feed", onTap = { onFeed?.invoke() })
@@ -2266,7 +2267,7 @@ private fun PrimaryVerb(
             .then(gesture)
             .testTag(tag),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
     ) {
         Box(
             Modifier
@@ -2288,10 +2289,9 @@ private fun PrimaryVerb(
         Text(
             label,
             color = Color.White.copy(alpha = 0.85f),
-            fontSize = 11.sp,
+            fontSize = DuckTheme.Type.Caption,
             fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            softWrap = false,
+            maxLines = 2, softWrap = true, textAlign = TextAlign.Center,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -2348,7 +2348,7 @@ internal fun CloseChip(tag: String, onClose: () -> Unit, size: Dp = 48.dp) {
             .testTag(tag),
         contentAlignment = Alignment.Center,
     ) {
-        Text("×", color = Color.White.copy(alpha = 0.9f), fontSize = 16.sp)
+        Text("×", color = Color.White.copy(alpha = 0.9f), fontSize = DuckTheme.Type.Body)
     }
 }
 
@@ -2660,7 +2660,7 @@ private fun SurfaceChip(
 ) {
     Box(
         Modifier
-            .padding(horizontal = 2.dp)
+            .padding(horizontal = DuckTheme.Space.xxs)
             // The chip was a 26 dp target; every control gets a 48 dp floor.
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .background(
@@ -2674,10 +2674,10 @@ private fun SurfaceChip(
                 role = Role.Button,
             ) { onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.xs),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White.copy(alpha = 0.85f), fontSize = 11.sp)
+        Text(label, color = Color.White.copy(alpha = 0.85f), fontSize = DuckTheme.Type.Caption)
     }
 }
 
@@ -2710,7 +2710,7 @@ private fun RoundChip(
         Text(
             label,
             color = Color.White.copy(alpha = 0.9f),
-            fontSize = 11.sp,
+            fontSize = DuckTheme.Type.Caption,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
@@ -2765,7 +2765,7 @@ private fun WheeeChip(
         Text(
             label,
             color = Color.White.copy(alpha = 0.9f),
-            fontSize = 11.sp,
+            fontSize = DuckTheme.Type.Caption,
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Ellipsis,
@@ -2811,13 +2811,13 @@ private fun SkillRing(
                         Modifier.fillMaxHeight(0.86f).widthIn(max = 360.dp)
                     }
                     )
-                    .padding(horizontal = 12.dp)
-                    .background(DuckTheme.BgSurface.copy(alpha = 0.96f), RoundedCornerShape(22.dp))
+                    .padding(horizontal = DuckTheme.Space.md)
+                    .background(DuckTheme.BgSurface.copy(alpha = 0.96f), RoundedCornerShape(DuckTheme.Radius.panel))
                     // Taps on the panel itself (headings, padding) must not
                     // bubble to the scrim's dismissal: consuming them here
                     // keeps only taps outside the panel closing the ring.
                     .pointerInput(Unit) { detectTapGestures { } }
-                    .padding(16.dp),
+                    .padding(DuckTheme.Space.lg),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
@@ -2828,27 +2828,27 @@ private fun SkillRing(
                         Copy.skills,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp,
+                        fontSize = DuckTheme.Type.Body,
                     )
                     Spacer(Modifier.weight(1f))
                     // The ring's own 48 dp dismissal: tapping the scrim works
                     // too, but a visible target is what a thumb looks for.
                     CloseChip("ring-close", onClose)
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(DuckTheme.Space.sm))
                 Column(
                     Modifier
                         .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 ) {
                     if (actions.isNotEmpty()) {
                         SkillHeading(Copy.actions)
                         actions.forEach { name -> SkillChip(name, onPick) }
                     }
                     if (emotions.isNotEmpty()) {
-                        if (actions.isNotEmpty()) Spacer(Modifier.height(10.dp))
+                        if (actions.isNotEmpty()) Spacer(Modifier.height(DuckTheme.Space.sm))
                         SkillHeading(Copy.emotions)
                         emotions.forEach { name -> SkillChip(name, onPick) }
                     }
@@ -2866,7 +2866,7 @@ private fun SkillHeading(label: String) {
     Text(
         label,
         color = Color.White.copy(alpha = 0.55f),
-        fontSize = 11.sp,
+        fontSize = DuckTheme.Type.Caption,
         fontWeight = FontWeight.Medium,
     )
 }
@@ -2884,10 +2884,10 @@ private fun SkillChip(name: String, onPick: (String) -> Unit) {
                 role = Role.Button,
             ) { onPick(name) }
             .testTag("ring-$name")
-            .padding(horizontal = 18.dp, vertical = 10.dp),
+            .padding(horizontal = DuckTheme.Space.lg, vertical = DuckTheme.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
-        Text(skillLabel(name), color = Color.White, fontSize = 13.sp)
+        Text(skillLabel(name), color = Color.White, fontSize = DuckTheme.Type.Label)
     }
 }
 
@@ -2912,8 +2912,8 @@ private fun DirectorOverlay(core: DuckCore?, modifier: Modifier = Modifier) {
         Text(
             Copy.viewfinder,
             color = Color.White.copy(alpha = 0.8f),
-            fontSize = 10.sp,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp),
+            fontSize = DuckTheme.Type.Micro,
+            modifier = Modifier.padding(start = DuckTheme.Space.lg, top = DuckTheme.Space.lg),
         )
     }
 }
@@ -2933,9 +2933,9 @@ internal fun QuestCard(board: QuestBoardUi) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(14.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(DuckTheme.Radius.control))
+            .padding(DuckTheme.Space.md),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -2944,7 +2944,7 @@ internal fun QuestCard(board: QuestBoardUi) {
             Text(
                 Copy.quests,
                 color = Color.White,
-                fontSize = 14.sp,
+                fontSize = DuckTheme.Type.Label,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .weight(1f)
@@ -2954,15 +2954,15 @@ internal fun QuestCard(board: QuestBoardUi) {
                 Text(
                     Copy.questStreak(board.streak),
                     color = DuckTheme.StateWarn,
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
             }
         }
         if (board.quests.isEmpty()) {
-            Text("…", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+            Text("…", color = Color.White.copy(alpha = 0.6f), fontSize = DuckTheme.Type.Caption)
         } else {
             board.quests.forEachIndexed { index, quest ->
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
                     Row(
                         Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -2970,14 +2970,14 @@ internal fun QuestCard(board: QuestBoardUi) {
                         Text(
                             if (quest.done) "✓" else "${index + 1}",
                             color = if (quest.done) DuckTheme.StateGood else Color.White.copy(alpha = 0.55f),
-                            fontSize = 11.sp,
+                            fontSize = DuckTheme.Type.Caption,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.width(18.dp),
                         )
                         Text(
                             quest.title,
                             color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 12.sp,
+                            fontSize = DuckTheme.Type.Caption,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
@@ -2985,7 +2985,7 @@ internal fun QuestCard(board: QuestBoardUi) {
                         Text(
                             if (quest.done) Copy.questDone else "${(quest.progress * 100).roundToInt()}%",
                             color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 10.sp,
+                            fontSize = DuckTheme.Type.Micro,
                             fontFamily = FontFamily.Monospace,
                         )
                     }
@@ -2994,7 +2994,7 @@ internal fun QuestCard(board: QuestBoardUi) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(5.dp)
-                            .clip(RoundedCornerShape(3.dp))
+                            .clip(RoundedCornerShape(DuckTheme.Radius.tiny))
                             .testTag("quest-progress-$index"),
                         color = if (quest.done) DuckTheme.StateGood else DuckTheme.AccentData,
                         trackColor = Color.White.copy(alpha = 0.10f),
@@ -3005,7 +3005,7 @@ internal fun QuestCard(board: QuestBoardUi) {
                 Text(
                     Copy.questAllDone,
                     color = DuckTheme.StateGood,
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     modifier = Modifier.testTag("quest-all-done"),
                 )
             }
@@ -3015,7 +3015,7 @@ internal fun QuestCard(board: QuestBoardUi) {
 
 @Composable
 private fun CareCard(care: CareUi) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -3024,19 +3024,19 @@ private fun CareCard(care: CareUi) {
             Text(
                 Copy.care,
                 color = Color.White,
-                fontSize = 13.sp,
+                fontSize = DuckTheme.Type.Label,
                 fontWeight = FontWeight.SemiBold,
             )
             if (care.asleep) {
                 Text(
                     Copy.dozing,
                     color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     modifier = Modifier.testTag("care-sleep"),
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md)) {
             CareBar(Copy.fullness, care.fullness, DuckTheme.StateWarn, "care-hunger", Modifier.weight(1f))
             CareBar(Copy.mood, care.moodFraction, DuckTheme.AccentData, "care-mood", Modifier.weight(1f))
             CareBar(Copy.bond, care.bondFraction, DuckTheme.AccentData, "care-bond", Modifier.weight(1f))
@@ -3046,7 +3046,7 @@ private fun CareCard(care: CareUi) {
         Text(
             Copy.careLine(care.hunger, care.mood, care.bond, care.asleep),
             color = Color.White.copy(alpha = 0.6f),
-            fontSize = 11.sp,
+            fontSize = DuckTheme.Type.Caption,
             modifier = Modifier.testTag("care-detail"),
         )
     }
@@ -3068,7 +3068,7 @@ private fun NightRow(night: NightUi, onNight: (Boolean) -> Unit) {
             Text(
                 Copy.nightQuiet((night.quietSeconds / 60.0).roundToInt()),
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
                 modifier = Modifier.testTag("night-quiet"),
             )
             ButtonChip(Copy.goodMorning, "night-wake") { onNight(false) }
@@ -3087,14 +3087,14 @@ private fun CareBar(
     tag: String,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
+        Text(label, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
         LinearProgressIndicator(
             progress = { value },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
+                .clip(RoundedCornerShape(DuckTheme.Radius.tiny))
                 .testTag(tag),
             color = tint,
             trackColor = Color.White.copy(alpha = 0.10f),
@@ -3102,7 +3102,7 @@ private fun CareBar(
         Text(
             "${(value * 100).roundToInt()}%",
             color = Color.White.copy(alpha = 0.6f),
-            fontSize = 10.sp,
+            fontSize = DuckTheme.Type.Micro,
             fontFamily = FontFamily.Monospace,
         )
     }
@@ -3115,14 +3115,14 @@ private fun CareBar(
  */
 @Composable
 private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
         Text(
             Copy.lifeRecord,
             color = Color.White,
-            fontSize = 13.sp,
+            fontSize = DuckTheme.Type.Label,
             fontWeight = FontWeight.SemiBold,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
             LifeStat("${life.metres.roundToInt()} m", Copy.walked, Modifier.weight(1f))
             LifeStat("${life.rolls}", Copy.rolls, Modifier.weight(1f))
             LifeStat("${life.pickups}", Copy.pickups, Modifier.weight(1f))
@@ -3131,7 +3131,7 @@ private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
             Text(
                 life.days.takeLast(7).joinToString(" | "),
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
             )
         }
         ButtonChip(Copy.exportVetbook, "export-vetbook", onExport)
@@ -3142,13 +3142,13 @@ private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
 private fun LifeStat(value: String, label: String, modifier: Modifier = Modifier) {
     Column(
         modifier
-            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
-            .padding(vertical = 10.dp),
+            .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(DuckTheme.Radius.thumb))
+            .padding(vertical = DuckTheme.Space.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
     ) {
-        Text(value, color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
-        Text(label, color = Color.White.copy(alpha = 0.65f), fontSize = 10.sp)
+        Text(value, color = Color.White, fontSize = DuckTheme.Type.Title, fontWeight = FontWeight.SemiBold)
+        Text(label, color = Color.White.copy(alpha = 0.65f), fontSize = DuckTheme.Type.Micro)
     }
 }
 
@@ -3287,8 +3287,8 @@ private fun InstrumentSheet(
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             Row(
                 Modifier.fillMaxWidth(),
@@ -3327,7 +3327,7 @@ private fun InstrumentSheet(
                         )
                     },
                     color = Color.White.copy(alpha = 0.65f),
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
             }
             // Microphone: the room, not a sense. Off (default) shows "—"; enabling
@@ -3341,7 +3341,7 @@ private fun InstrumentSheet(
                 Text(
                     Copy.microphone,
                     color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -3351,7 +3351,7 @@ private fun InstrumentSheet(
                             MicState.On -> micSummary
                         },
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
+                        fontSize = DuckTheme.Type.Caption,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -3385,7 +3385,7 @@ private fun InstrumentSheet(
                 Text(
                     Copy.voiceCommands,
                     color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 12.sp,
+                    fontSize = DuckTheme.Type.Caption,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -3396,7 +3396,7 @@ private fun InstrumentSheet(
                             SpeechState.Unavailable -> Copy.speechUnavailable
                         },
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
+                        fontSize = DuckTheme.Type.Caption,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -3415,11 +3415,11 @@ private fun InstrumentSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(Copy.behavior, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Text(Copy.behavior, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
                 Text(
                     behaviorSummary,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -3430,11 +3430,11 @@ private fun InstrumentSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(Copy.trickBook, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Text(Copy.trickBook, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
                 Text(
                     trickBook,
                     color = Color.White.copy(alpha = 0.6f),
-                    fontSize = 11.sp,
+                    fontSize = DuckTheme.Type.Caption,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -3450,11 +3450,11 @@ private fun InstrumentSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(Copy.apiToken, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                    Text(Copy.apiToken, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
                     Text(
                         token,
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 10.sp,
+                        fontSize = DuckTheme.Type.Micro,
                         maxLines = 3,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -3471,7 +3471,7 @@ private fun InstrumentSheet(
                         Text(
                             Copy.provenance,
                             color = Color.White.copy(alpha = 0.75f),
-                            fontSize = 12.sp,
+                            fontSize = DuckTheme.Type.Caption,
                         )
                         // Selectable, like the iOS row: a parent copying the
                         // hash for a bug report should not have to retype it.
@@ -3479,7 +3479,7 @@ private fun InstrumentSheet(
                             Text(
                                 fingerprint,
                                 color = Color.White.copy(alpha = 0.5f),
-                                fontSize = 9.sp,
+                                fontSize = DuckTheme.Type.Micro,
                                 fontFamily = FontFamily.Monospace,
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
@@ -3501,11 +3501,11 @@ private fun InstrumentSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(Copy.awayTitle, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                    Text(Copy.awayTitle, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
                     Text(
                         summary,
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
+                        fontSize = DuckTheme.Type.Caption,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -3519,29 +3519,29 @@ private fun InstrumentSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(Copy.face, color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                Text(Copy.face, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 ) {
                     Text(
                         Copy.faceStatus(face.status),
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
+                        fontSize = DuckTheme.Type.Caption,
                     )
                     Text(
                         gaugeBars(face.bars),
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
+                        fontSize = DuckTheme.Type.Caption,
                     )
                     Text(
                         face.percent,
                         color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 11.sp,
+                        fontSize = DuckTheme.Type.Caption,
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 ButtonChip(
                     if (paused) Copy.resume else Copy.freeze,
                     testTag = if (paused) "time-play.fill" else "time-pause.fill",
@@ -3566,12 +3566,12 @@ private fun InstrumentSheet(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 ButtonChip(Copy.drive + ": " + if (core.mode() == "roller") Copy.roller else Copy.walk) {
                     core.setMode(if (core.mode() == "roller") "walk" else "roller")
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
                 listOf(0.25, 0.5, 1.0, 2.0).forEach { option ->
                     ButtonChip(if (option == 1.0) "1×" else "${option}×") {
                         speed = option
@@ -3582,7 +3582,7 @@ private fun InstrumentSheet(
             Text(
                 "speed ${speed}× · ${Copy.branches} $branches · AI API :8765 · MCP /mcp",
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
             )
         }
     }
@@ -3598,7 +3598,7 @@ internal fun ButtonChip(
         Modifier
             // A 48 dp floor: the sheet's controls were ~34 dp tall.
             .heightIn(min = 48.dp)
-            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(DuckTheme.Radius.thumb))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -3606,10 +3606,10 @@ internal fun ButtonChip(
                 role = Role.Button,
             ) { onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = DuckTheme.Space.md, vertical = DuckTheme.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = 12.sp)
+        Text(label, color = Color.White, fontSize = DuckTheme.Type.Caption)
     }
 }
 
@@ -3631,7 +3631,7 @@ private fun PathChip(
             .heightIn(min = 48.dp)
             .background(
                 Color.White.copy(alpha = if (enabled) 0.10f else 0.05f),
-                RoundedCornerShape(10.dp),
+                RoundedCornerShape(DuckTheme.Radius.thumb),
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -3640,10 +3640,10 @@ private fun PathChip(
                 role = Role.Button,
             ) { if (enabled) onClick() }
             .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = DuckTheme.Space.md, vertical = DuckTheme.Space.sm),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.4f), fontSize = 12.sp)
+        Text(label, color = Color.White.copy(alpha = if (enabled) 1f else 0.4f), fontSize = DuckTheme.Type.Caption)
     }
 }
 
@@ -3668,7 +3668,7 @@ private fun PathBar(
     if (!drawing && !active) return
     Row(
         modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (active) {
@@ -3677,7 +3677,7 @@ private fun PathBar(
                 // (reached+1)-st of the total steps.
                 Copy.pathStep(reached + 1, total),
                 color = Color.White.copy(alpha = 0.75f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
                 maxLines = 1,
                 modifier = Modifier
                     .weight(1f)

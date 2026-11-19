@@ -433,15 +433,15 @@ struct ProgressSheet: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: DuckSpace.xxl) {
                     streakBanner
                     dayRows
                     taskSection
                     weekSection
                     achievementSection
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 32)
+                .padding(.horizontal, DuckSpace.xl)
+                .padding(.bottom, DuckSpace.xxxl)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -462,7 +462,7 @@ struct ProgressSheet: View {
     private var dayRows: some View {
         if let controller, !controller.vetbookDays.isEmpty {
             Text(controller.vetbookDays.suffix(7).joined(separator: " | "))
-                .font(.system(.caption2, design: .rounded))
+                .font(.duckCaption)
                 .foregroundStyle(Color.duckTextSecondary)
                 .lineLimit(3)
                 .accessibilityIdentifier("day-rows")
@@ -474,13 +474,13 @@ struct ProgressSheet: View {
     private var header: some View {
         HStack {
             Text("成长手册")
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(Color.duckTextPrimary)
                 .accessibilityIdentifier("progress-title")
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(DuckIcon.xs)
                     .foregroundStyle(Color.duckTextPrimary.opacity(0.7))
                     .frame(width: 48, height: 48)
                     .background(Color.duckTextPrimary.opacity(0.10), in: Circle())
@@ -490,45 +490,45 @@ struct ProgressSheet: View {
             .accessibilityLabel("关闭")
             .accessibilityIdentifier("progress-close")
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, DuckSpace.xl)
+        .padding(.vertical, DuckSpace.md)
     }
 
     // MARK: 连续天数
 
     private var streakBanner: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: DuckSpace.md) {
             Image(systemName: "flame.fill")
-                .font(.system(size: 26, weight: .semibold))
+                .font(DuckIcon.lg)
                 .foregroundStyle(Color.duckAction)
                 .frame(width: 44)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 Text("连续 \(store.streak) 天")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.duckTitle.weight(.semibold))
                     .foregroundStyle(Color.duckTextPrimary)
                     .monospacedDigit()
                 Text("最长连续 \(store.bestStreak) 天 · 每天来看看它")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.duckCaption.weight(.medium))
                     .foregroundStyle(Color.duckTextPrimary.opacity(0.5))
             }
             Spacer()
         }
-        .padding(16)
+        .padding(DuckSpace.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 18).fill(Color.duckAction.opacity(0.10)))
+        .background(RoundedRectangle(cornerRadius: DuckRadius.card).fill(Color.duckAction.opacity(0.10)))
     }
 
     // MARK: 今日任务
 
     private var taskSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             sectionTitle("今日任务 · \(store.tasksDoneToday)/\(DailyTask.catalog.count)")
             ForEach(DailyTask.catalog) { task in
                 taskRow(task, amount: store.todayAmounts[task.event] ?? 0)
             }
             if !extras.isEmpty {
                 Text("今日还有：" + extras.joined(separator: " · "))
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .font(.duckCaption.weight(.medium))
                     .foregroundStyle(Color.duckTextPrimary.opacity(0.5))
             }
         }
@@ -546,26 +546,26 @@ struct ProgressSheet: View {
     private func taskRow(_ task: DailyTask, amount: Int) -> some View {
         let done = amount >= task.goal
         let fraction = task.goal > 0 ? Double(min(amount, task.goal)) / Double(task.goal) : 1.0
-        return HStack(spacing: 12) {
+        return HStack(spacing: DuckSpace.md) {
             ZStack {
                 Circle()
                     .fill(done ? Color.duckGood : Color.duckTextPrimary.opacity(0.08))
                 if done {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(DuckIcon.xs)
                         .foregroundStyle(Color.duckOnAccent)
                 }
             }
             .frame(width: 28, height: 28)
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DuckSpace.xs) {
                 Text(task.title)
-                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .font(.duckBody.weight(.medium))
                     .foregroundStyle(done ? Color.duckTextPrimary : Color.duckTextPrimary.opacity(0.7))
                 ProgressView(value: fraction)
                     .tint(done ? Color.duckGood : Color.duckData)
             }
             Text("\(min(amount, task.goal))/\(task.goal) \(task.unit)")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .font(.duckData.weight(.medium))
                 .foregroundStyle(Color.duckTextPrimary.opacity(0.5))
                 .monospacedDigit()
         }
@@ -576,13 +576,13 @@ struct ProgressSheet: View {
     // MARK: 最近 7 天
 
     private var weekSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             sectionTitle("最近 7 天")
             HStack(spacing: 0) {
                 ForEach(store.week) { tile in
-                    VStack(spacing: 6) {
+                    VStack(spacing: DuckSpace.xs) {
                         Text(tile.isToday ? "今天" : tile.weekday)
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.duckCaption.weight(.medium))
                             .foregroundStyle(tile.isToday
                                              ? Color.duckTextPrimary
                                              : Color.duckTextPrimary.opacity(0.5))
@@ -591,7 +591,7 @@ struct ProgressSheet: View {
                                 .fill(tile.active ? Color.duckGood : Color.duckTextPrimary.opacity(0.08))
                             if tile.active {
                                 Image(systemName: "checkmark")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(DuckIcon.xs)
                                     .foregroundStyle(Color.duckOnAccent)
                             }
                         }
@@ -610,10 +610,10 @@ struct ProgressSheet: View {
     // MARK: 成就墙
 
     private var achievementSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             sectionTitle("成就墙 · \(store.unlockedIDs.count)/\(Achievement.catalog.count)")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
-                      spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: DuckSpace.md), GridItem(.flexible(), spacing: DuckSpace.md)],
+                      spacing: DuckSpace.md) {
                 ForEach(Achievement.catalog) { achievement in
                     achievementCard(achievement)
                 }
@@ -623,37 +623,37 @@ struct ProgressSheet: View {
 
     private func achievementCard(_ achievement: Achievement) -> some View {
         let unlocked = store.unlockedIDs.contains(achievement.id)
-        return HStack(spacing: 10) {
+        return HStack(spacing: DuckSpace.sm) {
             ZStack {
                 Circle()
                     .fill(unlocked ? achievement.tint.opacity(0.16) : Color.duckTextPrimary.opacity(0.06))
                 Image(systemName: achievement.icon)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(DuckIcon.sm)
                     .foregroundStyle(unlocked ? achievement.tint : Color.duckTextPrimary.opacity(0.3))
             }
             .frame(width: 40, height: 40)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 Text(achievement.name)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.duckLabel.weight(.semibold))
                     .foregroundStyle(unlocked ? Color.duckTextPrimary : Color.duckTextPrimary.opacity(0.5))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 if unlocked, let date = store.unlockDates[achievement.id] {
                     Text("\(Self.unlockLabel(date))解锁")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(.duckCaption.weight(.medium))
                         .foregroundStyle(Color.duckTextPrimary.opacity(0.7))
                 } else {
                     Text(achievement.detail)
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .font(.duckCaption.weight(.medium))
                         .foregroundStyle(Color.duckTextPrimary.opacity(0.5))
                         .lineLimit(2)
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(12)
+        .padding(DuckSpace.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.duckBgRoot))
+        .background(RoundedRectangle(cornerRadius: DuckRadius.control).fill(Color.duckBgRoot))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("progress-achievement-\(achievement.id)")
     }
@@ -662,7 +662,7 @@ struct ProgressSheet: View {
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .font(.duckCaption.weight(.semibold))
             .foregroundStyle(Color.duckTextPrimary.opacity(0.7))
     }
 

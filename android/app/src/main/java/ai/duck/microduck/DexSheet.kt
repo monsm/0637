@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.sp
 fun DexSheet(entries: List<DexEntryUi>, onClose: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(DuckTheme.Space.xl), verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -43,7 +43,7 @@ fun DexSheet(entries: List<DexEntryUi>, onClose: () -> Unit) {
                     Copy.dex,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
+                    fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
                         .testTag("dex-title"),
@@ -52,7 +52,7 @@ fun DexSheet(entries: List<DexEntryUi>, onClose: () -> Unit) {
             }
             LazyColumn(
                 modifier = Modifier.height(460.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
             ) {
                 section(Copy.dexMoves, entries.filter { !it.isEmotion })
                 section(Copy.dexMoods, entries.filter { it.isEmotion })
@@ -69,44 +69,44 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(
         Text(
             title,
             color = Color.White.copy(alpha = 0.55f),
-            fontSize = 12.sp,
+            fontSize = DuckTheme.Type.Caption,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+            modifier = Modifier.padding(top = DuckTheme.Space.xs, bottom = DuckTheme.Space.xxs),
         )
     }
     items(entries, key = { it.name }) { entry ->
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(DuckTheme.Radius.tiny))
+                .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.sm)
                 .testTag("dex-${entry.name}"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             Text(
                 if (entry.count > 0) "✓" else "·",
                 color = if (entry.count > 0) DuckTheme.StateGood else Color.White.copy(alpha = 0.45f),
-                fontSize = 12.sp,
+                fontSize = DuckTheme.Type.Caption,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 skillLabel(entry.name),
                 color = if (entry.count > 0) Color.White else Color.White.copy(alpha = 0.5f),
-                fontSize = 13.sp,
+                fontSize = DuckTheme.Type.Label,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 if (entry.count > 0) "× ${entry.count}" else Copy.dexNever,
                 color = Color.White.copy(alpha = 0.6f),
-                fontSize = 11.sp,
+                fontSize = DuckTheme.Type.Caption,
                 fontFamily = FontFamily.Monospace,
             )
             entry.firstSeen?.let {
                 Text(
                     "${Copy.dexFirst} $it",
                     color = Color.White.copy(alpha = 0.4f),
-                    fontSize = 9.sp,
+                    fontSize = DuckTheme.Type.Micro,
                     fontFamily = FontFamily.Monospace,
                 )
             }

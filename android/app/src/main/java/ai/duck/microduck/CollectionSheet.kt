@@ -196,8 +196,8 @@ fun CollectionSheet(onClose: () -> Unit) {
         containerColor = ShellSurface,
     ) {
         Column(
-            Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            Modifier.padding(DuckTheme.Space.xl),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -213,7 +213,7 @@ fun CollectionSheet(onClose: () -> Unit) {
             }
             val ui = data
             if (ui != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md)) {
                     Text(
                         "${Copy.collectionMoods} ${ui.moodsUnlocked}/${ui.moodsTotal}",
                         color = Color.White.copy(alpha = 0.75f),
@@ -229,7 +229,7 @@ fun CollectionSheet(onClose: () -> Unit) {
                 }
                 LazyColumn(
                     modifier = Modifier.heightIn(max = 460.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
                 ) {
                     collectionBadges(ui)
                     collectionSection(Copy.collectionMoods, "moods", ui.emotions, trySkill)
@@ -256,24 +256,24 @@ fun CollectionSheet(onClose: () -> Unit) {
  */
 private fun LazyListScope.collectionBadges(book: CollectionUi) {
     item {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
             Text(
                 Copy.badgeSection,
                 color = Color.White.copy(alpha = 0.55f),
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier
-                    .padding(top = 6.dp, bottom = 2.dp)
+                    .padding(top = DuckTheme.Space.xs, bottom = DuckTheme.Space.xxs)
                     .testTag("collection-section-badges"),
             )
             CollectionBadges.evaluate(book).forEach { badge ->
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(DuckTheme.Radius.tiny))
+                        .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.xs)
                         .testTag("collection-badge-${badge.id}"),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 ) {
                     Text(
                         if (badge.unlocked) "✓" else "·",
@@ -338,7 +338,7 @@ private fun LazyListScope.collectionSection(
             color = Color.White.copy(alpha = 0.55f),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier
-                .padding(top = 6.dp, bottom = 2.dp)
+                .padding(top = DuckTheme.Space.xs, bottom = DuckTheme.Space.xxs)
                 .testTag("collection-section-$id"),
         )
     }
@@ -347,12 +347,12 @@ private fun LazyListScope.collectionSection(
         Row(
             Modifier
                 .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(DuckTheme.Radius.tiny))
                 .clickable(onClickLabel = skillLabel(row.name)) { onTry(row.name) }
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.sm)
                 .testTag("collection-item-${row.name}"),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         ) {
             Text(
                 if (row.locked) "·" else "✓",

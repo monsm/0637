@@ -1,6 +1,8 @@
 package ai.duck.microduck
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /// The one colour table both phones share (UI_TOKENS §7). Every value here
 /// is a decision from docs/UI_TOKENS.md, not a taste: the warm black of the
@@ -30,4 +32,47 @@ object DuckTheme {
     val StateWarn = Color(0xFFE8B45E)
     /// state.bad #E8836B.
     val StateBad = Color(0xFFE8836B)
+
+    /// type.* — the seven text roles (UI_TOKENS §3). sp already scales with
+    /// the system font scale; fixed dp containers must use heightIn(min).
+    object Type {
+        val Micro = 10.sp
+        val Caption = 11.sp
+        val Label = 13.sp
+        val Body = 15.sp
+        val Title = 20.sp
+        val Display = 28.sp
+    }
+
+    /// space.* — the 4-point grid (UI_TOKENS §4). Hand-tuned 1/3/5/9/18
+    /// values snap to the nearest step; 0 stays 0.
+    object Space {
+        val xxs = 2.dp
+        val xs = 4.dp
+        val sm = 8.dp
+        val md = 12.dp
+        val lg = 16.dp
+        val xl = 20.dp
+        val xxl = 24.dp
+        val xxxl = 32.dp
+    }
+
+    /// radius.* — one gear per role (UI_TOKENS §4); tiny is the 4 dp optical
+    /// exception for tags and hairlines, so a 3 dp literal never comes back.
+    object Radius {
+        val tiny = 4.dp
+        val thumb = 12.dp
+        val control = 14.dp
+        val card = 18.dp
+        val panel = 24.dp
+    }
+
+    /// Icon glyphs are geometry, not text: fixed dp sizes that do not follow
+    /// the font scale, so a 52 dp circle never bursts under large type.
+    object Icon {
+        val xs = 12.dp
+        val sm = 15.dp
+        val md = 18.dp
+        val lg = 22.dp
+    }
 }
