@@ -1,0 +1,252 @@
+Current Input Method Manager state:
+  Input Methods: mMethodMapUpdateCount=4
+  InputMethod #0:
+    mId=com.android.inputmethod.latin/.LatinIME mSettingsActivityName=com.android.inputmethod.latin.settings.SettingsActivity mIsVrOnly=false mSupportsSwitchingToNextInputMethod=true mInlineSuggestionsEnabled=false
+    mIsDefaultResId=0x7f040012
+    Service:
+      priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+      ServiceInfo:
+        name=com.android.inputmethod.latin.LatinIME
+        packageName=com.android.inputmethod.latin
+        labelRes=0x7f0e004b nonLocalizedLabel=null icon=0x0 banner=0x0
+        enabled=true exported=true directBootAware=true
+        permission=android.permission.BIND_INPUT_METHOD
+        flags=0x0
+        ApplicationInfo:
+          packageName=com.android.inputmethod.latin
+          labelRes=0x7f0e004b nonLocalizedLabel=null icon=0x7f070098 banner=0x0
+          processName=com.android.inputmethod.latin
+          taskAffinity=com.android.inputmethod.latin
+          uid=10106 flags=0x30c8be45 privateFlags=0xa4081060 theme=0x0
+          requiresSmallestWidthDp=0 compatibleWidthLimitDp=0 largestWidthLimitDp=0
+          sourceDir=/product/app/LatinIME/LatinIME.apk
+          seinfo=default:targetSdkVersion=28
+          seinfoUser=:complete
+          dataDir=/data/user_de/0/com.android.inputmethod.latin
+          deviceProtectedDataDir=/data/user_de/0/com.android.inputmethod.latin
+          credentialProtectedDataDir=/data/user/0/com.android.inputmethod.latin
+          sharedLibraryFiles=[/system/framework/android.test.base.jar, /system/framework/android.hidl.manager-V1.0-java.jar, /system/framework/android.hidl.base-V1.0-java.jar]
+          enabled=true minSdkVersion=21 targetSdkVersion=28 versionCode=28 targetSandboxVersion=1
+          supportsRtl=true
+          fullBackupContent=true
+          crossProfile=false
+          HiddenApiEnforcementPolicy=2
+          usesNonSdkApi=false
+          allowsPlaybackCapture=false
+  Clients:
+  Client ClientState{cdadf06 uid=10130 pid=2788 displayId=0}:
+    client=com.android.internal.view.IInputMethodClient$Stub$Proxy@22ab689
+    inputContext=com.android.internal.view.IInputContext$Stub$Proxy@6c3a68e
+    sessionRequested=false
+    curSession=SessionState{uid 10130 pid 2788 method de15eaf session e28d2bc channel ClientState{cdadf06 uid=10130 pid=2788 displayId=0} (server)}
+  Client ClientState{ff3245 uid=10121 pid=714 displayId=0}:
+    client=com.android.internal.view.IInputMethodClient$Stub$Proxy@4579d9a
+    inputContext=com.android.internal.view.IInputContext$Stub$Proxy@a6f36cb
+    sessionRequested=false
+    curSession=null
+  Client ClientState{186aed3 uid=10117 pid=887 displayId=0}:
+    client=com.android.internal.view.IInputMethodClient$Stub$Proxy@e5ea8
+    inputContext=com.android.internal.view.IInputContext$Stub$Proxy@4e5adc1
+    sessionRequested=false
+    curSession=SessionState{uid 10117 pid 887 method de15eaf session 501f966 channel ClientState{186aed3 uid=10117 pid=887 displayId=0} (server)}
+  Client ClientState{6b874a7 uid=10064 pid=1496 displayId=0}:
+    client=com.android.internal.view.IInputMethodClient$Stub$Proxy@3ebd54
+    inputContext=com.android.internal.view.IInputContext$Stub$Proxy@b5e64fd
+    sessionRequested=false
+    curSession=null
+  Client ClientState{2a445f2 uid=1000 pid=507 displayId=0}:
+    client=android.view.inputmethod.InputMethodManager$1@94c586c
+    inputContext=ControlledInputConnectionWrapper{connection=android.view.inputmethod.BaseInputConnection@86db443 finished=false mParentInputMethodManager.mActive=false mServedView=null}
+    sessionRequested=false
+    curSession=null
+  Client ClientState{dc98604 uid=1000 pid=1094 displayId=0}:
+    client=com.android.internal.view.IInputMethodClient$Stub$Proxy@2745ac0
+    inputContext=com.android.internal.view.IInputContext$Stub$Proxy@fb153f9
+    sessionRequested=false
+    curSession=SessionState{uid 1000 pid 1094 method de15eaf session 1accf3e channel ClientState{dc98604 uid=1000 pid=1094 displayId=0} (server)}
+  Client ClientState{5ad519f uid=10106 pid=1297 displayId=0}:
+    client=com.android.internal.view.IInputMethodClient$Stub$Proxy@9a462ec
+    inputContext=com.android.internal.view.IInputContext$Stub$Proxy@faa36b5
+    sessionRequested=false
+    curSession=null
+  mCurMethodId=com.android.inputmethod.latin/.LatinIME
+  mCurClient=ClientState{cdadf06 uid=10130 pid=2788 displayId=0} mCurSeq=8
+  mCurPerceptible=false
+  mCurFocusedWindow=android.os.BinderProxy@d79bf73 softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION client=ClientState{cdadf06 uid=10130 pid=2788 displayId=0}
+  mCurId=com.android.inputmethod.latin/.LatinIME mHaveConnection=true mBoundToMethod=true mVisibleBound=false
+  mCurToken=android.os.Binder@5422bc0
+  mCurTokenDisplayId=0
+  mCurHostInputToken=null
+  mCurIntent=Intent { act=android.view.InputMethod cmp=com.android.inputmethod.latin/.LatinIME (has extras) }
+  mCurMethod=com.android.internal.view.IInputMethod$Stub$Proxy@de15eaf
+  mEnabledSession=SessionState{uid 10130 pid 2788 method de15eaf session e28d2bc channel ClientState{cdadf06 uid=10130 pid=2788 displayId=0} (server)}
+  mShowRequested=false mShowExplicitlyRequested=false mShowForced=false mInputShown=false
+  mInFullscreenMode=false
+  mSystemReady=true mInteractive=true
+  mSettingsObserver=SettingsObserver{mUserId=0 mRegistered=true mLastEnabled=com.android.inputmethod.latin/.LatinIME}
+  mSwitchingController:
+    mSwitchingAwareRotationList:
+      rank=0 item=ImeSubtypeListItem{mImeName=Android Keyboard (AOSP) mSubtypeName=English (US) mSubtypeId=0 mIsSystemLocale=true mIsSystemLanguage=true}
+    mSwitchingUnawareRotationList:
+  mSettings:
+    mCurrentUserId=0
+    mCurrentProfileIds=[0]
+    mCopyOnWrite=false
+    mEnabledInputMethodsStrCache=com.android.inputmethod.latin/.LatinIME
+  mStartInputHistory:
+   StartInput #0:
+    time=2026-11-19 16:01:27.777 (timestamp=22371) reason=SESSION_CREATED_BY_IME restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@c430a51 [com.android.settings] targetUserId=0 targetDisplayId=0 clientBindSeq=1
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+   StartInput #1:
+    time=2026-11-19 16:01:30.008 (timestamp=24601) reason=SESSION_CREATED_BY_IME restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@2ab66bd [com.android.launcher3] targetUserId=0 targetDisplayId=0 clientBindSeq=2
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+   StartInput #2:
+    time=2026-11-19 16:01:32.825 (timestamp=27419) reason=SESSION_CREATED_BY_IME restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@4c0432 [ai.duck.microduck] targetUserId=0 targetDisplayId=0 clientBindSeq=3
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+   StartInput #3:
+    time=2026-11-19 16:02:39.610 (timestamp=94203) reason=WINDOW_FOCUS_GAIN restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@2ab66bd [com.android.launcher3] targetUserId=0 targetDisplayId=0 clientBindSeq=4
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+   StartInput #4:
+    time=2026-11-19 16:02:44.291 (timestamp=98885) reason=SESSION_CREATED_BY_IME restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@7be1811 [ai.duck.microduck] targetUserId=0 targetDisplayId=0 clientBindSeq=5
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+   StartInput #5:
+    time=2026-11-19 16:02:51.580 (timestamp=106174) reason=WINDOW_FOCUS_GAIN restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@3e464f8 [ai.duck.microduck] targetUserId=0 targetDisplayId=0 clientBindSeq=6
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+   StartInput #6:
+    time=2026-11-19 16:02:53.600 (timestamp=108193) reason=WINDOW_FOCUS_GAIN restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@2ab66bd [com.android.launcher3] targetUserId=0 targetDisplayId=0 clientBindSeq=7
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+   StartInput #7:
+    time=2026-11-19 16:02:54.893 (timestamp=109487) reason=SESSION_CREATED_BY_IME restarting=false
+    imeToken=android.os.Binder@5422bc0 [com.android.inputmethod.latin/.LatinIME] imeUserId=0 imeDisplayId=0
+    targetWin=android.os.BinderProxy@d79bf73 [ai.duck.microduck] targetUserId=0 targetDisplayId=0 clientBindSeq=8
+    softInputMode=STATE_UNSPECIFIED|ADJUST_PAN|IS_FORWARD_NAVIGATION
+    inputType=0x0 imeOptions=0x0 fieldId=0xffffffff fieldName=null actionId=0 actionLabel=null
+  mSoftInputShowHideHistory:
+ 
+Input method client state for android.view.inputmethod.InputMethodManager@976f279:
+  mService=com.android.internal.view.IInputMethodManager$Stub$Proxy@81c4bbe
+  mMainLooper=Looper (main, tid 2) {614541f}
+  mIInputContext=ControlledInputConnectionWrapper{connection=android.view.inputmethod.BaseInputConnection@743736c finished=false mParentInputMethodManager.mActive=true mServedView=null}
+  mActive=true mRestartOnNextWindowFocus=false mBindSequence=8 mCurId=com.android.inputmethod.latin/.LatinIME
+  mFullscreenMode=false
+  mCurMethod=com.android.internal.view.IInputMethodSession$Stub$Proxy@66b3d35
+  mCurRootView=android.view.ViewRootImpl@44d65ca
+  mServedView=DecorView@e34133b[MainActivity]
+  mNextServedView=DecorView@e34133b[MainActivity]
+  mServedConnecting=false
+  mCurrentTextBoxAttribute:
+    inputType=0x0 imeOptions=0x0 privateImeOptions=null
+    actionLabel=null actionId=0
+    initialSelStart=-1 initialSelEnd=-1 initialCapsMode=0x0
+    hintText=null label=null
+    packageName=ai.duck.microduck autofillId=0 fieldId=-1 fieldName=null
+    extras=null
+    hintLocales=null
+    contentMimeTypes=null
+  mServedInputConnectionWrapper=null
+  mCompletions=null
+  mCursorRect=Rect(0, 0 - 0, 0)
+  mCursorSelStart=0 mCursorSelEnd=0 mCursorCandStart=0 mCursorCandEnd=0
+ 
+Input method service state for com.android.inputmethod.latin.LatinIME@d2c201c:
+  mViewsCreated=false
+  mDecorViewVisible=false mDecorViewWasVisible=false mWindowVisible=false mInShowWindow=false
+  Configuration={1.0 310mcc260mnc [en_US] ldltr sw320dp w320dp h616dp 160dpi nrml long port finger qwerty/v/v -nav/h winConfig={ mBounds=Rect(0, 0 - 320, 640) mAppBounds=Rect(0, 0 - 320, 640) mWindowingMode=fullscreen mDisplayWindowingMode=fullscreen mActivityType=undefined mAlwaysOnTop=undefined mRotation=ROTATION_0} s.8}
+  mToken=android.os.BinderProxy@bf256b4
+  mInputBinding=InputBinding{android.os.BinderProxy@2f1dc7c / uid 10130 / pid 2788}
+  mInputConnection=InputConnectionWrapper{idHash=#610d905 mMissingMethods=}
+  mStartedInputConnection=null
+  mInputStarted=true mInputViewStarted=false mCandidatesViewStarted=false
+  mInputEditorInfo:
+    inputType=0x0 imeOptions=0x0 privateImeOptions=null
+    actionLabel=null actionId=0
+    initialSelStart=-1 initialSelEnd=-1 initialCapsMode=0x0
+    hintText=null label=null
+    packageName=ai.duck.microduck autofillId=0 fieldId=-1 fieldName=null
+    extras=null
+    hintLocales=null
+    contentMimeTypes=null
+  mShowInputRequested=false mLastShowInputRequested=false mCanPreRender=false mIsPreRendered=false mShowInputFlags=0x0
+  mCandidatesVisibility=4 mFullscreenApplied=false mIsFullscreen=false mExtractViewHidden=false
+  mExtractedText: null
+  mExtractedToken=0
+  mIsInputViewShown=false mStatusIcon=0
+Last computed insets:
+  contentTopInsets=0 visibleTopInsets=0 touchableInsets=2 touchableRegion=SkRegion()
+ mSettingsObserver=SettingsObserver{mShowImeWithHardKeyboard=0}
+LatinIME state :
+  VersionCode = 28
+  VersionName = 11
+  Keyboard mode = -1
+Current settings :
+   mSpacingAndPunctuations = mSortedSymbolsPrecededBySpace = [38, 40, 91, 123]
+   mSortedSymbolsFollowedBySpace = [33, 38, 41, 44, 46, 58, 59, 63, 93, 125]
+   mSortedWordConnectors = [39, 45]
+   mSortedWordSeparators = [9, 10, 32, 33, 34, 38, 40, 41, 42, 43, 44, 46, 47, 58, 59, 60, 61, 62, 63, 91, 93, 95, 123, 124, 125, 160]
+   mSuggestPuncList = PunctuationSuggestions:  words=[!, ?, \,, :, ;, ", (, ), ', -, /, @, _]
+   mSentenceSeparator = 46
+   mSentenceSeparatorAndSpace = . 
+   mCurrentLanguageHasSpaces = true
+   mUsesAmericanTypography = true
+   mUsesGermanRules = false
+   mDelayInMillisecondsToUpdateOldSuggestions = 300
+   mAutoCap = true
+   mVibrateOn = true
+   mSoundOn = false
+   mKeyPreviewPopupOn = true
+   mShowsVoiceInputKey = false
+   mIncludesOtherImesInLanguageSwitchList = true
+   mShowsLanguageSwitchKey = true
+   mUseContactsDict = true
+   mUsePersonalizedDicts = true
+   mUseDoubleSpacePeriod = false
+   mBlockPotentiallyOffensive = true
+   mBigramPredictionEnabled = true
+   mGestureInputEnabled = false
+   mGestureTrailEnabled = true
+   mGestureFloatingPreviewTextEnabled = true
+   mSlidingKeyInputPreviewEnabled = true
+   mKeyLongpressTimeout = 300
+   mLocale = en_US
+   mInputAttributes = InputAttributes: inputType=0x00000000 targetApp=ai.duck.microduck
+
+   mKeypressVibrationDuration = -1
+   mKeypressSoundVolume = -1.0
+   mKeyPreviewPopupDismissDelay = 70
+   mAutoCorrectEnabled = true
+   mAutoCorrectionThreshold = 0.185
+   mAutoCorrectionEnabledPerUserSettings = true
+   mSuggestionsEnabledPerUserSettings = true
+   mDisplayOrientation = 1
+   mAppWorkarounds = Target application : null
+Package : ai.duck.microduck
+Target app sdk version : 35
+   mIsInternal = false
+   mKeyPreviewShowUpDuration = 17
+   mKeyPreviewDismissDuration = 53
+   mKeyPreviewShowUpStartScaleX = 0.98
+   mKeyPreviewShowUpStartScaleY = 0.98
+   mKeyPreviewDismissEndScaleX = 0.94000006
+   mKeyPreviewDismissEndScaleY = 0.94000006
+
