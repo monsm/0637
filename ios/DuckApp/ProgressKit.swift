@@ -479,15 +479,10 @@ struct ProgressSheet: View {
                 .accessibilityIdentifier("progress-title")
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(DuckIcon.xs)
-                    .foregroundStyle(Color.duckTextPrimary.opacity(0.7))
-                    .frame(width: 48, height: 48)
-                    .background(Color.duckTextPrimary.opacity(0.10), in: Circle())
-                    .contentShape(Circle())
+                DuckCloseGlyph()
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("关闭")
+            .accessibilityLabel(Copy.close)
             .accessibilityIdentifier("progress-close")
         }
         .padding(.horizontal, DuckSpace.xl)

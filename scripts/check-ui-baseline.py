@@ -31,7 +31,12 @@ def collect(root):
     # The theme files are where literals are allowed to live (UI_TOKENS §7).
     swift_ui = {p: t for p, t in swift.items()
                 if not p.endswith(f"{IOS_DIR}/Design/DuckTheme.swift")}
-    kt_ui = {p: t for p, t in kt.items() if not p.endswith(f"{KT_DIR}/DuckTheme.kt")}
+    kt_ui = {p: t for p, t in kt.items()
+             if not p.endswith(f"{KT_DIR}/DuckTheme.kt")
+             # DuckComponents.kt is where the shared press feedback is
+             # IMPLEMENTED: its `indication = null` sits beside a
+             # graphicsLayer scale/dim, so it is not missing feedback.
+             and not p.endswith(f"{KT_DIR}/DuckComponents.kt")}
 
     def total(files, pattern, flags=0):
         rx = re.compile(pattern, flags)

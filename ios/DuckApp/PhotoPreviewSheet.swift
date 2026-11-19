@@ -29,12 +29,7 @@ struct PhotoPreviewSheet: View {
                 Button {
                     dismiss()
                 } label: {
-                    Image(systemName: "xmark")
-                        .font(DuckIcon.xs)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 48, height: 48)
-                        .background(Color.white.opacity(0.10), in: Circle())
-                        .contentShape(Circle())
+                    DuckCloseGlyph()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Copy.close)
