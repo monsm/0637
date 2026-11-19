@@ -323,7 +323,10 @@ internal fun DuckPanelSheet(
     }
 }
 
-/** 工具: parent time, room lamp, backup, ToF, big buttons - five controls. */
+/** 工具: parent time, room lamp, backup, ToF, big buttons, days - six
+ *  controls, under the cap. Days is the newest (2026-11-19 K3): a local
+ *  sheet, the same replacement the duck panel's words page uses, so the
+ *  pinned route table does not grow a case. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ToolsSheet(
@@ -337,6 +340,14 @@ internal fun ToolsSheet(
     var care by remember { mutableStateOf(CareUi()) }
     var tofStrip by remember { mutableStateOf("—") }
     var backupStatus by remember { mutableStateOf<String?>(null) }
+    // The days board replaces the tools page inside the same sheet rather
+    // than stacking a second modal: one sheet at a time, and no new route
+    // case (the route table is a frozen contract) — the alias page pattern.
+    var daysOpen by remember { mutableStateOf(false) }
+    if (daysOpen) {
+        DaysSheet(onClose = { daysOpen = false })
+        return
+    }
     val backupPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -440,6 +451,13 @@ internal fun ToolsSheet(
                 note = Copy.bigButtonsNote,
                 tag = "duck-panel-big",
             ) { onOpen(DuckRoute.Big) }
+            // Days, the sixth control: the parent's board of the duck's real
+            // days. A local sheet (no route case), the same replacement the
+            // duck panel's words page uses on both phones.
+            ControlRow(
+                Copy.daysTitle,
+                tag = "days-open",
+            ) { daysOpen = true }
         }
     }
 }
