@@ -1096,17 +1096,38 @@ PY
     DUCK_FACE_FOUND=1
     break
   fi
-  adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+  # The drawer may not have opened at all (a tap swallowed by a sheet that
+  # was still animating, or a boot whose window came up small): re-tap the
+  # More verb when the dump shows no drawer drag handle, then scroll. Two
+  # swipe lanes cover both the full window and a shrunken one.
+  if ! grep -q 'Drag handle' language-ui.xml; then
+    tap_text "More" > /dev/null 2>&1 || tap_text "更多" > /dev/null 2>&1 || true
+  else
+    adb shell input swipe 160 520 160 200 300 > /dev/null 2>&1 || true
+    adb shell input swipe 160 380 160 60 300 > /dev/null 2>&1 || true
+  fi
 done
 if [ "$DUCK_FACE_FOUND" -ne 1 ]; then
   echo "::error::the More drawer never showed the duck-panel row"
+  # Keep the whole scene for the artifact: the dump, a screenshot and the
+  # window's inset report — a shrunken window or a mis-composited GL layer
+  # is invisible in the text log alone.
+  cp language-ui.xml drawer-dump.xml 2>/dev/null || true
+  adb exec-out screencap -p > drawer-screen.png 2>/dev/null || true
+  adb shell dumpsys window windows > window-dumpsys.txt 2>/dev/null || true
+  adb shell dumpsys input_method > input-method.txt 2>/dev/null || true
   python3 - <<'PY' || true
 import xml.etree.ElementTree as ET
 try:
-    root = ET.parse('language-ui.xml').getroot()
+    root = ET.parse('drawer-dump.xml').getroot()
 except Exception as exc:
     raise SystemExit(f"cannot read the drawer dump: {exc}")
-print("drawer held:", [n.get('text') or n.get('content-desc') for n in root.iter('node')][:24])
+rows = [(n.get('text') or n.get('content-desc') or '') for n in root.iter('node')]
+print("drawer held:", [r for r in rows][:40])
+print("drawer bounds of text nodes:")
+for n in root.iter('node'):
+    if (n.get('text') or '').strip():
+        print("   ", (n.get('text') or '')[:32], n.get('bounds'))
 PY
   exit 1
 fi
