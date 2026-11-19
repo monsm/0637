@@ -8591,9 +8591,9 @@ mod tests {
 
             // The C ABI entries the shell's ring and big buttons call.
             let skill = CString::new("roulade").unwrap();
-            assert_eq!(unsafe { duck_core_trigger_skill(core, skill.as_ptr()) }, 0);
-            assert_eq!(unsafe { duck_core_sit_toggle(core) }, -1);
-            assert_eq!(unsafe { duck_core_ground_pick(core) }, -1);
+            assert_eq!(duck_core_trigger_skill(core, skill.as_ptr()), 0);
+            assert_eq!(duck_core_sit_toggle(core), -1);
+            assert_eq!(duck_core_ground_pick(core), -1);
 
             // The mode switch loads the roller bundle and does not stand the
             // resting duck up.
@@ -8851,7 +8851,7 @@ mod tests {
                 "a frozen duck does not land the change"
             );
             // Seek restores the active runtime, which drops the pending swap.
-            assert_eq!(unsafe { duck_core_seek(core, 1) }, 0);
+            assert_eq!(duck_core_seek(core, 1), 0);
             assert!(c.swap_landing.is_none(), "the seek cleared the marker");
         }
         unsafe { duck_core_free(core) };

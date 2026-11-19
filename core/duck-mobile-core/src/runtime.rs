@@ -1300,6 +1300,29 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.pet_model.as_deref()
     }
 
+    /// Test-only: attach the official model with thresholds a synthetic
+    /// window can cross, so a dispatch test measures *which* runtime was fed
+    /// rather than the CNN's opinion of digital silence. Production always
+    /// loads the official 0.95/0.85 pair through [`Self::load_pet_detector`].
+    ///
+    /// Gated on `mujoco` as well as `test`: only the FFI tests (compiled with
+    /// that feature) call it, and without the gate the default-profile build
+    /// has a `#[cfg(test)]` item with no test users — which `-D warnings`
+    /// rightly calls dead code.
+    #[cfg(all(test, feature = "mujoco"))]
+    pub(crate) fn load_pet_detector_with_config(
+        &mut self,
+        model: &std::path::Path,
+        config: crate::petdetect::DetectorConfig,
+    ) -> Result<(), String> {
+        let detector = crate::petdetect::PettingDetector::load_with_config(model, config)?;
+        self.sound_pet = Some(detector);
+        self.pet_model = Some(model.to_path_buf());
+        self.petting = false;
+        self.petting_since_tick = None;
+        Ok(())
+    }
+
     /// Feed the microphone's PCM16 to the official petting classifier and
     /// apply its Start/End edges.
     ///
