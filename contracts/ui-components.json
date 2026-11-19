@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "comment": "D2 component contract (docs/UIUX_REFACTOR_DEEP_2026-11-19.md §3.2, §9.1 Q3). Two waves: wave 1 = button/chip/card/sheet header/list row; wave 2 = toggle/segmented/progress/empty/error/loading. Each component is one implementation per end, carries a STATE MATRIX line in its source file, and references tokens only. scripts/check-ui-components.py asserts this file, the source files and their state lines agree.",
+  "waves": {
+    "1": ["DuckButton", "DuckChip", "DuckCard", "DuckSheetHeader", "DuckListRow"],
+    "2": ["DuckToggle", "DuckSegmented", "DuckProgress", "DuckEmptyState", "DuckErrorCard", "DuckLoading"]
+  },
+  "components": [
+    {
+      "name": "DuckButton",
+      "ios_file": "ios/DuckApp/Design/DuckButton.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "pressed", "disabled", "selected", "focus"],
+      "tokens": ["accent.action", "text.onAccent", "bg.surface", "radius.control", "space.md", "type.label", "motion.quick"],
+      "a11y": "label + hint + value where applicable; 44/48 minimum target; selected state exposed"
+    },
+    {
+      "name": "DuckChip",
+      "ios_file": "ios/DuckApp/Design/DuckButton.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "pressed", "disabled", "selected"],
+      "tokens": ["accent.action", "text.onAccent", "text.primary", "radius.control", "space.sm", "type.label"],
+      "a11y": "isSelected semantic + check glyph; never colour alone"
+    },
+    {
+      "name": "DuckCard",
+      "ios_file": "ios/DuckApp/Design/DuckSurfaces.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "pressed", "disabled"],
+      "tokens": ["bg.surface", "text.primary", "radius.card", "elevation.card", "space.lg"],
+      "a11y": "content grouped; press feedback only when tappable"
+    },
+    {
+      "name": "DuckSheetHeader",
+      "ios_file": "ios/DuckApp/Design/DuckSurfaces.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "closePressed", "closeDisabled"],
+      "tokens": ["bg.surface", "text.primary", "space.lg", "type.title", "radius.control"],
+      "a11y": "title as header; close 48 pt with label; focus moves here on open"
+    },
+    {
+      "name": "DuckListRow",
+      "ios_file": "ios/DuckApp/Design/DuckSurfaces.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "pressed", "disabled", "selected"],
+      "tokens": ["text.primary", "text.secondary", "space.lg", "type.body", "divider"],
+      "a11y": "row reads title + value + action hint; trailing chevron not the only cue"
+    },
+    {
+      "name": "DuckToggle",
+      "ios_file": "ios/DuckApp/Design/DuckControls.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["off", "on", "disabled"],
+      "tokens": ["accent.action", "text.secondary", "radius.control", "space.sm", "type.label"],
+      "a11y": "object name in label ('Room lamp: on'), state exposed as value"
+    },
+    {
+      "name": "DuckSegmented",
+      "ios_file": "ios/DuckApp/Design/DuckControls.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "selected", "disabled"],
+      "tokens": ["bg.surface", "accent.action", "text.primary", "radius.control", "type.label"],
+      "a11y": "selected trait/state; group label"
+    },
+    {
+      "name": "DuckProgress",
+      "ios_file": "ios/DuckApp/Design/DuckControls.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["normal", "warning", "error"],
+      "tokens": ["accent.data", "state.warn", "state.bad", "radius.chip", "type.data"],
+      "a11y": "value as percentage text; not colour alone"
+    },
+    {
+      "name": "DuckEmptyState",
+      "ios_file": "ios/DuckApp/Design/DuckStates.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "actionPressed"],
+      "tokens": ["text.secondary", "text.tertiary", "space.lg", "type.body", "type.caption"],
+      "a11y": "one sentence + one action; no fabricated numbers"
+    },
+    {
+      "name": "DuckErrorCard",
+      "ios_file": "ios/DuckApp/Design/DuckStates.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "retryPressed", "retrying", "offline"],
+      "tokens": ["state.bad", "state.warn", "bg.surface", "radius.card", "type.label"],
+      "a11y": "what happened + what to do + retry; announce on appear"
+    },
+    {
+      "name": "DuckLoading",
+      "ios_file": "ios/DuckApp/Design/DuckStates.swift",
+      "android_file": "android/app/src/main/java/ai/duck/microduck/DuckComponents.kt",
+      "states": ["default", "reducedMotion"],
+      "tokens": ["text.secondary", "motion.slow", "space.lg", "type.caption"],
+      "a11y": "plain words, no engine names; static under Reduce Motion"
+    }
+  ]
+}

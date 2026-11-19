@@ -52,6 +52,8 @@ jobs:
         run: python3 scripts/check-ui-entries.py .
       - name: One route table (B7)
         run: python3 scripts/check-routes.py .
+      - name: Component contract (D2)
+        run: python3 scripts/check-ui-components.py .
       - name: IA feature contract
         run: |
           python3 -m pip install --quiet --user pyyaml 2>/dev/null ||             python3 -m pip install --quiet --user --break-system-packages pyyaml 2>/dev/null || true
