@@ -188,10 +188,15 @@ struct DuckPanelSheet: View {
 
 /// 工具: the parent's tools, plus big buttons relocated here so the "This
 /// duck" panel fits under the six-control cap (2026-11-19 H2, both phones
-/// moved together; the row keeps its duck-panel-big id).
+/// moved together; the row keeps its duck-panel-big id). Days (2026-11-19
+/// K2) is the sixth: a local sheet — the route table is pinned by
+/// scripts/check-routes.py — showing the core's own day record.
 struct ToolsSheet: View {
     @ObservedObject var controller: DuckController
     let onOpen: (DuckRoute) -> Void
+    /// The days board. A local presentation, the same pattern the duck
+    /// panel's words page uses (see DuckPanelSheet.aliasOpen).
+    @State private var daysOpen = false
 
     private var parentNote: String {
         controller.parentMinutes.map { minutes in
@@ -244,6 +249,16 @@ struct ToolsSheet: View {
                 selected: false,
                 id: "duck-panel-big"
             ) { onOpen(.big) }
+            PageRow(
+                title: Copy.daysTitle,
+                selected: false,
+                id: "days-open"
+            ) { daysOpen = true }
+        }
+        .sheet(isPresented: $daysOpen) {
+            DaysSheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 }
