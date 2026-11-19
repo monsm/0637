@@ -2664,10 +2664,12 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             // The route checked the published list; the runtime is the
             // authority on which official emotions this build loaded.
-            if !moves
-                .iter()
-                .all(|name| core.runtime.emotion_names().iter().any(|loaded| loaded == name))
-            {
+            if !moves.iter().all(|name| {
+                core.runtime
+                    .emotion_names()
+                    .iter()
+                    .any(|loaded| loaded == name)
+            }) {
                 return refuse(core, "no such emotion".to_owned());
             }
             let id = format!("chorus-{}", core.runtime.clock().tick);
@@ -2687,12 +2689,14 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             if core.runtime.chorus_active() {
                 return refuse(core, "a performance is already playing".to_owned());
             }
-            if !moves
-                .iter()
-                .all(|name| core.runtime.emotion_names().iter().any(|loaded| loaded == name))
-                || !sounds
+            if !moves.iter().all(|name| {
+                core.runtime
+                    .emotion_names()
                     .iter()
-                    .all(|tag| crate::voice::TAGS.contains(&tag.as_str()))
+                    .any(|loaded| loaded == name)
+            }) || !sounds
+                .iter()
+                .all(|tag| crate::voice::TAGS.contains(&tag.as_str()))
             {
                 return refuse(core, "no such mood or sound".to_owned());
             }
@@ -2778,9 +2782,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             let mut rules_answer = json!(null);
             let mut rules_error = None;
             on_active(core, |runtime| match runtime.set_rules(&saved_rules) {
-                Ok(()) => {
-                    rules_answer = json!({ "ok": true, "rules": runtime.rules_summary() })
-                }
+                Ok(()) => rules_answer = json!({ "ok": true, "rules": runtime.rules_summary() }),
                 Err(reason) => rules_error = Some(reason),
             });
             // A refused program still goes through the refusal channel, the
@@ -9160,9 +9162,7 @@ mod tests {
                 "the branch owns the allowance"
             );
             assert!(
-                c.runtime.care_summary()["parent"]
-                    .get("minutes")
-                    .is_none(),
+                c.runtime.care_summary()["parent"].get("minutes").is_none(),
                 "the original keeps no allowance"
             );
         }
@@ -9183,8 +9183,10 @@ mod tests {
             assert_eq!(answer["ok"], json!(true), "{answer}");
             assert_eq!(c.runtime.book().life.sound_pets, 0);
 
-            let answer =
-                apply_intent(c, Intent::RestoreLife(json!({ "sound_pets": 7, "pets": 3 })));
+            let answer = apply_intent(
+                c,
+                Intent::RestoreLife(json!({ "sound_pets": 7, "pets": 3 })),
+            );
             assert_eq!(answer["ok"], json!(true), "{answer}");
             assert_eq!(c.runtime.book().life.sound_pets, 7);
             assert_eq!(c.runtime.book().life.pets, 3);
@@ -9218,7 +9220,11 @@ mod tests {
             // The transport is a LAN socket, not a peer: the arm refuses
             // without it. Core creation is serialized, so UDP 8766 is ours.
             let answer = apply_intent(c, Intent::StartLan("song-lead".to_owned()));
-            assert_eq!(answer["ok"], json!(true), "LAN for the chorus probe: {answer}");
+            assert_eq!(
+                answer["ok"],
+                json!(true),
+                "LAN for the chorus probe: {answer}"
+            );
 
             let answer = apply_intent(c, Intent::Chorus(vec!["yes".to_owned()]));
             assert_eq!(answer["ok"], json!(true), "{answer}");

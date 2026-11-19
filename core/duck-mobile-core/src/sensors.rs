@@ -94,8 +94,9 @@ pub fn take_pcm16(value: &mut Value) -> Option<(Vec<i16>, u32)> {
     // 8 kHz..=48 kHz is a bad payload, not a capture setting: 1 Hz would make
     // the resampler turn a second of audio into 160 million samples, and the
     // app would be killed for memory. Out of range means dropped.
-    let rate =
-        u32::try_from(rate).ok().filter(|rate| (8_000..=48_000).contains(rate))?;
+    let rate = u32::try_from(rate)
+        .ok()
+        .filter(|rate| (8_000..=48_000).contains(rate))?;
     let samples = crate::petdetect::decode_pcm16_base64(&encoded)?;
     // Two seconds at the detector's 16 kHz is one post's worth of evidence. A
     // longer array is a malformed upload and would only inflate memory before

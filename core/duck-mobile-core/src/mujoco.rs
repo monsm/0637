@@ -320,8 +320,7 @@ impl MujocoIo {
     fn contacts(&self) -> Vec<(String, String)> {
         // The shim's buffer holds 512 pairs and clamps `ncon` to match; the
         // min here keeps the slice honest even if a future shim forgets.
-        let count =
-            (unsafe { duck_mj_ncon(self.handle) } as usize).min(CONTACT_PAIR_LIMIT);
+        let count = (unsafe { duck_mj_ncon(self.handle) } as usize).min(CONTACT_PAIR_LIMIT);
         if count == 0 {
             return Vec::new();
         }
@@ -1534,10 +1533,10 @@ mod tests {
     }
 
     /// An unterminated comment means a truncated scan. Cutting at the comment's
-/// open and keeping its text would let `<worldbody>` *inside* the comment
-/// masquerade as the scan's real wrapper; the extraction refuses the file
-/// instead, and the load path keeps the plain room. QA's sample is the
-/// first document below.
+    /// open and keeping its text would let `<worldbody>` *inside* the comment
+    /// masquerade as the scan's real wrapper; the extraction refuses the file
+    /// instead, and the load path keeps the plain room. QA's sample is the
+    /// first document below.
     #[test]
     fn an_unterminated_comment_rejects_the_scan() {
         let truncated = concat!(
@@ -1804,15 +1803,12 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|elapsed| elapsed.as_nanos())
             .unwrap_or(0);
-        let dir = std::env::temp_dir().join(format!(
-            "duck-crowded-scan-{}-{stamp}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("duck-crowded-scan-{}-{stamp}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("staging");
         std::fs::write(dir.join(OBSTACLES_FILE), scan).expect("write scan");
 
-        let mut body =
-            MujocoIo::load_with_obstacles(&scene, &dir).expect("the crowded room loads");
+        let mut body = MujocoIo::load_with_obstacles(&scene, &dir).expect("the crowded room loads");
         body.step_once();
         let contacts = body.contacts();
         assert!(
