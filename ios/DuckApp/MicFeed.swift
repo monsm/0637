@@ -9,7 +9,10 @@ import Speech
 /// here feeds the 61-D observation; the RMS and a crude pitch estimate are
 /// posted to `/sensor` for an AI client to react to, exactly as the camera's
 /// metadata is. Only one summary per second leaves the phone, so the 50 Hz
-/// control loop sees no per-frame audio callback.
+/// control loop sees no per-frame audio callback. When the official
+/// pet-detect model was staged and the room mic is on, the same tap also
+/// yields one-second 16 kHz mono PCM windows for `/sensor`; that branch is
+/// silent and network-free without the model.
 ///
 /// The speech recogniser is a different thing entirely: the words a person
 /// says are the duck's own input. "翻滚" becomes the roulade skill, and that
@@ -47,6 +50,11 @@ final class MicFeed: ObservableObject {
     /// The duck's ear. It reads the same buffers as the room's loudness:
     /// one engine, one session, one tap.
     private let listener = SpeechListener()
+    /// The pet-detect branch of the same tap: 48 kHz Float32 in, 16 kHz i16
+    /// ring out. It starts with the room's mic toggle, and only when the
+    /// official model was staged; otherwise it does nothing and posts
+    /// nothing.
+    private let petAudio = PetAudioStream()
     private var postTimer: Timer?
     /// Written on the real-time audio thread, read on `queue`. Swift 5 mode
     /// has no strict-concurrency checking, and a one-buffer-old snapshot of a
@@ -64,6 +72,13 @@ final class MicFeed: ObservableObject {
 
     init(voice: Voice) {
         self.voice = voice
+        // The pet-detect window carries the latest room level beside the
+        // audio, so an audio-only microphone reading never blanks the
+        // summary the sheet is showing.
+        petAudio.reading = { [weak self] in
+            guard let self else { return (rms: 0.0, peakHz: 0.0) }
+            return (rms: self.latestRMS, peakHz: self.latestPeakHz)
+        }
         // The ear answers on its own queue; the sheet reads the mirrors.
         speechCancellable = listener.$state
             .receive(on: RunLoop.main)
@@ -88,6 +103,9 @@ final class MicFeed: ObservableObject {
             // No tap, no room: posting a silence would be a lie.
             guard self.tapInstalled else { return }
             self.startPosting()
+            // The one-second pet-detect windows ride the same tap. With no
+            // staged model this is a no-op: no timer, no network.
+            self.petAudio.start()
         }
     }
 
@@ -96,6 +114,7 @@ final class MicFeed: ObservableObject {
     func stop() {
         rmsActive = false
         stopPosting()
+        petAudio.stop()
         releaseTapIfUnused()
     }
 
@@ -142,6 +161,7 @@ final class MicFeed: ObservableObject {
         rmsActive = false
         speechActive = false
         stopPosting()
+        petAudio.stop()
         listener.stop()
         releaseTapIfUnused()
     }
@@ -215,6 +235,10 @@ final class MicFeed: ObservableObject {
         // loudness posted or dropped.
         if rmsActive { analyse(buffer: buffer) }
         if speechActive { listener.append(buffer) }
+        // Downsample only; the windowing, base64 and POST live on the
+        // stream's own serial queue. `active` is false when no model was
+        // staged or the mic toggle is off.
+        if petAudio.active { petAudio.append(buffer) }
     }
 
     /// Runs on the real-time audio thread. RMS is the room's loudness; a

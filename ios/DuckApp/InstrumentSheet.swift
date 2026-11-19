@@ -636,12 +636,27 @@ struct InstrumentSheet: View {
                 .font(.system(size: 10, design: .rounded))
                 .foregroundStyle(.secondary)
             // A refused camera has no reading, so "—" must not hide the denial.
-            // Depth has no app-owned feed yet and stays "—" on devices without
-            // LiDAR, which is honest; on LiDAR hardware a camera denial is a
-            // depth denial too (the controller already formats that).
+            // The launch LiDAR scan has its own line below the depth row:
+            // unsupported hardware says so, a refused camera says denied,
+            // and a completed scan says what it scanned and when.
             row(Copy.camera, controller.cameraDenied ? Copy.denied : controller.cameraSummary)
             micRow
+            // The one note the pet-detect microphone branch adds. The mic
+            // row is the sound switch on this phone; no second control.
+            if controller.petSoundAvailable {
+                Text(Copy.petSoundNote)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("sheet-pet-sound-note")
+            }
             row(Copy.depth, controller.depthSummary)
+            // The depth viewfinder's honest line: unavailable hardware,
+            // refused permission, or the one-shot scan's real result. The
+            // scan never runs again until the next launch.
+            Text(controller.depthScanLine)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("sheet-depth-scan")
             row("IMU", controller.imuSummary)
         }
         .padding(14)

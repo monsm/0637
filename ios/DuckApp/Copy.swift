@@ -757,6 +757,29 @@ enum Copy {
     static var showMore: String { pick("More", "更多") }
     static var showLess: String { pick("Less", "收起") }
     static var depth: String { pick("depth", "深度") }
+    /// A phone without LiDAR (or the simulator) has no depth sensor at all;
+    /// "—" or "denied" would blame the user for hardware that is not there.
+    /// Shared byte-for-byte with Android.
+    static var depthUnsupported: String {
+        pick("This device has no depth sensor", "这台设备没有深度传感器")
+    }
+    /// The obstacle scan is a one-shot at launch. Saying otherwise would
+    /// claim the furniture follows the room during play.
+    static var depthScanNote: String {
+        pick(
+            "Furniture was scanned at launch; it does not follow the room",
+            "启动时扫的家具,不会随房间变化"
+        )
+    }
+    /// The official pet-detect model hears head scratches in the phone's
+    /// microphone; the audio never leaves the phone. Shared byte-for-byte
+    /// with Android.
+    static var petSoundNote: String {
+        pick(
+            "Scratch sounds are detected by the official model, on this phone only",
+            "摸摸声由官方模型识别,只在手机"
+        )
+    }
     static var provenance: String { pick("Provenance", "出处") }
     /// The label for the API token: what a tool on another machine has to
     /// send, so the duck's own history cannot be rewritten from the network.
