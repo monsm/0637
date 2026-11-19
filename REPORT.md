@@ -721,6 +721,18 @@ COMPANION 头脑风暴里仅剩未做的两项落地：
 - **验证**：核心 290+9 / mujoco 341+9（本批修复新增 13 条测试，含 6 处先红后绿）；Android JVM 全绿（DaysSheetTest 10）；六道契约门禁绿（台账 44 行/50 条目，Copy 350=350）。Swift/真机与真实 ONNX 热插拔由 CI 与真机裁决。
 - **QA**：3 维对抗审查 28 agent，拦下 2 blocker（setSkill 路径穿越；冷启动把终身计数当今天）+ 4 major，全部修复并带红绿证据，见 `docs/QA_SKILLS_DAYS_2026-11-19.md`。
 
+### 四之三十二、D1 排版与网格——深度重构第一批（2026-11-20）
+
+总纲 `docs/UIUX_REFACTOR_DEEP_2026-11-19.md`（对抗评审结论在 §9）的 D1，按「契约先红、再施工」执行：
+
+- **令牌三层落地（双端同名同值）**：`DuckTheme.swift`/`DuckTheme.kt` 在色层之上补 `type`（iOS 语义字体七档——display/title/body/label/caption/data/micro，动态字体免费生效；Android Type 10/11/13/15/20/28 sp）、`space`（4 基数 2–32）、`radius`（tiny/thumb/control/card/panel）、`icon`（12/15/18/22，不随字号缩放的几何量）。
+- **裸值清零**：iOS 207 处、Android 143 处固定字号全部走令牌（主题文件外 `.system(size:`/`fontSize=`=0）；padding/spacedBy/Spacer/cornerRadius 全部收进 4 基数与五档圆角（off-grid=0）。棘轮 `check-ui-baseline.py` 重定基线并收紧到 0，新增 `ios/android_offgrid_spacing`、`ios/android_radius_literals` 四项；计数排除两个主题文件（令牌持有地）。
+- **动态字体**：首屏固定高容器改自适应（iOS 拇指台/时间栏 `minHeight`，标签允许两行、去掉 `minimumScaleFactor` 压字；Android 同步）；新增 XCUITest `testFirstScreenSurvivesAccessibilityXXXL`（AX3 启动，五个动词 + 时间栏不出屏不重叠）与 Android 冒烟 `font_scale 2.0` 段（uiautomator 断言同语义）。
+- **新门禁**：`scripts/check-ui-scope.py`（UI 批次触碰 `core/`、`upstream/`、`patches/` 即红，书面豁免除外）挂进 contracts.yml 与 ios.yml/android.yml 的本地检查组。
+- **施工留痕（冒烟揪出两个真缺陷，均已修）**：① 时间轨 `height(48.dp)`→`heightIn(min=48.dp)` 是 D1 引入的真缺陷——内层 `fillMaxHeight()` 失去唯一上限后把整列吃掉（失败 dump 实测时间轨按钮 532dp、拇指台被挤成 16dp 残条、五个动词退出语义树），恢复固定高度；该行无随字号缩放内容，固定 48dp 本就正确。② 语言切换从不持久化（iOS 写 UserDefaults、Android 只改内存）——跨端 parity bug，`font_scale` 段的重启揭出；两端统一为切换即持久化，两处重复 handler 收敛为 `flipLanguage()`。冒烟自身同步加固：抽屉未开重试、双通道滚动，失败时 dump/截图/dumpsys/IME 状态全部落 artifact——本批三次定位全靠它。
+- **验证**：本地 `compileDebugKotlin + testDebugUnitTest` 绿、八道静态门禁绿；CI 四工作流全绿（Android+Contracts 于 `86b5365`；iOS+Core 于 `20189e8`，其后提交未触碰两路径）。棘轮 `shell_kt_lines` 压回 3763 基线。
+- **附**：D2 组件契约先行件已备于 `contracts/ui-components.json` + `scripts/check-ui-components.py`（未接线，随 D2 首推按「先红后绿」落门禁）。
+
 ---
 
 ## 八、仓库与复现

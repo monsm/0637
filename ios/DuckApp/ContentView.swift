@@ -1606,15 +1606,7 @@ struct SkillRing: View {
                     .font(.duckBody.weight(.semibold))
                 Spacer()
                 Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(DuckIcon.xs)
-                        .foregroundStyle(.secondary)
-                        // 48 pt, the same floor as every other control; the
-                        // 28 pt icon-only target was the smallest thing in
-                        // the app.
-                        .frame(width: 48, height: 48)
-                        .background(Color.white.opacity(0.10), in: Circle())
-                        .contentShape(Circle())
+                    DuckCloseGlyph()
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(Copy.close)

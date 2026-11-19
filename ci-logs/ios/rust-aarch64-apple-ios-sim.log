@@ -3,20 +3,12 @@
    Compiling kinematics v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/kinematics)
    Compiling duck-mobile-core v0.1.0 (/Users/runner/work/0637/0637/core/duck-mobile-core)
    Compiling odometry v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/odometry)
-   Compiling duck-control v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-control)
    Compiling robotd-params v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/robotd-params)
-warning: unused import: `crate::control::Tuning`
-  --> duck-mobile-core/src/ffi.rs:19:5
-   |
-19 | use crate::control::Tuning;
-   |     ^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
-
+   Compiling duck-control v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-control)
 warning: variable does not need to be mutable
-   --> duck-mobile-core/src/lan.rs:203:13
+   --> duck-mobile-core/src/lan.rs:209:13
     |
-203 |         let mut inner = self.inner.lock().map_err(|_| "the peer table is busy".to_owned())?;
+209 |         let mut inner = self
     |             ----^^^^^
     |             |
     |             help: remove this `mut`
@@ -24,31 +16,31 @@ warning: variable does not need to be mutable
     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
 
 warning: unused variable: `name`
-   --> duck-mobile-core/src/ffi.rs:805:23
-    |
-805 |         Intent::Skill(name) if core.runtime.shutting_down() => {
-    |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
-    |
-    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+    --> duck-mobile-core/src/ffi.rs:2258:23
+     |
+2258 |         Intent::Skill(name) if core.runtime.shutting_down() => {
+     |                       ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
 
 warning: unused variable: `dir`
-    --> duck-mobile-core/src/ffi.rs:1337:24
+    --> duck-mobile-core/src/ffi.rs:3051:24
      |
-1337 |         Intent::Reload(dir) if core.runtime.shutting_down() => {
+3051 |         Intent::Reload(dir) if core.runtime.shutting_down() => {
      |                        ^^^ help: if this is intentional, prefix it with an underscore: `_dir`
 
 warning: variable does not need to be mutable
-   --> duck-mobile-core/src/mujoco.rs:554:13
+   --> duck-mobile-core/src/mujoco.rs:765:13
     |
-554 |         let mut copy = Self {
+765 |         let mut copy = Self {
     |             ----^^^^
     |             |
     |             help: remove this `mut`
 
 warning: type `DuckMj` is more private than the item `MujocoIo::handle`
-   --> duck-mobile-core/src/mujoco.rs:587:5
+   --> duck-mobile-core/src/mujoco.rs:799:5
     |
-587 |     pub fn handle(&self) -> *mut DuckMj {
+799 |     pub fn handle(&self) -> *mut DuckMj {
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ method `MujocoIo::handle` is reachable at visibility `pub`
     |
 note: but type `DuckMj` is only usable at visibility `pub(self)`
@@ -75,5 +67,23 @@ warning: function `duck_mj_timestep` is never used
 43 |     fn duck_mj_timestep(handle: *const DuckMj) -> c_double;
    |        ^^^^^^^^^^^^^^^^
 
-warning: `duck-mobile-core` (lib) generated 8 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 5 suggestions)
-    Finished `release` profile [optimized] target(s) in 56.84s
+warning: function `duck_mj_ncon` is never used
+  --> duck-mobile-core/src/mujoco.rs:59:8
+   |
+59 |     fn duck_mj_ncon(handle: *const DuckMj) -> c_int;
+   |        ^^^^^^^^^^^^
+
+warning: function `duck_mj_contact_geoms` is never used
+  --> duck-mobile-core/src/mujoco.rs:60:8
+   |
+60 |     fn duck_mj_contact_geoms(handle: *const DuckMj) -> *const c_int;
+   |        ^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `duck_mj_geom_name` is never used
+  --> duck-mobile-core/src/mujoco.rs:61:8
+   |
+61 |     fn duck_mj_geom_name(handle: *const DuckMj, geom: c_int) -> *const c_char;
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: `duck-mobile-core` (lib) generated 10 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 4 suggestions)
+    Finished `release` profile [optimized] target(s) in 55.11s

@@ -27,6 +27,8 @@ import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.Visibility
@@ -39,6 +41,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
  * the contract between the platforms; only the glyphs differ.
  */
 internal object Icons {
+    /** The component layer's two glyphs (DuckChip selection, DuckCloseControl). */
+    val check: ImageVector = MaterialIcons.Outlined.Check
+    val close: ImageVector = MaterialIcons.Outlined.Close
     val feed: ImageVector = MaterialIcons.Outlined.Restaurant
     /** The big-button page: reuses the core icon set - the extended
      *  material set is not a dependency, and these three verbs already have
