@@ -2102,7 +2102,7 @@ private fun PortraitTimeRail(
         (newest - oldestClamped).toDouble() / newest.coerceAtLeast(1L).toDouble()
         ).coerceIn(0.0, 1.0)
     Row(
-        modifier.heightIn(min = 48.dp),
+        modifier.height(48.dp),
         horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
