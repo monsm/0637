@@ -118,7 +118,7 @@ struct DuckListRow: View {
                 if selected {
                     Image(systemName: "checkmark")
                         .font(DuckIcon.xs)
-                        .foregroundStyle(.duckAction)
+                        .foregroundStyle(Color.duckAction)
                 }
             }
             .frame(minHeight: 56)

@@ -16,12 +16,12 @@ struct DuckEmptyState: View {
         VStack(spacing: DuckSpace.md) {
             Text(title)
                 .font(.duckBody)
-                .foregroundStyle(.duckTextPrimary)
+                .foregroundStyle(Color.duckTextPrimary)
                 .multilineTextAlignment(.center)
             if let note {
                 Text(note)
                     .font(.duckCaption)
-                    .foregroundStyle(.duckTextSecondary)
+                    .foregroundStyle(Color.duckTextSecondary)
                     .multilineTextAlignment(.center)
             }
             if let actionTitle, let action {
@@ -48,11 +48,11 @@ struct DuckErrorCard: View {
         VStack(spacing: DuckSpace.sm) {
             Text(title)
                 .font(.duckLabel.weight(.semibold))
-                .foregroundStyle(.duckBad)
+                .foregroundStyle(Color.duckBad)
                 .multilineTextAlignment(.center)
             Text(reason)
                 .font(.duckCaption)
-                .foregroundStyle(.duckTextSecondary)
+                .foregroundStyle(Color.duckTextSecondary)
                 .multilineTextAlignment(.center)
             DuckButton(
                 title: Copy.retry,
@@ -96,7 +96,7 @@ struct DuckLoading: View {
                 .scaleEffect(reduceMotion ? 1 : 0.85)
             Text(title)
                 .font(.duckCaption)
-                .foregroundStyle(.duckTextSecondary)
+                .foregroundStyle(Color.duckTextSecondary)
         }
         .padding(DuckSpace.lg)
         .frame(maxWidth: .infinity)

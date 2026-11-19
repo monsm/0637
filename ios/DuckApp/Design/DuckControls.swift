@@ -105,7 +105,7 @@ struct DuckProgress: View {
             if let label {
                 Text(label)
                     .font(.duckCaption)
-                    .foregroundStyle(.duckTextPrimary)
+                    .foregroundStyle(Color.duckTextPrimary)
             }
             HStack(spacing: DuckSpace.sm) {
                 GeometryReader { proxy in
