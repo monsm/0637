@@ -200,6 +200,28 @@ int duck_mj_mesh_id(const DuckMj* h, const char* name) { return mj_name2id(h->m,
 int duck_mj_site_id(const DuckMj* h, const char* name) { return mj_name2id(h->m, mjOBJ_SITE, name); }
 int duck_mj_key_id(const DuckMj* h, const char* name) { return mj_name2id(h->m, mjOBJ_KEY, name); }
 
+/* pairs[] below is 1024 ints = 512 (geom1, geom2) contact pairs. MuJoCo can
+   report more contacts than that in one step, and the caller sizes its slice
+   from this count: clamp here so `ncon * 2` ints never run past the buffer. */
+int duck_mj_ncon(const DuckMj* h) {
+    if (!h || !h->d) return 0;
+    return h->d->ncon < 512 ? h->d->ncon : 512;
+}
+/* The contact pairs as a caller-owned flat (geom1, geom2) array. mjContact
+   is a large struct, so the ids are copied out; NULL when there are none. */
+const int* duck_mj_contact_geoms(const DuckMj* h) {
+    if (!h || !h->d || h->d->ncon <= 0) return NULL;
+    static thread_local int pairs[1024];
+    int n = h->d->ncon < 512 ? h->d->ncon : 512;
+    for (int i = 0; i < n; i++) {
+        pairs[i * 2 + 0] = h->d->contact[i].geom[0];
+        pairs[i * 2 + 1] = h->d->contact[i].geom[1];
+    }
+    return pairs;
+}
+const char* duck_mj_geom_name(const DuckMj* h, int geom) {
+    return (geom >= 0 && geom < h->m->ngeom) ? mj_id2name(h->m, mjOBJ_GEOM, geom) : NULL;
+}
 const char* duck_mj_body_name(const DuckMj* h, int body) { return mj_id2name(h->m, mjOBJ_BODY, body); }
 const char* duck_mj_mesh_name(const DuckMj* h, int mesh) { return mj_id2name(h->m, mjOBJ_MESH, mesh); }
 const char* duck_mj_joint_name(const DuckMj* h, int joint) { return mj_id2name(h->m, mjOBJ_JOINT, joint); }

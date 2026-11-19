@@ -1316,13 +1316,21 @@ fn handle(
                 .to_string()),
             }
         }
+        // The AR floor, in ONE dimension, pinned here because the shells
+        // measured different things: `z` is the walkable plane's **offset in
+        // metres from the scene's default floor** (0 = unchanged), not the
+        // camera's height over that plane and not an absolute world z. The
+        // core moves the plane and the duck together, so a standing duck
+        // still stands on its floor. `-0.1 ..= 0.3 m` is the accepted band;
+        // anything else is refused with a reason rather than clamped.
         ("POST", "/floor") => {
-            let z = value["z"].as_f64().unwrap_or(0.0);
-            if !(0.0..=2.0).contains(&z) {
-                Ok(
-                    json!({ "ok": false, "error": "the floor lives between 0 and 2 m" })
-                        .to_string(),
-                )
+            let z = value["z"].as_f64().unwrap_or(f64::NAN);
+            if !z.is_finite() || !(-0.1..=0.3).contains(&z) {
+                Ok(json!({
+                    "ok": false,
+                    "error": "the floor offset lives between -0.1 and 0.3 m from the scene's floor",
+                })
+                .to_string())
             } else {
                 Ok(queue.request(Intent::FloorHeight(z)).to_string())
             }
@@ -1753,6 +1761,40 @@ mod tests {
         assert!(response.contains(r#""label":"walk""#), "{response}");
         let response = request(port, "GET", "/skills", "");
         assert!(response.contains("roulade"), "{response}");
+    }
+
+    /// The AR floor's dimension is pinned at the route: `z` is a **scene-
+    /// relative offset** in metres, accepted only in `-0.1 ..= 0.3`. The
+    /// shells' measured camera heights are not this number; QA aligns them.
+    /// A legal offset reaches the duck as `Intent::FloorHeight`; an
+    /// impossible one is refused at the door, never clamped.
+    #[test]
+    fn the_floor_route_speaks_scene_offsets_and_refuses_impossible_ones() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for z in [-0.1, 0.0, 0.3] {
+            let response = request(port, "POST", "/floor", &format!(r#"{{"z":{z}}}"#));
+            assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+            assert!(!response.contains("floor offset lives"), "{response}");
+            let queued = queue.drain();
+            assert_eq!(queued.len(), 1, "{z} must be queued: {response}");
+            match &queued[0].intent {
+                Intent::FloorHeight(queued) => assert!((queued - z).abs() < 1e-12),
+                other => panic!("unexpected intent: {other:?}"),
+            }
+        }
+
+        for body in [r#"{"z":0.31}"#, r#"{"z":-0.11}"#, "{}"] {
+            let response = request(port, "POST", "/floor", body);
+            assert!(
+                response.contains("the floor offset lives between -0.1 and 0.3 m"),
+                "{body} must be refused at the route: {response}"
+            );
+            assert!(queue.drain().is_empty(), "{body} must not reach the duck");
+        }
     }
 
     /// The collection page: each loaded mood and manifest trick with the

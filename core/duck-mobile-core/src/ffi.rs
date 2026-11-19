@@ -996,7 +996,7 @@ pub unsafe extern "C" fn duck_core_new(
         stage("policy");
         let policy = Policy::load(&bundle.paths, 0.05).map_err(|error| error.to_string())?;
         stage("mujoco");
-        let body = MujocoIo::load(&scene)?;
+        let body = load_body(&scene, &policies)?;
         stage("runtime");
         let tuning = bundle.tuning();
         let mut runtime = DuckRuntime::new(
@@ -1022,6 +1022,16 @@ pub unsafe extern "C" fn duck_core_new(
         let voice_seed = seed_from_fingerprint(&provenance.fingerprint);
         runtime.set_voice_seed(voice_seed);
         stage(&format!("voice seed {voice_seed:#x}"));
+        // The room's microphone can hear a hand stroking the duck when this
+        // build shipped the official CNN. Missing model, missing ONNX
+        // Runtime, wrong shape: the feature stays off and the duck starts —
+        // the classifier is an interaction, never a health verdict.
+        if let Some(model) = pet_model_path(&scene, &policies) {
+            match runtime.load_pet_detector(&model) {
+                Ok(()) => stage(&format!("pet model {}", model.display())),
+                Err(error) => stage(&format!("pet model unavailable: {error}")),
+            }
+        }
         stage("ready");
 
         // The shell's ring shows the same verbs `/skills` publishes, so a
@@ -1464,6 +1474,76 @@ fn scene_for(core: &DuckCore, mode: robotd_params::Mode) -> Option<String> {
     }
 }
 
+/// Where the official pet-detect model sits, if this build shipped it.
+///
+/// The shells stage non-policy models beside the scene/policies; the actual
+/// layouts are `<root>/pet-detect/pet_detect.onnx` (Android
+/// `filesDir/.../pet-detect/`, iOS `DuckResources/pet-detect/`) and the
+/// older `<root>/models/pet_detect.onnx` convention used by the pickup
+/// classifier. The core derives every candidate from the `scene_path` and
+/// `policies_dir` its caller already passes — no platform path is baked in —
+/// and accepts only a file that exists: no model staged means the feature is
+/// off. `DUCK_PET_MODEL` names an explicit file (tests and debugging).
+fn pet_model_path(scene: &str, policies: &Path) -> Option<std::path::PathBuf> {
+    const MODEL: &str = "pet_detect.onnx";
+    if let Some(explicit) = std::env::var_os("DUCK_PET_MODEL").map(std::path::PathBuf::from) {
+        return explicit.is_file().then_some(explicit);
+    }
+    let mut candidates = Vec::new();
+    let mut add_root = |root: &Path| {
+        candidates.push(root.join("pet-detect").join(MODEL));
+        candidates.push(root.join("models").join(MODEL));
+        candidates.push(root.join(MODEL));
+    };
+    if let Some(scene_dir) = Path::new(scene).parent() {
+        if let Some(root) = scene_dir.parent().and_then(Path::parent) {
+            add_root(root);
+        }
+        add_root(scene_dir);
+    }
+    if let Some(root) = policies.parent() {
+        add_root(root);
+    }
+    add_root(policies);
+    candidates.into_iter().find(|path| path.is_file())
+}
+
+/// Where the shell staged its AR depth scan, if it wrote one.
+///
+/// The contract is `obstacles.xml` in the directory of the `scene_path` the
+/// caller already passes — Android writes
+/// `filesDir/duck/robot/microduck/obstacles.xml`, iOS plans the same shape
+/// beside `DuckResources/robot/microduck/scene_backlash.xml` — with the
+/// policy root accepted as a fallback for a build that stages assets
+/// differently. No platform path is hard-coded; the scene parameter is the
+/// single source of the location. `DUCK_OBSTACLES_DIR` names an explicit
+/// directory for tests and debugging. A shell that never scanned leaves no
+/// file, and the duck loads exactly as before.
+fn obstacles_staging(scene: &str, policies: &Path) -> Option<std::path::PathBuf> {
+    let has_scan = |dir: &Path| dir.join(crate::mujoco::OBSTACLES_FILE).is_file();
+    if let Some(dir) = std::env::var_os("DUCK_OBSTACLES_DIR").map(std::path::PathBuf::from) {
+        return has_scan(&dir).then_some(dir);
+    }
+    let mut candidates = Vec::new();
+    if let Some(scene_dir) = Path::new(scene).parent() {
+        candidates.push(scene_dir.to_path_buf());
+    }
+    if let Some(root) = policies.parent() {
+        candidates.push(root.to_path_buf());
+    }
+    candidates.push(policies.to_path_buf());
+    candidates.into_iter().find(|dir| has_scan(dir))
+}
+
+/// The body this build loads: the scene, with the room's scanned furniture
+/// merged when one was staged.
+fn load_body(scene: &str, policies: &Path) -> Result<MujocoIo, String> {
+    match obstacles_staging(scene, policies) {
+        Some(dir) => MujocoIo::load_with_obstacles(scene, dir),
+        None => MujocoIo::load(scene),
+    }
+}
+
 /// Switch the whole bundle, the way `robotd`'s mode line does.
 ///
 /// Not a filter: roller loads `roller.onnx` as the locomotion network, drops
@@ -1521,7 +1601,7 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
         // not select one.
         policy.set_standing_disabled(true);
     }
-    let body = MujocoIo::load(&scene)?;
+    let body = load_body(&scene, &core.policies)?;
     let mut runtime = DuckRuntime::new(
         body,
         policy,
@@ -1551,6 +1631,12 @@ fn switch_mode(core: &mut DuckCore, name: &str) -> Result<serde_json::Value, Str
     // watch on the new runtime, or it silently disappears for the session.
     if let Some(model) = core.runtime.pickup_model().map(Path::to_path_buf) {
         let _ = runtime.load_pickup(&model);
+    }
+    // The petting classifier is part of the duck too, and its session was
+    // built on the runtime this switch replaces. Same model, same thresholds,
+    // fresh ring.
+    if let Some(model) = core.runtime.pet_detector_model().map(Path::to_path_buf) {
+        let _ = runtime.load_pet_detector(&model);
     }
 
     // The emotion timelines are part of the duck, not of the body: the fresh
@@ -2129,6 +2215,17 @@ fn apply_control_to(runtime: &mut DuckRuntime<MujocoIo>, command: ControlCommand
     runtime_policy_enabled(runtime)
 }
 
+/// Dispatch one intent with the runtime `apply_intent` prepared.
+///
+/// **Invariant — read this before adding an arm.** For every intent that
+/// `apply_intent` routes through the branch swap (everything outside its
+/// `global` list), `core.runtime` *is* the selected branch when this function
+/// runs. Those arms must speak to `core.runtime` and must not call
+/// [`on_active`] or [`active_runtime`]: both swap/read the branch slot, which
+/// holds the **original** runtime while the swap is in flight. The global
+/// arms (`Mode`, `Fork`, `DropBranch`, `SelectBranch`, `QuestDay`, `Backup`,
+/// `RestoreBackup`, `TrajectoryExport`) deliberately run without a swap; they
+/// are the only place [`active_runtime`] is the right reader.
 fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value {
     match intent {
         Intent::Twist(twist) => {
@@ -2319,6 +2416,9 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
             if let Some(v) = num("pets") {
                 life.pets = v as u64;
+            }
+            if let Some(v) = num("sound_pets") {
+                life.sound_pets = v as u64;
             }
             if let Some(v) = num("fed") {
                 life.fed = v as u64;
@@ -2556,27 +2656,27 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
         }
         Intent::Chorus(moves) => {
-            if active_runtime(core).chorus_active() {
+            // `apply_intent` swapped the selected branch into `core.runtime`;
+            // both the checks and the start speak to that duck. on_active or
+            // active_runtime here would swap back to the original.
+            if core.runtime.chorus_active() {
                 return refuse(core, "a chorus is already playing".to_owned());
             }
             // The route checked the published list; the runtime is the
             // authority on which official emotions this build loaded.
-            if !moves.iter().all(|name| {
-                active_runtime(core)
-                    .emotion_names()
-                    .iter()
-                    .any(|loaded| loaded == name)
-            }) {
+            if !moves
+                .iter()
+                .all(|name| core.runtime.emotion_names().iter().any(|loaded| loaded == name))
+            {
                 return refuse(core, "no such emotion".to_owned());
             }
-            let id = format!("chorus-{}", active_runtime(core).clock().tick);
+            let id = format!("chorus-{}", core.runtime.clock().tick);
             let sent = core.lan.as_ref().map(|lan| lan.chorus(&id, &moves));
             match sent {
                 Some(Ok(())) => {
                     let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
-                    on_active(core, |runtime| {
-                        runtime.start_chorus("lead", moves.clone(), peers, Some(id))
-                    });
+                    core.runtime
+                        .start_chorus("lead", moves.clone(), peers, Some(id));
                     json!({ "ok": true, "queued": true, "moves": moves })
                 }
                 Some(Err(error)) => refuse(core, format!("chorus refused: {error}")),
@@ -2584,21 +2684,19 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
         }
         Intent::Ensemble(moves, sounds) => {
-            if active_runtime(core).chorus_active() {
+            if core.runtime.chorus_active() {
                 return refuse(core, "a performance is already playing".to_owned());
             }
-            if !moves.iter().all(|name| {
-                active_runtime(core)
-                    .emotion_names()
-                    .iter()
-                    .any(|loaded| loaded == name)
-            }) || !sounds
+            if !moves
                 .iter()
-                .all(|tag| crate::voice::TAGS.contains(&tag.as_str()))
+                .all(|name| core.runtime.emotion_names().iter().any(|loaded| loaded == name))
+                || !sounds
+                    .iter()
+                    .all(|tag| crate::voice::TAGS.contains(&tag.as_str()))
             {
                 return refuse(core, "no such mood or sound".to_owned());
             }
-            let id = format!("ensemble-{}", active_runtime(core).clock().tick);
+            let id = format!("ensemble-{}", core.runtime.clock().tick);
             let sent = core
                 .lan
                 .as_ref()
@@ -2607,17 +2705,15 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 Some(Ok(roles)) => {
                     let peers = core.lan.as_ref().map_or(0, crate::lan::Lan::peer_count);
                     // The lead plays too: its own part is the first role.
-                    on_active(core, |runtime| {
-                        runtime.start_ensemble(
-                            "lead",
-                            0,
-                            roles + 1,
-                            moves.clone(),
-                            sounds.clone(),
-                            peers,
-                            Some(id.clone()),
-                        );
-                    });
+                    core.runtime.start_ensemble(
+                        "lead",
+                        0,
+                        roles + 1,
+                        moves.clone(),
+                        sounds.clone(),
+                        peers,
+                        Some(id.clone()),
+                    );
                     json!({ "ok": true, "roles": roles + 1, "moves": moves, "sounds": sounds })
                 }
                 Some(Err(error)) => refuse(core, format!("ensemble refused: {error}")),
@@ -2646,16 +2742,25 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             {
                 return refuse(core, "unknown backup format".to_owned());
             }
+            // A global intent gets no branch swap from `apply_intent`, so the
+            // restore must swap explicitly: `on_active` is the correct
+            // swapper in this context, and the answers are read after the
+            // swap so they describe the duck that was written. (The QuestDay
+            // call below is global-safe as written: it reads the watched duck
+            // through `active_runtime`.)
+            //
             // Three parts, three of the duck's own doors: the care restore
             // clamps what it is given, the quest board re-measures against
             // the duck as it is now, and the rules vocabulary refuses a
             // program with a word the duck does not know. Nothing here
             // accepts a sentence, a number without a source, or a new kind
             // of fact.
-            let care = apply_intent_active(
-                core,
-                Intent::RestoreCare(value.get("care").cloned().unwrap_or(json!({}))),
-            );
+            let saved_care = value.get("care").cloned().unwrap_or(json!({}));
+            let mut care = json!(null);
+            on_active(core, |runtime| {
+                runtime.restore_care(&saved_care);
+                care = json!({ "ok": true, "care": runtime.care_summary() });
+            });
             let day = value
                 .get("day")
                 .and_then(serde_json::Value::as_str)
@@ -2669,10 +2774,21 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             } else {
                 json!({ "ok": false, "error": "the backup carries no calendar day" })
             };
-            let rules = apply_intent_active(
-                core,
-                Intent::SetRules(value.get("rules").cloned().unwrap_or(json!({}))),
-            );
+            let saved_rules = value.get("rules").cloned().unwrap_or(json!({}));
+            let mut rules_answer = json!(null);
+            let mut rules_error = None;
+            on_active(core, |runtime| match runtime.set_rules(&saved_rules) {
+                Ok(()) => {
+                    rules_answer = json!({ "ok": true, "rules": runtime.rules_summary() })
+                }
+                Err(reason) => rules_error = Some(reason),
+            });
+            // A refused program still goes through the refusal channel, the
+            // same words and side effect `Intent::SetRules` gives.
+            let rules = match rules_error {
+                Some(reason) => refuse(core, format!("rules refused: {reason}")),
+                None => rules_answer,
+            };
             json!({ "ok": true, "care": care, "quests": quests, "rules": rules })
         }
         Intent::PeerName(name) => match &core.lan {
@@ -2709,17 +2825,17 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
         }
         Intent::FloorHeight(z) => {
             // Only a MuJoCo body has a ground to move; the feature-gated
-            // core answers honestly rather than pretending.
+            // core answers honestly rather than pretending. `z` is the
+            // offset from the scene's default floor — the route owns the
+            // dimension and range, and the runtime moves the duck with the
+            // plane so a standing duck does not end up under it.
             #[cfg(feature = "mujoco")]
             {
-                // The closure carries the verdict out through a captured
-                // slot: on_active's own shape returns nothing.
-                let mut moved = false;
-                on_active(core, |runtime| {
-                    moved = runtime.set_floor_height(z).unwrap_or(false);
-                });
-                if moved {
-                    json!({ "ok": true, "floor_z": z })
+                // `apply_intent` swapped the selected branch into
+                // `core.runtime` for this dispatch; the plane to move is
+                // that duck's. Swapping again here would move the original.
+                if core.runtime.set_floor_height(z).unwrap_or(false) {
+                    json!({ "ok": true, "floor_offset_m": z, "floor_z": z })
                 } else {
                     refuse(core, "the scene has no ground plane".to_owned())
                 }
@@ -2731,8 +2847,12 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
             }
         }
         Intent::ParentBudget(minutes) => {
-            on_active(core, |runtime| runtime.set_parent_budget(minutes));
-            let summary = active_runtime(core).care_summary();
+            // Same branch swap: during the dispatch `core.runtime` *is* the
+            // duck the client is watching, so both the budget and the answer
+            // come from it. `active_runtime` would read the branch slot,
+            // which holds the original while the swap is in flight.
+            core.runtime.set_parent_budget(minutes);
+            let summary = core.runtime.care_summary();
             json!({ "ok": true, "minutes": minutes, "parent": summary.get("parent") })
         }
         Intent::PadSwitch(on) => {
@@ -2986,7 +3106,7 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 None => refuse(core, format!("no checkpoint at tick {tick}")),
             }
         }
-        Intent::Sensor(reading) => {
+        Intent::Sensor(mut reading) => {
             use crate::sensors::Mode;
             let mode = match reading.mode.as_str() {
                 "ar" => Some(Mode::Ar),
@@ -2999,6 +3119,18 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                 "imu" => core.sensors.imu = Some(reading),
                 "camera" => core.sensors.camera = Some(reading),
                 "microphone" => {
+                    // The shell's optional PCM16 rides beside the RMS/peak
+                    // summary. Pull it out first: `/sensors` publishes the
+                    // registry, and a megabyte of audio base64 is neither
+                    // useful to a poller nor private to keep. The runtime
+                    // owns the model and the pause gate; without a model the
+                    // call is a no-op, which is the feature's off switch.
+                    if let Some((samples, rate)) = crate::sensors::take_pcm16(&mut reading.value) {
+                        // `apply_intent` already swapped the selected branch
+                        // into `core.runtime`; this arm speaks to that duck.
+                        // Swapping again (`on_active`) fed the original.
+                        let _ = core.runtime.pet_by_sound(&samples, rate);
+                    }
                     core.sensors.microphone = Some(reading);
                     core.sound_sequence = core.sound_sequence.wrapping_add(1);
                 }
@@ -3115,6 +3247,12 @@ fn active_runtime(core: &DuckCore) -> &DuckRuntime<MujocoIo> {
 
 /// Run one runtime-only operation on the duck the client is watching,
 /// swapping a selected branch into `core.runtime` for the duration.
+///
+/// **Never call this from inside [`apply_intent_active`] for a swapped
+/// intent**: that dispatch already has the selected branch in `core.runtime`,
+/// so the second swap here would operate on the original. Inside those arms
+/// speak to `core.runtime` directly. This helper is for callers outside the
+/// dispatch — the tick's LAN/peer path, mode carriers, readers.
 fn on_active(core: &mut DuckCore, f: impl FnOnce(&mut DuckRuntime<MujocoIo>)) {
     let selected = core.selected;
     if selected > 0 && selected <= core.branches.len() {
@@ -3851,6 +3989,10 @@ fn publish_state(core: &DuckCore) {
         "sound_event": active.last_sound_event().map(|(kind, tick)| {
             json!({ "kind": kind, "tick": tick })
         }),
+        // The microphone's petting verdict: whether the official CNN hears a
+        // hand on the shell now, and the tick the spell started. The audio
+        // itself never reaches the observation or the wire.
+        "pet_detect": active.pet_detect_summary(),
         // The last programmed block that fired, so the child can see their
         // rule run even when the action's own label is gone.
         "rule_event": active.last_rule(),
@@ -8709,6 +8851,512 @@ mod tests {
             // Seek restores the active runtime, which drops the pending swap.
             assert_eq!(unsafe { duck_core_seek(core, 1) }, 0);
             assert!(c.swap_landing.is_none(), "the seek cleared the marker");
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// SENSORS S2 wiring: the `/floor` route's intent reaches the MuJoCo plane.
+    /// The dimension is the scene-relative offset pinned in `POST /floor`:
+    /// the plane moves to the default floor + offset, the duck moves with it,
+    /// and the duck is still standing afterwards — not buried in, or dropped
+    /// through, its own floor.
+    #[test]
+    fn the_floor_offset_moves_the_plane_and_the_duck_stays_on_it() {
+        const TRUNK: usize = 2;
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        let plane_z = |core: *mut DuckCore| -> Option<f64> {
+            let io = unsafe { (*core).runtime.io() };
+            (0..io.geom_count())
+                .filter_map(|geom| io.geom_info(geom))
+                .find(|info| info.geom_type == 0)
+                .map(|info| info.pos[2])
+        };
+        let status = |core: *mut DuckCore| {
+            let mut status = DuckStatus {
+                bringup: 0,
+                fallen: 0,
+                gain: 0,
+                label: [0; 64],
+                trunk: [0.0; 3],
+                gravity: [0.0; 3],
+                imu_ready: 0,
+                picked_up: 0,
+                p_held: 0.0,
+                mouth: 0.0,
+                volts: 0.0,
+                has_mouth: 0,
+                fps: 0.0,
+                ticks_per_second: 0.0,
+            };
+            assert_eq!(unsafe { duck_core_status(core, &mut status) }, 0);
+            status
+        };
+        assert!(plane_z(core).expect("the scene has a ground plane").abs() < 1e-9);
+        let trunk_before = status(core).trunk[TRUNK];
+
+        // +5 cm, inside the route's -0.1..=0.3 band.
+        let answer = unsafe { apply_intent(&mut *core, Intent::FloorHeight(0.05)) };
+        assert_eq!(answer["ok"], json!(true), "{answer}");
+        assert_eq!(answer["floor_offset_m"], json!(0.05));
+        let plane = plane_z(core).expect("the plane is still there");
+        assert!((plane - 0.05).abs() < 1e-9, "plane z is {plane}");
+        let trunk = status(core).trunk[TRUNK];
+        assert!(
+            (trunk - (trunk_before + 0.05)).abs() < 1e-6,
+            "the duck moves with its floor: {trunk_before} -> {trunk}"
+        );
+
+        // Let the gait absorb the step: it must still be up, above the
+        // plane it stands on.
+        for _ in 0..100 {
+            assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        }
+        let settled = status(core);
+        assert_eq!(settled.fallen, 0, "the floor move must not trip the duck");
+        assert_eq!(settled.bringup, 2, "the duck is still Ready");
+        assert!(
+            settled.trunk[TRUNK] > plane + 0.04,
+            "the trunk must stay above its floor: {} vs {plane}",
+            settled.trunk[TRUNK]
+        );
+
+        // Back down past the default: the same rule in the other direction.
+        // A 5 cm step down is a real one for the gait — the settled trunk
+        // sits lower and the fall verdict is not the assertion here, only
+        // that the plane and the duck moved together and the duck is still
+        // standing on its floor.
+        let answer = unsafe { apply_intent(&mut *core, Intent::FloorHeight(-0.05)) };
+        assert_eq!(answer["ok"], json!(true), "{answer}");
+        let lowered = plane_z(core).expect("plane");
+        assert!(
+            (lowered + 0.05).abs() < 1e-9,
+            "the plane is 0.05 below the default floor, got {lowered}"
+        );
+        for _ in 0..100 {
+            assert_eq!(unsafe { duck_core_tick(core) }, 0);
+        }
+        let settled = status(core);
+        assert!(
+            settled.trunk[TRUNK] > lowered,
+            "the duck is still above its lowered floor: {} vs {lowered}",
+            settled.trunk[TRUNK]
+        );
+        unsafe { duck_core_free(core) };
+    }
+
+    /// `/sensor` microphone PCM: decoded into the detector, stripped from the
+    /// registry so `/sensors` never echoes audio, and `/state.pet_detect`
+    /// always shaped even when no stroke is in progress.
+    #[test]
+    fn a_pcm_post_never_echoes_audio_and_publishes_the_verdict() {
+        let (_guard, core) = new_core();
+        tick_until_ready(core);
+        // Attach the official model when the upstream checkout has it, so
+        // the post travels the real detector path. Without it the post must
+        // still be accepted and stripped — the feature is off, not broken.
+        let model = crate::fixtures::workspace_root()
+            .join("upstream/microduck/pet-detect/models/pet_detect.onnx");
+        if model.is_file() {
+            unsafe {
+                (*core)
+                    .runtime
+                    .load_pet_detector(&model)
+                    .expect("the official pet model loads")
+            };
+        } else if crate::fixtures::required() {
+            panic!("the official pet model is missing at {}", model.display());
+        }
+
+        // 3 200 zero bytes: 1 600 i16 samples, base64 is 1 066 groups of
+        // "AAAA" plus the two-byte tail "AAA=".
+        let pcm = format!("{}{}", "AAAA".repeat(1_066), "AAA=");
+        let reading = crate::sensors::Reading {
+            sensor: "microphone".to_owned(),
+            mode: "twin".to_owned(),
+            value: json!({ "rms": 0.01, "pcm16": pcm, "rate": 16000 }),
+            tick_ms: 0,
+            in_observation: false,
+        };
+        let answer = unsafe { apply_intent(&mut *core, Intent::Sensor(reading)) };
+        assert_eq!(answer["ok"], json!(true), "{answer}");
+        assert_eq!(unsafe { duck_core_tick(core) }, 0);
+
+        let sensors = unsafe { (*core).intents.sensors_json() };
+        assert!(
+            !sensors.contains("pcm16"),
+            "the registry must not echo the audio: {sensors}"
+        );
+        assert!(sensors.contains("\"rms\":0.01"), "{sensors}");
+        let state: serde_json::Value =
+            serde_json::from_str(&unsafe { (*core).intents.state_json() }).expect("state");
+        assert_eq!(
+            state["pet_detect"],
+            json!({ "petting": false, "since_tick": null }),
+            "{state}"
+        );
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The microphone PCM must reach the duck the client is watching. Every
+    /// dispatch arm used to speak `core.runtime`; a branch session swaps the
+    /// selected branch in, so an arm that swaps again (`on_active`) feeds the
+    /// original instead. The same PCM posted twice — once live, once while
+    /// frozen — proves both which duck hears it and that the pause gate holds.
+    #[test]
+    fn a_pcm_post_reaches_the_selected_branch_and_its_pause_gate() {
+        let (_guard, core) = new_core();
+        let model = crate::fixtures::workspace_root()
+            .join("upstream/microduck/pet-detect/models/pet_detect.onnx");
+        if !model.is_file() {
+            if crate::fixtures::required() {
+                panic!("the official pet model is missing at {}", model.display());
+            }
+            eprintln!(
+                "skipping: the official pet model is not here at {}",
+                model.display()
+            );
+            return;
+        }
+        unsafe {
+            let c = &mut *core;
+            let answer = apply_intent(c, Intent::Fork("mic-branch".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let answer = apply_intent(c, Intent::SelectBranch("mic-branch".to_owned()));
+            assert_eq!(answer["selected"], json!("mic-branch"), "{answer}");
+
+            // Inverted thresholds make a silent window a stroke: the test is
+            // about which runtime hears the post, not what the CNN thinks of
+            // digital silence. Both ducks carry the same detector, so either
+            // one feeding itself is visible.
+            let config = || crate::petdetect::DetectorConfig {
+                stride: crate::petdetect::DEFAULT_STRIDE,
+                enter_threshold: -1.0,
+                exit_threshold: 2.0,
+            };
+            c.runtime
+                .load_pet_detector_with_config(&model, config())
+                .expect("the official pet model loads");
+            c.branches[0]
+                .runtime
+                .load_pet_detector_with_config(&model, config())
+                .expect("the official pet model loads on the branch");
+
+            // Exactly one full 16 240-sample window: 32 480 zero bytes.
+            let pcm = format!("{}{}", "AAAA".repeat(10_826), "AAA=");
+            let reading = || crate::sensors::Reading {
+                sensor: "microphone".to_owned(),
+                mode: "twin".to_owned(),
+                value: json!({ "rms": 0.01, "pcm16": pcm, "rate": 16000 }),
+                tick_ms: 0,
+                in_observation: false,
+            };
+            let answer = apply_intent(c, Intent::Sensor(reading()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+
+            let branch = &c.branches[0].runtime;
+            assert_eq!(
+                branch.book().life.sound_pets,
+                1,
+                "the selected branch heard the post"
+            );
+            assert_eq!(
+                branch.pet_detect_summary(),
+                json!({ "petting": true, "since_tick": 0 })
+            );
+            assert_eq!(
+                c.runtime.book().life.sound_pets,
+                0,
+                "the original runtime heard nothing"
+            );
+            assert_eq!(
+                c.runtime.pet_detect_summary(),
+                json!({ "petting": false, "since_tick": null }),
+                "and its verdict did not change"
+            );
+
+            // `/state.pet_detect` publishes the selected duck's verdict.
+            assert_eq!(duck_core_tick(core), 0);
+            let state: serde_json::Value =
+                serde_json::from_str(&c.intents.state_json()).expect("state");
+            assert_eq!(
+                state["pet_detect"],
+                json!({ "petting": true, "since_tick": 0 }),
+                "{state}"
+            );
+
+            // Frozen time hears nothing, on the selected branch too.
+            let answer = apply_intent(c, Intent::Pause(true));
+            assert_eq!(answer["paused"], json!(true), "{answer}");
+            assert!(c.branches[0].runtime.clock().paused);
+            let answer = apply_intent(c, Intent::Sensor(reading()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            assert_eq!(
+                c.branches[0].runtime.book().life.sound_pets,
+                1,
+                "a paused branch hears nothing"
+            );
+            assert_eq!(c.runtime.book().life.sound_pets, 0);
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The floor is the branch's own world: moving it in a branch session
+    /// must not move the original's ground (the arm used to swap twice and
+    /// land on the original).
+    #[test]
+    fn a_floor_offset_lands_on_the_selected_branch() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            let plane = |io: &crate::mujoco::MujocoIo| -> Option<f64> {
+                (0..io.geom_count())
+                    .filter_map(|geom| io.geom_info(geom))
+                    .find(|info| info.geom_type == 0)
+                    .map(|info| info.pos[2])
+            };
+            let answer = apply_intent(c, Intent::Fork("floor-branch".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let answer = apply_intent(c, Intent::SelectBranch("floor-branch".to_owned()));
+            assert_eq!(answer["selected"], json!("floor-branch"), "{answer}");
+            let original_before = plane(c.runtime.io()).expect("the original floor");
+            let branch_before = plane(c.branches[0].runtime.io()).expect("the branch floor");
+
+            let answer = apply_intent(c, Intent::FloorHeight(0.05));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+
+            let branch_after = plane(c.branches[0].runtime.io()).expect("the branch floor");
+            let original_after = plane(c.runtime.io()).expect("the original floor");
+            assert!(
+                (branch_after - (branch_before + 0.05)).abs() < 1e-9,
+                "the selected branch's floor moved: {branch_before} -> {branch_after}"
+            );
+            assert!(
+                (original_after - original_before).abs() < 1e-9,
+                "the original's floor did not move: {original_before} -> {original_after}"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// The allowance is care state, and care is per runtime: setting it in a
+    /// branch session must land on the branch and answer from the same duck.
+    #[test]
+    fn a_parent_budget_lands_on_the_selected_branch() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            let answer = apply_intent(c, Intent::Fork("budget-branch".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let answer = apply_intent(c, Intent::SelectBranch("budget-branch".to_owned()));
+            assert_eq!(answer["selected"], json!("budget-branch"), "{answer}");
+
+            let answer = apply_intent(c, Intent::ParentBudget(30));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            assert_eq!(answer["parent"]["minutes"], json!(30), "{answer}");
+            assert_eq!(
+                c.branches[0].runtime.care_summary()["parent"]["minutes"],
+                json!(30),
+                "the branch owns the allowance"
+            );
+            assert!(
+                c.runtime.care_summary()["parent"]
+                    .get("minutes")
+                    .is_none(),
+                "the original keeps no allowance"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// `sound_pets` is a lifetime counter like every other field in the
+    /// summary: a restart must hand it back, not zero it.
+    #[test]
+    fn a_restored_life_keeps_the_sound_pet_count() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            // A save from before the field existed restores without
+            // inventing a count and without an error: on a fresh book the
+            // field is the book's own zero.
+            let answer = apply_intent(c, Intent::RestoreLife(json!({ "pets": 3 })));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            assert_eq!(c.runtime.book().life.sound_pets, 0);
+
+            let answer =
+                apply_intent(c, Intent::RestoreLife(json!({ "sound_pets": 7, "pets": 3 })));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            assert_eq!(c.runtime.book().life.sound_pets, 7);
+            assert_eq!(c.runtime.book().life.pets, 3);
+            let life: serde_json::Value =
+                serde_json::from_str(&c.intents.life_json()).expect("life");
+            assert_eq!(life["sound_pets"], json!(7), "{life}");
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// A chorus started in a branch session belongs to the selected duck.
+    /// The arm used to validate and start through `active_runtime`/`on_active`
+    /// — a second swap that lands on the original while `apply_intent` has
+    /// the branch in `core.runtime`.
+    #[test]
+    fn a_chorus_with_a_selected_branch_sings_on_the_branch() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            // The arm refuses a move this build did not load; fork clones
+            // the moods, so loading before the fork seeds both ducks.
+            let emotions = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../upstream/microduck/robotd/emotions");
+            c.runtime
+                .load_emotions(&emotions)
+                .expect("the official moods");
+            let answer = apply_intent(c, Intent::Fork("song-branch".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let answer = apply_intent(c, Intent::SelectBranch("song-branch".to_owned()));
+            assert_eq!(answer["selected"], json!("song-branch"), "{answer}");
+            // The transport is a LAN socket, not a peer: the arm refuses
+            // without it. Core creation is serialized, so UDP 8766 is ours.
+            let answer = apply_intent(c, Intent::StartLan("song-lead".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "LAN for the chorus probe: {answer}");
+
+            let answer = apply_intent(c, Intent::Chorus(vec!["yes".to_owned()]));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            assert!(
+                c.branches[0].runtime.chorus_active(),
+                "the selected branch is the duck that sings"
+            );
+            assert!(
+                !c.runtime.chorus_active(),
+                "the original does not perform a branch's chorus"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// `Backup` is a global intent: `apply_intent` does not swap a branch in,
+    /// so `active_runtime` is the selected duck and `core.runtime` is the
+    /// original. Its care summary must describe the selected duck. This is
+    /// the guard for the global arms' reads: "simplifying" them to
+    /// `core.runtime` would back up the wrong animal.
+    #[test]
+    fn a_backup_summary_describes_the_selected_branch() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            let answer = apply_intent(c, Intent::Fork("backup-branch".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let answer = apply_intent(c, Intent::SelectBranch("backup-branch".to_owned()));
+            assert_eq!(answer["selected"], json!("backup-branch"), "{answer}");
+            // Five branch ticks, no touch: the branch's idle is 0.1 s while
+            // the original's is still zero.
+            let answer = apply_intent(c, Intent::Step(5));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let backup = apply_intent(c, Intent::Backup);
+            assert_eq!(
+                backup["care"]["idle_s"],
+                json!(0.1),
+                "the branch's clock is the one backed up: {backup}"
+            );
+            assert_eq!(
+                c.runtime.care_summary()["idle_s"],
+                json!(0.0),
+                "the original is still on tick zero"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// `SelectBranch` is global too: after moving `core.selected`, the policy
+    /// flag it mirrors must come from the newly selected duck. This is the
+    /// second read that must stay `active_runtime`.
+    #[test]
+    fn a_branch_switch_mirrors_the_new_ducks_policy_flag() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            let answer = apply_intent(c, Intent::Fork("flag-branch".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let answer = apply_intent(c, Intent::SelectBranch("flag-branch".to_owned()));
+            assert_eq!(answer["selected"], json!("flag-branch"), "{answer}");
+            // The control door swaps the selected branch in: stop the branch,
+            // leave the original driving.
+            assert!(!apply_control(c, ControlCommand::Enable(false)));
+            assert!(!runtime_policy_enabled(&c.branches[0].runtime));
+            assert!(runtime_policy_enabled(&c.runtime));
+
+            // Selecting the original mirrors its enabled flag...
+            apply_intent(c, Intent::SelectBranch(String::new()));
+            assert!(
+                c.robot_snapshot.lock().unwrap().enabled,
+                "the original is still driving"
+            );
+            // ...and selecting the branch mirrors the branch's disabled one.
+            apply_intent(c, Intent::SelectBranch("flag-branch".to_owned()));
+            assert!(
+                !c.robot_snapshot.lock().unwrap().enabled,
+                "the branch was stopped"
+            );
+        }
+        unsafe { duck_core_free(core) };
+    }
+
+    /// `RestoreBackup` is global, so `apply_intent` gives it no branch swap; the
+    /// care and rules halves must swap explicitly onto the duck the client
+    /// watches. They used to write straight to `core.runtime` — the original —
+    /// while `Intent::Backup` read the selected branch: a backup taken from a
+    /// branch restored into a hidden duck.
+    #[test]
+    fn a_restored_backup_lands_on_the_selected_branch() {
+        let (_guard, core) = new_core();
+        unsafe {
+            let c = &mut *core;
+            let answer = apply_intent(c, Intent::Fork("restore-branch".to_owned()));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+            let answer = apply_intent(c, Intent::SelectBranch("restore-branch".to_owned()));
+            assert_eq!(answer["selected"], json!("restore-branch"), "{answer}");
+            let original_care = c.runtime.care_summary();
+            let original_rules = c.runtime.rules_summary();
+
+            let backup = json!({
+                "format": "microduck-backup/1",
+                "day": "2026-11-19",
+                "care": { "hunger": 0.37, "mood": 0.42, "asleep": false },
+                "quests": { "quests": [] },
+                "rules": {
+                    "rules": [
+                        { "trigger": "clap", "action": "sound", "value": "chirp" }
+                    ]
+                },
+            });
+            let answer = apply_intent(c, Intent::RestoreBackup(backup));
+            assert_eq!(answer["ok"], json!(true), "{answer}");
+
+            // The answer's summaries are the branch's, freshly restored.
+            assert_eq!(answer["care"]["care"]["hunger"], json!(0.37), "{answer}");
+            assert_eq!(answer["care"]["care"]["mood"], json!(0.42), "{answer}");
+            assert_eq!(
+                answer["rules"]["rules"]["rules"][0]["trigger"],
+                json!("clap"),
+                "{answer}"
+            );
+            assert_eq!(c.branches[0].runtime.care_summary()["hunger"], json!(0.37));
+            assert_eq!(
+                c.branches[0].runtime.rules_summary()["rules"][0]["value"],
+                json!("chirp")
+            );
+
+            // The original runtime received neither half.
+            assert_eq!(
+                c.runtime.care_summary()["hunger"],
+                original_care["hunger"],
+                "the original's care is untouched"
+            );
+            assert_eq!(
+                c.runtime.rules_summary(),
+                original_rules,
+                "the original's rules are untouched"
+            );
         }
         unsafe { duck_core_free(core) };
     }

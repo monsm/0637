@@ -29,6 +29,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
 tracing = "0.1"
+# The official pet-detect CNN (`pet_detect.onnx`) runs through the same ONNX
+# Runtime the policies link. Pinned to duck-control's exact version so the
+# workspace keeps one `ort`/`ort-sys`; `default-features = false` lets
+# duck-control's onnx-dynamic/onnx-static features decide how it loads.
+ort = { version = "=2.0.0-rc.11", default-features = false }
 
 [features]
 # Desktop builds dlopen ONNX Runtime (ORT_DYLIB_PATH). iOS builds link the

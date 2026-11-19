@@ -812,6 +812,14 @@ pub struct Checkpoint {
     /// rewind should not carry a clap from a future the duck no longer has.
     #[serde(default)]
     pub last_sound_event: Option<(String, u64)>,
+    /// The sound-petting verdict at this tick. The model session cannot ride
+    /// a checkpoint (ONNX sessions are not serialised), but the edge state
+    /// can: a rewind must not carry a stroke from a future the duck no
+    /// longer has, and a branch must start with the verdict its parent has.
+    #[serde(default)]
+    pub petting: bool,
+    #[serde(default)]
+    pub petting_since_tick: Option<u64>,
     /// The driving-edge bookkeeping, for the same reason as everything above:
     /// a fork or rewind that missed these starts its first tick on a false
     /// rising edge. `driving_prev = false` under a non-zero twist is that edge;
@@ -1022,6 +1030,18 @@ pub struct DuckRuntime<T: RobotIo> {
     pickup: Option<crate::pickup::Watch>,
     /// Where the detector loads from, so a fork can build its own watch.
     pickup_model: Option<std::path::PathBuf>,
+    /// The official `pet_detect` CNN over the phone's microphone. `None`
+    /// when this build has no model: the feature is off, `/sensor` PCM is
+    /// dropped, and nothing else changes.
+    sound_pet: Option<crate::petdetect::PettingDetector>,
+    /// Where the pet model loads from, so a fork or a mode switch reattaches
+    /// it (the same reason `pickup_model` exists).
+    pet_model: Option<std::path::PathBuf>,
+    /// The detector's current verdict, published as `/state.pet_detect`.
+    /// `since_tick` is the tick the current spell started; both are
+    /// checkpointed so a rewind does not carry a stroke from a future.
+    petting: bool,
+    petting_since_tick: Option<u64>,
     /// A hand on the duck: (anchor at grab, offset). The force is applied to
     /// the body, never to a joint.
     carry: Option<([f64; 3], [f64; 3])>,
@@ -1122,8 +1142,14 @@ impl DuckRuntime<MujocoIo> {
     /// The AR floor (SENSORS_PLAN S2): only the MuJoCo body can move its
     /// ground, so the typed impl is where the intent lands. Refused on a
     /// body without a plane geom.
-    pub fn set_floor_height(&mut self, z: f64) -> Result<bool, RuntimeError> {
-        Ok(self.safety.io_mut().set_floor_z(z).is_some())
+    ///
+    /// `offset_m` is the **offset from the scene's own floor**, not a world
+    /// z and not a shell's camera height: `0` leaves the training scene's
+    /// floor untouched, and the plane and the duck move together so it keeps
+    /// standing on its floor. `/floor` owns this dimension and its range;
+    /// see the route.
+    pub fn set_floor_height(&mut self, offset_m: f64) -> Result<bool, RuntimeError> {
+        Ok(self.safety.io_mut().set_floor_delta(offset_m).is_some())
     }
 }
 
@@ -1198,6 +1224,10 @@ impl<T: RobotIo> DuckRuntime<T> {
             imu_samples: 0,
             pickup: None,
             pickup_model: None,
+            sound_pet: None,
+            pet_model: None,
+            petting: false,
+            petting_since_tick: None,
             carry: None,
             mouth: 0.0,
             mode: robotd_params::Mode::Walk,
@@ -1248,6 +1278,121 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.pickup = Some(watch);
         self.pickup_model = Some(model.to_path_buf());
         Ok(())
+    }
+
+    /// Load the official `pet_detect` CNN. Like the pickup classifier, a
+    /// model that will not load is a feature that stays off — never a reason
+    /// the duck does not start. Attaching a fresh model forgets any spell in
+    /// progress: the new session's ring is empty and the duck has not heard
+    /// the audio it never listened to.
+    pub fn load_pet_detector(&mut self, model: &std::path::Path) -> Result<(), String> {
+        let detector = crate::petdetect::PettingDetector::load(model)?;
+        self.sound_pet = Some(detector);
+        self.pet_model = Some(model.to_path_buf());
+        self.petting = false;
+        self.petting_since_tick = None;
+        Ok(())
+    }
+
+    /// Where the pet model loads from, so a fork or a mode switch can
+    /// reattach it to the fresh runtime.
+    pub fn pet_detector_model(&self) -> Option<&std::path::Path> {
+        self.pet_model.as_deref()
+    }
+
+    /// Test-only: attach the official model with thresholds a synthetic
+    /// window can cross, so a dispatch test measures *which* runtime was fed
+    /// rather than the CNN's opinion of digital silence. Production always
+    /// loads the official 0.95/0.85 pair through [`Self::load_pet_detector`].
+    #[cfg(test)]
+    pub(crate) fn load_pet_detector_with_config(
+        &mut self,
+        model: &std::path::Path,
+        config: crate::petdetect::DetectorConfig,
+    ) -> Result<(), String> {
+        let detector = crate::petdetect::PettingDetector::load_with_config(model, config)?;
+        self.sound_pet = Some(detector);
+        self.pet_model = Some(model.to_path_buf());
+        self.petting = false;
+        self.petting_since_tick = None;
+        Ok(())
+    }
+
+    /// Feed the microphone's PCM16 to the official petting classifier and
+    /// apply its Start/End edges.
+    ///
+    /// `rate` is the shell's capture rate; the detector's features live at
+    /// 16 kHz and a non-16 kHz post is resampled. The array is i16
+    /// little-endian / 32768, exactly the `/sensor` `pcm16` payload.
+    ///
+    /// Frozen time hears nothing: a paused duck neither runs the model nor
+    /// counts a stroke, the same gate the clap/whistle path has. With no
+    /// model attached the samples are dropped before any FFT — "model
+    /// missing" is a quiet off switch, not a feature that runs and lies.
+    ///
+    /// Returns the edges this chunk produced, for tests and a future audit;
+    /// production callers ignore the value.
+    pub fn pet_by_sound(
+        &mut self,
+        pcm16: &[i16],
+        rate: u32,
+    ) -> Vec<crate::petdetect::PettingEvent> {
+        if self.clock.paused {
+            return Vec::new();
+        }
+        let Some(detector) = self.sound_pet.as_mut() else {
+            return Vec::new();
+        };
+        let samples = crate::petdetect::pcm16_at_rate(pcm16, rate);
+        // The detector borrow ends before the effects below mutate self.
+        let events = match detector.push_samples(&samples, true) {
+            Ok(events) => events,
+            Err(error) => {
+                tracing::warn!(%error, "petting detection failed; keeping the duck walking");
+                return Vec::new();
+            }
+        };
+        for event in &events {
+            self.apply_petting(*event);
+        }
+        events
+    }
+
+    /// The companion half of a petting edge: a Start is a real pet the room
+    /// heard — counted apart from the screen's touches, answered with the
+    /// official coo when the duck is calm, and recorded as the last sound
+    /// event. The official `robotd` counts the pet even when the duck is
+    /// busy or down and skips only the coo; the same here.
+    fn apply_petting(&mut self, event: crate::petdetect::PettingEvent) {
+        match event {
+            crate::petdetect::PettingEvent::Start => {
+                self.book.life.sound_pets += 1;
+                self.care.touch(self.clock.tick);
+                self.petting = true;
+                self.petting_since_tick = Some(self.clock.tick);
+                self.last_sound_event = Some(("pet".to_owned(), self.clock.tick));
+                // `robotd/src/main.rs:2867-2885`: coo only while not fallen
+                // and no scripted move owns the body.
+                if !self.safety.fallen() && !self.controller.busy() {
+                    self.queue_sound("coo");
+                }
+            }
+            crate::petdetect::PettingEvent::End => {
+                self.petting = false;
+                self.petting_since_tick = None;
+            }
+        }
+    }
+
+    /// `/state.pet_detect`: whether the model hears a stroke right now, and
+    /// the tick the current spell started. `since_tick` is null whenever
+    /// `petting` is false — a clock to the last pet would read as if it were
+    /// still happening.
+    pub fn pet_detect_summary(&self) -> serde_json::Value {
+        serde_json::json!({
+            "petting": self.petting,
+            "since_tick": self.petting_since_tick,
+        })
     }
 
     /// Whether the orientation filter has converged. Until it has, the loop
@@ -2055,7 +2200,19 @@ impl<T: RobotIo> DuckRuntime<T> {
         // The book's line says where the treat came from; the gift's arrival
         // is recorded by the caller, once, whether or not the duck was in a
         // state to eat it.
-        self.queue_sound("yes");
+        //
+        // The voice is the official "yes" emotion when this build loaded it,
+        // the synth's chirp otherwise — the same choice `end_night` makes.
+        // A bare `"yes"` is not a tag `queue_sound` knows, so this used to be
+        // dropped and a neighbour's treat arrived in silence. Only the voice
+        // is queued here: `ground_pick` owns the body, and an emotion's
+        // keyframes would fight the peck.
+        let voice = if self.emotions.get("yes").is_some() {
+            "emotion:yes"
+        } else {
+            "chirp"
+        };
+        self.queue_sound(voice);
         self.care.feed_from_away();
         Ok(true)
     }
@@ -2193,7 +2350,16 @@ impl<T: RobotIo> DuckRuntime<T> {
         self.start_ground_pick()?;
         self.book.life.fed += 1;
         self.book.note("feed".to_owned());
-        self.queue_sound("yes");
+        // The same official "yes" the night's wake speaks: the loaded emotion
+        // if this build has it, the synth's chirp if it does not. The bare
+        // tag `"yes"` is not one `queue_sound` knows, which made every feed
+        // silent. Voice only — `ground_pick` is already driving the body.
+        let voice = if self.emotions.get("yes").is_some() {
+            "emotion:yes"
+        } else {
+            "chirp"
+        };
+        self.queue_sound(voice);
         self.care.feed(self.clock.tick);
         Ok(true)
     }
@@ -2605,7 +2771,18 @@ impl<T: RobotIo> DuckRuntime<T> {
             crate::lan::PeerEvent::Greeted { from, name } => {
                 ("greeted", from, name, "greet", "excited")
             }
-            crate::lan::PeerEvent::Replied { from, name } => ("replied", from, name, "yes", "yes"),
+            crate::lan::PeerEvent::Replied { from, name } => {
+                // A reply's fallback is the voice `feed`/`end_night` choose:
+                // the official "yes" emotion when this build loaded it, the
+                // synth's chirp otherwise. The bare tag "yes" is not one
+                // `queue_sound` knows, which made every answer silent.
+                let voice = if self.emotions.get("yes").is_some() {
+                    "emotion:yes"
+                } else {
+                    "chirp"
+                };
+                ("replied", from, name, voice, "yes")
+            }
             // A gift is not a greeting: the tick applies it through feed or
             // trigger_emotion (ffi.rs), so it never reaches this voice path
             // and must not publish a peer_event. A chorus is not a greeting
@@ -3154,6 +3331,11 @@ impl<T: RobotIo> DuckRuntime<T> {
         if let Some(model) = &self.pickup_model {
             let _ = fork.load_pickup(model);
         }
+        // The petting classifier is a per-timeline listener too: its ring and
+        // verdict belong to this duck's future, not its parent's.
+        if let Some(model) = &self.pet_model {
+            let _ = fork.load_pet_detector(model);
+        }
         // The emotions are data, not hardware: a fork must keep its own copy
         // or `robot.do curious` silently vanishes on every branch.
         fork.emotions = self.emotions.clone();
@@ -3289,6 +3471,8 @@ impl<T: RobotIo> DuckRuntime<T> {
             care: Some(self.care),
             last_sad: self.last_sad,
             last_sound_event: self.last_sound_event.clone(),
+            petting: self.petting,
+            petting_since_tick: self.petting_since_tick,
             driving_prev: self.driving_prev,
             stopped_driving_at: self.stopped_driving_at.map(|stopped| stopped.0),
             posture_checked: self.posture_checked,
@@ -3418,6 +3602,14 @@ impl<T: RobotIo> DuckRuntime<T> {
         }
         self.last_sad = checkpoint.last_sad;
         self.last_sound_event = checkpoint.last_sound_event.clone();
+        self.petting = checkpoint.petting;
+        self.petting_since_tick = checkpoint.petting_since_tick;
+        // The detector's ring held audio from the timeline this restore just
+        // left; drop it and put the verdict back from the checkpoint.
+        if let Some(detector) = &mut self.sound_pet {
+            detector.reset();
+            detector.set_petting(self.petting);
+        }
         // A policy change queued in the future this duck just left goes with
         // it: the `Policy` inside it cannot ride a checkpoint (ONNX sessions
         // are not serialised), and landing a change the rewound timeline never
@@ -3502,6 +3694,19 @@ impl<T: RobotIo> DuckRuntime<T> {
     }
 
     pub fn set_paused(&mut self, paused: bool) {
+        // Resuming is a new listening session. The detector's ring holds
+        // audio from before the pause; splicing it onto the first post-resume
+        // window could count a stroke from before the pause as a new one.
+        // Sound heard during the pause is not evidence about this stretch of
+        // time. The verdict itself survives — a pause is not an End — only
+        // the ring and its schedule are dropped.
+        if self.clock.paused && !paused {
+            let petting = self.petting;
+            if let Some(detector) = &mut self.sound_pet {
+                detector.reset();
+                detector.set_petting(petting);
+            }
+        }
         self.clock.paused = paused;
     }
 
@@ -6051,6 +6256,300 @@ mod tests {
         runtime.set_twist([0.4, 0.0, 0.0]);
         runtime.tick().expect("the driven tick");
         assert!(runtime.driving_prev, "the gait has the robot");
+    }
+
+    /// A runtime raised to Ready with no queued voice left over, so a test
+    /// asserting the *next* sound is not reading the boot greet.
+    fn ready_runtime(emotions: bool) -> DuckRuntime<Probe> {
+        // A feed is a real ground pick, so this runtime carries the episodic
+        // peck network; `test_policy` has no ground-pick slot and would
+        // refuse before the voice ever mattered.
+        let dir = crate::fixtures::policies_dir().expect("the official policy bundle");
+        let policy = Policy::load(
+            &duck_control::policy::PolicyPaths {
+                walk: dir.join("velstand.onnx"),
+                stand: None,
+                sitstand: None,
+                ground_pick: Some(dir.join("alpha_ground_pick.onnx")),
+                skills: Vec::new(),
+            },
+            0.05,
+        )
+        .expect("the official walk + ground-pick set");
+        let mut runtime = DuckRuntime::new(
+            Probe {
+                sensors: Sensors::default(),
+                targets: [0.0; NUM_JOINTS],
+            },
+            policy,
+            Tuning::default(),
+            SkillTuning::default(),
+            SafetyConfig::default(),
+        );
+        if emotions {
+            runtime.emotions = official_emotions();
+        }
+        runtime.enable().expect("enable");
+        for _ in 0..110 {
+            runtime.tick().expect("warm-up ticks");
+        }
+        assert_eq!(runtime.bringup(), BringupState::Ready);
+        while runtime.take_sound().is_some() {}
+        runtime
+    }
+
+    /// The official `yes` emotion, where the wake and the feed find it.
+    fn official_emotions() -> crate::emotion::Library {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../upstream/microduck/robotd/emotions");
+        crate::emotion::Library::load(&dir).expect("official emotions")
+    }
+
+    /// The official pet CNN, or the documented skip when the upstream
+    /// checkout has not been fetched (`DUCK_REQUIRE_FIXTURES=1` makes it a
+    /// failure in CI).
+    fn pet_model() -> Option<std::path::PathBuf> {
+        let path = crate::fixtures::workspace_root()
+            .join("upstream/microduck/pet-detect/models/pet_detect.onnx");
+        if path.is_file() {
+            return Some(path);
+        }
+        if crate::fixtures::required() {
+            panic!("the official pet model is missing at {}", path.display());
+        }
+        eprintln!(
+            "skipping: the official pet model is not here at {}",
+            path.display()
+        );
+        None
+    }
+
+    /// A feed answers with the official "yes" when the build loaded it — and
+    /// only the voice is queued: `ground_pick` owns the body, so no emotion
+    /// keyframes may start on top of the peck.
+    #[test]
+    fn a_feed_speaks_the_yes_emotion_when_it_is_loaded() {
+        let mut runtime = ready_runtime(false);
+        runtime.emotions = official_emotions();
+        assert_eq!(runtime.feed(), Ok(true));
+        assert_eq!(runtime.take_sound().as_deref(), Some("emotion:yes"));
+        assert!(
+            runtime.emotion_playing.is_none(),
+            "the peck owns the body; the voice must not start the timeline"
+        );
+    }
+
+    /// Without that emotion the feed is still not silent: the synth's chirp
+    /// is the fallback, the same one `end_night` uses.
+    #[test]
+    fn a_feed_without_the_emotion_chirps() {
+        let mut runtime = ready_runtime(false);
+        assert_eq!(runtime.feed(), Ok(true));
+        assert_eq!(runtime.take_sound().as_deref(), Some("chirp"));
+    }
+
+    /// A neighbour's treat takes the same voice path.
+    #[test]
+    fn a_gift_treat_speaks_the_yes_emotion_when_it_is_loaded() {
+        let mut runtime = ready_runtime(false);
+        runtime.emotions = official_emotions();
+        assert_eq!(runtime.gift_treat(), Ok(true));
+        assert_eq!(runtime.take_sound().as_deref(), Some("emotion:yes"));
+        assert!(runtime.emotion_playing.is_none());
+    }
+
+    #[test]
+    fn a_gift_treat_without_the_emotion_chirps() {
+        let mut runtime = ready_runtime(false);
+        assert_eq!(runtime.gift_treat(), Ok(true));
+        assert_eq!(runtime.take_sound().as_deref(), Some("chirp"));
+    }
+
+    /// A neighbour's duck answered our greeting. When the official "yes"
+    /// emotion cannot play — another mood already owns the body — the reply
+    /// still has to be audible: the loaded emotion's voice, or the synth's
+    /// chirp. The bare tag "yes" is not one `queue_sound` knows.
+    #[test]
+    fn a_replied_greeting_speaks_yes_or_chirps() {
+        let mut runtime = test_runtime();
+        runtime.emotions = official_emotions();
+        // The fallback branch is the one under test: a mood already playing
+        // is `trigger_emotion`'s canonical refusal.
+        runtime.emotion_playing = Some(crate::emotion::Playing {
+            name: "yes".to_owned(),
+            elapsed: 0.0,
+            skill_delivered: false,
+        });
+        runtime.peer_event(&crate::lan::PeerEvent::Replied {
+            from: "peer-a".to_owned(),
+            name: "Neighbour".to_owned(),
+        });
+        assert_eq!(runtime.take_sound().as_deref(), Some("emotion:yes"));
+        assert_eq!(
+            runtime.last_peer_event().expect("the event is published")["kind"],
+            serde_json::json!("replied")
+        );
+
+        // A build without the emotion answers with the chirp, not silence.
+        let mut runtime = test_runtime();
+        runtime.peer_event(&crate::lan::PeerEvent::Replied {
+            from: "peer-a".to_owned(),
+            name: "Neighbour".to_owned(),
+        });
+        assert_eq!(runtime.take_sound().as_deref(), Some("chirp"));
+    }
+
+    /// With no model attached the microphone's PCM is dropped before any
+    /// analysis: the feature is off, not a silent lie in the life record.
+    #[test]
+    fn sound_petting_without_a_model_counts_nothing() {
+        let mut runtime = test_runtime();
+        let silence = vec![0i16; crate::petdetect::WINDOW_SAMPLES];
+        assert!(runtime.pet_by_sound(&silence, 16_000).is_empty());
+        assert_eq!(runtime.book().life.sound_pets, 0);
+        assert!(!runtime.petting);
+        assert!(runtime.last_sound_event().is_none());
+    }
+
+    /// The Start/End edges are applied to the duck: counted apart from the
+    /// screen's touches, answered with a coo, recorded as the last sound, and
+    /// published. The thresholds here are inverted only to make a silent
+    /// window classify as a stroke; production keeps the official 0.95/0.85.
+    #[test]
+    fn a_sound_pet_is_counted_apart_and_answered() {
+        let Some(model) = pet_model() else {
+            return;
+        };
+        let mut runtime = test_runtime();
+        runtime.sound_pet = Some(
+            crate::petdetect::PettingDetector::load_with_config(
+                &model,
+                crate::petdetect::DetectorConfig {
+                    stride: crate::petdetect::DEFAULT_STRIDE,
+                    enter_threshold: -1.0,
+                    exit_threshold: 2.0,
+                },
+            )
+            .expect("the official pet model loads"),
+        );
+        let silence = vec![0i16; crate::petdetect::WINDOW_SAMPLES];
+
+        let events = runtime.pet_by_sound(&silence, 16_000);
+        assert_eq!(events, vec![crate::petdetect::PettingEvent::Start]);
+        assert_eq!(runtime.book().life.sound_pets, 1);
+        assert_eq!(runtime.book().life.pets, 0, "a sound pet is not a touch");
+        assert!(runtime.petting);
+        let tick = runtime.clock().tick;
+        assert_eq!(runtime.petting_since_tick, Some(tick));
+        assert_eq!(runtime.last_sound_event(), Some(("pet", tick)));
+        assert_eq!(runtime.care().last_touch, tick, "a pet is attention");
+        assert_eq!(runtime.take_sound().as_deref(), Some("coo"));
+        assert_eq!(
+            runtime.pet_detect_summary(),
+            serde_json::json!({ "petting": true, "since_tick": tick })
+        );
+
+        // One stride later the (inverted) exit threshold closes the spell.
+        let more = vec![0i16; crate::petdetect::DEFAULT_STRIDE];
+        let events = runtime.pet_by_sound(&more, 16_000);
+        assert_eq!(events, vec![crate::petdetect::PettingEvent::End]);
+        assert!(!runtime.petting);
+        assert_eq!(runtime.petting_since_tick, None);
+        assert_eq!(runtime.book().life.sound_pets, 1, "End is not a second pet");
+        assert_eq!(
+            runtime.pet_detect_summary(),
+            serde_json::json!({ "petting": false, "since_tick": null })
+        );
+    }
+
+    /// Frozen time hears nothing: the detector is not fed (no samples, no
+    /// inference) and no pet is counted. The same gate the clap/whistle path
+    /// sits behind.
+    #[test]
+    fn a_paused_duck_does_not_feed_the_pet_model() {
+        let Some(model) = pet_model() else {
+            return;
+        };
+        let mut runtime = test_runtime();
+        runtime.sound_pet = Some(
+            crate::petdetect::PettingDetector::load_with_config(
+                &model,
+                crate::petdetect::DetectorConfig {
+                    stride: crate::petdetect::DEFAULT_STRIDE,
+                    enter_threshold: -1.0,
+                    exit_threshold: 2.0,
+                },
+            )
+            .expect("the official pet model loads"),
+        );
+        runtime.set_paused(true);
+        let silence = vec![0i16; crate::petdetect::WINDOW_SAMPLES];
+        assert!(runtime.pet_by_sound(&silence, 16_000).is_empty());
+        let detector = runtime.sound_pet.as_ref().expect("the detector");
+        assert_eq!(detector.buffered_samples(), 0, "no audio was buffered");
+        assert_eq!(detector.inferences(), 0, "the model never ran");
+        assert_eq!(runtime.book().life.sound_pets, 0);
+        assert!(!runtime.petting);
+        assert!(runtime.last_sound_event().is_none());
+    }
+
+    /// Audio heard before a pause is not evidence about the stretch after it.
+    /// The detector's ring survives a pause today; on resume the first full
+    /// window would splice the pre-pause tail onto post-resume audio and could
+    /// count a stroke from before the pause as a new one. The verdict itself
+    /// stands — a pause is not an End — only the ring is dropped.
+    #[test]
+    fn resuming_from_a_pause_clears_the_pet_ring_but_keeps_the_verdict() {
+        let Some(model) = pet_model() else {
+            return;
+        };
+        let mut runtime = test_runtime();
+        runtime.sound_pet = Some(
+            crate::petdetect::PettingDetector::load(&model).expect("the official pet model loads"),
+        );
+        // One second at 16 kHz, deliberately short of the 16 240-sample
+        // window: the samples sit in the ring, no window has run.
+        let second = vec![0i16; crate::petdetect::SAMPLE_RATE];
+        runtime.pet_by_sound(&second, 16_000);
+        {
+            let detector = runtime.sound_pet.as_ref().expect("the detector");
+            assert_eq!(detector.buffered_samples(), crate::petdetect::SAMPLE_RATE);
+            assert_eq!(detector.inferences(), 0);
+        }
+        // A stroke in progress is a verdict, not buffered audio.
+        runtime.petting = true;
+        runtime
+            .sound_pet
+            .as_mut()
+            .expect("the detector")
+            .set_petting(true);
+
+        runtime.set_paused(true);
+        runtime.set_paused(false);
+
+        let detector = runtime.sound_pet.as_ref().expect("the detector");
+        assert_eq!(
+            detector.buffered_samples(),
+            0,
+            "the pre-pause audio must not be spliced into the next window"
+        );
+        assert!(runtime.petting, "a pause is not an End");
+        assert!(detector.is_petting(), "the verdict stands across the pause");
+    }
+
+    /// The verdict and its start tick ride a checkpoint; a rewind must not
+    /// keep a stroke from a future the duck no longer has.
+    #[test]
+    fn the_petting_verdict_survives_a_checkpoint() {
+        let mut runtime = test_runtime();
+        runtime.apply_petting(crate::petdetect::PettingEvent::Start);
+        let saved = runtime.checkpoint().expect("a checkpoint");
+        assert!(saved.petting);
+        runtime.apply_petting(crate::petdetect::PettingEvent::End);
+        assert!(!runtime.petting);
+        assert!(runtime.restore(&saved));
+        assert!(runtime.petting);
+        assert_eq!(runtime.petting_since_tick, saved.petting_since_tick);
     }
 
     /// Defect 1: an API-driven duck is a duck with no shell keepalive, and the
