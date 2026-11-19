@@ -733,6 +733,17 @@ COMPANION 头脑风暴里仅剩未做的两项落地：
 - **验证**：本地 `compileDebugKotlin + testDebugUnitTest` 绿、八道静态门禁绿；CI 四工作流全绿（Android+Contracts 于 `86b5365`；iOS+Core 于 `20189e8`，其后提交未触碰两路径）。棘轮 `shell_kt_lines` 压回 3763 基线。
 - **附**：D2 组件契约先行件已备于 `contracts/ui-components.json` + `scripts/check-ui-components.py`（未接线，随 D2 首推按「先红后绿」落门禁）。
 
+### 四之三十三、D2 组件库定义批（2026-11-20）
+
+深度重构第二批，按老板裁定「定义一次建齐、接入分两波」执行：
+
+- **契约先行**：`contracts/ui-components.json` 冻结 11 个基础组件（两波）的双端文件、状态矩阵、令牌清单；`scripts/check-ui-components.py` 断言实现双端在位、源码 `STATE MATRIX:` 行与契约逐字相等、组件文件内零裸字面量。首推 `0d73354` 有意红（组件尚不存在），次推转绿——IA 批「契约先红、再施工」的既定纪律。
+- **11 组件双端落地**：一波 DuckButton/DuckChip/DuckCard/DuckSheetHeader/DuckListRow；二波 DuckToggle/DuckSegmented/DuckProgress/DuckEmptyState/DuckErrorCard/DuckLoading。iOS 落 `Design/DuckButton.swift`、`DuckSurfaces.swift`、`DuckControls.swift`、`DuckStates.swift`；Android 落 `DuckComponents.kt` + Icons 补 check/close 两枚。每组件源码带状态矩阵行，只引用令牌，统一按压反馈（scale 0.96 + 变暗，减动效即无）。
+- **手抄关闭钮收敛**：15 处逐字节相同的 xmark 块换成共享 `DuckCloseGlyph`（各 Button 保留自己的 action 与测试 id，零行为变化）；棘轮 `ios_close_button_files` 16→1；顺带修掉 ProgressKit 硬编码「关闭」（→ `Copy.close`）。
+- **施工留痕**：iOS 首推红在 `.foregroundStyle(.duckX)` 隐式成员简写——令牌声明在 Color 上，ShapeStyle 上不可解析，5 处改显式 `Color.`（`feba979`）；棘轮学会识别组件实现层（DuckComponents.kt 的 `indication=null` 伴随 graphicsLayer 缩放/变暗，不计入 press_no_feedback）。
+- **验证**：组件门禁 + 八道静态门禁绿；Android compile + JVM 绿（`68c4a07`）；iOS 编译绿（`feba979`）；Contracts 绿（`feba979`）。
+- **下一波（接入）**：把组件用进高频面（抽屉行、sheet 头、按钮），每屏独立绿；DuckTheme.kt/MoreSheet.kt 归老板领地，接入时由老板侧合并。
+
 ---
 
 ## 八、仓库与复现
