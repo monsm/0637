@@ -40,3 +40,9 @@
 - `ground_pick`/`sit_toggle` 是官方 daemon 所有技能，官方 `setSkill` 同样先拒绝；`"none"` 关闭适用于套装声明的技能（如 roulade）。
 - 自定义技能文件只从 policies 目录内的裸文件名加载（手机无绝对路径概念，官方板子上是绝对路径——刻意形状差，代码注释已登记）。
 - `DayRecord` 的 `sit_downs` 现由运行时 label 边沿累加；旧存档缺字段=0。
+
+## CI 首跑（2026-11-19）
+
+- **Core ✅、Contracts ✅、Android ✅。**
+- **iOS 第一轮**：`the lead chorus is published (role=)` 失败。会话日志显示 POST 已被核心接受（`queued:true`），其后合唱未在轮询窗内出现；同轮「加入邻居合唱并完成」两项均 PASS，本轮代码未触碰 chorus 路径。**重跑后该检查通过**——归档为 CI 环境停顿（/state 快照按 tick 刷新，渲染循环停顿时读不到刚接受的合唱），非代码缺陷。
+- **iOS 第二轮**：`English speech maps to the same table` 失败，响应为上一批「情绪一次一个」的丢弃体 `{ok:true, dropped:"an emotion is already playing", heard, phrase}`——**缺 `skill` 字段**，冒烟按 `"skill":"excited"` 断言。这是真问题：丢弃/失败回答应始终告诉客户端「本意是哪个动词」。已修：两种回答都带 `skill` 或 `sound` 字段（`7ea7da5`），并加断言；本地 290+9 / 341+9 全绿。此修复对通用客户端同样有意义：语音遥控连发第二个情绪时仍能知道它被理解成了什么。
