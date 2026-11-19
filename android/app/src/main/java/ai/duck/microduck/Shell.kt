@@ -304,6 +304,19 @@ fun Shell(
     }
     // Flipping this re-renders every Copy string in the shell.
     var languageTick by remember { mutableStateOf(0) }
+
+    // One flip for both entries (the landscape menu and the duck panel):
+    // persisted like iOS's UserDefaults setter, because a process death
+    // must not quietly drop the choice (the font-scale smoke restart came
+    // back English before this saved).
+    fun flipLanguage() {
+        Copy.save(
+            context,
+            if (Copy.language == Copy.Language.English) Copy.Language.Chinese else Copy.Language.English,
+        )
+        languageTick += 1
+        soundLine = null
+    }
     // The face's flashlight: 0 is off, 1..7 are robotd's seven colours. The
     // top-bar chip and the sheet's chip both write here, so the two never
     // disagree about whether the light is on.
@@ -891,15 +904,7 @@ fun Shell(
                 onDance = { open(DuckRoute.Dance) },
                 onPeers = { open(DuckRoute.Peers) },
                 onAI = { open(DuckRoute.AI) },
-                onLanguage = {
-                    Copy.language = if (Copy.language == Copy.Language.English) {
-                        Copy.Language.Chinese
-                    } else {
-                        Copy.Language.English
-                    }
-                    languageTick += 1
-                    soundLine = null
-                },
+                onLanguage = { flipLanguage() },
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     // Fullscreen theme: keep the menu out of the display cutout.
@@ -1134,15 +1139,7 @@ fun Shell(
         DuckPanelSheet(
             flashlightState = flashlightState,
             onFlashlight = toggleFlashlight,
-            onLanguage = {
-                Copy.language = if (Copy.language == Copy.Language.English) {
-                    Copy.Language.Chinese
-                } else {
-                    Copy.Language.English
-                }
-                languageTick += 1
-                soundLine = null
-            },
+            onLanguage = { flipLanguage() },
             onOpen = { open(it) },
             onClose = { closeSheet() },
         )
