@@ -2821,6 +2821,15 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                     "the policy is not driving — press Start on the pad".to_owned(),
                 );
             }
+            // The verb the utterance named, kept even when the verb itself
+            // is dropped: a client should still see what the duck heard.
+            let (verb_key, verb_value) = match &heard {
+                crate::speech::HeardWord::Skill(name) => ("skill", name.clone()),
+                crate::speech::HeardWord::Sound(tag) => ("sound", tag.clone()),
+                crate::speech::HeardWord::Sit => ("skill", "sit".to_owned()),
+                crate::speech::HeardWord::Stand => ("skill", "stand".to_owned()),
+                crate::speech::HeardWord::GroundPick => ("skill", "ground_pick".to_owned()),
+            };
             let result = match heard {
                 crate::speech::HeardWord::Skill(name) => core
                     .runtime
@@ -2874,20 +2883,24 @@ fn apply_intent_active(core: &mut DuckCore, intent: Intent) -> serde_json::Value
                     //   keeps `heard` and `phrase` so the client can see what
                     //   was meant.
                     if error == "an emotion is already playing" {
-                        json!({
+                        let mut body = json!({
                             "ok": true,
                             "heard": text,
                             "phrase": phrase,
                             "dropped": "an emotion is already playing",
-                        })
+                        });
+                        body[verb_key] = json!(verb_value);
+                        body
                     } else {
-                        json!({
+                        let mut body = json!({
                             "ok": false,
                             "heard": text,
                             "phrase": phrase,
                             "error": error,
                             "reason": "the verb did not run",
-                        })
+                        });
+                        body[verb_key] = json!(verb_value);
+                        body
                     }
                 }
             }
@@ -5636,6 +5649,10 @@ mod tests {
             assert_eq!(
                 second["dropped"], "an emotion is already playing",
                 "{second}"
+            );
+            assert_eq!(
+                second["skill"], "curious",
+                "the dropped verb is still named"
             );
             assert!(second["error"].is_null(), "{second}");
         }
