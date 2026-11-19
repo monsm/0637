@@ -2,7 +2,7 @@
 PASS  bundle has Shaders.metal  (ios/build/Build/Products/Debug-iphonesimulator/Duck.app/DuckResources)
 --- install and launch ---
 PASS  simctl install  (installed)
-app container: /Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/C2D55378-94F2-4DD9-8C24-5BD58B8C322B/Duck.app
+app container: /Users/runner/Library/Developer/CoreSimulator/Devices/5AB3DACF-C352-49D1-BF9A-3C0104FA4ED3/data/Containers/Bundle/Application/9755A6D8-82E0-43C9-A197-96D2C11EEE95/Duck.app
 PASS  intent API answers on :8765  (walk)
 PASS  the 50 Hz control loop is ticking  (label=walk)
 PASS  policy reached ready (bringup=2)  (bringup=2)
@@ -33,12 +33,12 @@ PASS  state publishes the duck's proprioception
 PASS  measured joint positions are published
 PASS  commanded joint targets are published
 PASS  state publishes the platform's own performance
-PASS  the control loop reports 49.94246435457199 ticks/s
+PASS  the control loop reports 46.94976269365094 ticks/s
 PASS  the IMU reports warm once the loop is driving
 PASS  the beak is published
 PASS  build fingerprint is served  ("fingerprint":"69b4e43b681bead51f5736ff810c269316d5cb19903db6db3794b88c36bfe5c1")
 --- idle look-around ---
-PASS  a still duck looks around  (takeover=1.0 head=0.28917075547434407)
+PASS  a still duck looks around  (takeover=0.8133333333333324 head=0.237060257497073)
 --- idle ritual ---
 PASS  a duck left alone does something by itself  (emotions 1 -> 2)
 --- face ---
@@ -77,14 +77,14 @@ PASS  an unknown chorus move is refused  ({"error":"no such emotion","ok":false}
 PASS  the duck queues its own chorus  ({"moves":["laugh"],"ok":true,"queued":true})
 PASS  the lead chorus is published  (role=lead)
 --- feed ---
-PASS  a treat starts the peck  ({"care":{"asleep":false,"bond":0.1495756944444417,"budget_s":null,"heart_bpm":77.7,"hunger":0.0,"idle_s":0.0,"last_touch)
+PASS  a treat starts the peck  ({"care":{"asleep":false,"bond":0.14957615740740465,"budget_s":null,"heart_bpm":77.7,"hunger":0.0,"idle_s":0.0,"last_touc)
 --- life ---
 PASS  life publishes the record  ({"boots":2,"claps":3,"day_started":{"claps":0,"day":"2026-11-19","falls":0,"fed":0,"ground_picks":0,"metres":0.0,"pets":)
 PASS  life counts the skills and emotions the duck ran
 PASS  life does not count a refused skill
 PASS  state carries the same record  (walking_s=0.0)
 --- care ---
-PASS  care publishes hunger, mood and bond  ({"care":{"asleep":false,"bond":0.14957106481481203,"budget_s":null,"heart_bpm":77.7,"hunger":0.00014814814814814815,"idle_s":0.4,"last_touch)
+PASS  care publishes hunger, mood and bond  ({"care":{"asleep":false,"bond":0.14956712962962682,"budget_s":null,"heart_bpm":77.7,"hunger":0.00028888888888888904,"idle_s":0.78,"last_touc)
 PASS  a treat fills the tummy and a stroke warms the bond
 PASS  care publishes the palm's heart reading
 PASS  a long neglect puts the duck to sleep  (asleep=yes)
@@ -99,8 +99,8 @@ PASS  a low mood plays the official sad timeline  (emotion=sad)
 --- night ---
 PASS  a good night is accepted  ({"ok":true,"queued":true})
 PASS  the night puts the duck to sleep on purpose  (active/asleep=yes)
-PASS  the morning is accepted  ({"ok":true,"queued":true,"quiet_s":0.76})
-PASS  the morning reports how quiet the night was  (quiet_s=0.76)
+PASS  the morning is accepted  ({"ok":true,"queued":true,"quiet_s":0.86})
+PASS  the morning reports how quiet the night was  (quiet_s=0.86)
 PASS  the morning clears the night  (active=yes)
 PASS  the vet book names the morning  (morning=yes)
 PASS  a stroke ends the night  (active=yes)
@@ -108,7 +108,7 @@ PASS  the vet book names the hand that woke it  (woken_by_touch=yes)
 --- vet book export ---
 PASS  the vet book is a readable document  (# MicroDuck · 终身记录 / Vet book
 
-走过 / walked **1.1 m** · 翻滚 / rolls **1** · 被抱�)
+走过 / walked **1.2 m** · 翻滚 / rolls **1** · 被抱�)
 PASS  the vet book has a canonical JSON shape  ({"build":{"fingerprint":"69b4e43b681bead51f5736ff810c269316d5cb19903db6db3794b88c36bfe5c1"},"care":{"asleep":false,"bond)
 --- daily quests ---
 PASS  a calendar day creates three real quests  ({"best_streak":0,"completed_today":2,"day":"2026-11-19","last_completed_day":"","quests":[{"done":true,"id":"whistle","progress":1.0,"target":1.0,"title_en":"Wh)
@@ -121,17 +121,17 @@ PASS  the ride streams start/loop  (wheee:start:0)
 PASS  the ride ends on release  (wheee:end:0)
 --- heard ---
 PASS  Chinese speech maps to a skill  ({"chained":false,"heard":"翻滚","ok":true,"phrase":"翻滚","skill":"roulade"})
-FAIL  English speech maps to the same table  ({"dropped":"an emotion is already playing","heard":"excited","ok":true,"phrase":"excited"})
-PASS  the heard words are published for an outside model  ({"last_heard":{"text":"excited","tick":2663}})
+PASS  English speech maps to the same table  ({"chained":false,"heard":"excited","ok":true,"phrase":"excited","skill":"excited"})
+PASS  the heard words are published for an outside model  ({"last_heard":{"text":"excited","tick":2912}})
 PASS  站起来 on a standing duck is a no-op  ({"did":false,"heard":"站起来","ok":true,"phrase":"站起来","skill":"stand"})
 PASS  a greeting answers with the duck's voice  ({"heard":"你好","ok":true,"phrase":"你好","sound":"greet"})
 PASS  unrecognized speech is refused, not guessed  ({"heard":"qwertyuiop","ok":false,"reason":"no verb matched"})
 --- odometry ---
-PASS  the duck publishes its own pose  (pose=0.253 0.214 0.117 0.720)
+PASS  the duck publishes its own pose  (pose=0.184 0.306 0.115 0.670)
 --- walk ---
-trunk while walking: 0.8240 0.8592 0.1164 -> 1.3748 1.1236 0.1152
-PASS  twist moves the duck  (0.8240 0.8592 0.1164 -> 1.3748 1.1236 0.1152)
-PASS  the vet book counts the metres walked  (metres=2.49334532753071)
+trunk while walking: 0.9642 0.7138 0.1151 -> 1.2764 0.8739 0.1150
+PASS  twist moves the duck  (0.9642 0.7138 0.1151 -> 1.2764 0.8739 0.1150)
+PASS  the vet book counts the metres walked  (metres=2.211616827919843)
 --- sit and stand ---
 PASS  sit command seats the duck  (label=sit)
 PASS  sit toggle stands it back up  (label=rise)
@@ -148,7 +148,7 @@ PASS  skill runs: kick_right  (label=kick_right)
 PASS  life counts the skills that ran  (counted=3/3)
 PASS  an emotion plays: curious  (emotion=curious)
 PASS  an emotion's voice is queued  (last_emotion_sound=emotion:curious)
-PASS  the emotion clock advances  (0.25999999999999995 curious)
+PASS  the emotion clock advances  (0.4200000000000001 curious)
 --- ground pick ---
 PASS  ground pick runs  (label=ground_pick)
 PASS  the book counts the peck  (ground_picks=7)
@@ -156,11 +156,11 @@ PASS  the book counts the peck  (ground_picks=7)
 PASS  head command accepted
 PASS  body command accepted
 PASS  body pose released
-PASS  the duck walks again after releasing the pose  (1.7113 0.8510 0.0921 -> 2.0352 0.6814 0.1162)
+PASS  the duck walks again after releasing the pose  (1.6165 0.6010 0.0949 -> 2.0130 0.3694 0.1147)
 --- voice ---
 PASS  the duck can be asked to chirp  ({"ok":true,"tag":"chirp"})
 PASS  the chirp reaches the audio engine  (scheduled chirps 1 -> 2)
-PASS  the audio session is playable (playback, not ambient)  (2026-11-19 03:59:55.261 Duck[10858:35993] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker)
+PASS  the audio session is playable (playback, not ambient)  (2026-11-19 04:49:02.097 Duck[16850:52759] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker)
 PASS  an unknown sound is refused  ({"error":"no such sound: bark","ok":false})
 PASS  MCP duck_sound plays the voice  ({"id":9,"jsonrpc":"2.0","result":{"content":[{"text":"{\"ok\":true,\"tag\":\"greet\"}","type":"text"}]}})
 --- beak ---
@@ -175,7 +175,7 @@ PASS  roller keeps the skill: kick_left
 PASS  roller keeps the skill: sit
 PASS  the duck can switch back to walk  ({"mode":"walk","ok":true})
 PASS  the state reports walk again  (mode=walk)
-PASS  a mode switch keeps the companion  (bond 0.34961874999999754 -> 0.3495824074074047)
+PASS  a mode switch keeps the companion  (bond 0.34952731481481175 -> 0.34948773148147816)
 PASS  a mode switch keeps the child's rules
 PASS  an unknown mode is refused  ({"error":"mode refused: no such mode: hover","ok":false})
 --- shutdown ---
@@ -185,11 +185,11 @@ PASS  the state reports powered off  (powered_off=True)
 PASS  the vet book counts the power-off  (power_offs=1)
 PASS  power-on accepted
 PASS  the duck powers back on  (bringup=2)
-after power-on: label=walk trunk=-0.0677 -0.1078 0.0682
+after power-on: label=walk trunk=-0.0017 -0.0394 0.1155
 PASS  the walking networks have the duck after power-on  (label=walk)
 --- carry ---
 PASS  the duck can be picked up  ({"carrying":true,"ok":true})
-PASS  picking it up lifts the body  (z 0.0622 -> 0.2884)
+PASS  picking it up lifts the body  (z 0.1155 -> 0.3542)
 PASS  the duck can be set down
 --- external push ---
 PASS  push (external disturbance) accepted
@@ -198,13 +198,13 @@ PASS  duck survives the push  (bringup=2)
 PASS  reload the bundled policy set  ({"ok":true})
 PASS  skills still available after reload  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
 --- time machine ---
-PASS  pause freezes the simulation clock  (1123 -> 1123)
+PASS  pause freezes the simulation clock  (1190 -> 1190)
 PASS  state reports the duck is paused  (paused=true)
-PASS  step advances exactly the ticks asked for  (1123 -> 1133 (want +10))
+PASS  step advances exactly the ticks asked for  (1190 -> 1200 (want +10))
 PASS  the clock takes the half-speed setting  (speed=0.5000 paused=false)
-PASS  half speed advances about half as fast  (55 ticks in 2 s)
+PASS  half speed advances about half as fast  (51 ticks in 2 s)
 PASS  the timeline lists checkpoints  ({"checkpoints":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,)
-PASS  seek rewinds the duck  (1230 -> 1071)
+PASS  seek rewinds the duck  (1294 -> 1131)
 PASS  the rewound duck is still driving  (label=homing)
 PASS  the rewound duck is still ready or walking home  (bringup=1)
 --- mcp ---
@@ -222,35 +222,35 @@ PASS  MCP tool listed: duck_wheee
 PASS  MCP tool listed: duck_life
 PASS  MCP tool listed: duck_pet
 PASS  MCP tool listed: duck_feed
-PASS  MCP duck_state answers with content  ({"id":3,"jsonrpc":"2.0","result":{"content":[{"text":"{\"bringup\":1,\"care\":{\"asleep\":)
+PASS  MCP duck_state answers with content  ({"id":3,"jsonrpc":"2.0","result":{"content":[{"text":"{\"bringup\":2,\"care\":{\"asleep\":)
 --- sensors ---
 PASS  sensors are served with their mode  ({"camera":null,"depth":null,"imu":null,"microphone":null,"mode":"twin","note":"phone sensors never e)
 PASS  sensor reading is published: camera
 PASS  sensor reading is published: microphone
 PASS  sensor reading is published: depth
 PASS  phone sensors stay out of the 61-D observation
-PASS  an IMU shake pushes the duck  (0.2762 -0.1234 0.1148 -> 0.5080 -0.0441 0.0406)
+PASS  an IMU shake pushes the duck  (0.2107 -0.1874 0.1158 -> 0.4723 -0.1827 0.0585)
 --- fork ---
-PASS  fork creates a branch  ({"branches":[{"gravity":[-0.42676386761586077,-0.8886739622537976,-0.16772355263851974],"label":"a","label_state":"ready","paused":false,"ti)
+PASS  fork creates a branch  ({"branches":[{"gravity":[-0.8428084617826507,-0.5321401442148265,-0.08062731337818135],"label":"a","label_state":"ready","paused":false,"tic)
 PASS  the branch reports its own tick
 PASS  a branch can be selected  (selected=a)
-PASS  a selected branch keeps recording checkpoints  (newest=1291)
-PASS  the branch's newest checkpoint is rewindable  ({"ok":true,"pending":true,"tick":1291})
+PASS  a selected branch keeps recording checkpoints  (newest=1394)
+PASS  the branch's newest checkpoint is rewindable  ({"ok":true,"pending":true,"tick":1394})
 PASS  the ninth branch is refused (cap 8)  ({"error":"fork refused: at most 8 branches","ok":false})
 PASS  a branch can be dropped
 --- frames ---
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: 9AC77480-1049-4E35-952A-E13557F25933 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: 550EED2E-F013-4D6C-A2A7-BC241726B340 (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-1.png
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: 9AC77480-1049-4E35-952A-E13557F25933 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: 550EED2E-F013-4D6C-A2A7-BC241726B340 (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-2.png
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: 9AC77480-1049-4E35-952A-E13557F25933 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: 550EED2E-F013-4D6C-A2A7-BC241726B340 (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-3.png
-PASS  frame 1: lit viewport with the duck's materials  (sim-drive/frame-1.png: bright neutral shell (>= 120) -> 134071 px (want >= 1200))
-PASS  frame 2: lit viewport with the duck's materials  (sim-drive/frame-2.png: bright neutral shell (>= 120) -> 137644 px (want >= 1200))
-PASS  frame 3: lit viewport with the duck's materials  (sim-drive/frame-3.png: bright neutral shell (>= 120) -> 131747 px (want >= 1200))
+PASS  frame 1: lit viewport with the duck's materials  (sim-drive/frame-1.png: bright neutral shell (>= 120) -> 119182 px (want >= 1200))
+PASS  frame 2: lit viewport with the duck's materials  (sim-drive/frame-2.png: bright neutral shell (>= 120) -> 133186 px (want >= 1200))
+PASS  frame 3: lit viewport with the duck's materials  (sim-drive/frame-3.png: bright neutral shell (>= 120) -> 122567 px (want >= 1200))
 PASS  frames 1-2 differ (scene is live)
 PASS  frames 2-3 differ (scene is live)
 --- companion survives a restart ---
@@ -263,185 +263,5 @@ note  log: the renderer line was not in the captured stream (not a failure)
 PASS  log: no renderer failure
 PASS  still running at the end  (bringup=2)
 
-=== feature matrix: 204 passed, 1 failed ===
-=== app stdout ===
-2026-11-19 03:59:53.665 Duck[10858:36022] duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/C2D55378-94F2-4DD9-8C24-5BD58B8C322B/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
-2026-11-19 03:59:53.666 Duck[10858:36022] duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/C2D55378-94F2-4DD9-8C24-5BD58B8C322B/Duck.app/DuckResources/policies
-2026-11-19 03:59:54.363 Duck[10858:35993] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-19 03:59:54.386 Duck[10858:35993] duck: voice resumed category=AVAudioSessionCategoryPlayback
-2026-11-19 03:59:55.246 Duck[10858:36022] duck: built 38 meshes off the main thread
-2026-11-19 03:59:55.246 Duck[10858:35993] duck: core created
-2026-11-19 03:59:55.249 Duck[10858:35993] duck: pickup detector -> 0
-2026-11-19 03:59:55.259 Duck[10858:35993] duck: emotions -> 13
-2026-11-19 03:59:55.260 Duck[10858:35993] duck: intent server -> 0
-2026-11-19 03:59:55.261 Duck[10858:35993] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-19 03:59:55.261 Duck[10858:35993] duck: voice ready at 48000 Hz
-2026-11-19 03:59:57.003 Duck[10858:35993] duck: renderer: 70 visual geoms
-2026-11-19 03:59:57.243 Duck[10858:35993] duck: voice scheduled tag=greet frames=19251 total=1
-2026-11-19 03:59:58.566 Duck[10858:35993] duck: voice scheduled tag=alarm frames=8827 total=2
-2026-11-19 04:00:02.646 Duck[10858:35993] duck: voice scheduled tag=emotion:angry frames=112790 total=3
-2026-11-19 04:00:11.151 Duck[10858:35993] duck: voice scheduled tag=emotion:impatient frames=110399 total=4
-2026-11-19 04:00:13.456 Duck[10858:35993] duck: voice scheduled tag=coo frames=36764 total=5
-2026-11-19 04:00:16.433 Duck[10858:35993] duck: voice scheduled tag=alarm frames=9760 total=6
-2026-11-19 04:00:18.456 Duck[10858:35993] duck: voice scheduled tag=emotion:laugh frames=116254 total=7
-2026-11-19 04:00:20.896 Duck[10858:35993] duck: voice scheduled tag=inquire frames=17124 total=8
-2026-11-19 04:00:26.330 Duck[10858:35993] duck: voice scheduled tag=alarm frames=9524 total=9
-2026-11-19 04:00:27.960 Duck[10858:35993] duck: voice scheduled tag=emotion:laugh frames=116254 total=10
-2026-11-19 04:00:30.403 Duck[10858:35993] duck: voice scheduled tag=greet frames=38682 total=11
-2026-11-19 04:00:33.623 Duck[10858:35993] duck: voice scheduled tag=emotion:laugh frames=116254 total=12
-2026-11-19 04:00:36.071 Duck[10858:35993] duck: voice scheduled tag=coo frames=49379 total=13
-2026-11-19 04:00:39.044 Duck[10858:35993] duck: voice scheduled tag=coo frames=49379 total=14
-2026-11-19 04:00:44.046 Duck[10858:35993] duck: voice scheduled tag=emotion:sad frames=146047 total=15
-2026-11-19 04:00:47.111 Duck[10858:35993] duck: voice scheduled tag=coo frames=43954 total=16
-2026-11-19 04:00:48.045 Duck[10858:35993] duck: voice scheduled tag=wheee:start:0 frames=32627 total=17
-2026-11-19 04:00:48.747 Duck[10858:35993] duck: voice scheduled tag=wheee:end:0 frames=25061 total=18
-2026-11-19 04:00:50.471 Duck[10858:35993] duck: voice scheduled tag=alarm frames=10767 total=19
-2026-11-19 04:00:51.093 Duck[10858:35993] duck: voice scheduled tag=greet frames=29638 total=20
-2026-11-19 04:01:05.419 Duck[10858:35993] duck: voice scheduled tag=alarm frames=11533 total=21
-2026-11-19 04:01:07.658 Duck[10858:35993] duck: voice scheduled tag=emotion:curious frames=68331 total=22
-2026-11-19 04:01:13.661 Duck[10858:35993] duck: voice scheduled tag=chirp frames=4665 total=23
-2026-11-19 04:01:13.861 Duck[10858:35993] duck: voice scheduled tag=chirp frames=4665 total=24
-2026-11-19 04:01:14.044 Duck[10858:35993] duck: voice scheduled tag=greet frames=18493 total=25
-2026-11-19 04:01:15.217 Duck[10858:35993] duck: renderer: 76 visual geoms
-2026-11-19 04:01:15.221 Duck[10858:35993] duck: voice scheduled tag=chirp frames=7710 total=26
-2026-11-19 04:01:16.504 Duck[10858:35993] duck: voice scheduled tag=alarm frames=9716 total=27
-2026-11-19 04:01:18.995 Duck[10858:35993] duck: renderer: 70 visual geoms
-2026-11-19 04:01:18.997 Duck[10858:35993] duck: voice scheduled tag=chirp frames=13199 total=28
-2026-11-19 04:01:20.247 Duck[10858:35993] duck: voice scheduled tag=alarm frames=11830 total=29
-2026-11-19 04:01:22.288 Duck[10858:35993] duck: voice scheduled tag=peck frames=7491 total=30
-2026-11-19 04:01:28.094 Duck[10858:35993] duck: voice scheduled tag=greet frames=37646 total=31
-2026-11-19 04:01:30.893 Duck[10858:35993] duck: voice scheduled tag=alarm frames=12272 total=32
-2026-11-19 04:01:33.397 Duck[10858:35993] duck: voice scheduled tag=coo frames=48388 total=33
-2026-11-19 04:01:34.413 Duck[10858:35993] duck: voice scheduled tag=coo frames=48388 total=34
-2026-11-19 04:01:35.434 Duck[10858:35993] duck: voice scheduled tag=alarm frames=11817 total=35
-2026-11-19 04:01:38.916 Duck[10858:35993] duck: voice scheduled tag=emotion:angry frames=112790 total=36
-2026-11-19 04:01:41.275 Duck[10858:35993] duck: voice scheduled tag=alarm frames=9298 total=37
-2026-11-19 04:01:47.499 Duck[10858:35993] duck: voice scheduled tag=alarm frames=9298 total=38
-2026-11-19 04:01:49.660 Duck[10858:35993] duck: voice scheduled tag=alarm frames=9298 total=39
-2026-11-19 04:01:52.341 Duck[10858:35993] duck: voice scheduled tag=emotion:excited frames=136319 total=40
-2026-11-19 04:02:18.595 Duck[10858:35993] duck: voice scheduled tag=emotion:curious frames=68331 total=41
-ai.duck.microduck: 10858
-=== simulator console ===
-2026-11-19 04:03:29.405 Df Duck[20951:f131] [com.apple.network:connection] [C58 IPv4#1f9300ac:8765 waiting parent-flow (satisfied (Path is satisfied), interface: lo0)] event: path:satisfied @0.002s, uuid: 7D4E8AD2-188A-4C2A-9C36-AD6822938201
-2026-11-19 04:03:29.407 Df Duck[20951:f131] [com.apple.network:connection] [C58 IPv4#1f9300ac:8765 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] event: flow:start_connect @0.004s
-2026-11-19 04:03:29.407 Df Duck[20951:f131] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C58] reporting state preparing
-2026-11-19 04:03:29.407 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> setting up Connection 58
-2026-11-19 04:03:29.407 Df Duck[20951:f131] [com.apple.network:connection] nw_socket_handle_socket_event [C57:2] Socket received CONNECTED event
-2026-11-19 04:03:29.408 Df Duck[20951:f131] [com.apple.network:connection] nw_flow_connected [C57 IPv4#1f9300ac:8765 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] Transport protocol connected (socket)
-2026-11-19 04:03:29.408 Df Duck[20951:f131] [com.apple.network:connection] [C57 IPv4#1f9300ac:8765 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] event: flow:finish_transport @0.008s
-2026-11-19 04:03:29.408 Df Duck[20951:f131] [com.apple.network:connection] nw_flow_connected [C57 IPv4#1f9300ac:8765 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] Output protocol connected (CFNetworkConnection-160953970)
-2026-11-19 04:03:29.408 Df Duck[20951:f131] [com.apple.network:connection] [C57 IPv4#1f9300ac:8765 ready socket-flow (satisfied (Path is satisfied), interface: lo0)] event: flow:finish_connect @0.008s
-2026-11-19 04:03:29.408 Df Duck[20951:f131] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C57] reporting state ready
-2026-11-19 04:03:29.408 Df Duck[20951:f131] [com.apple.network:connection] nw_socket_handle_socket_event [C58:2] Socket received CONNECTED event
-2026-11-19 04:03:29.409 Df Duck[20951:f131] [com.apple.network:connection] nw_flow_connected [C58 IPv4#1f9300ac:8765 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] Transport protocol connected (socket)
-2026-11-19 04:03:29.409 Df Duck[20951:f131] [com.apple.network:connection] [C58 IPv4#1f9300ac:8765 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] event: flow:finish_transport @0.006s
-2026-11-19 04:03:29.409 Df Duck[20951:f131] [com.apple.network:connection] nw_flow_connected [C58 IPv4#1f9300ac:8765 in_progress socket-flow (satisfied (Path is satisfied), interface: lo0)] Output protocol connected (CFNetworkConnection-160953970)
-2026-11-19 04:03:29.409 Df Duck[20951:f131] [com.apple.network:connection] [C58 IPv4#1f9300ac:8765 ready socket-flow (satisfied (Path is satisfied), interface: lo0)] event: flow:finish_connect @0.006s
-2026-11-19 04:03:29.410 Df Duck[20951:f131] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C58] reporting state ready
-2026-11-19 04:03:29.410 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Connection 58: connected successfully
-2026-11-19 04:03:29.410 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Connection 58: ready C(N) E(N)
-2026-11-19 04:03:29.410 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> now using Connection 58
-2026-11-19 04:03:29.410 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> sent request, body N 0
-2026-11-19 04:03:29.410 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Connection 57: connected successfully
-2026-11-19 04:03:29.410 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Connection 57: ready C(N) E(N)
-2026-11-19 04:03:29.411 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Task <BC5D6C83-9F75-4C91-B856-1DC35CB50AA1>.<57> now using Connection 57
-2026-11-19 04:03:29.411 Df Duck[20951:f131] [com.apple.CFNetwork:Default] Task <BC5D6C83-9F75-4C91-B856-1DC35CB50AA1>.<57> sent request, body N 0
-2026-11-19 04:03:29.417 Df Duck[20951:f0cb] [com.apple.network:connection] nw_socket_handle_socket_event [C57:2] Socket received READ_CLOSE event
-2026-11-19 04:03:29.417 Df Duck[20951:f0cb] [com.apple.network:connection] nw_socket_handle_socket_event [C58:2] Socket received READ_CLOSE event
-2026-11-19 04:03:29.418 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> received response, status 200 content K
-2026-11-19 04:03:29.418 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Connection 58: read-side closed
-2026-11-19 04:03:29.418 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Connection 58: cleaning up
-2026-11-19 04:03:29.418 Df Duck[20951:f0cb] [com.apple.network:connection] [C58 4F17CF1B-4E9F-417F-AA49-E12CA964F3EA IPv4#1f9300ac:8765 tcp, url: http://127.0.0.1:8765/sensors, definite, attribution: developer] cancel
-2026-11-19 04:03:29.419 Df Duck[20951:f0cb] [com.apple.network:connection] [C58 4F17CF1B-4E9F-417F-AA49-E12CA964F3EA IPv4#1f9300ac:8765 tcp, url: http://127.0.0.1:8765/sensors, definite, attribution: developer] cancelled
-	[C58 7D4E8AD2-188A-4C2A-9C36-AD6822938201 127.0.0.1:54239<->IPv4#1f9300ac:8765]
-	Connected Path: satisfied (Path is satisfied), interface: lo0
-	Privacy Stance: Not Eligible
-	Duration: 0.015s, TCP @0.004s took 0.002s
-	bytes in/out: 273/205, packets in/out: 2/1, rtt: 0.001s, retransmitted bytes: 0, out-of-order bytes: 0
-	ecn packets sent/acked/marked/lost: 0/0/0/0
-2026-11-19 04:03:29.419 Df Duck[20951:f0cb] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C58] reporting state cancelled
-2026-11-19 04:03:29.419 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> response ended
-2026-11-19 04:03:29.419 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> done using Connection 58
-2026-11-19 04:03:29.419 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Connection 58: done
-2026-11-19 04:03:29.421 Df Duck[20951:f131] [com.apple.CFNetwork:Summary] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> summary for task success {transaction_duration_ms=23, response_status=200, connection=58, protocol="http/1.1", domain_lookup_duration_ms=0, connect_duration_ms=2, secure_connection_duration_ms=0, private_relay=false, request_start_ms=12, request_duration_ms=0, response_start_ms=20, response_duration_ms=1, request_bytes=205, request_throughput_kbps=25242, response_bytes=273, response_throughput_kbps=1614, cache_hit=true}
-2026-11-19 04:03:29.421 Df Duck[20951:f101] [com.apple.CFNetwork:Default] Task <747C97B4-97BC-4375-94E6-F137BB86B781>.<58> finished successfully
-2026-11-19 04:03:29.423 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Task <BC5D6C83-9F75-4C91-B856-1DC35CB50AA1>.<57> received response, status 200 content K
-2026-11-19 04:03:29.424 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Connection 57: read-side closed
-2026-11-19 04:03:29.424 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Connection 57: cleaning up
-2026-11-19 04:03:29.424 Df Duck[20951:f0cb] [com.apple.network:connection] [C57 4B851C6D-B27F-4DAB-9A19-403872187323 IPv4#1f9300ac:8765 tcp, url: http://127.0.0.1:8765/state, definite, attribution: developer] cancel
-2026-11-19 04:03:29.424 Df Duck[20951:f0cb] [com.apple.network:connection] [C57 4B851C6D-B27F-4DAB-9A19-403872187323 IPv4#1f9300ac:8765 tcp, url: http://127.0.0.1:8765/state, definite, attribution: developer] cancelled
-	[C57 7D4E8AD2-188A-4C2A-9C36-AD6822938201 127.0.0.1:54238<->IPv4#1f9300ac:8765]
-	Connected Path: satisfied (Path is satisfied), interface: lo0
-	Privacy Stance: Not Eligible
-	Duration: 0.024s, TCP @0.002s took 0.006s
-	bytes in/out: 5838/203, packets in/out: 2/1, rtt: 0.001s, retransmitted bytes: 0, out-of-order bytes: 0
-	ecn packets sent/acked/marked/lost: 0/0/0/0
-2026-11-19 04:03:29.425 Df Duck[20951:f0cb] [com.apple.network:connection] nw_connection_report_state_with_handler_on_nw_queue [C57] reporting state cancelled
-2026-11-19 04:03:29.425 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Task <BC5D6C83-9F75-4C91-B856-1DC35CB50AA1>.<57> response ended
-2026-11-19 04:03:29.425 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Task <BC5D6C83-9F75-4C91-B856-1DC35CB50AA1>.<57> done using Connection 57
-2026-11-19 04:03:29.425 Df Duck[20951:f0cb] [com.apple.CFNetwork:Default] Connection 57: done
-2026-11-19 04:03:29.425 Df Duck[20951:f0c7] [com.apple.CFNetwork:Summary] Task <BC5D6C83-9F75-4C91-B856-1DC35CB50AA1>.<57> summary for task success {transaction_duration_ms=27, response_status=200, connection=57, protocol="http/1.1", domain_lookup_duration_ms=0, connect_duration_ms=6, secure_connection_duration_ms=0, private_relay=false, request_start_ms=13, request_duration_ms=0, response_start_ms=25, response_duration_ms=1, request_bytes=203, request_throughput_kbps=4981, response_bytes=5838, response_throughput_kbps=29466, cache_hit=true}
-2026-11-19 04:03:29.425 Df Duck[20951:f101] [com.apple.CFNetwork:Default] Task <BC5D6C83-9F75-4C91-B856-1DC35CB50AA1>.<57> finished successfully
-=== unified log (Duck) ===
-2026-11-19 04:00:18.308 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:laugh frames=116254 total=7
-2026-11-19 04:00:20.747 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=inquire frames=17124 total=8
-2026-11-19 04:00:26.178 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=9524 total=9
-2026-11-19 04:00:27.807 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:laugh frames=116254 total=10
-2026-11-19 04:00:30.249 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=greet frames=38682 total=11
-2026-11-19 04:00:33.467 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:laugh frames=116254 total=12
-2026-11-19 04:00:35.914 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=coo frames=49379 total=13
-2026-11-19 04:00:38.886 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=coo frames=49379 total=14
-2026-11-19 04:00:43.886 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:sad frames=146047 total=15
-2026-11-19 04:00:46.949 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=coo frames=43954 total=16
-2026-11-19 04:00:47.882 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=wheee:start:0 frames=32627 total=17
-2026-11-19 04:00:48.584 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=wheee:end:0 frames=25061 total=18
-2026-11-19 04:00:50.307 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=10767 total=19
-2026-11-19 04:00:50.928 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=greet frames=29638 total=20
-2026-11-19 04:01:05.248 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=11533 total=21
-2026-11-19 04:01:07.485 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:curious frames=68331 total=22
-2026-11-19 04:01:13.485 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=chirp frames=4665 total=23
-2026-11-19 04:01:13.685 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=chirp frames=4665 total=24
-2026-11-19 04:01:13.869 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=greet frames=18493 total=25
-2026-11-19 04:01:15.041 Df Duck[10858:8c99] (Foundation) duck: renderer: 76 visual geoms
-2026-11-19 04:01:15.045 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=chirp frames=7710 total=26
-2026-11-19 04:01:16.327 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=9716 total=27
-2026-11-19 04:01:18.817 Df Duck[10858:8c99] (Foundation) duck: renderer: 70 visual geoms
-2026-11-19 04:01:18.818 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=chirp frames=13199 total=28
-2026-11-19 04:01:20.068 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=11830 total=29
-2026-11-19 04:01:22.108 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=peck frames=7491 total=30
-2026-11-19 04:01:27.911 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=greet frames=37646 total=31
-2026-11-19 04:01:30.709 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=12272 total=32
-2026-11-19 04:01:33.212 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=coo frames=48388 total=33
-2026-11-19 04:01:34.227 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=coo frames=48388 total=34
-2026-11-19 04:01:35.248 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=11817 total=35
-2026-11-19 04:01:38.727 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:angry frames=112790 total=36
-2026-11-19 04:01:41.086 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=9298 total=37
-2026-11-19 04:01:47.307 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=9298 total=38
-2026-11-19 04:01:49.467 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=alarm frames=9298 total=39
-2026-11-19 04:01:52.146 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:excited frames=136319 total=40
-2026-11-19 04:02:18.387 Df Duck[10858:8c99] (Foundation) duck: voice scheduled tag=emotion:curious frames=68331 total=41
-2026-11-19 04:02:57.511 Df Duck[20951:f0c2] [com.apple.UIKit:BackgroundTask] Creating new assertion because there is no existing background assertion.
-2026-11-19 04:02:57.511 Df Duck[20951:f0c2] [com.apple.UIKit:BackgroundTask] Creating new background assertion
-2026-11-19 04:02:57.512 Df Duck[20951:f0c2] [com.apple.UIKit:BackgroundTask] Created new background assertion <BKSProcessAssertion: 0x60000210c190>
-2026-11-19 04:02:57.520 Df Duck[20951:f0c2] [com.apple.UIKit:BackgroundTask] Incrementing reference count for background assertion <BKSProcessAssertion: 0x60000210c190>
-2026-11-19 04:02:57.528 Df Duck[20951:f0b4] [com.apple.runningboard:general] Added observer for process assertions expiration warning: <_RBSExpirationWarningClient: 0x600000211400>
-2026-11-19 04:02:58.466 Df Duck[20951:f0cb] (Foundation) duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/C2D55378-94F2-4DD9-8C24-5BD58B8C322B/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
-2026-11-19 04:02:58.467 Df Duck[20951:f0cb] (Foundation) duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/98A0BFA3-CEC3-4FD6-9916-5A2149774DBF/data/Containers/Bundle/Application/C2D55378-94F2-4DD9-8C24-5BD58B8C322B/Duck.app/DuckResources/policies
-2026-11-19 04:02:58.564 Df Duck[20951:f0ce] [com.apple.UIKit:BackgroundTask] Decrementing reference count for assertion <BKSProcessAssertion: 0x60000210c190> (used by background task with identifier 1: <_UIBackgroundTaskInfo: 0x60000170b080>: taskID = 1, taskName = Launch Background Task for Coalescing, creationTime = 628 (elapsed = 1))
-2026-11-19 04:02:58.564 Df Duck[20951:f0ce] [com.apple.UIKit:BackgroundTask] Will invalidate assertion: <BKSProcessAssertion: 0x60000210c190> for task identifier: 1
-2026-11-19 04:02:59.991 Df Duck[20951:f0c8] [com.apple.coreaudio:AudioConverter]        ACv2Workarounds.mm:51    ai.duck.microduck: fix84702776_86723525_86479548_89800354_SinglePacketDesc: false
-2026-11-19 04:03:00.127 Df Duck[20951:f0b4] (Foundation) duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-19 04:03:00.175 Df Duck[20951:f0b4] (Foundation) duck: voice resumed category=AVAudioSessionCategoryPlayback
-2026-11-19 04:03:03.085 Df Duck[20951:f0cb] (Foundation) duck: built 38 meshes off the main thread
-2026-11-19 04:03:03.087 Df Duck[20951:f0b4] (Foundation) duck: core created
-2026-11-19 04:03:03.103 Df Duck[20951:f0b4] (Foundation) duck: pickup detector -> 0
-2026-11-19 04:03:03.147 Df Duck[20951:f0b4] (Foundation) duck: emotions -> 13
-2026-11-19 04:03:03.148 Df Duck[20951:f0b4] (Foundation) duck: intent server -> 0
-2026-11-19 04:03:03.151 Df Duck[20951:f0b4] (Foundation) duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-19 04:03:03.151 Df Duck[20951:f0b4] (Foundation) duck: voice ready at 48000 Hz
-2026-11-19 04:03:03.854 Df Duck[20951:f0b4] (Foundation) duck: renderer: 70 visual geoms
-2026-11-19 04:03:03.964 Df Duck[20951:f0b4] (Foundation) duck: voice scheduled tag=greet frames=19251 total=1
-2026-11-19 04:03:06.095 Df Duck[20951:f0b4] (Foundation) duck: voice scheduled tag=alarm frames=8827 total=2
-2026-11-19 04:03:11.672 Df Duck[20951:f0b4] (Foundation) duck: voice scheduled tag=emotion:angry frames=112790 total=3
-=== crash reports ===
-::error::1 checks failed in the simulator session
+=== feature matrix: 205 passed, 0 failed ===
+the simulator session passed every check

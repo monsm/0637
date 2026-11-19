@@ -1,27 +1,27 @@
-sim-drive/frame-1.png: 1206x2622 lit=70.3224% colours=64
+sim-drive/frame-1.png: 1206x2622 lit=70.5060% colours=64
 frame has content
-sim-drive/frame-1.png: region (0.3, 0.3, 0.7, 0.7) lit=75.7478% colours=64
-sim-drive/frame-1.png: colour (255,140,50) +/-110 -> 48718 px (want >= 300)
-sim-drive/frame-1.png: bright neutral shell (>= 120) -> 134071 px (want >= 1200)
-sim-drive/frame-2.png: 1206x2622 lit=70.3305% colours=64
+sim-drive/frame-1.png: region (0.3, 0.3, 0.7, 0.7) lit=72.1734% colours=64
+sim-drive/frame-1.png: colour (255,140,50) +/-110 -> 43580 px (want >= 300)
+sim-drive/frame-1.png: bright neutral shell (>= 120) -> 119182 px (want >= 1200)
+sim-drive/frame-2.png: 1206x2622 lit=70.3233% colours=64
 frame has content
-sim-drive/frame-2.png: region (0.3, 0.3, 0.7, 0.7) lit=75.6949% colours=64
-sim-drive/frame-2.png: colour (255,140,50) +/-110 -> 49033 px (want >= 300)
-sim-drive/frame-2.png: bright neutral shell (>= 120) -> 137644 px (want >= 1200)
-sim-drive/frame-3.png: 1206x2622 lit=70.0496% colours=64
+sim-drive/frame-2.png: region (0.3, 0.3, 0.7, 0.7) lit=73.0871% colours=64
+sim-drive/frame-2.png: colour (255,140,50) +/-110 -> 44071 px (want >= 300)
+sim-drive/frame-2.png: bright neutral shell (>= 120) -> 133186 px (want >= 1200)
+sim-drive/frame-3.png: 1206x2622 lit=69.7642% colours=64
 frame has content
-sim-drive/frame-3.png: region (0.3, 0.3, 0.7, 0.7) lit=75.4545% colours=64
-sim-drive/frame-3.png: colour (255,140,50) +/-110 -> 46422 px (want >= 300)
-sim-drive/frame-3.png: bright neutral shell (>= 120) -> 131747 px (want >= 1200)
-sim-drive/frame-1.png: 1206x2622 lit=70.3224% colours=64
+sim-drive/frame-3.png: region (0.3, 0.3, 0.7, 0.7) lit=72.0236% colours=64
+sim-drive/frame-3.png: colour (255,140,50) +/-110 -> 40714 px (want >= 300)
+sim-drive/frame-3.png: bright neutral shell (>= 120) -> 122567 px (want >= 1200)
+sim-drive/frame-1.png: 1206x2622 lit=70.5060% colours=64
 frame has content
-sim-drive/frame-2.png: 1206x2622 lit=70.3305% colours=64
+sim-drive/frame-2.png: 1206x2622 lit=70.3233% colours=64
 frame has content
-sim-drive/frame-1.png vs sim-drive/frame-2.png: 87179/3162132 pixels differ (2.7570%)
+sim-drive/frame-1.png vs sim-drive/frame-2.png: 119776/3162132 pixels differ (3.7878%)
 the frames differ - the scene is live
-sim-drive/frame-2.png: 1206x2622 lit=70.3305% colours=64
+sim-drive/frame-2.png: 1206x2622 lit=70.3233% colours=64
 frame has content
-sim-drive/frame-3.png: 1206x2622 lit=70.0496% colours=64
+sim-drive/frame-3.png: 1206x2622 lit=69.7642% colours=64
 frame has content
-sim-drive/frame-2.png vs sim-drive/frame-3.png: 116596/3162132 pixels differ (3.6873%)
+sim-drive/frame-2.png vs sim-drive/frame-3.png: 125578/3162132 pixels differ (3.9713%)
 the frames differ - the scene is live
