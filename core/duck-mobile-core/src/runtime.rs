@@ -987,6 +987,10 @@ pub struct DuckRuntime<T: RobotIo> {
     /// Whether a ground pick was running last tick, so the book counts the
     /// start of each peck exactly once.
     last_ground_pick: bool,
+    /// The driving label the last tick reported, for the official vet book's
+    /// label edges (`robotd/src/vetbook.rs:428-434`): the tick `sit` becomes
+    /// the label is a sit-down, and `rise` becomes it a stand-up.
+    vet_label: String,
     /// Consecutive ticks the fall predictor has said "down". A one-tick tip
     /// while a scripted move shifts the trunk is not a fall and must not
     /// make the duck shriek.
@@ -1181,6 +1185,7 @@ impl<T: RobotIo> DuckRuntime<T> {
             last_pickup_paused: false,
             last_fallen: false,
             last_ground_pick: false,
+            vet_label: String::new(),
             fallen_ticks: 0,
             last_moving: false,
             last_reaction: None,
@@ -4833,6 +4838,21 @@ impl<T: RobotIo> DuckRuntime<T> {
             self.book.note("ground_pick".to_owned());
         }
         self.last_ground_pick = picking;
+        // The driving label's edges, the official vet book's own rule
+        // (`robotd/src/vetbook.rs:428-434`): the tick a `sit` becomes the
+        // label is a sit-down, the tick `rise` becomes it a stand-up.
+        // `report.label` is the controller's wire label on the branches that
+        // drive (`step.label`), which is exactly what the official
+        // `Facts.label` carries; the `sitting` seconds above are the time
+        // spent, this is how many times it happened.
+        if report.label != self.vet_label {
+            match report.label.as_str() {
+                "sit" => self.book.life.sit_downs += 1,
+                "rise" => self.book.life.stand_ups += 1,
+                _ => {}
+            }
+            self.vet_label.clone_from(&report.label);
+        }
 
         // The robot.state frame, in the official wire shape — the same struct
         // `robotd` publishes, filled from what this tick actually was. Kept
