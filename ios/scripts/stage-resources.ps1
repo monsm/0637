@@ -21,6 +21,16 @@ $manifest = Join-Path $root 'policies\manifest.json'
 if (Test-Path $manifest) { Copy-Item $manifest (Join-Path $dst 'policies') -Force }
 $pickup = Join-Path $root 'upstream\microduck\duck-control\models\pickup_detector.onnx'
 if (Test-Path $pickup) { Copy-Item $pickup (Join-Path $dst 'models\pickup_detector.onnx') -Force }
+# The official pet-detect model: the shell posts 16 kHz mono PCM to the core
+# only when this file is staged. The core resolves `<root>/models/
+# pet_detect.onnx` beside the policy set; the ticket's `pet-detect/` path is
+# staged too. A missing model is a supported state (no stream, no network).
+$petDetect = Join-Path $root 'upstream\microduck\pet-detect\models\pet_detect.onnx'
+if (Test-Path $petDetect) {
+  New-Item -ItemType Directory -Force (Join-Path $dst 'pet-detect') | Out-Null
+  Copy-Item $petDetect (Join-Path $dst 'pet-detect\pet_detect.onnx') -Force
+  Copy-Item $petDetect (Join-Path $dst 'models\pet_detect.onnx') -Force
+}
 # `robotd/emotions/`: the real duck's thirteen scripted moods and voices.
 $emotions = Join-Path $root 'upstream\microduck\robotd\emotions'
 if (Test-Path $emotions) {

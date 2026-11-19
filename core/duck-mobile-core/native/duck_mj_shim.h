@@ -65,6 +65,10 @@ int duck_mj_mesh_id(const DuckMj* h, const char* name);
 int duck_mj_site_id(const DuckMj* h, const char* name);
 int duck_mj_key_id(const DuckMj* h, const char* name);
 
+/* Contacts after a step: count, then flat (geom1, geom2) pairs. */
+int duck_mj_ncon(const DuckMj* h);
+const int* duck_mj_contact_geoms(const DuckMj* h);
+const char* duck_mj_geom_name(const DuckMj* h, int geom);
 const char* duck_mj_body_name(const DuckMj* h, int body);
 const char* duck_mj_mesh_name(const DuckMj* h, int mesh);
 const char* duck_mj_joint_name(const DuckMj* h, int joint);

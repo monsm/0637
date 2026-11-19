@@ -71,6 +71,51 @@ pub struct Sensors {
     pub mode: Option<Mode>,
 }
 
+/// Pull the microphone's `pcm16` payload out of a `/sensor` reading.
+///
+/// The wire format is the shell's: base64 of mono little-endian i16 samples,
+/// with an optional `"rate"` field (Hz, 16 000 when absent). The fields are
+/// **removed from the reading** whether or not this build can use them:
+/// `/sensors` publishes the registry, and echoing a megabyte of base64 audio
+/// back to every poller would be neither useful nor private. A payload that
+/// does not decode is dropped the same way — nothing is invented, nothing is
+/// stored. So is a malformed one: a capture rate outside 8 000..=48 000 Hz
+/// (a 1 Hz post would resample one second into 160 million samples) or a
+/// decoded array longer than two seconds at the detector's 16 kHz.
+pub fn take_pcm16(value: &mut Value) -> Option<(Vec<i16>, u32)> {
+    let object = value.as_object_mut()?;
+    let encoded = object.remove("pcm16")?.as_str().map(str::to_owned)?;
+    let rate = object
+        .remove("rate")
+        .as_ref()
+        .and_then(Value::as_u64)
+        .unwrap_or(crate::petdetect::SAMPLE_RATE as u64);
+    // The shells capture at 16 kHz, 44.1 kHz or 48 kHz. A rate outside
+    // 8 kHz..=48 kHz is a bad payload, not a capture setting: 1 Hz would make
+    // the resampler turn a second of audio into 160 million samples, and the
+    // app would be killed for memory. Out of range means dropped.
+    let rate =
+        u32::try_from(rate).ok().filter(|rate| (8_000..=48_000).contains(rate))?;
+    let samples = crate::petdetect::decode_pcm16_base64(&encoded)?;
+    // Two seconds at the detector's 16 kHz is one post's worth of evidence. A
+    // longer array is a malformed upload and would only inflate memory before
+    // the detector's own ring caps it.
+    if samples.len() > 2 * crate::petdetect::SAMPLE_RATE {
+        return None;
+    }
+    Some((samples, rate))
+}
+
+impl Sensors {
+    /// [`take_pcm16`] on the latest microphone reading. `None` means this
+    /// post carried no audio (the RMS/zero-crossing summary is all it had).
+    pub fn take_pcm16(&mut self) -> Option<(Vec<i16>, u32)> {
+        self.microphone
+            .as_mut()
+            .and_then(|reading| take_pcm16(&mut reading.value))
+    }
+}
+
 impl Sensors {
     /// The IMU as a disturbance impulse, which is the one sensor that acts on
     /// the duck. Scaled the way the app has always scaled a shake.
@@ -375,6 +420,91 @@ mod tests {
         assert_eq!(
             watch.observe(Some(&mic(0.4, 950.0, 2400)), 2400, 2),
             Some(SoundKind::Whistle)
+        );
+    }
+
+    #[test]
+    fn a_microphone_post_can_carry_pcm_and_the_registry_does_not_echo_it() {
+        let mut reading = Reading {
+            sensor: "microphone".to_owned(),
+            mode: "twin".to_owned(),
+            value: json!({
+                "rms": 0.12,
+                "peak_hz": 900.0,
+                "pcm16": "AQD+/w==",
+                "rate": 16000,
+            }),
+            tick_ms: 0,
+            in_observation: false,
+        };
+        let (samples, rate) = take_pcm16(&mut reading.value).expect("PCM decodes");
+        assert_eq!(samples, vec![1, -2]);
+        assert_eq!(rate, 16_000);
+        assert!(reading.value.get("pcm16").is_none(), "audio is not stored");
+        assert!(reading.value.get("rate").is_none());
+        assert_eq!(reading.value["rms"], json!(0.12), "the summary survives");
+
+        // A rate the shell did not send is the 16 kHz contract.
+        let mut bare = json!({ "pcm16": "AQD+/w==" });
+        assert_eq!(take_pcm16(&mut bare).map(|(_, rate)| rate), Some(16_000));
+        // Malformed or odd-length payloads are removed and refused, not kept.
+        let mut broken = json!({ "pcm16": "AQA", "rate": 16000 });
+        assert_eq!(take_pcm16(&mut broken), None);
+        assert!(broken.get("pcm16").is_none());
+        // Something that is not a microphone payload is untouched.
+        let mut other = json!({ "acceleration": [1.0, 0.0, 0.0] });
+        assert_eq!(take_pcm16(&mut other), None);
+        assert!(other.get("acceleration").is_some());
+    }
+
+    /// Base64 for `bytes` zero bytes: the mic payload is little-endian i16
+    /// samples, and zero bytes decode to zero samples.
+    fn pcm_base64(bytes: usize) -> String {
+        let mut out = "AAAA".repeat(bytes / 3);
+        match bytes % 3 {
+            1 => out.push_str("AA=="),
+            2 => out.push_str("AAA="),
+            _ => {}
+        }
+        out
+    }
+
+    /// A rate is a capture rate the shell really uses (8 kHz … 48 kHz). A
+    /// rate of 1 Hz would make the resampler turn one second of audio into
+    /// 160 million samples, and a megabyte post is not this second's sound.
+    /// Both are bad payloads: stripped from the registry and dropped.
+    #[test]
+    fn a_pcm_post_is_bounded_to_real_rates_and_two_seconds() {
+        for rate in [0, 1, 7_999, 48_001] {
+            let mut value = json!({ "pcm16": pcm_base64(4), "rate": rate });
+            assert_eq!(take_pcm16(&mut value), None, "rate {rate} must be refused");
+            assert!(
+                value.get("pcm16").is_none(),
+                "rate {rate}: the audio is stripped, not stored"
+            );
+            assert!(value.get("rate").is_none(), "rate {rate}");
+        }
+        for rate in [8_000u64, 16_000, 44_100, 48_000] {
+            let mut value = json!({ "pcm16": pcm_base64(4), "rate": rate });
+            assert_eq!(
+                take_pcm16(&mut value).map(|(_, accepted)| accepted),
+                Some(rate as u32),
+                "rate {rate} is a real capture rate"
+            );
+        }
+
+        // Two seconds at the model's 16 kHz is exactly the cap.
+        let two_seconds = pcm_base64(2 * crate::petdetect::SAMPLE_RATE * 2);
+        let mut value = json!({ "pcm16": two_seconds, "rate": 16_000 });
+        let (samples, _) = take_pcm16(&mut value).expect("two seconds is accepted");
+        assert_eq!(samples.len(), 2 * crate::petdetect::SAMPLE_RATE);
+
+        let over = pcm_base64(2 * (crate::petdetect::SAMPLE_RATE + 1) * 2);
+        let mut value = json!({ "pcm16": over, "rate": 16_000 });
+        assert_eq!(take_pcm16(&mut value), None, "over two seconds is refused");
+        assert!(
+            value.get("pcm16").is_none(),
+            "the oversized payload is stripped too"
         );
     }
 

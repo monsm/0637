@@ -83,7 +83,16 @@ the natural place for an LLM/agent bridge.
 - CoreMotion: a shake above ~1.2 g becomes an external trunk velocity impulse —
   a disturbance, not a replacement for the duck's proprioception (Twin mode).
 - Touch: the joystick streams twist at 50 Hz.
-- Camera/LiDAR/AR and microphone are not wired yet (M2.3).
+- Camera/LiDAR: Director is the rear-camera backdrop. On a LiDAR phone whose
+  camera the user has already granted (Director asks; launch never prompts),
+  a one-second ARKit `sceneDepth` scan at launch writes up to three furniture
+  boxes into the scene's `obstacles.xml` and posts the scene-relative floor
+  offset to `/floor` (the detected plane is the duck's floor, so this launch
+  reports 0; the core refuses a camera height). Simulator and non-LiDAR
+  phones say "no depth sensor"; the furniture does not follow the room.
+- Microphone: the room's RMS/peak feed plus, when the official
+  `pet_detect.onnx` was staged, one-second 16 kHz mono PCM windows to
+  `/sensor` for the core's petting classifier. Audio stays on the phone.
 
 The high-level intent surface is also the C ABI (`duck_core_set_twist`,
 `duck_core_trigger_skill`, `duck_core_sit_toggle`, `duck_core_ground_pick`,
@@ -93,7 +102,7 @@ The high-level intent surface is also the C ABI (`duck_core_set_twist`,
 
 - The renderer is a first pass: flat-per-face normals, one directional light,
   a follow camera. No PBR materials/shadows yet.
-- Phone sensors are not wired into the loop yet (M2.3). The core runs in Twin
-  mode; phone IMU/camera/LiDAR should drive the world, not the duck's
-  proprioception, to preserve 1:1.
+- Phone sensors drive the world, not the duck's proprioception (Twin mode):
+  the IMU is a disturbance, the depth scan edits the scene and floor, and the
+  microphone is the room. The 61-D observation is unchanged.
 - Android is not started.

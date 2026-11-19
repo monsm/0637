@@ -25,6 +25,17 @@ cp "$ROOT"/policies/*.onnx "$DST/policies/"
 # with duck-control, not with the policy set.
 PICKUP="$ROOT/upstream/microduck/duck-control/models/pickup_detector.onnx"
 [ -f "$PICKUP" ] && cp "$PICKUP" "$DST/models/pickup_detector.onnx"
+# The official pet-detect model: the shell streams 16 kHz mono PCM to the
+# core only when this file is staged. The core resolves `<root>/models/
+# pet_detect.onnx` beside the policy set; the ticket's `pet-detect/` path is
+# staged too so both names are real. A missing clone of pet-detect does not
+# fail the bundle: no model, no stream, no network.
+PET_DETECT="$ROOT/upstream/microduck/pet-detect/models/pet_detect.onnx"
+if [ -f "$PET_DETECT" ]; then
+  mkdir -p "$DST/pet-detect" "$DST/models"
+  cp "$PET_DETECT" "$DST/pet-detect/pet_detect.onnx"
+  cp "$PET_DETECT" "$DST/models/pet_detect.onnx"
+fi
 # `robotd/emotions/`: the real duck's thirteen keyframe timelines and their
 # 48 kHz voices. `robot.do curious` is a skill, so the app needs the data.
 EMOTIONS="$ROOT/upstream/microduck/robotd/emotions"

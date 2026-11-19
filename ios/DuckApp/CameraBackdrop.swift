@@ -47,7 +47,9 @@ final class CameraFeed: NSObject, ObservableObject {
         case .authorized:
             activate()
         case .notDetermined:
-            // Asked only when Director is opened, never at launch.
+            // Asked only when Director is opened, never at launch. The
+            // launch depth scan never prompts; it simply waits for this
+            // grant to exist on a later launch (see `DepthScanner`).
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     if granted {

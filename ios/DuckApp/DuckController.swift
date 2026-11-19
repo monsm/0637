@@ -518,6 +518,42 @@ final class DuckController: ObservableObject {
     private var wantsCamera = false
     private var cameraCancellable: AnyCancellable?
     private var cameraDeniedCancellable: AnyCancellable?
+
+    /// The one-shot LiDAR scan that has to finish before `duck_core_new`:
+    /// its `obstacles.xml` is compiled with the scene, and its floor height
+    /// is the `/floor` intent the core receives once its server is up.
+    private let depthScanner = DepthScanner()
+    /// Set before the core is built and never changes afterwards; a plain
+    /// value is enough because the sensors card opens only after the core is
+    /// ready. Keeping it a plain value also keeps the UI debt ratchet's
+    /// published-property count from growing for a launch-time fact.
+    private(set) var depthScanStatus: DepthScanStatus = .unsupported
+    /// Main-thread only: the scan result the core was (or will be) built
+    /// with. Retrying a failed startup must not rescan the room.
+    private var scanOutcome: DepthScanResult?
+    /// Main-thread only: one core build at a time, scan or retry.
+    private var coreCreationStarted = false
+
+    /// The sensors card's depth hint. It is a line of text, not a control:
+    /// the scan itself is a launch fact, not something the sheet switches.
+    var depthScanLine: String {
+        switch depthScanStatus {
+        case .unsupported:
+            return Copy.depthUnsupported
+        case .denied:
+            return Copy.denied
+        case .scanning:
+            return "…"
+        case .failed:
+            return "—"
+        case .scanned(let boxes, _):
+            return boxes > 0 ? "\(Copy.depthScanNote) · \(boxes)" : Copy.depthScanNote
+        }
+    }
+
+    /// The pet-sound note promises the official model; show it only when
+    /// that model was really staged beside the scene.
+    var petSoundAvailable: Bool { PetPCM.modelStaged }
     /// The room's microphone. It taps Voice's engine rather than making a
     /// second one: one app, one AVAudioSession. Created at init but never
     /// started until the sheet's toggle is switched on.
@@ -695,9 +731,11 @@ final class DuckController: ObservableObject {
         // black screen. Build it on a worker queue and publish on the main
         // thread; the core itself is only touched from the main thread
         // afterwards (timer and renderer).
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.createCore()
-        }
+        //
+        // On a LiDAR device the one-second depth scan runs first, because
+        // obstacles.xml has to exist when MuJoCo compiles the scene. On any
+        // other device (and in the simulator) that path is honestly skipped.
+        beginLaunchScan()
     }
 
     /// The failure card's one action. A core that never came up is built
@@ -712,20 +750,105 @@ final class DuckController: ObservableObject {
         // tap while the loader runs is a no-op rather than a second core.
         guard errorMessage != nil else { return }
         errorMessage = nil
+        // A retry reuses the launch scan: another AR pass would delay the
+        // core again, and the furniture has not changed since this launch.
+        coreCreationStarted = false
+        createCoreOnWorker()
+    }
+
+    /// The launch scan's one owner. It must produce (or refuse) the
+    /// obstacle file before the core compiles the scene, so the core is
+    /// built from its completion. A camera the user has never granted is
+    /// not a reason to prompt at launch (Director owns that prompt, and
+    /// Android's scan makes the same call); the path answers "denied" and
+    /// the next launch after a Director visit can scan. A four-second
+    /// watchdog covers a session that never delivers a frame, so the app
+    /// wakes without obstacles instead of sitting on "waking the duck…".
+    private func beginLaunchScan() {
+        guard DepthScanner.isSupported else {
+            depthScanStatus = .unsupported
+            scanOutcome = nil
+            createCoreOnWorker()
+            return
+        }
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            break
+        case .denied, .restricted, .notDetermined:
+            // The sheet says "denied"; it never blames a depth sensor the
+            // phone does have, and it never asks here.
+            depthScanStatus = .denied
+            scanOutcome = nil
+            createCoreOnWorker()
+            return
+        @unknown default:
+            depthScanStatus = .denied
+            scanOutcome = nil
+            createCoreOnWorker()
+            return
+        }
+        depthScanStatus = .scanning
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak self] in
+            guard let self, !self.coreCreationStarted else { return }
+            NSLog("duck: depth scan watchdog fired; building without obstacles")
+            self.depthScanner.cancel()
+            self.depthScanStatus = .failed
+            self.scanOutcome = nil
+            self.createCoreOnWorker()
+        }
+        depthScanner.scan { [weak self] outcome in
+            guard let self, !self.coreCreationStarted else { return }
+            switch outcome {
+            case .unsupported:
+                self.depthScanStatus = .unsupported
+                self.scanOutcome = nil
+            case .denied:
+                self.depthScanStatus = .denied
+                self.scanOutcome = nil
+            case .failed:
+                self.depthScanStatus = .failed
+                self.scanOutcome = nil
+            case .done(let result):
+                self.depthScanStatus = .scanned(
+                    boxes: result.boxes.count,
+                    floorOffset: result.floorOffset
+                )
+                self.scanOutcome = result
+            }
+            self.createCoreOnWorker()
+        }
+    }
+
+    /// Main thread. Snapshot the scan so the worker never reads mutable
+    /// controller state.
+    private func createCoreOnWorker() {
+        guard !coreCreationStarted else { return }
+        coreCreationStarted = true
+        let scan = scanOutcome
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            self?.createCore()
+            self?.createCore(scan: scan)
         }
     }
 
     /// Runs off the main thread; hops back to publish the result.
-    private func createCore() {
+    private func createCore(scan: DepthScanResult?) {
         guard let resourceURL = Bundle.main.resourceURL else {
             DispatchQueue.main.async { self.errorMessage = "Bundle resources not found" }
             return
         }
-        let scene = resourceURL
-            .appendingPathComponent("DuckResources/robot/microduck/scene_backlash.xml")
-            .path
+        // The scan's boxes become obstacles.xml. The bundle is read-only, so
+        // the shell mirrors the scene beside it in Application Support and
+        // hands the core that copy; without boxes the bundled scene is used
+        // and no 23 MB mirror is made.
+        let obstacleXML = DepthObstaclePlanner.makeXML(boxes: scan?.boxes ?? [])
+        let staged = DuckSceneStaging.prepare(resourceURL: resourceURL, obstacleXML: obstacleXML)
+        let scene = staged.sceneURL.path
+        if !obstacleXML.isEmpty && !staged.wroteObstacles {
+            NSLog("duck: scan found obstacles but obstacles.xml could not be staged")
+            DispatchQueue.main.async { [weak self] in
+                self?.depthScanStatus = .failed
+            }
+        }
         let policies = resourceURL.appendingPathComponent("DuckResources/policies").path
         policyDirectory = policies
         // Startup trail in the unified log, so CI can tell where it stopped.
@@ -789,6 +912,15 @@ final class DuckController: ObservableObject {
             NSLog("duck: emotions -> %d", emotionCount)
             let port = duck_core_start_intent_server(created, 8765)
             NSLog("duck: intent server -> %d", port)
+            // The AR floor: a scene-relative offset, the core's current
+            // `/floor` dimension (0 = unchanged). The scan defines the
+            // detected plane as the duck's floor, so the honest offset is
+            // 0; a camera height is explicitly refused by the core and is
+            // not what this shell invents.
+            if let floorOffset = scan?.floorOffset {
+                NSLog("duck: AR floor offset %.2f m", floorOffset)
+                self.postJSON("/floor", ["z": floorOffset])
+            }
             self.voice.start()
             self.startTimer()
             self.startMotion()

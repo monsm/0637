@@ -64,9 +64,11 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
         INFOPLIST_KEY_NSMotionUsageDescription: "Shake your phone to push the digital duck."
-        # Director mode composites the 3D duck over the rear camera. Asked
-        # only when Director is opened, never at launch.
-        INFOPLIST_KEY_NSCameraUsageDescription: "Director mode puts the digital duck in your room. The camera image never reaches the duck's senses."
+        # Director mode composites the 3D duck over the rear camera. The prompt is
+        # asked only when Director is opened, never at launch; the same grant
+        # also lets later launches run the one-second depth scan that keeps
+        # the duck off the furniture already in the room.
+        INFOPLIST_KEY_NSCameraUsageDescription: "Director mode puts the digital duck in your room, and the camera also lets a one-second scan at launch keep the duck off your furniture. The camera image never reaches the duck's senses."
         # The microphone is the ROOM, never the duck's senses. Asked only when
         # the user enables the mic row in the instrument sheet, never at launch.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "MicroDuck listens for loud sounds in the room so your AI can react. Audio stays on your phone and never reaches the duck's senses."
@@ -108,6 +110,9 @@ targets:
       - sdk: MetalKit.framework
       - sdk: CoreMotion.framework
       - sdk: AVFoundation.framework
+      # The one-second launch scan reads `sceneDepth` from an ARKit world
+      # tracking session on LiDAR phones; every other device skips it.
+      - sdk: ARKit.framework
       # The duck's ear: SFSpeechRecognizer recognises Mandarin on the
       # device. `import Speech` would autolink it, but the system frameworks
       # this app uses are declared here, so this one is too.

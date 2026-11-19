@@ -326,7 +326,16 @@ object AssetStager {
         // from a build without them would otherwise keep the old filesDir
         // and silently lose all 13 skills.
         val emotions = File(root, "emotions/curious.json")
-        if (marker.exists() && pickup.exists() && emotions.exists()) return root
+        // The scratch-sound classifier is staged in assets/pet-detect. Like
+        // the emotions, it joins the marker: an install upgraded from a
+        // build without the model must copy it before the mic can use it.
+        val hasPetAsset = !context.assets.list("pet-detect").isNullOrEmpty()
+        val petModel = File(root, "pet-detect/pet_detect.onnx")
+        if (marker.exists() && pickup.exists() && emotions.exists() &&
+            (!hasPetAsset || petModel.exists())
+        ) {
+            return root
+        }
         copy(context, "robot", File(root, "robot"))
         copy(context, "policies", File(root, "policies"))
         // The pickup classifier ships beside the policies but is not one.
@@ -336,6 +345,10 @@ object AssetStager {
         // `robotd/emotions/`: thirteen keyframe timelines and their voices.
         if (!context.assets.list("emotions").isNullOrEmpty()) {
             copy(context, "emotions", File(root, "emotions"))
+        }
+        // The official scratch-sound classifier for POST /sensor pcm16.
+        if (hasPetAsset) {
+            copy(context, "pet-detect", File(root, "pet-detect"))
         }
         return root
     }

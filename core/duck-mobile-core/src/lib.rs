@@ -33,6 +33,7 @@ pub mod mcp;
 #[cfg(feature = "mujoco")]
 pub mod mujoco;
 pub mod params;
+pub mod petdetect;
 pub mod pickup;
 pub mod provenance;
 pub mod quests;

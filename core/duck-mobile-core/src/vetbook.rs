@@ -47,6 +47,13 @@ pub struct Life {
     pub wake_ups: u64,
     /// Times somebody petted it.
     pub pets: u64,
+    /// Times the room's microphone heard a hand stroking it: the official
+    /// `pet_detect` CNN's Start edges. Kept apart from [`Self::pets`], which
+    /// counts touches on the screen — a stroke heard and a hand drawn are
+    /// two different events, and adding them together would claim one was
+    /// the other. A save from before the field loads as zero.
+    #[serde(default)]
+    pub sound_pets: u64,
     /// Breadcrumb rituals: a treat dropped on the floor for the peck.
     pub fed: u64,
     /// Room sounds the duck answered: claps and whistles.
@@ -605,6 +612,10 @@ impl Book {
             "stand_ups": self.life.stand_ups,
             "wake_ups": self.life.wake_ups,
             "pets": self.life.pets,
+            // The microphone's pets, beside the hand's. `/days` keeps its
+            // existing fields: a day row is a calendar-day delta and this
+            // counter has no day semantics yet.
+            "sound_pets": self.life.sound_pets,
             "fed": self.life.fed,
             "claps": self.life.claps,
             "whistles": self.life.whistles,
@@ -724,6 +735,10 @@ mod tests {
         assert!(life.unlocks.is_empty());
         assert!(!life.unlocks_backfilled);
         assert_eq!(life.emotions.get("curious"), Some(&1));
+        assert_eq!(
+            life.sound_pets, 0,
+            "a save from before the microphone's pets existed counts none"
+        );
 
         let mut book = Book {
             life,
@@ -749,6 +764,19 @@ mod tests {
         book.life.emotions.insert("sad".to_owned(), 0);
         book.note_unlocks("2026-11-18");
         assert!(!book.life.unlocks.contains_key("emotion:sad"));
+    }
+
+    /// `/life` publishes the microphone's pets beside the hand's, apart. The
+    /// day rows deliberately keep their existing shape: this counter has no
+    /// per-day accounting yet and inventing one here would claim otherwise.
+    #[test]
+    fn the_life_summary_keeps_sound_pets_apart_from_touch_pets() {
+        let mut book = Book::default();
+        book.life.pets = 5;
+        book.life.sound_pets = 3;
+        let summary = book.summary();
+        assert_eq!(summary["pets"], serde_json::json!(5));
+        assert_eq!(summary["sound_pets"], serde_json::json!(3));
     }
 
     /// Days are real calendar days, not ten characters shaped like one: the

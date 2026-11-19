@@ -88,6 +88,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import java.io.File
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -135,6 +136,12 @@ fun Shell(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    // The pet-sound stream is only enabled when the official classifier was
+    // actually staged (AssetStager copies assets/pet-detect before the core
+    // exists). No model, no PCM frames: the mic stays the RMS room only.
+    val petSoundStaged = remember {
+        File(context.filesDir, "duck/pet-detect/pet_detect.onnx").isFile
+    }
     // One route table (B7): every sheet is a DuckRoute, the skill ring is the
     // overlay field. Opening replaces the sheet (one at a time, never
     // stacked); back closes the ring first, then the sheet. Only the
@@ -498,7 +505,7 @@ fun Shell(
             // The feed is created here, not in onToggleMic: that path only
             // launches the prompt, so by the time the callback runs micFeed is
             // still null and starting it here is the one place it can begin.
-            micFeed = MicFeed().also { it.start() }
+            micFeed = MicFeed(petSound = petSoundStaged).also { it.start() }
             micState = MicState.On
         } else {
             micState = MicState.Denied
@@ -1014,6 +1021,7 @@ fun Shell(
             flashlightState = flashlightState,
             onFlashlight = toggleFlashlight,
             speechFeed = speechFeed,
+            petSoundStaged = petSoundStaged,
             onToggleSpeech = {
                 when (speechFeed.state) {
                     SpeechState.Off, SpeechState.Denied, SpeechState.Unavailable -> {
@@ -1038,7 +1046,7 @@ fun Shell(
                             Manifest.permission.RECORD_AUDIO,
                         ) == PackageManager.PERMISSION_GRANTED
                         if (granted) {
-                            micFeed = MicFeed()
+                            micFeed = MicFeed(petSound = petSoundStaged)
                             micFeed?.start()
                             micState = MicState.On
                         } else {
@@ -1142,6 +1150,7 @@ fun Shell(
     if (route == DuckRoute.Tools) {
         ToolsSheet(
             input = input,
+            depth = DepthStatus.last,
             onOpen = { open(it) },
             onClose = { closeSheet() },
         )
@@ -3152,6 +3161,7 @@ private fun InstrumentSheet(
     flashlightState: Int,
     onFlashlight: () -> Unit,
     speechFeed: SpeechFeed,
+    petSoundStaged: Boolean,
     onToggleSpeech: () -> Unit,
     onToggleMic: () -> Unit,
     quests: QuestBoardUi,
@@ -3350,6 +3360,17 @@ private fun InstrumentSheet(
                         onToggleMic()
                     }
                 }
+            }
+            // The sound-stroke channel only exists when the official model
+            // is on this phone. Text, not a control: the one mic toggle above
+            // owns both the RMS reading and this PCM stream.
+            if (petSoundStaged) {
+                Text(
+                    Copy.petSoundNote,
+                    color = Color.White.copy(alpha = 0.55f),
+                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.testTag("sheet-pet-sound-note"),
+                )
             }
             // Spoken commands: a separate toggle from the room mic. Off until
             // tapped; enabling asks RECORD_AUDIO. The last final transcript is

@@ -124,6 +124,7 @@ dependencies = [
  "jni",
  "kinematics",
  "odometry",
+ "ort",
  "robotd-params",
  "serde",
  "serde_json",

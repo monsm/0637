@@ -36,6 +36,15 @@
 - **已修**：逐槽覆盖、技能元数据（`robot.skills` 带参数/overridden）、manifest 作为下载清单、`robot.enable(false)`/`robot.relax`/`robot.init` 分支、`safe_to_restart`、health 启动 degraded、`robot.subscribe` 身份字段、`robot.sound`、`robot.policies`/`loadPolicy`/`reloadPolicies`、state skeleton/t_ns、C ABI 三入口的驱动门（技能环/大按钮/语音在休息态拒绝而非 accepted-then-frozen）、分支切换重发技能表、swap 落地按 owner 鸭判定。
 - **保留/边界（如实登记，不冒充已修）**：多鸭共享 MuJoCo 世界（官方 sim 测试特性）、头部 ToF 射线场景与 `--cameras` 帧流（真机/相机源）、训练期命令延迟模型（推理默认无延迟）、运行期增删技能（技能集由 manifest 决定）、社区策略门禁（本地用户自装文件语义）、`setMode` 整机重建（换 MJCF 必须重建，官方只换策略槽）、updaterd/configd 方法族与 robotctl CLI（手机无守护进程/CLI）、chorale 乐谱半（BRAINSTORM 登记）、head_imu 流（真机传感器）、vetbook Space traits、API_VERSION 握手（壳与核心同构建，无版本错配面）、coverage 门禁（需先有基线）。
 
+### 0.3 2026-11-19 SENSORS 批更新（本报告之后的事实变更）
+
+- **§4 #5 官方 pet-detect 音频抚摸分类：已实现**（不再是 not_doing）。核心 `petdetect.rs` 自写 40 带 log-mel（16 kHz/512 FFT/400 Hann/160 hop/100 帧、0.95/0.85 迟滞逐常量对齐上游）+ `ort` 加载**上游原模型 `pet_detect.onnx`（未自训）**；双端麦克风开关下每秒上报 16 kHz PCM16。摸声 → coo、`/state.sound_event="pet"`、`life.sound_pets` 与触摸分开计；无模型静默关闭；暂停不推理不计数。手机麦克风仍不进 61 维观测。
+- **§4 #4 喂食/送礼无声缺陷：已修**。`feed()`/`gift_treat()` 改排 `emotion:yes`（无 yes 情绪资源时 `chirp`），邻居 `Replied` 同款；原「裸 `"yes"` 被白名单丢弃」不再成立。
+- **§4 #6 麦克风通道**：两端新增 16 kHz PCM16（信封 `sensor=microphone`、`value.pcm16/rate`）；Android 采集改为连续读 + 2 s 环形缓冲，RMS 取最新 2048 样本。原有 RMS/过零事件与核心 `SoundWatch` 阈值未变。
+- **§4 #10 ToF 8×8**：2026-11-19 的 AR 深度扫描只喂 `obstacles.xml` 与 `POST /floor`，**仍不上报 depth 读数**——`tof_grid` 恒空的事实不变（不渲染假数）；本批未改动 `to_tof_grid` 语义。
+- **AR 地板（#20）与深度障碍（#4）**：手机侧接线已落（iOS ARKit LiDAR / Android 后置 Camera2 DEPTH16），核心把扫描 AABB 并入 MuJoCo 世界并把地面平面与鸭子同移；`POST /floor` 量纲钉死为「相对默认地面偏移 −0.1…0.3 m」。真机限定，模拟器/无深度诚实隐藏。
+- **#21 自愈爬起**：仍 blocked——官方未发布 `standup.onnx` 权重，不自训、不编造。
+
 
 ## 1. 头部：直答与 11-16 审计差值
 
