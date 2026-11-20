@@ -1,7 +1,7 @@
 # 深度 UI/UX 重构 · QA 记录与七条口径评分（2026-11-20）
 
 > 小盯（测试兼 CI）· 对照 `docs/UIUX_REFACTOR_DEEP_2026-11-19.md`（总纲 §9 评审结论）
-> 基线 `964b872`，收口 `b407608`（D4–D7 合并推送）。发布前一票否决权在本记录末尾。
+> 基线 `964b872`，收口 `67c11dc`（老板的 iOS 无障碍 API 修复）。发布前一票否决权在本记录末尾。
 
 ## 一、七条天花板口径 · 逐条判分
 
@@ -22,6 +22,7 @@
 3. **进度页硬编码「关闭」**（存量 i18n bug）：→ `Copy.close`（D2 关闭钮收敛时顺手）。
 4. **入口台账锚点被组件替换吞掉**：`play-more-mode-` → `play-more-mode-stick`（`61f93e8`）。
 5. **`.foregroundStyle(.duckX)` 隐式成员不解析**：5 处改显式 `Color.`（`feba979`）。
+6. **舞台自定义动作用错 API**：SwiftUI 没有 `.accessibilityCustomActions` / `AccessibilityCustomAction`（那是 UIKit 的），正确写法是 `.accessibilityAction(named:)`；`9de558e` 推红后由老板 `67c11dc` 修正——记录在案，防回锅。
 
 ## 三、遗留清单（诚实登记，不含糊）
 
