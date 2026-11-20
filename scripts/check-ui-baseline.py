@@ -102,7 +102,7 @@ def collect(root):
         # Guard metrics: these may only grow (a11y, state restoration, back handling)
         "android_remember_saveable": (total(kt, r"rememberSaveable"), "min"),
         "android_back_handler": (total(kt, r"BackHandler"), "min"),
-        "a11y_custom_actions": (total(swift, r"accessibilityCustomActions")
+        "a11y_custom_actions": (total(swift, r"accessibilityCustomActions|accessibilityAction\(named:")
                                 + total(kt, r"customActions"), "min"),
         "a11y_announcements": (total(swift, r"UIAccessibility\.post")
                                + total(kt, r"\.liveRegion"), "min"),
