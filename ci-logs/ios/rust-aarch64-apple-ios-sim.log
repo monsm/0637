@@ -2,9 +2,9 @@
    Compiling duck-ipc-proto v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-ipc-proto)
    Compiling kinematics v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/kinematics)
    Compiling duck-mobile-core v0.1.0 (/Users/runner/work/0637/0637/core/duck-mobile-core)
-   Compiling odometry v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/odometry)
    Compiling robotd-params v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/robotd-params)
    Compiling duck-control v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/duck-control)
+   Compiling odometry v0.18.9 (/Users/runner/work/0637/0637/upstream/microduck/odometry)
 warning: variable does not need to be mutable
    --> duck-mobile-core/src/lan.rs:209:13
     |
@@ -86,4 +86,4 @@ warning: function `duck_mj_geom_name` is never used
    |        ^^^^^^^^^^^^^^^^^
 
 warning: `duck-mobile-core` (lib) generated 10 warnings (run `cargo fix --lib -p duck-mobile-core` to apply 4 suggestions)
-    Finished `release` profile [optimized] target(s) in 55.11s
+    Finished `release` profile [optimized] target(s) in 53.28s

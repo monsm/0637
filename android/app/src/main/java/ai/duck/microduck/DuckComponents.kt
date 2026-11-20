@@ -495,6 +495,7 @@ fun DuckErrorCard(
     retrying: Boolean = false,
     offline: Boolean = false,
     testTag: String = "",
+    retryTag: String = "",
 ) {
     Column(
         modifier
@@ -522,7 +523,7 @@ fun DuckErrorCard(
             title = Copy.retry,
             onClick = onRetry,
             enabled = !retrying,
-            testTag = "$testTag-retry",
+            testTag = if (retryTag.isNotEmpty()) retryTag else "$testTag-retry",
         )
     }
 }

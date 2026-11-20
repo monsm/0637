@@ -233,6 +233,13 @@ val quack get() = pick("Quack", "叫一声")
     fun lookingAround(percent: Int): String = pick("looking around $percent%", "四处张望 $percent%")
 
     val close get() = pick("Close", "关闭")
+
+    // D4: the stage's accessibility face — one label and four actions.
+    val duckStage get() = pick("Duck stage", "鸭子舞台")
+    val walkStep get() = pick("Walk forward a step", "向前走一步")
+    val turnLeft get() = pick("Turn left", "左转")
+    val turnRight get() = pick("Turn right", "右转")
+    val petIt get() = pick("Pet the duck", "摸摸它")
     val timeMachine get() = pick("Time machine", "时间机器")
     val freeze get() = pick("Freeze", "冻结")
     val resume get() = pick("Resume", "继续")

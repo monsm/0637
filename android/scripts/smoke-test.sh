@@ -1788,4 +1788,16 @@ print("large type: every verb and the time rail are on screen, no overlap")
 PY
 adb shell settings put system font_scale 1.0 > /dev/null 2>&1 || true
 
+# ------------------------------------------------------------------ D7 perf
+# The debug shell logs its composition counter every 5 s; the smoke proves
+# the instrument exists and records the number. The ceiling is set from
+# real runs — recording first, gating second, never the other way round.
+echo "--- recomposition counter ---"
+RECOMP=$(adb logcat -d -s duck-perf:I 2>/dev/null | grep -o 'recompose=[0-9]*' | tail -1 | cut -d= -f2)
+if [ -z "$RECOMP" ]; then
+  echo "::error::the shell's recomposition counter never logged"
+  exit 1
+fi
+echo "shell compositions since launch (last window): $RECOMP (recorded; ceiling after two green runs)"
+
 echo "smoke test passed"

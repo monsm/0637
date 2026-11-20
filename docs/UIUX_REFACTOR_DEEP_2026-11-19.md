@@ -30,17 +30,19 @@
 
 ## 2. 现状基线（2026-11-19 实测，施工前后都要重算）
 
-| 项 | 现状 |
+| 项 | 现状（2026-11-20 施工后实测） |
 |---|---|
-| 颜色令牌 | ✅ `DuckTheme.swift`（13 值）/ `DuckTheme.kt`（10 值）已建；`preferredColorScheme` 0 处 |
-| 字体令牌 | ❌ 不存在：iOS `.system(size:)` **207 处 / 16 文件**（其中 **39 行仍缺 `design:`**，26 处 monospaced、1 处 serif 是刻意字形）；Android `fontSize=N.sp` **143 处 / 11 文件**；`MaterialTheme.typography` 0 引用 |
-| 间距/圆角 | ❌ 无令牌：手调值仍在 |
-| 动效/触感 | ❌ 无令牌；触感仅零星几处；减动效两端 0 处 |
-| 组件 | ❌ 无组件库：无 ButtonStyle/卡片/空态统一实现；sheet 关闭钮 iOS 各文件手抄 |
-| 无障碍 | ❌ 自定义动作/播报/焦点管理基本为空（审计 P0-8、P1-5/6 未全收） |
-| 状态覆盖 | ⚠️ 部分：错误卡已有（横屏），空态零散；加载态未统一 |
-| IA | ✅ IA 4×4 已落地（抽屉 16 行/五页/≤6 控件）；需复核双端入口一一对应 |
-| 已知红线 | 61 维观测与安全层不动；离线优先；事实不编造；只做 iOS+Android；中文圆体不随包（老板已拍板） |
+| 颜色令牌 | ✅ `DuckTheme.swift` / `DuckTheme.kt`；主题外色字面量：iOS 4 / Android 0（棘轮） |
+| 字体令牌 | ✅ seven-gear Type 双端；主题外裸字号 **0 / 0**、`ios_missing_rounded` 0；数值走 `duckData/Micro`（等宽） |
+| 间距/圆角 | ✅ 4 基数 Space + 五档 Radius；off-grid **0 / 0**、radius 裸值 **0 / 0** |
+| 动效/触感 | ✅ `DuckMotion` 四档双端；内联动效 **0 / 0**（棘轮）；触感地图 12 个真实事件点；减动效单点收口 |
+| 组件 | ✅ 11 组件双端（`contracts/ui-components.json` + 门禁）；iOS 手抄关闭钮 16→1；两壳的行已走组件层 |
+| 无障碍 | 🟡 舞台 4 自定义动作 + 播报单点（pill liveRegion / moodText announcement）已落；**动态字体全表、焦点顺序、44/48 全审未完成**（D4 遗留） |
+| 状态覆盖 | 🟡 三态组件已建；Android 失败卡/唤醒已接入；各表面三态矩阵未铺完（D5 遗留） |
+| 性能 | 🟡 Android 调试重组计数已挂、冒烟已记录首个数值；仪表 30 控件列 Lazy 化与 iOS @Published 拆分**未做**（D7 遗留） |
+| IA | ✅ IA 4×4；入口台账 50 条锚点 94 处全绿 |
+| 断点/平台差异 | ✅ `contracts/adaptive.json` 三档 + `contracts/platform-differences.json` 5 条平台事实（各有理由），`check-ui-parity.py` 守门 |
+| 已知红线 | 未触碰：61 维/核心/upstream 零改动（`check-ui-scope.py` 守门）；离线优先；事实不编造；只做 iOS+Android；中文圆体不随包 |
 
 ---
 
