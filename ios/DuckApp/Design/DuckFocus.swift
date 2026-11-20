@@ -75,15 +75,12 @@ struct StageFocusModifier: ViewModifier {
     func body(content: Content) -> some View {
         if let focus {
             if probe && active {
+                // A Button's accessibilityValue is exposed by XCUITest; the
+                // return-focus half is read from this, not from an overlay
+                // that the button would swallow into its own element.
                 content
                     .accessibilityFocused(binding, equals: focus)
-                    .overlay(alignment: .topLeading) {
-                        Text(" ")
-                            .font(.duckMicro)
-                            .opacity(0.01)
-                            .allowsHitTesting(false)
-                            .accessibilityIdentifier("stage-focus-\(focus)")
-                    }
+                    .accessibilityValue("focused")
             } else {
                 content.accessibilityFocused(binding, equals: focus)
             }

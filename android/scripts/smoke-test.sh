@@ -1873,15 +1873,17 @@ tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || {
 }
 sleep 1.5
 dense_sheet_check "More" "更多" "More" || exit 1
-open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours"
+# The drawer's own order, top to bottom: a one-way scroll reaches every
+# row without having to scroll back up after a close.
 open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks"
 open_more_sheet "Dance Studio" "编舞铺" "Dance Studio" "编舞铺" "Dance Studio"
-open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion"
+open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more"
+open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours"
+open_more_sheet "Daily quests" "每日任务" "Today's quests" "今日小挑战" "Daily quests"
 open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky diary"
 open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards"
 open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book"
-open_more_sheet "Daily quests" "每日任务" "Today's quests" "今日小挑战" "Daily quests"
-open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more"
+open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion"
 open_more_sheet "This duck" "这只鸭子" "This duck" "这只鸭子" "This duck"
 open_more_sheet "Tools" "工具" "Tools" "工具" "Tools"
 

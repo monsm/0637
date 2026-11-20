@@ -933,27 +933,28 @@ final class DuckUITests: XCTestCase {
         assertSheetFocus("more-title", sheet: "More", probesBefore: moreProbes)
         assertHitTargets(sheet: "More", ids: moreControls)
 
-        openDense("more-peers", title: "peers-title", close: "peers-close", sheet: "Neighbours",
-                  controls: ["peers-close", "ensemble-formation", "ensemble-roles",
-                             "ensemble-choir", "chorus-start", "peers-empty-action"])
+        // Top to bottom, the drawer's own order: scrolling stays one-way.
         openDense("more-blocks", title: "rules-title", close: "rules-close", sheet: "Blocks",
                   controls: ["rules-close", "rules-share", "rules-paste"])
         openDense("more-dance", title: "dance-title", close: "dance-close", sheet: "Dance",
                   controls: ["dance-close", "dance-record", "dance-play", "dance-clear",
                              "dance-try-roulade"])
-        openDense("more-ai", title: "ai-title", close: "ai-close", sheet: "AI",
-                  controls: ["ai-close", "ai-save", "ai-think", "chat-send"])
+        openDense("more-playmore", title: "play-more-title", close: "sheet-close-shared", sheet: "Play more",
+                  controls: ["sheet-close-shared", "play-more-mode-drive",
+                             "play-more-ab-load", "play-more-push", "play-more-hud"])
+        openDense("more-peers", title: "peers-title", close: "peers-close", sheet: "Neighbours",
+                  controls: ["peers-close", "ensemble-formation", "ensemble-roles",
+                             "ensemble-choir", "chorus-start", "peers-empty-action"])
+        openDense("more-quests", title: "progress-title", close: "progress-close", sheet: "Progress",
+                  controls: ["progress-close"])
         openDense("more-diary", title: "diary-title", close: "diary-close", sheet: "Diary",
                   controls: ["diary-close", "diary-empty-state-action"])
         openDense("more-postcards", title: "postcards-title", close: "postcards-close", sheet: "Postcards",
                   controls: ["postcards-close", "postcards-empty-state-action"])
         openDense("more-dex", title: "collection-title", close: "collection-close", sheet: "Collection",
                   controls: ["collection-close", "collection-refresh"])
-        openDense("more-quests", title: "progress-title", close: "progress-close", sheet: "Progress",
-                  controls: ["progress-close"])
-        openDense("more-playmore", title: "play-more-title", close: "sheet-close-shared", sheet: "Play more",
-                  controls: ["sheet-close-shared", "play-more-mode-drive",
-                             "play-more-ab-load", "play-more-push", "play-more-hud"])
+        openDense("more-ai", title: "ai-title", close: "ai-close", sheet: "AI",
+                  controls: ["ai-close", "ai-save", "ai-think", "chat-send"])
         openDense("more-duckpanel", title: "duck-panel-title", close: "sheet-close-shared", sheet: "Duck panel",
                   controls: ["sheet-close-shared", "duck-panel-heart", "duck-panel-flashlight",
                              "duck-panel-language", "duck-panel-compass", "alias-open"])
@@ -964,7 +965,7 @@ final class DuckUITests: XCTestCase {
 
         // Nested dense pages: words under the duck panel, days and big
         // buttons under tools.
-        app.buttons["more-duckpanel"].tap()
+        XCTAssertTrue(tapWhenVisible(app.buttons["more-duckpanel"]), "Duck panel: row unreachable")
         XCTAssertTrue(anyElement("duck-panel-title").waitForExistence(timeout: 10))
         let aliasProbes = focusProbeCount()
         XCTAssertTrue(tapWhenVisible(app.buttons["alias-open"]), "Words: alias row unreachable")
@@ -976,8 +977,12 @@ final class DuckUITests: XCTestCase {
             object: anyElement("alias-title")
         )], timeout: 6)
         app.buttons["sheet-close-shared"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("duck-panel-title")
+        )], timeout: 6)
 
-        app.buttons["more-tools"].tap()
+        XCTAssertTrue(tapWhenVisible(app.buttons["more-tools"]), "Tools: row unreachable")
         XCTAssertTrue(anyElement("tools-title").waitForExistence(timeout: 10))
         let daysProbes = focusProbeCount()
         XCTAssertTrue(tapWhenVisible(app.buttons["days-open"]), "Days: days row unreachable")
@@ -999,10 +1004,14 @@ final class DuckUITests: XCTestCase {
             object: anyElement("big-title")
         )], timeout: 6)
         app.buttons["sheet-close-shared"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("tools-title")
+        )], timeout: 6)
 
         // The drawer closes and focus returns to the More button.
         closeMore()
-        assertStageFocus("duck-more", focus: "more", sheet: "More return")
+        assertStageFocus("duck-more", sheet: "More return")
 
         // The instrument is the densest surface: same focus and hit rules.
         let instrumentProbes = focusProbeCount()
@@ -1017,7 +1026,7 @@ final class DuckUITests: XCTestCase {
             predicate: NSPredicate(format: "exists == false"),
             object: anyElement("sheet-title")
         )], timeout: 6)
-        assertStageFocus("duck-time", focus: "time", sheet: "Instrument return")
+        assertStageFocus("duck-time", sheet: "Instrument return")
     }
 
     /// XCUITest cannot inspect VoiceOver focus directly; each sheet title
@@ -1041,13 +1050,15 @@ final class DuckUITests: XCTestCase {
 
     /// Closing returns focus to the stage control that opened the sheet; its
     /// test-only badge is armed only while no sheet is up.
-    private func assertStageFocus(_ id: String, focus: String, sheet: String) {
+    private func assertStageFocus(_ id: String, sheet: String) {
         let element = app.buttons[id]
         XCTAssertTrue(element.waitForExistence(timeout: 10), "\(sheet): \(id) is missing after close")
-        XCTAssertTrue(
-            app.staticTexts["stage-focus-\(focus)"].waitForExistence(timeout: 6),
-            "\(sheet): \(id) did not regain focus"
-        )
+        let deadline = Date().addingTimeInterval(6)
+        while Date() < deadline {
+            if (element.value as? String) == "focused" { return }
+            usleep(100_000)
+        }
+        XCTFail("\(sheet): \(id) did not regain focus (value=\(String(describing: element.value)))")
     }
 
     /// Tap an element that may have scrolled below the fold at AX3. Swipes
@@ -1057,6 +1068,11 @@ final class DuckUITests: XCTestCase {
         var count = 0
         while !(element.exists && element.isHittable) && count < swipes {
             app.swipeUp()
+            count += 1
+        }
+        count = 0
+        while !(element.exists && element.isHittable) && count < swipes {
+            app.swipeDown()
             count += 1
         }
         guard element.exists && element.isHittable else { return false }
