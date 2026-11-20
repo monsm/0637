@@ -3663,8 +3663,9 @@ internal fun ButtonChip(
 ) {
     Box(
         Modifier
-            // A 48 dp floor: the sheet's controls were ~34 dp tall.
-            .heightIn(min = 48.dp)
+            // A 48 dp floor in both axes: short labels ("1x", "ON") were
+            // narrow targets even when tall enough.
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(DuckTheme.Radius.thumb))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -3694,8 +3695,8 @@ private fun PathChip(
 ) {
     Box(
         Modifier
-            // A 48 dp floor, the same one every chip got.
-            .heightIn(min = 48.dp)
+            // A 48 dp floor in both axes, the same one every chip got.
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .background(
                 Color.White.copy(alpha = if (enabled) 0.10f else 0.05f),
                 RoundedCornerShape(DuckTheme.Radius.thumb),

@@ -66,6 +66,7 @@ struct RulesSheet: View {
                                     .font(.duckCaption.weight(.semibold))
                             }
                             .buttonStyle(.bordered)
+                            .frame(minHeight: 44)
                             .accessibilityIdentifier("rules-share")
                         }
                         Button {
@@ -75,6 +76,7 @@ struct RulesSheet: View {
                                 .font(.duckCaption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
+                        .frame(minHeight: 44)
                         .accessibilityIdentifier("rules-paste")
                         Spacer()
                     }
