@@ -933,27 +933,28 @@ final class DuckUITests: XCTestCase {
         assertSheetFocus("more-title", sheet: "More", probesBefore: moreProbes)
         assertHitTargets(sheet: "More", ids: moreControls)
 
-        openDense("more-peers", title: "peers-title", close: "peers-close", sheet: "Neighbours",
-                  controls: ["peers-close", "ensemble-formation", "ensemble-roles",
-                             "ensemble-choir", "chorus-start", "peers-empty-action"])
+        // Top to bottom, the drawer's own order: scrolling stays one-way.
         openDense("more-blocks", title: "rules-title", close: "rules-close", sheet: "Blocks",
                   controls: ["rules-close", "rules-share", "rules-paste"])
         openDense("more-dance", title: "dance-title", close: "dance-close", sheet: "Dance",
                   controls: ["dance-close", "dance-record", "dance-play", "dance-clear",
                              "dance-try-roulade"])
-        openDense("more-ai", title: "ai-title", close: "ai-close", sheet: "AI",
-                  controls: ["ai-close", "ai-save", "ai-think", "chat-send"])
+        openDense("more-playmore", title: "play-more-title", close: "sheet-close-shared", sheet: "Play more",
+                  controls: ["sheet-close-shared", "play-more-mode-drive",
+                             "play-more-ab-load", "play-more-push", "play-more-hud"])
+        openDense("more-peers", title: "peers-title", close: "peers-close", sheet: "Neighbours",
+                  controls: ["peers-close", "ensemble-formation", "ensemble-roles",
+                             "ensemble-choir", "chorus-start", "peers-empty-action"])
+        openDense("more-quests", title: "progress-title", close: "progress-close", sheet: "Progress",
+                  controls: ["progress-close"])
         openDense("more-diary", title: "diary-title", close: "diary-close", sheet: "Diary",
                   controls: ["diary-close", "diary-empty-state-action"])
         openDense("more-postcards", title: "postcards-title", close: "postcards-close", sheet: "Postcards",
                   controls: ["postcards-close", "postcards-empty-state-action"])
         openDense("more-dex", title: "collection-title", close: "collection-close", sheet: "Collection",
                   controls: ["collection-close", "collection-refresh"])
-        openDense("more-quests", title: "progress-title", close: "progress-close", sheet: "Progress",
-                  controls: ["progress-close"])
-        openDense("more-playmore", title: "play-more-title", close: "sheet-close-shared", sheet: "Play more",
-                  controls: ["sheet-close-shared", "play-more-mode-drive",
-                             "play-more-ab-load", "play-more-push", "play-more-hud"])
+        openDense("more-ai", title: "ai-title", close: "ai-close", sheet: "AI",
+                  controls: ["ai-close", "ai-save", "ai-think", "chat-send"])
         openDense("more-duckpanel", title: "duck-panel-title", close: "sheet-close-shared", sheet: "Duck panel",
                   controls: ["sheet-close-shared", "duck-panel-heart", "duck-panel-flashlight",
                              "duck-panel-language", "duck-panel-compass", "alias-open"])
@@ -1059,6 +1060,11 @@ final class DuckUITests: XCTestCase {
         var count = 0
         while !(element.exists && element.isHittable) && count < swipes {
             app.swipeUp()
+            count += 1
+        }
+        count = 0
+        while !(element.exists && element.isHittable) && count < swipes {
+            app.swipeDown()
             count += 1
         }
         guard element.exists && element.isHittable else { return false }
