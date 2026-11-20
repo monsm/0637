@@ -965,7 +965,7 @@ final class DuckUITests: XCTestCase {
 
         // Nested dense pages: words under the duck panel, days and big
         // buttons under tools.
-        app.buttons["more-duckpanel"].tap()
+        XCTAssertTrue(tapWhenVisible(app.buttons["more-duckpanel"]), "Duck panel: row unreachable")
         XCTAssertTrue(anyElement("duck-panel-title").waitForExistence(timeout: 10))
         let aliasProbes = focusProbeCount()
         XCTAssertTrue(tapWhenVisible(app.buttons["alias-open"]), "Words: alias row unreachable")
@@ -978,7 +978,7 @@ final class DuckUITests: XCTestCase {
         )], timeout: 6)
         app.buttons["sheet-close-shared"].tap()
 
-        app.buttons["more-tools"].tap()
+        XCTAssertTrue(tapWhenVisible(app.buttons["more-tools"]), "Tools: row unreachable")
         XCTAssertTrue(anyElement("tools-title").waitForExistence(timeout: 10))
         let daysProbes = focusProbeCount()
         XCTAssertTrue(tapWhenVisible(app.buttons["days-open"]), "Days: days row unreachable")
