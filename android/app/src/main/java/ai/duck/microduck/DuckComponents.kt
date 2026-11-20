@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -215,16 +216,19 @@ fun DuckSheetHeader(
     }
 }
 
-/** The one list row: title, note, trailing value; the row is the target.
+/** The one list row: icon, title, note, trailing value/badge; the row is the
+ * target. The drawer's MoreRow delegates here so the shell has one row.
  * STATE MATRIX: DuckListRow = default, pressed, disabled, selected */
 @Composable
 fun DuckListRow(
     title: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
     note: String? = null,
     value: String? = null,
     selected: Boolean = false,
+    showChevron: Boolean = false,
     enabled: Boolean = true,
     testTag: String = "",
 ) {
@@ -232,7 +236,7 @@ fun DuckListRow(
     Row(
         modifier
             .duckPress(interaction)
-            .heightIn(min = 56.dp)
+            .heightIn(min = 48.dp)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -241,15 +245,32 @@ fun DuckListRow(
                 onClick = onClick,
             )
             .semantics { this.selected = selected }
-            .testTag(testTag),
+            .testTag(testTag)
+            .padding(horizontal = DuckTheme.Space.xs),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
     ) {
+        if (icon != null) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.size(20.dp),
+            )
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs)) {
             Text(title, color = Color.White, fontSize = DuckTheme.Type.Body, fontWeight = FontWeight.Medium)
             if (note != null) {
                 Text(note, color = Color.White.copy(alpha = 0.6f), fontSize = DuckTheme.Type.Caption)
             }
+        }
+        if (selected) {
+            Icon(
+                Icons.check,
+                contentDescription = null,
+                tint = DuckTheme.AccentAction,
+                modifier = Modifier.size(16.dp),
+            )
         }
         if (value != null) {
             Text(
@@ -259,12 +280,12 @@ fun DuckListRow(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        if (selected) {
+        if (showChevron) {
             Icon(
-                Icons.check,
+                Icons.chevronRight,
                 contentDescription = null,
-                tint = DuckTheme.AccentAction,
-                modifier = Modifier.size(14.dp),
+                tint = Color.White.copy(alpha = 0.65f),
+                modifier = Modifier.size(16.dp),
             )
         }
     }

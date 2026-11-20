@@ -47,27 +47,16 @@ private struct PageRow: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: DuckSpace.md) {
-                Text(title)
-                    .font(.duckBody.weight(.medium))
-                    .foregroundStyle(.white)
-                Spacer()
-                if let note {
-                    Text(note)
-                        .font(.duckCaption)
-                        .foregroundStyle(.white.opacity(0.6))
-                        .lineLimit(1)
-                }
-                Text(selected ? Copy.stateOn : Copy.stateOff)
-                    .font(.duckCaption.weight(.semibold))
-                    .foregroundStyle(selected ? Color.duckAction : .white.opacity(0.55))
-            }
-            .frame(minHeight: 48)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(id)
+        // The page row IS the shared list row now (D2): one implementation,
+        // the trailing on/off word and its colour included.
+        DuckListRow(
+            title: title,
+            note: note,
+            value: selected ? Copy.stateOn : Copy.stateOff,
+            selected: selected,
+            identifier: id,
+            action: action
+        )
     }
 }
 
@@ -80,29 +69,18 @@ struct PlayMoreSheet: View {
 
     var body: some View {
         PageChrome(title: Copy.playMore) {
-            HStack(spacing: DuckSpace.sm) {
-                ForEach(StickMode.allCases, id: \.self) { mode in
-                    Button {
-                        stickMode = mode
-                        controller.setHead(yaw: 0, pitch: 0)
-                        controller.releaseBody()
-                    } label: {
-                        Text(Copy.stick(mode.rawValue))
-                            .font(.duckCaption.weight(.semibold))
-                            .foregroundStyle(stickMode == mode ? .white : .white.opacity(0.7))
-                            .padding(.horizontal, DuckSpace.md)
-                            .frame(minHeight: 48)
-                            .background(
-                                stickMode == mode
-                                    ? AnyShapeStyle(Color.duckAction.opacity(0.4))
-                                    : AnyShapeStyle(Color.white.opacity(0.08)),
-                                in: Capsule()
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("play-more-mode-\(mode.rawValue)")
-                }
-            }
+            // The four play controls share one segmented control (D2).
+            DuckSegmented(
+                options: StickMode.allCases.map { Copy.stick($0.rawValue) },
+                selectedIndex: StickMode.allCases.firstIndex(of: stickMode) ?? 0,
+                onSelect: { index in
+                    let mode = StickMode.allCases[index]
+                    stickMode = mode
+                    controller.setHead(yaw: 0, pitch: 0)
+                    controller.releaseBody()
+                },
+                identifier: "play-more-mode"
+            )
             PageRow(
                 title: Copy.abTry,
                 note: Copy.abNote,
