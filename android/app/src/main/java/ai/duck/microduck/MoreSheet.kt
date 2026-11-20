@@ -398,75 +398,19 @@ private fun MoreRow(
     tag: String,
     onClick: () -> Unit,
 ) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClickLabel = title,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .testTag(tag)
-            .padding(horizontal = DuckTheme.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.85f),
-            modifier = Modifier.size(20.dp),
-        )
-        Column(
-            Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
-        ) {
-            Text(
-                title,
-                color = Color.White,
-                fontSize = DuckTheme.Type.Body,
-                fontWeight = FontWeight.Medium,
-            )
-            if (note != null) {
-                Text(
-                    note,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = DuckTheme.Type.Caption,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if (check) {
-            Icon(
-                MaterialIcons.Filled.Check,
-                contentDescription = null,
-                tint = ActionAccent,
-                modifier = Modifier.size(16.dp),
-            )
-        }
-        if (dot) {
-            Box(Modifier.size(8.dp).background(ActionAccent, CircleShape))
-        }
-        if (badge != null) {
-            Text(
-                badge,
-                color = Color.White.copy(alpha = 0.6f),
-                fontSize = DuckTheme.Type.Caption,
-            )
-        }
-        if (showsChevron) {
-            Icon(
-                MaterialIcons.Outlined.ChevronRight,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.65f),
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
+    // One row implementation (D2): the drawer's row is the shared
+    // DuckListRow with the drawer's extras mapped on — the badge rides in
+    // the value slot and `dot`/`check` both read as "selected".
+    DuckListRow(
+        title = title,
+        onClick = onClick,
+        icon = icon,
+        note = note,
+        value = badge,
+        selected = check || dot,
+        showChevron = showsChevron,
+        testTag = tag,
+    )
 }
 
 /** The three stick modes, one tap each; path has its own row. */
