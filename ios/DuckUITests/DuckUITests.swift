@@ -1034,7 +1034,7 @@ final class DuckUITests: XCTestCase {
     /// a new probe past the pre-open count proves this sheet's first stop
     /// ran and set @AccessibilityFocusState.
     private func focusProbeCount() -> Int {
-        app.staticTexts.matching(identifier: "sheet-focus-probe").count
+        app.descendants(matching: .any).matching(identifier: "sheet-focus-probe").count
     }
 
     private func assertSheetFocus(_ id: String, sheet: String, probesBefore: Int) {
