@@ -898,4 +898,190 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// D4 sweep: every dense sheet at Accessibility XXXL. Each one opens
+    /// with its title as the first focus stop, its close and key controls
+    /// stay tappable at 44 pt, and closing the drawer returns focus to the
+    /// button that opened it (the probe value is the real
+    /// @AccessibilityFocusState the modifier drives).
+    func testDenseSheetsSurviveAccessibilityXXXL() throws {
+        app.terminate()
+        app = XCUIApplication()
+        app.launchArguments += [
+            "-duck.language", "EN",
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL",
+            "-duck.focusProbe", "YES",
+        ]
+        app.launch()
+        let more = app.buttons["duck-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 30), "the More button is missing at Accessibility XXXL")
+        more.tap()
+
+        let moreControls = [
+            "more-close", "more-path", "more-blocks", "more-dance", "more-playmore",
+            "more-peers", "more-chorus", "more-gifts", "more-p2", "more-quests",
+            "more-diary", "more-postcards", "more-dex", "more-ai", "more-night",
+            "more-duckpanel", "more-tools",
+        ]
+        assertSheetFocus("more-title", sheet: "More")
+        assertHitTargets(sheet: "More", ids: moreControls)
+
+        openDense("more-peers", title: "peers-title", close: "peers-close", sheet: "Neighbours",
+                  controls: ["peers-close", "ensemble-formation", "ensemble-roles",
+                             "ensemble-choir", "chorus-start", "peers-netpad", "peers-empty-action"])
+        openDense("more-blocks", title: "rules-title", close: "rules-close", sheet: "Blocks",
+                  controls: ["rules-close", "rules-share", "rules-paste"])
+        openDense("more-dance", title: "dance-title", close: "dance-close", sheet: "Dance",
+                  controls: ["dance-close", "dance-record", "dance-play", "dance-clear",
+                             "dance-try-roulade"])
+        openDense("more-ai", title: "ai-title", close: "ai-close", sheet: "AI",
+                  controls: ["ai-close", "ai-save", "ai-think", "chat-send"])
+        openDense("more-diary", title: "diary-title", close: "diary-close", sheet: "Diary",
+                  controls: ["diary-close", "diary-empty-state-action"])
+        openDense("more-postcards", title: "postcards-title", close: "postcards-close", sheet: "Postcards",
+                  controls: ["postcards-close", "postcards-empty-state-action"])
+        openDense("more-dex", title: "collection-title", close: "collection-close", sheet: "Collection",
+                  controls: ["collection-close", "collection-refresh"])
+        openDense("more-quests", title: "progress-title", close: "progress-close", sheet: "Progress",
+                  controls: ["progress-close"])
+        openDense("more-playmore", title: "play-more-title", close: "sheet-close-shared", sheet: "Play more",
+                  controls: ["sheet-close-shared", "play-more-mode-drive",
+                             "play-more-ab-load", "play-more-push", "play-more-hud"])
+        openDense("more-duckpanel", title: "duck-panel-title", close: "sheet-close-shared", sheet: "Duck panel",
+                  controls: ["sheet-close-shared", "duck-panel-heart", "duck-panel-flashlight",
+                             "duck-panel-language", "duck-panel-compass", "alias-open"])
+        openDense("more-tools", title: "tools-title", close: "sheet-close-shared", sheet: "Tools",
+                  controls: ["sheet-close-shared", "tools-parent", "tools-lamp",
+                             "tools-backup-export", "tools-backup-import", "tools-tof",
+                             "duck-panel-big", "days-open"])
+
+        // Nested dense pages: words under the duck panel, days and big
+        // buttons under tools.
+        app.buttons["more-duckpanel"].tap()
+        XCTAssertTrue(anyElement("duck-panel-title").waitForExistence(timeout: 10))
+        app.buttons["alias-open"].tap()
+        assertSheetFocus("alias-title", sheet: "Words")
+        assertHitTargets(sheet: "Words", ids: ["alias-close", "alias-add"])
+        app.buttons["alias-close"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("alias-title")
+        )], timeout: 6)
+        app.buttons["sheet-close-shared"].tap()
+
+        app.buttons["more-tools"].tap()
+        XCTAssertTrue(anyElement("tools-title").waitForExistence(timeout: 10))
+        app.buttons["days-open"].tap()
+        assertSheetFocus("days-title", sheet: "Days")
+        assertHitTargets(sheet: "Days", ids: ["days-close", "days-empty-state-action"])
+        app.buttons["days-close"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("days-title")
+        )], timeout: 6)
+        app.buttons["duck-panel-big"].tap()
+        assertSheetFocus("big-title", sheet: "Big buttons")
+        assertHitTargets(sheet: "Big buttons",
+                         ids: ["big-close", "big-action-0", "big-action-1", "big-action-2", "big-action-3"])
+        app.buttons["big-close"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("big-title")
+        )], timeout: 6)
+        app.buttons["sheet-close-shared"].tap()
+
+        // The drawer closes and focus returns to the More button.
+        closeMore()
+        assertStageFocus("duck-more", sheet: "More return")
+
+        // The instrument is the densest surface: same focus and hit rules.
+        app.buttons["duck-time"].tap()
+        assertSheetFocus("sheet-title", sheet: "Instrument")
+        assertHitTargets(sheet: "Instrument", ids: [
+            "sheet-close", "time-pause.fill", "export-vetbook", "vetbook-card-open",
+            "collection-open", "postcards-open", "diary-open", "ai-open",
+        ])
+        app.buttons["sheet-close"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("sheet-title")
+        )], timeout: 6)
+        assertStageFocus("duck-time", sheet: "Instrument return")
+    }
+
+    /// Wait for the sheet's first element to report the focus the modifier
+    /// drives. The value exists only under the focus probe argument.
+    private func assertSheetFocus(_ id: String, sheet: String) {
+        let element = anyElement(id)
+        XCTAssertTrue(element.waitForExistence(timeout: 10), "\(sheet): the first element \(id) is missing")
+        XCTAssertTrue(
+            waitForValue(element, "focused", timeout: 6),
+            "\(sheet): \(id) never took focus (value=\(String(describing: element.value)))"
+        )
+    }
+
+    /// Closing returns focus to the stage control that opened the sheet.
+    private func assertStageFocus(_ id: String, sheet: String) {
+        let element = app.buttons[id]
+        XCTAssertTrue(element.waitForExistence(timeout: 10), "\(sheet): \(id) is missing after close")
+        XCTAssertTrue(
+            waitForValue(element, "focused", timeout: 6),
+            "\(sheet): \(id) did not regain focus (value=\(String(describing: element.value)))"
+        )
+    }
+
+    private func waitForValue(_ element: XCUIElement, _ wanted: String, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if (element.value as? String) == wanted { return true }
+            usleep(100_000)
+        }
+        return false
+    }
+
+    /// Open a drawer row's sheet, assert its first-focus element and the
+    /// 44 pt floor of the named controls, then close it back to the drawer.
+    private func openDense(
+        _ row: String,
+        title: String,
+        close: String,
+        sheet: String,
+        controls: [String]
+    ) {
+        let button = app.buttons[row]
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "\(sheet): the drawer row \(row) is missing")
+        button.tap()
+        assertSheetFocus(title, sheet: sheet)
+        assertHitTargets(sheet: sheet, ids: controls)
+        let closeButton = app.buttons[close]
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 5), "\(sheet): close \(close) is missing")
+        XCTAssertTrue(closeButton.isHittable, "\(sheet): close \(close) is unreachable")
+        closeButton.tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement(title)
+        )], timeout: 6)
+        XCTAssertTrue(
+            app.staticTexts["more-title"].waitForExistence(timeout: 6),
+            "\(sheet): closing did not return to the drawer"
+        )
+    }
+
+    /// The 44 pt audit for the controls the sheet really shows: each named
+    /// element, when hittable, must have a full-size target.
+    private func assertHitTargets(sheet: String, ids: [String]) {
+        for id in ids {
+            let element = anyElement(id)
+            guard element.exists && element.isHittable else { continue }
+            let frame = element.frame
+            XCTAssertGreaterThanOrEqual(
+                frame.height, 43,
+                "\(sheet): \(id) is \(frame.height) pt tall at Accessibility XXXL"
+            )
+            XCTAssertGreaterThanOrEqual(
+                frame.width, 43,
+                "\(sheet): \(id) is \(frame.width) pt wide at Accessibility XXXL"
+            )
+        }
+    }
+
 }

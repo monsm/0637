@@ -1,5 +1,6 @@
 package ai.duck.microduck
 
+import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,7 +58,7 @@ private fun PageHeader(title: String, closeTag: String, onClose: () -> Unit) {
             color = Color.White,
             fontWeight = FontWeight.SemiBold,
             fontSize = DuckTheme.Type.Title,
-            modifier = Modifier.weight(1f).testTag("$closeTag-title"),
+            modifier = Modifier.weight(1f).testTag("$closeTag-title").duckSheetFirstFocus(),
         )
         CloseChip(closeTag, onClose)
     }
@@ -89,7 +91,7 @@ private fun ControlRow(
                     note,
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = DuckTheme.Type.Caption,
-                    maxLines = 2,
+                    maxLines = if (duckLargeText()) 4 else 2,
                 )
             }
         }
@@ -101,6 +103,23 @@ private fun ControlRow(
                 fontWeight = FontWeight.SemiBold,
             )
         }
+    }
+}
+
+/** One A/B load, shared by the row and its stacked large-type form. */
+private fun loadBranchB(folder: String, core: DuckCore?, context: Context, scope: CoroutineScope) {
+    core?.fork()
+    // The reload is seconds of ONNX work and its verdict is the honest answer
+    // for a folder the core refuses: the route returns the reason, and the
+    // reason is what shows.
+    scope.launch {
+        val verdict = withContext(Dispatchers.IO) { loadBranchB(folder) }
+        android.widget.Toast.makeText(
+            context,
+            verdict ?: Copy.abLoaded,
+            if (verdict == null) android.widget.Toast.LENGTH_SHORT
+            else android.widget.Toast.LENGTH_LONG,
+        ).show()
     }
 }
 
@@ -132,52 +151,78 @@ internal fun PlayMoreSheet(
             verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             PageHeader(Copy.playMore, "play-more-close", onClose)
-            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
-                listOf("drive", "head", "body").forEach { mode ->
-                    ButtonChip(
-                        Copy.stick(mode),
-                        testTag = "play-more-mode-$mode",
-                    ) { onMode(mode) }
+            if (duckLargeText()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
+                    listOf("drive", "head", "body").forEach { mode ->
+                        ButtonChip(
+                            Copy.stick(mode),
+                            testTag = "play-more-mode-$mode",
+                        ) { onMode(mode) }
+                    }
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+                    listOf("drive", "head", "body").forEach { mode ->
+                        ButtonChip(
+                            Copy.stick(mode),
+                            testTag = "play-more-mode-$mode",
+                        ) { onMode(mode) }
+                    }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
-                Column(Modifier.weight(1f).padding(horizontal = DuckTheme.Space.sm)) {
+            if (duckLargeText()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
+                    Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
                     OutlinedTextField(
                         value = abFolder,
                         onValueChange = { abFolder = it.take(64) },
                         singleLine = true,
-                        modifier = Modifier.testTag("play-more-ab-folder"),
+                        modifier = Modifier.fillMaxWidth().testTag("play-more-ab-folder"),
                     )
+                    ButtonChip(Copy.stateOn, "play-more-ab-load") { loadBranchB(abFolder, core, context, scope) }
                 }
-                ButtonChip(Copy.stateOn, "play-more-ab-load") {
-                    core?.fork()
-                    // The reload is seconds of ONNX work and its verdict is
-                    // the honest answer for a folder the core refuses: the
-                    // route returns the reason, and the reason is what shows.
-                    scope.launch {
-                        val verdict = withContext(Dispatchers.IO) { loadBranchB(abFolder) }
-                        android.widget.Toast.makeText(
-                            context,
-                            verdict ?: Copy.abLoaded,
-                            if (verdict == null) android.widget.Toast.LENGTH_SHORT
-                            else android.widget.Toast.LENGTH_LONG,
-                        ).show()
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(Copy.abTry, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Caption)
+                    Column(Modifier.weight(1f).padding(horizontal = DuckTheme.Space.sm)) {
+                        OutlinedTextField(
+                            value = abFolder,
+                            onValueChange = { abFolder = it.take(64) },
+                            singleLine = true,
+                            modifier = Modifier.testTag("play-more-ab-folder"),
+                        )
                     }
+                    ButtonChip(Copy.stateOn, "play-more-ab-load") { loadBranchB(abFolder, core, context, scope) }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
-                ButtonChip(Copy.pushCompare, "play-more-push") {
-                    core?.fork()
-                    postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
-                    android.widget.Toast.makeText(
-                        context, Copy.pushCompareDone, android.widget.Toast.LENGTH_SHORT,
-                    ).show()
+            if (duckLargeText()) {
+                Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
+                    ButtonChip(Copy.pushCompare, "play-more-push") {
+                        core?.fork()
+                        postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
+                        android.widget.Toast.makeText(
+                            context, Copy.pushCompareDone, android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                    ButtonChip(
+                        if (input.hudOn) Copy.stateOn else Copy.hud,
+                        "play-more-hud",
+                    ) { input.hudOn = !input.hudOn }
                 }
-                ButtonChip(
-                    if (input.hudOn) Copy.stateOn else Copy.hud,
-                    "play-more-hud",
-                ) { input.hudOn = !input.hudOn }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+                    ButtonChip(Copy.pushCompare, "play-more-push") {
+                        core?.fork()
+                        postDuckCommand("/push", """{"vx":0.6,"vy":0.0,"vz":0.0}""")
+                        android.widget.Toast.makeText(
+                            context, Copy.pushCompareDone, android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                    ButtonChip(
+                        if (input.hudOn) Copy.stateOn else Copy.hud,
+                        "play-more-hud",
+                    ) { input.hudOn = !input.hudOn }
+                }
             }
             Text(Copy.abNote, color = Color.White.copy(alpha = 0.55f), fontSize = DuckTheme.Type.Micro)
             if (stick.isNotBlank()) {

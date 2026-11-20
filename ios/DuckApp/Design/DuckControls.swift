@@ -57,22 +57,14 @@ struct DuckSegmented: View {
     var identifier = ""
 
     @Environment(\.isEnabled) private var enabled
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        HStack(spacing: DuckSpace.xxs) {
-            ForEach(Array(options.enumerated()), id: \.offset) { index, option in
-                let picked = index == selectedIndex
-                Text(option)
-                    .font(.duckLabel.weight(picked ? .semibold : .medium))
-                    .foregroundStyle(picked ? Color.duckOnAccent : Color.duckTextPrimary.opacity(enabled ? 0.85 : 0.4))
-                    .frame(maxWidth: .infinity, minHeight: 40)
-                    .background(
-                        picked ? Color.duckAction : Color.white.opacity(0.10),
-                        in: RoundedRectangle(cornerRadius: DuckRadius.control)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: DuckRadius.control))
-                    .onTapGesture { onSelect(index) }
-                    .accessibilityAddTraits(picked ? .isSelected : [])
+        Group {
+            if typeSize.duckIsAccessibility {
+                VStack(spacing: DuckSpace.xxs) { optionsView }
+            } else {
+                HStack(spacing: DuckSpace.xxs) { optionsView }
             }
         }
         .padding(DuckSpace.xxs)
@@ -80,6 +72,23 @@ struct DuckSegmented: View {
         .accessibilityIdentifier(identifier)
         .opacity(enabled ? 1 : 0.4)
         .disabled(!enabled)
+    }
+
+    @ViewBuilder private var optionsView: some View {
+        ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+            let picked = index == selectedIndex
+            Text(option)
+                .font(.duckLabel.weight(picked ? .semibold : .medium))
+                .foregroundStyle(picked ? Color.duckOnAccent : Color.duckTextPrimary.opacity(enabled ? 0.85 : 0.4))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    picked ? Color.duckAction : Color.white.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: DuckRadius.control)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: DuckRadius.control))
+                .onTapGesture { onSelect(index) }
+                .accessibilityAddTraits(picked ? .isSelected : [])
+        }
     }
 }
 

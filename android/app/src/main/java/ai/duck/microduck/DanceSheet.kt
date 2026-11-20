@@ -108,7 +108,7 @@ fun DanceSheet(
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("dance-title"),
+                        .testTag("dance-title").duckSheetFirstFocus(),
                 )
                 CloseChip("dance-close", onClose)
             }
@@ -118,7 +118,7 @@ fun DanceSheet(
                 fontSize = DuckTheme.Type.Caption,
             )
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 88.dp),
+                columns = GridCells.Adaptive(minSize = if (duckLargeText()) 220.dp else 88.dp),
                 verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                 modifier = Modifier
@@ -176,7 +176,7 @@ fun DanceSheet(
                             color = ink,
                             fontSize = DuckTheme.Type.Caption,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
+                            maxLines = if (duckLargeText()) 3 else 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }

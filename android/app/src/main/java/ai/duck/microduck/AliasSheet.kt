@@ -341,7 +341,7 @@ internal fun AliasSheet(onClose: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("alias-title"),
+                        .testTag("alias-title").duckSheetFirstFocus(),
                 )
                 CloseChip("alias-close", onClose)
             }

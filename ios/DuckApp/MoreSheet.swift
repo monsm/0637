@@ -157,6 +157,7 @@ struct MoreSheet: View {
                 .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("more-title")
+                .duckSheetFirstFocus()
             Spacer()
             SheetCloseButton(identifier: "more-close")
         }
@@ -205,7 +206,7 @@ struct MoreSheet: View {
                         Text(note)
                             .font(.duckCaption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: DuckSpace.sm)

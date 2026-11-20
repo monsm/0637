@@ -103,7 +103,7 @@ internal fun MoreSheet(
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("more-title"),
+                        .testTag("more-title").duckSheetFirstFocus(),
                 )
                 CloseChip("more-close", onClose)
             }
@@ -233,7 +233,7 @@ internal fun QuestsSheet(board: QuestBoardUi, onClose: () -> Unit) {
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("quests-sheet-title"),
+                        .testTag("quests-sheet-title").duckSheetFirstFocus(),
                 )
                 CloseChip("quests-close", onClose)
             }

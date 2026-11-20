@@ -13,6 +13,7 @@ struct DexSheet: View {
                 Text(Copy.dex)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("dex-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button { dismiss() } label: {
                     DuckCloseGlyph()

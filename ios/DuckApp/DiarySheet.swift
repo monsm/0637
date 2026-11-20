@@ -6,51 +6,29 @@ import SwiftUI
 struct DiarySheet: View {
     @ObservedObject var controller: DuckController
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: DuckSpace.md) {
-            HStack {
-                Text(Copy.diary)
-                    .font(.duckTitle.weight(.semibold))
-                    .accessibilityIdentifier("diary-title")
-                Spacer()
-                if !shareText.isEmpty {
-                    // The system voice reading the day aloud. The duck's own
-                    // synth stays the 1:1 channel; this button toggles the
-                    // honest stand-in, labelled as such below.
-                    Button {
-                        if controller.ttsSpeaking {
-                            controller.stopSpeaking()
-                        } else {
-                            controller.speakDiary(shareText)
-                        }
-                    } label: {
-                        Image(systemName: controller.ttsSpeaking ? "stop.fill" : "speaker.wave.2.fill")
-                            .font(DuckIcon.sm)
-                            .frame(width: 48, height: 48)
-                            .contentShape(Rectangle())
+            if typeSize.duckIsAccessibility {
+                VStack(alignment: .leading, spacing: DuckSpace.xs) {
+                    HStack {
+                        titleText
+                        Spacer(minLength: DuckSpace.sm)
+                        closeButton
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(controller.ttsSpeaking ? Copy.stopSpeaking : Copy.speak)
-                    .accessibilityIdentifier("diary-speak")
-                    ShareLink(item: shareText) {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(DuckIcon.sm)
-                            .frame(width: 48, height: 48)
-                            .contentShape(Rectangle())
+                    HStack(spacing: DuckSpace.sm) {
+                        shareActions
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Copy.share)
-                    .accessibilityIdentifier("diary-share")
                 }
-                Button {
-                    dismiss()
-                } label: {
-                    DuckCloseGlyph()
+            } else {
+                HStack {
+                    titleText
+                    Spacer()
+                    shareActions
+                    closeButton
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Copy.close)
-                .accessibilityIdentifier("diary-close")
             }
 
             ScrollView {
@@ -59,9 +37,12 @@ struct DiarySheet: View {
                         .font(.duckCaption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     if controller.diaryLines.isEmpty {
-                        Text(Copy.diaryEmpty)
-                            .font(.duckLabel)
-                            .foregroundStyle(.secondary)
+                        DuckEmptyState(
+                            title: Copy.diaryEmpty,
+                            actionTitle: Copy.emptyPlayAction,
+                            action: { dismiss() },
+                            identifier: "diary-empty-state"
+                        )
                     } else {
                         ForEach(Array(controller.diaryLines.enumerated()), id: \.offset) { _, line in
                             HStack(spacing: DuckSpace.sm) {
@@ -120,5 +101,55 @@ struct DiarySheet: View {
             return controller.diaryModelText
         }
         return controller.diaryLines.joined(separator: "\n")
+    }
+
+    private var titleText: some View {
+        Text(Copy.diary)
+            .font(.duckTitle.weight(.semibold))
+            .accessibilityIdentifier("diary-title")
+            .duckSheetFirstFocus()
+    }
+
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            DuckCloseGlyph()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Copy.close)
+        .accessibilityIdentifier("diary-close")
+    }
+
+    @ViewBuilder private var shareActions: some View {
+        if !shareText.isEmpty {
+            // The system voice reading the day aloud. The duck's own
+            // synth stays the 1:1 channel; this button toggles the
+            // honest stand-in, labelled as such below.
+            Button {
+                if controller.ttsSpeaking {
+                    controller.stopSpeaking()
+                } else {
+                    controller.speakDiary(shareText)
+                }
+            } label: {
+                Image(systemName: controller.ttsSpeaking ? "stop.fill" : "speaker.wave.2.fill")
+                    .font(DuckIcon.sm)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(controller.ttsSpeaking ? Copy.stopSpeaking : Copy.speak)
+            .accessibilityIdentifier("diary-speak")
+            ShareLink(item: shareText) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(DuckIcon.sm)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.share)
+            .accessibilityIdentifier("diary-share")
+        }
     }
 }

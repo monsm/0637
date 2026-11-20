@@ -328,6 +328,7 @@ struct CollectionSheet: View {
     /// Kept for the practice tap: the skill ring's own trigger.
     @ObservedObject var controller: DuckController
     @StateObject private var store = CollectionStore()
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: DuckSpace.md) {
@@ -336,9 +337,24 @@ struct CollectionSheet: View {
                 VStack(alignment: .leading, spacing: DuckSpace.lg) {
                     if let book = store.book {
                         totals(book)
-                        badgeSection(book)
-                        section(Copy.collectionMoods, tag: "moods", entries: book.emotions)
-                        section(Copy.collectionTricks, tag: "tricks", entries: book.tricks)
+                        if book.emotions.isEmpty && book.tricks.isEmpty {
+                            DuckEmptyState(
+                                title: Copy.collectionEmpty,
+                                actionTitle: Copy.emptyCollectionAction,
+                                action: {
+                                    controller.trigger("curious")
+                                    let store = self.store
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                        store.load()
+                                    }
+                                },
+                                identifier: "collection-empty-state"
+                            )
+                        } else {
+                            badgeSection(book)
+                            section(Copy.collectionMoods, tag: "moods", entries: book.emotions)
+                            section(Copy.collectionTricks, tag: "tricks", entries: book.tricks)
+                        }
                     } else if store.busy {
                         ProgressView()
                             .frame(maxWidth: .infinity)
@@ -370,6 +386,7 @@ struct CollectionSheet: View {
             Text(Copy.collectionTitle)
                 .font(.duckTitle.weight(.semibold))
                 .accessibilityIdentifier("collection-title")
+                .duckSheetFirstFocus()
             Spacer()
             Button {
                 store.load()
@@ -388,17 +405,30 @@ struct CollectionSheet: View {
         }
     }
 
-    private func totals(_ book: CollectionBook) -> some View {
-        HStack(spacing: DuckSpace.sm) {
-            total(
-                "\(Copy.collectionMoods) \(book.moodsUnlocked)/\(book.moodsTotal)",
-                id: "collection-moods-total"
-            )
-            total(
-                "\(Copy.collectionTricks) \(book.tricksUnlocked)/\(book.tricksTotal)",
-                id: "collection-tricks-total"
-            )
-            Spacer(minLength: 0)
+    @ViewBuilder private func totals(_ book: CollectionBook) -> some View {
+        if typeSize.duckIsAccessibility {
+            VStack(alignment: .leading, spacing: DuckSpace.xs) {
+                total(
+                    "\(Copy.collectionMoods) \(book.moodsUnlocked)/\(book.moodsTotal)",
+                    id: "collection-moods-total"
+                )
+                total(
+                    "\(Copy.collectionTricks) \(book.tricksUnlocked)/\(book.tricksTotal)",
+                    id: "collection-tricks-total"
+                )
+            }
+        } else {
+            HStack(spacing: DuckSpace.sm) {
+                total(
+                    "\(Copy.collectionMoods) \(book.moodsUnlocked)/\(book.moodsTotal)",
+                    id: "collection-moods-total"
+                )
+                total(
+                    "\(Copy.collectionTricks) \(book.tricksUnlocked)/\(book.tricksTotal)",
+                    id: "collection-tricks-total"
+                )
+                Spacer(minLength: 0)
+            }
         }
     }
 
@@ -428,34 +458,54 @@ struct CollectionSheet: View {
         .accessibilityIdentifier("collection-section-badges")
     }
 
-    private func badgeRow(_ badge: CollectionBadge) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
-            Image(systemName: badge.icon)
-                .font(DuckIcon.sm)
-                .foregroundStyle(
-                    badge.unlocked ? Color.duckData : Color.white.opacity(0.4)
-                )
-                .frame(width: 22)
+    @ViewBuilder private func badgeRow(_ badge: CollectionBadge) -> some View {
+        if typeSize.duckIsAccessibility {
             VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 Text(badge.title)
                     .font(.duckBody.weight(.medium))
                     .foregroundStyle(Color.white.opacity(badge.unlocked ? 1 : 0.4))
-                // The unlock condition is the row's second line, in the
-                // collection's own nouns: "Moods 7/13" is the state, and
-                // "Moods 13/13" (or "≥ 10") is the threshold.
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(badge.conditionText)
                     .font(.duckCaption)
                     .foregroundStyle(.tertiary)
+                Text(badge.progressText)
+                    .font(.duckCaption)
+                    .foregroundStyle(.secondary)
             }
-            Spacer(minLength: DuckSpace.sm)
-            Text(badge.progressText)
-                .font(.duckCaption)
-                .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44)
+            .opacity(badge.unlocked ? 1 : 0.55)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("collection-badge-\(badge.id)")
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
+                Image(systemName: badge.icon)
+                    .font(DuckIcon.sm)
+                    .foregroundStyle(
+                        badge.unlocked ? Color.duckData : Color.white.opacity(0.4)
+                    )
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: DuckSpace.xxs) {
+                    Text(badge.title)
+                        .font(.duckBody.weight(.medium))
+                        .foregroundStyle(Color.white.opacity(badge.unlocked ? 1 : 0.4))
+                    // The unlock condition is the row's second line, in the
+                    // collection's own nouns: "Moods 7/13" is the state, and
+                    // "Moods 13/13" (or "≥ 10") is the threshold.
+                    Text(badge.conditionText)
+                        .font(.duckCaption)
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: DuckSpace.sm)
+                Text(badge.progressText)
+                    .font(.duckCaption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minHeight: 44)
+            .opacity(badge.unlocked ? 1 : 0.55)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("collection-badge-\(badge.id)")
         }
-        .frame(minHeight: 44)
-        .opacity(badge.unlocked ? 1 : 0.55)
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("collection-badge-\(badge.id)")
     }
 
     private func section(
@@ -489,8 +539,8 @@ struct CollectionSheet: View {
         }
     }
 
-    private func row(_ entry: CollectionEntry) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
+    @ViewBuilder private func row(_ entry: CollectionEntry) -> some View {
+        if typeSize.duckIsAccessibility {
             VStack(alignment: .leading, spacing: DuckSpace.xxs) {
                 Text(SkillLabel.of(entry.name))
                     .font(.duckBody.weight(.medium))
@@ -498,15 +548,33 @@ struct CollectionSheet: View {
                 Text(firstDayLine(entry))
                     .font(.duckCaption)
                     .foregroundStyle(.tertiary)
+                Text(entry.countText)
+                    .font(.duckCaption)
+                    .foregroundStyle(.secondary)
             }
-            Spacer(minLength: DuckSpace.sm)
-            Text(entry.countText)
-                .font(.duckCaption)
-                .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44)
+            .opacity(entry.isLocked ? 0.55 : 1)
+            .contentShape(Rectangle())
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
+                VStack(alignment: .leading, spacing: DuckSpace.xxs) {
+                    Text(SkillLabel.of(entry.name))
+                        .font(.duckBody.weight(.medium))
+                        .foregroundStyle(Color.white.opacity(entry.isLocked ? 0.4 : 1))
+                    Text(firstDayLine(entry))
+                        .font(.duckCaption)
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer(minLength: DuckSpace.sm)
+                Text(entry.countText)
+                    .font(.duckCaption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minHeight: 44)
+            .opacity(entry.isLocked ? 0.55 : 1)
+            .contentShape(Rectangle())
         }
-        .frame(minHeight: 44)
-        .opacity(entry.isLocked ? 0.55 : 1)
-        .contentShape(Rectangle())
     }
 
     /// A locked row says it was never tried; an unlocked row says when it

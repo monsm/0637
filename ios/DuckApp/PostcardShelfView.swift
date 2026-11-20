@@ -5,6 +5,9 @@ import UIKit
 /// first, with its honest one-line caption and a Share button.
 struct PostcardShelfView: View {
     @ObservedObject var shelf: PostcardShelf
+    /// The empty state's way out: close the shelf and switch to Director,
+    /// where a real frame can be captured into a postcard.
+    var onOpenDirector: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
 
@@ -14,6 +17,7 @@ struct PostcardShelfView: View {
                 Text(Copy.postcardShelf)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("postcards-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button {
                     dismiss()
@@ -25,10 +29,15 @@ struct PostcardShelfView: View {
                 .accessibilityIdentifier("postcards-close")
             }
             if shelf.cards.isEmpty {
-                Text(Copy.postcardNone)
-                    .font(.duckCaption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("postcards-empty")
+                DuckEmptyState(
+                    title: Copy.postcardNone,
+                    actionTitle: Copy.emptyPostcardAction,
+                    action: {
+                        dismiss()
+                        onOpenDirector?()
+                    },
+                    identifier: "postcards-empty-state"
+                )
             } else {
                 ScrollView {
                     LazyVGrid(
@@ -50,7 +59,7 @@ struct PostcardShelfView: View {
                                 Text(card.caption)
                                     .font(.duckCaption)
                                     .foregroundStyle(.white.opacity(0.8))
-                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
                                 HStack {
                                     Text(card.day)
                                         .font(.duckMicro)
@@ -60,7 +69,7 @@ struct PostcardShelfView: View {
                                         shareURL = shelf.url(for: card)
                                     } label: {
                                         Image(systemName: "square.and.arrow.up")
-                                            .frame(width: 44, height: 36)
+                                            .frame(width: 44, height: 44)
                                             .contentShape(Rectangle())
                                     }
                                     .buttonStyle(.plain)

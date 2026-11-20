@@ -261,7 +261,7 @@ internal fun DaysSheet(onClose: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("days-title"),
+                        .testTag("days-title").duckSheetFirstFocus(),
                 )
                 CloseChip("days-close", onClose)
             }
@@ -280,13 +280,13 @@ internal fun DaysSheet(onClose: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.testTag("days-offline"),
                 )
-                data.isEmpty -> Text(
+                data.isEmpty -> DuckEmptyState(
                     // A real answer with no finished day and no today: one
-                    // true sentence, no zero table.
-                    Copy.daysEmpty,
-                    color = Color.White.copy(alpha = 0.6f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.testTag("days-empty"),
+                    // true sentence, one real way out.
+                    title = Copy.daysEmpty,
+                    actionTitle = Copy.emptyPlayAction,
+                    onAction = onClose,
+                    testTag = "days-empty",
                 )
                 else -> LazyColumn(
                     modifier = Modifier.heightIn(max = 460.dp),

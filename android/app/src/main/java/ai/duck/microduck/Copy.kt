@@ -352,6 +352,11 @@ val quack get() = pick("Quack", "叫一声")
     val postcardShelf get() = pick("Postcards", "明信片")
     val postcardSaved get() = pick("Kept to the shelf", "已收藏")
     val postcardNone get() = pick("No postcards yet", "还没有明信片")
+    /** D5 empty-state exits: every empty surface ends on a real action. */
+    val emptyPlayAction get() = pick("Go play with the duck", "去陪它玩")
+    val emptyPostcardAction get() = pick("Take a photo", "去拍一张")
+    val emptyCollectionAction get() = pick("Give it a try", "去练一练")
+    val emptyRetryAction get() = pick("Look again", "再找找")
     fun postcardMetres(m: Double) = pick("walked ${"%.1f".format(m)} m", "走了 ${"%.1f".format(m)} 米")
     // Mood dex.
     val dex get() = pick("Mood dex", "情绪图鉴")
@@ -367,6 +372,7 @@ val quack get() = pick("Quack", "叫一声")
     val collectionTricks get() = pick("Tricks", "把戏")
     val collectionFirst get() = pick("First unlocked", "首次解锁")
     val collectionLocked get() = pick("Not tried yet", "还没试过")
+    val collectionEmpty get() = pick("Nothing in the mood book yet", "图鉴还是空的")
     // The badge shelf (G3): earned from the same /collection counts, never
     // from a separate ledger. The names are the ticket's, word for word with
     // iOS; a locked badge still shows its true progress.

@@ -1786,6 +1786,132 @@ for i, (name_a, a) in enumerate(boxes):
             raise SystemExit(f"::error::large type overlaps {name_a} and {name_b}")
 print("large type: every verb and the time rail are on screen, no overlap")
 PY
+# ------------------------------------------------------------------ D4 dense sheets
+# Every dense sheet at the largest system font: its first title carries the
+# focus Compose requested on open, every clickable node keeps the 48 dp
+# floor, and no control leaves the 320x640 screen. Identifier-free Compose
+# test tags are not exported to uiautomator, so the titles are matched by
+# their two languages and the focused node must be one of them.
+echo "--- dense sheets at font scale 2.0 ---"
+DENSITY=$(adb shell wm density 2>/dev/null | grep -oE '[0-9]+' | head -1)
+[ -n "$DENSITY" ] || DENSITY=160
+
+dense_sheet_check() {
+  local en="$1" zh="$2" name="$3"
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || {
+    echo "::error::uiautomator could not dump $name at font scale 2.0"
+    return 1
+  }
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  python3 - "$en" "$zh" "$name" "$DENSITY" "$FONT_W" "$FONT_H" <<'PY'
+import sys, xml.etree.ElementTree as ET
+en, zh, name = sys.argv[1], sys.argv[2], sys.argv[3]
+density, width, height = float(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"::error::cannot read the {name} dump: {exc}")
+nodes = [n for n in root.iter('node') if n.get('package') == 'ai.duck.microduck']
+titles = [n for n in nodes if (n.get('text') or '') in {en, zh}]
+if not titles:
+    seen = sorted({(n.get('text') or n.get('content-desc') or '') for n in nodes})
+    raise SystemExit(f"::error::{name}: no title {en!r}/{zh!r}; screen held {seen[:24]}")
+if not any(n.get('focused') == 'true' for n in titles):
+    raise SystemExit(f"::error::{name}: the first element never took focus at font scale 2.0")
+bad = []
+for node in nodes:
+    if node.get('clickable') != 'true' or node.get('enabled') == 'false':
+        continue
+    parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
+    if len(parts) != 4:
+        continue
+    left, top, right, bottom = map(int, parts)
+    if left < 0 or top < 0 or right > width or bottom > height:
+        bad.append(f"{(node.get('text') or node.get('content-desc') or '<control>')} leaves the screen")
+        continue
+    tall = (bottom - top) * 160.0 / density
+    wide = (right - left) * 160.0 / density
+    if tall < 47 or wide < 47:
+        label = node.get('text') or node.get('content-desc') or '<control>'
+        bad.append(f"{label}: {wide:.0f}x{tall:.0f} dp")
+if bad:
+    raise SystemExit(f"::error::{name}: hit-target or bounds violations: {bad[:8]}")
+print(f"{name}: first element focused; every clickable target >= 48 dp")
+PY
+}
+
+open_more_sheet() {
+  local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
+  local ok=0
+  for _ in $(seq 1 10); do
+    if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
+      ok=1
+      break
+    fi
+    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+    sleep 0.4
+  done
+  [ "$ok" = "1" ] || { echo "::error::no $name row at font scale 2.0"; exit 1; }
+  sleep 1.5
+  dense_sheet_check "$title_en" "$title_zh" "$name" || exit 1
+  adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+  sleep 1
+}
+
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || {
+  echo "::error::no More button for the dense-sheet sweep"
+  exit 1
+}
+sleep 1.5
+dense_sheet_check "More" "更多" "More" || exit 1
+open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours"
+open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks"
+open_more_sheet "Dance Studio" "编舞铺" "Dance Studio" "编舞铺" "Dance Studio"
+open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion"
+open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky diary"
+open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards"
+open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book"
+open_more_sheet "Daily quests" "每日任务" "Today's quests" "今日小挑战" "Daily quests"
+open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more"
+open_more_sheet "This duck" "这只鸭子" "This duck" "这只鸭子" "This duck"
+open_more_sheet "Tools" "工具" "Tools" "工具" "Tools"
+
+# The days board is a local sheet over the tools page; the two nested backs
+# return tools, then the drawer.
+tap_text "工具" > /dev/null 2>&1 || tap_text "Tools" > /dev/null 2>&1 || true
+sleep 1.5
+DAYS_OK=0
+for _ in $(seq 1 8); do
+  if tap_text "日子" > /dev/null 2>&1 || tap_text "Days" > /dev/null 2>&1; then
+    DAYS_OK=1
+    break
+  fi
+  adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+  sleep 0.4
+done
+if [ "$DAYS_OK" = "1" ]; then
+  sleep 1.5
+  dense_sheet_check "Days" "日子" "Days" || exit 1
+  adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+  sleep 0.8
+  adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+else
+  echo "::warning::the tools page has no Days row at font scale 2.0"
+fi
+sleep 0.8
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+
+# The instrument, the densest surface of all.
+tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1 || {
+  echo "::error::no Time button for the dense-sheet sweep"
+  exit 1
+}
+sleep 1.5
+dense_sheet_check "This duck" "这只鸭子" "Instrument" || exit 1
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+
 adb shell settings put system font_scale 1.0 > /dev/null 2>&1 || true
 
 # ------------------------------------------------------------------ D7 perf

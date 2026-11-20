@@ -21,6 +21,11 @@ struct DanceSheet: View {
     /// Record and perform a quick action without closing the sheet.
     let tryStep: (String, String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private var stepColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: typeSize.duckIsAccessibility ? 220 : 88), spacing: DuckSpace.sm)]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: DuckSpace.md) {
@@ -28,6 +33,7 @@ struct DanceSheet: View {
                 Text(Copy.dance)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("dance-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button { dismiss() } label: {
                     DuckCloseGlyph()
@@ -43,7 +49,7 @@ struct DanceSheet: View {
 
             ScrollView {
                 LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 88), spacing: DuckSpace.sm)],
+                    columns: stepColumns,
                     spacing: DuckSpace.sm
                 ) {
                     ForEach(Array(studio.steps.enumerated()), id: \.element.id) { index, step in
@@ -52,8 +58,8 @@ struct DanceSheet: View {
                                 .font(DuckIcon.sm)
                             Text(step.label.isEmpty ? step.value : step.label)
                                 .font(.duckCaption)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
+                                .multilineTextAlignment(.center)
+                                .fixedSize(horizontal: false, vertical: true)
                             Text("\(index + 1)")
                                 .font(.duckMicro)
                                 .foregroundStyle(.secondary)
@@ -90,7 +96,7 @@ struct DanceSheet: View {
                             Text(step.kind == "sound" ? Copy.danceStepSound : SkillLabel.of(step.value))
                                 .font(.duckCaption.weight(.semibold))
                                 .padding(.horizontal, DuckSpace.md)
-                                .frame(minHeight: 40)
+                                .frame(minHeight: 44)
                                 .background(Color.white.opacity(0.10), in: Capsule())
                                 .contentShape(Capsule())
                         }
@@ -100,46 +106,18 @@ struct DanceSheet: View {
                 }
             }
 
-            HStack(spacing: DuckSpace.sm) {
-                Button {
-                    studio.toggleRecording()
-                } label: {
-                    Label(
-                        studio.recording ? Copy.danceStopRecord : Copy.danceRecord,
-                        systemImage: studio.recording ? "record.circle.fill" : "record.circle"
-                    )
-                    .font(.duckLabel.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 50)
+            if typeSize.duckIsAccessibility {
+                VStack(spacing: DuckSpace.sm) {
+                    recordButton
+                    playButton
+                    clearButton
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(studio.recording ? .red : Color.duckData)
-                .accessibilityIdentifier("dance-record")
-
-                Button {
-                    if studio.playing { studio.stop() } else { studio.play(execute) }
-                } label: {
-                    Label(
-                        studio.playing ? Copy.danceStop : Copy.dancePlay,
-                        systemImage: studio.playing ? "stop.fill" : "play.fill"
-                    )
-                    .font(.duckLabel.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 50)
+            } else {
+                HStack(spacing: DuckSpace.sm) {
+                    recordButton
+                    playButton
+                    clearButton
                 }
-                .buttonStyle(.bordered)
-                .disabled(studio.steps.isEmpty)
-                .accessibilityIdentifier("dance-play")
-
-                Button {
-                    studio.clear()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(DuckIcon.sm)
-                        .frame(width: 50, height: 50)
-                }
-                .buttonStyle(.bordered)
-                .disabled(studio.steps.isEmpty)
-                .accessibilityLabel(Copy.deleteRule)
-                .accessibilityIdentifier("dance-clear")
             }
             if studio.saved && !studio.steps.isEmpty {
                 Text(Copy.danceSaved)
@@ -148,5 +126,51 @@ struct DanceSheet: View {
             }
         }
         .padding(DuckSpace.xl)
+    }
+
+    private var recordButton: some View {
+        Button {
+            studio.toggleRecording()
+        } label: {
+            Label(
+                studio.recording ? Copy.danceStopRecord : Copy.danceRecord,
+                systemImage: studio.recording ? "record.circle.fill" : "record.circle"
+            )
+            .font(.duckLabel.weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: 50)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(studio.recording ? .red : Color.duckData)
+        .accessibilityIdentifier("dance-record")
+    }
+
+    private var playButton: some View {
+        Button {
+            if studio.playing { studio.stop() } else { studio.play(execute) }
+        } label: {
+            Label(
+                studio.playing ? Copy.danceStop : Copy.dancePlay,
+                systemImage: studio.playing ? "stop.fill" : "play.fill"
+            )
+            .font(.duckLabel.weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: 50)
+        }
+        .buttonStyle(.bordered)
+        .disabled(studio.steps.isEmpty)
+        .accessibilityIdentifier("dance-play")
+    }
+
+    private var clearButton: some View {
+        Button {
+            studio.clear()
+        } label: {
+            Image(systemName: "trash")
+                .font(DuckIcon.sm)
+                .frame(width: 50, height: 50)
+        }
+        .buttonStyle(.bordered)
+        .disabled(studio.steps.isEmpty)
+        .accessibilityLabel(Copy.deleteRule)
+        .accessibilityIdentifier("dance-clear")
     }
 }

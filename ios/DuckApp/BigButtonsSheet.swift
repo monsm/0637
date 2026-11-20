@@ -16,6 +16,7 @@ struct BigButtonsSheet: View {
                 Text(Copy.bigButtons)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("big-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button {
                     dismiss()

@@ -373,6 +373,11 @@ enum Copy {
     static var postcardShelf: String { pick("Postcards", "明信片") }
     static var postcardSaved: String { pick("Kept to the shelf", "已收藏") }
     static var postcardNone: String { pick("No postcards yet", "还没有明信片") }
+    /// D5 empty-state exits: every empty surface ends on a real action.
+    static var emptyPlayAction: String { pick("Go play with the duck", "去陪它玩") }
+    static var emptyPostcardAction: String { pick("Take a photo", "去拍一张") }
+    static var emptyCollectionAction: String { pick("Give it a try", "去练一练") }
+    static var emptyRetryAction: String { pick("Look again", "再找找") }
     static func postcardMetres(_ m: Double) -> String {
         pick(String(format: "walked %.1f m", m), String(format: "走了 %.1f 米", m))
     }
@@ -389,6 +394,7 @@ enum Copy {
     static var collectionTricks: String { pick("Tricks", "把戏") }
     static var collectionFirst: String { pick("First unlocked", "首次解锁") }
     static var collectionLocked: String { pick("Not tried yet", "还没试过") }
+    static var collectionEmpty: String { pick("Nothing in the mood book yet", "图鉴还是空的") }
     // The collection's badges (G2): thresholds over the core's own counts.
     // These keys are byte-for-byte the same as Android's parallel ticket.
     static var badgeSection: String { pick("Badges", "徽章") }

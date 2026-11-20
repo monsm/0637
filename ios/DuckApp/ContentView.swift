@@ -67,7 +67,11 @@ struct ContentView: View {
     /// One transient line above the time rail: what happened while the app
     /// was away. It hides itself and takes no space when empty.
     @State private var moodText: String?
-
+    /// D4 sheet focus: the stage control a sheet must return focus to when it
+    /// closes. The route reducer does not know who opened the sheet, so every
+    /// entry point names its own anchor here.
+    @AccessibilityFocusState private var stageFocus: DuckStageFocus?
+    @State private var lastSheetOpener: DuckStageFocus = .more
     enum Surface: String, CaseIterable {
         case live = "Live"
         case director = "Director"
@@ -76,7 +80,6 @@ struct ContentView: View {
     var body: some View {
         choreographed()
     }
-
     /// The stage and its lifecycle modifiers, in three separately checked
     /// pieces: one chain of them exceeded Xcode's type-checker budget once
     /// the route table joined the shell (the error moved from the ZStack to
@@ -116,8 +119,15 @@ struct ContentView: View {
             }
             // The renderer cannot see a SwiftUI sheet: tell it when the
             // instrument is up so the stage becomes the cold lab (look 2).
-            .onChange(of: routeState.sheet) { _, sheet in
+            .onChange(of: routeState.sheet) { old, sheet in
                 controller.instrumentOpen = (sheet == .instrument)
+                // D4: closing a sheet returns VoiceOver focus to the control
+                // that opened it; wait out the dismissal before moving it.
+                if old != nil, sheet == nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        stageFocus = lastSheetOpener
+                    }
+                }
             }
             .onReceive(controller.$capturedPhoto) { photo in
                 if let photo {
@@ -126,6 +136,7 @@ struct ContentView: View {
                     open(.photo)
                 }
             }
+            .duckFocusProbe(stageFocus)
         }
         // The hint teaches gestures, so it must wait until gestures work:
         // the core takes seconds to load, and a hint spent over a dead screen
@@ -362,7 +373,6 @@ struct ContentView: View {
 
 
     // MARK: - Driving
-
     /// Tap in front of the duck to walk there, either side to turn. The tap is
     /// turned into the twist the real pad would send, and released when the
     /// finger lifts — the duck stops when you stop asking.
@@ -436,7 +446,6 @@ struct ContentView: View {
     }
 
     // MARK: - Chrome
-
     /// The one-time gesture hint. It lives in the chrome column, not as an
     /// overlay with a magic bottom offset: any change in bar height or safe
     /// area would otherwise move it onto a button.
@@ -452,7 +461,6 @@ struct ContentView: View {
             .transition(.opacity)
             .accessibilityIdentifier("first-launch-hint")
     }
-
     /// The stage literal, split out of the body expression: once the route
     /// table's sheet/onChange modifiers joined the ZStack, Xcode stopped
     /// type-checking the body in reasonable time. The function's opaque
@@ -688,11 +696,14 @@ struct ContentView: View {
             .simultaneousGesture(timeHoldGesture)
             .accessibilityLabel(Copy.timeMachine)
             .accessibilityIdentifier("duck-time")
+            .accessibilityFocused($stageFocus, equals: .time)
+            .accessibilityValue(UserDefaults.standard.string(forKey: "duck.focusProbe")?.lowercased() == "yes" && stageFocus == .time ? "focused" : "")
 
             secondaryButton(
                 "surface-toggle",
                 surface == .live ? Copy.director : Copy.live,
-                surface == .live ? Icons.director : Icons.live
+                surface == .live ? Icons.director : Icons.live,
+                focus: .surface
             ) {
                 toggleSurface()
             }
@@ -707,13 +718,15 @@ struct ContentView: View {
     /// lift, so the two have to tell each other apart.
     private func openInstrument() {
         if timeHolding || Date().timeIntervalSince(timeHoldEndedAt) < 0.6 { return }
-        open(.instrument)
+        open(.instrument, from: .time)
     }
 
     /// Open a top-level destination. Rows inside a presented sheet do not
     /// come through here - the sheet host nests them - so this is a plain
-    /// "replace the sheet" reduce, same as Android.
-    private func open(_ route: DuckRoute) {
+    /// "replace the sheet" reduce, same as Android. `from` is the stage
+    /// control that gets focus back when the sheet closes (D4).
+    private func open(_ route: DuckRoute, from opener: DuckStageFocus? = nil) {
+        if let opener { lastSheetOpener = opener }
         routeState = ShellOverlayReducer.reduce(routeState, .open(route))
     }
 
@@ -753,7 +766,15 @@ struct ContentView: View {
             stickMode: $stickMode,
             languageTick: $languageTick,
             photo: photoPreview,
-            onDanceStep: playDanceStep
+            onDanceStep: playDanceStep,
+            onOpenDirector: {
+                // A sheet can hand over to Director (the postcards empty
+                // state); the switch belongs to ContentView, not the sheet.
+                withDuckMotion(DuckMotion.base) {
+                    routeState = ShellOverlayReducer.reduce(routeState, .closeSheet)
+                    surface = .director
+                }
+            }
         )
     }
 
@@ -776,16 +797,17 @@ struct ContentView: View {
     /// cannot drift apart.
     private var thumbDeck: some View {
         HStack(spacing: DuckSpace.sm) {
-            primaryButton("duck-feed", Copy.feed, Icons.feed) { controller.feed()
+            primaryButton("duck-feed", Copy.feed, Icons.feed, focus: .feed) { controller.feed()
                 DuckHaptics.medium() }
-            primaryButton("duck-skills", Copy.skills, Icons.skills) { setRing(true) }
-            primaryButton("duck-quack", Copy.quack, Icons.quack) { quackTapped() }
+            primaryButton("duck-skills", Copy.skills, Icons.skills, focus: .skills) { setRing(true) }
+            primaryButton("duck-quack", Copy.quack, Icons.quack, focus: .quack) { quackTapped() }
                 .simultaneousGesture(wheeeGesture)
             primaryButton(
                 "duck-grab",
                 controller.carrying ? Copy.putDown : Copy.grab,
                 controller.carrying ? Icons.drop : Icons.grab,
-                selected: controller.carrying
+                selected: controller.carrying,
+                focus: .grab
             ) {
                 if controller.carrying {
                     controller.release()
@@ -793,7 +815,7 @@ struct ContentView: View {
                     controller.grab()
                 }
             }
-            primaryButton("duck-more", Copy.more, Icons.more) { open(.more) }
+            primaryButton("duck-more", Copy.more, Icons.more, focus: .more) { open(.more, from: .more) }
         }
         .frame(minHeight: 82)
         .padding(.horizontal, DuckSpace.sm)
@@ -808,37 +830,20 @@ struct ContentView: View {
     }
 
     /// The one primary button (B4 §3): 52 pt circle, 18 pt icon, 11 pt label
-    /// underneath.
+    /// underneath. The pixels live in DuckStageButtons.swift.
     private func primaryButton(
         _ id: String,
         _ label: String,
         _ icon: String,
         selected: Bool = false,
+        focus: DuckStageFocus? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            VStack(spacing: DuckSpace.xxs) {
-                Image(systemName: icon)
-                    .font(DuckIcon.md)
-                    .frame(width: 52, height: 52)
-                    .background(
-                        selected
-                            ? AnyShapeStyle(Color.duckAction.opacity(0.35))
-                            : AnyShapeStyle(.ultraThinMaterial),
-                        in: Circle()
-                    )
-                    .contentShape(Circle())
-                Text(label)
-                    .font(.duckCaption.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .multilineTextAlignment(.center)
-                    .frame(width: 52)
-                    .lineLimit(2)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(id)
+        DuckPrimaryButton(
+            id: id, label: label, icon: icon, selected: selected,
+            focus: focus, focusActive: focus.map { stageFocus == $0 } ?? false,
+            stageFocus: $stageFocus, action: action
+        )
     }
 
     /// A secondary button (B4 §3): 48 pt circle, icon only, and always an
@@ -847,18 +852,14 @@ struct ContentView: View {
         _ id: String,
         _ label: String,
         _ icon: String,
+        focus: DuckStageFocus? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(DuckIcon.md)
-                .frame(width: 48, height: 48)
-                .background(.ultraThinMaterial, in: Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityIdentifier(id)
+        DuckSecondaryButton(
+            id: id, label: label, icon: icon,
+            focus: focus, focusActive: focus.map { stageFocus == $0 } ?? false,
+            stageFocus: $stageFocus, action: action
+        )
     }
 
     private func toggleSurface() {
@@ -1256,6 +1257,7 @@ struct ContentView: View {
                 }
                 .accessibilityLabel(surface == .live ? Copy.director : Copy.live)
                 .accessibilityIdentifier("surface-toggle")
+                .accessibilityFocused($stageFocus, equals: .surface)
             }
             // One menu, not six chips. On a landscape phone the chips ran off
             // the edge and nothing was legible; the stick modes, the surface,
@@ -1295,7 +1297,7 @@ struct ContentView: View {
         HStack(spacing: DuckSpace.sm) {
             // The time machine lives one pull away, not on the screen.
             Button {
-                open(.instrument)
+                open(.instrument, from: .time)
             } label: {
                 Label(Copy.time, systemImage: "clock.arrow.circlepath")
                     .labelStyle(.iconOnly)
@@ -1307,6 +1309,7 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(Copy.time)
             .accessibilityIdentifier("duck-time")
+            .accessibilityFocused($stageFocus, equals: .time)
 
             Button {
                 setRing(true)

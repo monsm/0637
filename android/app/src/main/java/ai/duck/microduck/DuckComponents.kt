@@ -2,6 +2,7 @@ package ai.duck.microduck
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -25,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -47,6 +52,42 @@ private fun Modifier.duckPress(interactionSource: MutableInteractionSource): Mod
         scaleX = if (pressed) 0.96f else 1f
         scaleY = if (pressed) 0.96f else 1f
         alpha = if (pressed) 0.82f else 1f
+    }
+}
+
+/**
+ * D4's line for the Android dense sheets: at font_scale 2.0 two or more
+ * columns collapse to one, and values that had maxLines=1 may wrap.
+ */
+@Composable
+fun duckLargeText(): Boolean = LocalDensity.current.fontScale >= 1.5f
+
+/**
+ * D4 §3.5 on Android: the first element of a sheet takes focus when the
+ * sheet appears. The ModalBottomSheet restores the opener's focus on close;
+ * this half moves it in.
+ */
+@Composable
+fun Modifier.duckSheetFirstFocus(): Modifier {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(200)
+        requester.requestFocus()
+    }
+    return focusRequester(requester).focusable()
+}
+
+/**
+ * A row of chips that becomes a column at accessibility font scales and
+ * keeps its normal row shape otherwise. No weight is used by its callers,
+ * so the same children can live in either scope.
+ */
+@Composable
+fun DuckChipWrap(content: @Composable () -> Unit) {
+    if (duckLargeText()) {
+        Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) { content() }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) { content() }
     }
 }
 
@@ -360,39 +401,70 @@ fun DuckSegmented(
     enabled: Boolean = true,
     testTag: String = "",
 ) {
-    Row(
-        modifier
-            .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(DuckTheme.Radius.control))
-            .padding(DuckTheme.Space.xxs)
-            .testTag(testTag),
-        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
-    ) {
-        options.forEachIndexed { index, option ->
-            val isPicked = index == selectedIndex
-            Text(
-                option,
-                color = if (isPicked) DuckTheme.TextOnAccent else DuckTheme.TextPrimary.copy(alpha = if (enabled) 0.85f else 0.4f),
-                fontSize = DuckTheme.Type.Label,
-                fontWeight = if (isPicked) FontWeight.SemiBold else FontWeight.Medium,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 40.dp)
-                    .background(
-                        if (isPicked) DuckTheme.AccentAction else Color.Transparent,
-                        RoundedCornerShape(DuckTheme.Radius.control),
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        enabled = enabled,
-                        role = Role.Button,
-                        onClickLabel = option,
-                    ) { onSelect(index) }
-                    .padding(horizontal = DuckTheme.Space.md)
-                    .wrapContentHeight(Alignment.CenterVertically)
-                    .semantics { this.selected = isPicked },
-                textAlign = TextAlign.Center,
-            )
+    val large = duckLargeText()
+    val base = modifier
+        .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(DuckTheme.Radius.control))
+        .padding(DuckTheme.Space.xxs)
+        .testTag(testTag)
+    if (large) {
+        Column(base, verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs)) {
+            options.forEachIndexed { index, option ->
+                val isPicked = index == selectedIndex
+                Text(
+                    option,
+                    color = if (isPicked) DuckTheme.TextOnAccent else DuckTheme.TextPrimary.copy(alpha = if (enabled) 0.85f else 0.4f),
+                    fontSize = DuckTheme.Type.Label,
+                    fontWeight = if (isPicked) FontWeight.SemiBold else FontWeight.Medium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .background(
+                            if (isPicked) DuckTheme.AccentAction else Color.Transparent,
+                            RoundedCornerShape(DuckTheme.Radius.control),
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = enabled,
+                            role = Role.Button,
+                            onClickLabel = option,
+                        ) { onSelect(index) }
+                        .padding(horizontal = DuckTheme.Space.md)
+                        .wrapContentHeight(Alignment.CenterVertically)
+                        .semantics { this.selected = isPicked },
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    } else {
+        Row(base, horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs)) {
+            options.forEachIndexed { index, option ->
+                val isPicked = index == selectedIndex
+                Text(
+                    option,
+                    color = if (isPicked) DuckTheme.TextOnAccent else DuckTheme.TextPrimary.copy(alpha = if (enabled) 0.85f else 0.4f),
+                    fontSize = DuckTheme.Type.Label,
+                    fontWeight = if (isPicked) FontWeight.SemiBold else FontWeight.Medium,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 48.dp)
+                        .background(
+                            if (isPicked) DuckTheme.AccentAction else Color.Transparent,
+                            RoundedCornerShape(DuckTheme.Radius.control),
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = enabled,
+                            role = Role.Button,
+                            onClickLabel = option,
+                        ) { onSelect(index) }
+                        .padding(horizontal = DuckTheme.Space.md)
+                        .wrapContentHeight(Alignment.CenterVertically)
+                        .semantics { this.selected = isPicked },
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
@@ -459,8 +531,7 @@ fun DuckEmptyState(
     Column(
         modifier
             .fillMaxWidth()
-            .padding(DuckTheme.Space.xl)
-            .testTag(testTag),
+            .padding(DuckTheme.Space.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
     ) {
@@ -469,6 +540,7 @@ fun DuckEmptyState(
             color = DuckTheme.TextPrimary,
             fontSize = DuckTheme.Type.Body,
             textAlign = TextAlign.Center,
+            modifier = Modifier.testTag(testTag),
         )
         if (note != null) {
             Text(

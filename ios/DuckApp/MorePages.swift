@@ -12,10 +12,12 @@ import SwiftUI
 
 private struct PageChrome<Content: View>: View {
     let title: String
+    let tag: String
     @ViewBuilder var content: Content
 
-    init(title: String, @ViewBuilder content: () -> Content) {
+    init(title: String, tag: String, @ViewBuilder content: () -> Content) {
         self.title = title
+        self.tag = tag
         self.content = content()
     }
 
@@ -26,6 +28,8 @@ private struct PageChrome<Content: View>: View {
                     Text(title)
                         .font(.duckTitle)
                         .foregroundStyle(.white)
+                        .accessibilityIdentifier(tag)
+                        .duckSheetFirstFocus()
                     Spacer()
                     SheetCloseButton()
                 }
@@ -68,7 +72,7 @@ struct PlayMoreSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        PageChrome(title: Copy.playMore) {
+        PageChrome(title: Copy.playMore, tag: "play-more-title") {
             // The four play controls share one segmented control (D2).
             DuckSegmented(
                 options: StickMode.allCases.map { Copy.stick($0.rawValue) },
@@ -114,7 +118,7 @@ struct DuckPanelSheet: View {
     @State private var aliasOpen = false
 
     var body: some View {
-        PageChrome(title: Copy.thisDuck) {
+        PageChrome(title: Copy.thisDuck, tag: "duck-panel-title") {
             PageRow(
                 title: Copy.heart,
                 note: controller.heartOn
@@ -187,7 +191,7 @@ struct ToolsSheet: View {
     }
 
     var body: some View {
-        PageChrome(title: Copy.tools) {
+        PageChrome(title: Copy.tools, tag: "tools-title") {
             PageRow(
                 title: Copy.parentTime,
                 note: parentNote,
