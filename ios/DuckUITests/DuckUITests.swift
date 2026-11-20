@@ -1002,7 +1002,7 @@ final class DuckUITests: XCTestCase {
 
         // The drawer closes and focus returns to the More button.
         closeMore()
-        assertStageFocus("duck-more", focus: "more", sheet: "More return")
+        assertStageFocus("duck-more", sheet: "More return")
 
         // The instrument is the densest surface: same focus and hit rules.
         let instrumentProbes = focusProbeCount()
@@ -1017,7 +1017,7 @@ final class DuckUITests: XCTestCase {
             predicate: NSPredicate(format: "exists == false"),
             object: anyElement("sheet-title")
         )], timeout: 6)
-        assertStageFocus("duck-time", focus: "time", sheet: "Instrument return")
+        assertStageFocus("duck-time", sheet: "Instrument return")
     }
 
     /// XCUITest cannot inspect VoiceOver focus directly; each sheet title
@@ -1041,13 +1041,15 @@ final class DuckUITests: XCTestCase {
 
     /// Closing returns focus to the stage control that opened the sheet; its
     /// test-only badge is armed only while no sheet is up.
-    private func assertStageFocus(_ id: String, focus: String, sheet: String) {
+    private func assertStageFocus(_ id: String, sheet: String) {
         let element = app.buttons[id]
         XCTAssertTrue(element.waitForExistence(timeout: 10), "\(sheet): \(id) is missing after close")
-        XCTAssertTrue(
-            app.staticTexts["stage-focus-\(focus)"].waitForExistence(timeout: 6),
-            "\(sheet): \(id) did not regain focus"
-        )
+        let deadline = Date().addingTimeInterval(6)
+        while Date() < deadline {
+            if (element.value as? String) == "focused" { return }
+            usleep(100_000)
+        }
+        XCTFail("\(sheet): \(id) did not regain focus (value=\(String(describing: element.value)))")
     }
 
     /// Tap an element that may have scrolled below the fold at AX3. Swipes

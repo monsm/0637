@@ -697,7 +697,7 @@ struct ContentView: View {
             .accessibilityLabel(Copy.timeMachine)
             .accessibilityIdentifier("duck-time")
             .accessibilityFocused($stageFocus, equals: .time)
-            .duckStageFocusBadge(.time, active: routeState.sheet == nil && lastSheetOpener == .time)
+            .accessibilityValue(UserDefaults.standard.string(forKey: "duck.focusProbe")?.lowercased() == "yes" && routeState.sheet == nil && lastSheetOpener == .time ? "focused" : "")
 
             secondaryButton(
                 "surface-toggle",
