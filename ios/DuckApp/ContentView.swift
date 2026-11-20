@@ -467,27 +467,24 @@ struct ContentView: View {
                     .contentShape(Rectangle())
                     // D4: the stage is one accessible element with the four
                     // actions a VoiceOver user needs to drive the duck.
+                    // SwiftUI on iOS has no `.accessibilityCustomActions` —
+                    // that is UIKit's API. Four named actions are the SwiftUI
+                    // spelling and compile from iOS 14 on.
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(Copy.duckStage)
-                    .accessibilityCustomActions([
-                        AccessibilityCustomAction(name: Copy.walkStep) {
-                            pulseDrive(0, -0.6)
-                            return true
-                        },
-                        AccessibilityCustomAction(name: Copy.turnLeft) {
-                            pulseDrive(-0.6, 0)
-                            return true
-                        },
-                        AccessibilityCustomAction(name: Copy.turnRight) {
-                            pulseDrive(0.6, 0)
-                            return true
-                        },
-                        AccessibilityCustomAction(name: Copy.petIt) {
-                            controller.pet()
-                            DuckHaptics.pet()
-                            return true
-                        },
-                    ])
+                    .accessibilityAction(named: Text(Copy.walkStep)) {
+                        pulseDrive(0, -0.6)
+                    }
+                    .accessibilityAction(named: Text(Copy.turnLeft)) {
+                        pulseDrive(-0.6, 0)
+                    }
+                    .accessibilityAction(named: Text(Copy.turnRight)) {
+                        pulseDrive(0.6, 0)
+                    }
+                    .accessibilityAction(named: Text(Copy.petIt)) {
+                        controller.pet()
+                        DuckHaptics.pet()
+                    }
                     // Both gestures stay installed; the mask picks the one
                     // for this composition. A ternary of AnyGesture erased
                     // two different `some Gesture` types and failed to infer.

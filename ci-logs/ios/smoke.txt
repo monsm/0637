@@ -1,4 +1,4 @@
-run=44661157795
-sha=7d45f9fff8a824995ae2629e700b94b3d930bbb8
-simsmoke=skipped
-uitest=skipped
+run=44666175289
+sha=67c11dccd00b3af4d1c6a773884ba8eb78892dda
+simsmoke=success
+uitest=success
