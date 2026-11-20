@@ -977,6 +977,10 @@ final class DuckUITests: XCTestCase {
             object: anyElement("alias-title")
         )], timeout: 6)
         app.buttons["sheet-close-shared"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("duck-panel-title")
+        )], timeout: 6)
 
         XCTAssertTrue(tapWhenVisible(app.buttons["more-tools"]), "Tools: row unreachable")
         XCTAssertTrue(anyElement("tools-title").waitForExistence(timeout: 10))
@@ -1000,6 +1004,10 @@ final class DuckUITests: XCTestCase {
             object: anyElement("big-title")
         )], timeout: 6)
         app.buttons["sheet-close-shared"].tap()
+        _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: anyElement("tools-title")
+        )], timeout: 6)
 
         // The drawer closes and focus returns to the More button.
         closeMore()
