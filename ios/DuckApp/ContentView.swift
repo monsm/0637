@@ -470,10 +470,23 @@ struct ContentView: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(Copy.duckStage)
                     .accessibilityCustomActions([
-                        .init(name: Copy.walkStep) { pulseDrive(0, -0.6); return true },
-                        .init(name: Copy.turnLeft) { pulseDrive(-0.6, 0); return true },
-                        .init(name: Copy.turnRight) { pulseDrive(0.6, 0); return true },
-                        .init(name: Copy.petIt) { controller.pet(); DuckHaptics.pet(); return true },
+                        AccessibilityCustomAction(name: Copy.walkStep) {
+                            pulseDrive(0, -0.6)
+                            return true
+                        },
+                        AccessibilityCustomAction(name: Copy.turnLeft) {
+                            pulseDrive(-0.6, 0)
+                            return true
+                        },
+                        AccessibilityCustomAction(name: Copy.turnRight) {
+                            pulseDrive(0.6, 0)
+                            return true
+                        },
+                        AccessibilityCustomAction(name: Copy.petIt) {
+                            controller.pet()
+                            DuckHaptics.pet()
+                            return true
+                        },
                     ])
                     // Both gestures stay installed; the mask picks the one
                     // for this composition. A ternary of AnyGesture erased
