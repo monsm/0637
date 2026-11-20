@@ -61,7 +61,7 @@ fun BigButtonsSheet(
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("big-title"),
+                        .testTag("big-title").duckSheetFirstFocus(),
                 )
                 CloseChip("big-close", onClose)
             }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -39,7 +40,7 @@ import java.io.File
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostcardsSheet(onClose: () -> Unit) {
+fun PostcardsSheet(onClose: () -> Unit, onOpenDirector: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cards = remember { PostcardShelf.load(context) }
@@ -59,23 +60,26 @@ fun PostcardsSheet(onClose: () -> Unit) {
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("postcards-title"),
+                        .testTag("postcards-title").duckSheetFirstFocus(),
                 )
                 CloseChip("postcards-close", onClose)
             }
             if (cards.isEmpty()) {
-                Text(
-                    Copy.postcardNone,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = DuckTheme.Type.Caption,
-                    modifier = Modifier.testTag("postcards-empty"),
+                DuckEmptyState(
+                    title = Copy.postcardNone,
+                    actionTitle = Copy.emptyPostcardAction,
+                    onAction = {
+                        onClose()
+                        onOpenDirector()
+                    },
+                    testTag = "postcards-empty",
                 )
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(minSize = 150.dp),
                     verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
                     horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
-                    modifier = Modifier.height(420.dp),
+                    modifier = Modifier.heightIn(max = 420.dp),
                 ) {
                     items(cards, key = { it.file }) { card ->
                         val bitmap = remember(card.file) {

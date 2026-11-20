@@ -1153,7 +1153,10 @@ fun Shell(
     }
 
     if (route == DuckRoute.Postcards) {
-        PostcardsSheet(onClose = { closeSheet() })
+        PostcardsSheet(
+            onClose = { closeSheet() },
+            onOpenDirector = { closeSheet(); onSurface(Surface.Director) },
+        )
     }
 
     if (route == DuckRoute.Progress) {
@@ -1382,7 +1385,7 @@ private fun AISheet(
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("ai-title"),
+                        .testTag("ai-title").duckSheetFirstFocus(),
                 )
                 CloseChip("ai-close", onClose)
             }
@@ -1439,7 +1442,7 @@ private fun AISheet(
                     .fillMaxWidth()
                     .testTag("ai-interval"),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            DuckChipWrap {
                 ButtonChip(Copy.aiSave, "ai-save") { onSave(current()) }
                 ButtonChip(Copy.aiThinkNow, "ai-think") { onThink(current()) }
             }
@@ -1537,7 +1540,7 @@ private fun PeersSheet(
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = DuckTheme.Type.Title,
-                        modifier = Modifier.testTag("peers-title"),
+                        modifier = Modifier.testTag("peers-title").duckSheetFirstFocus(),
                     )
                     if (peers.name.isNotEmpty()) {
                         Text(
@@ -1581,11 +1584,11 @@ private fun PeersSheet(
     )
 
     if (peers.peers.isEmpty()) {
-        Text(
-            Copy.peersEmpty,
-            color = Color.White.copy(alpha = 0.6f),
-            fontSize = DuckTheme.Type.Caption,
-            modifier = Modifier.testTag("peers-empty"),
+        DuckEmptyState(
+            title = Copy.peersEmpty,
+            actionTitle = Copy.emptyRetryAction,
+            onAction = onStart,
+            testTag = "peers-empty",
         )
     } else {
         peers.peers.forEachIndexed { index, peer ->
@@ -1633,7 +1636,7 @@ private fun PeersSheet(
                 // Gifts in the greeting's own chip language: a treat
                 // feeds through the real peck, a cheer runs the
                 // official excited timeline on the other duck.
-                Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+                DuckChipWrap {
                     ButtonChip(Copy.giftTreat, "gift-treat-${peer.id}") {
                         sendGift(peer.id, "treat", "")
                     }
@@ -1667,7 +1670,7 @@ private fun PeersSheet(
             .put("sounds", org.json.JSONArray(sounds))
         Thread { postDuckCommand("/ensemble", body.toString()) }.start()
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+    DuckChipWrap {
         PathChip(Copy.formation, enabled = canEnsemble, testTag = "ensemble-formation") {
             sendEnsemble(listOf("laugh", "yes_fast", "excited", "curious"), emptyList())
         }
@@ -1741,6 +1744,10 @@ private fun RulesSheet(onClose: () -> Unit) {
         else -> listOf("chirp", "coo", "greet", "inquire", "peck", "alarm")
     }
     LaunchedEffect(action) { value = values.first() }
+    // One paste action for both the empty state and its own chip.
+    val pasteClip: () -> Unit = {
+        pasteRulesFromClip(context, rules, rulesLoaded, ::applyRules)
+    }
 
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
         Column(
@@ -1760,21 +1767,22 @@ private fun RulesSheet(onClose: () -> Unit) {
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("rules-title"),
+                        .testTag("rules-title").duckSheetFirstFocus(),
                 )
                 CloseChip("rules-close", onClose)
             }
             if (rules.isEmpty()) {
-                Text(
-                    Copy.rulesEmpty,
-                    color = Color.White.copy(alpha = 0.6f),
-                    fontSize = DuckTheme.Type.Caption,
+                DuckEmptyState(
+                    title = Copy.rulesEmpty,
+                    actionTitle = Copy.rulesPaste,
+                    onAction = pasteClip,
+                    testTag = "rules-empty",
                 )
             }
             // A program travels between phones as text: the share sheet
             // carries the versioned document, paste reads one back and
             // merges it into what the child already built.
-            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            DuckChipWrap {
                 ButtonChip(Copy.rulesShare, "rules-share") {
                     if (rules.isNotEmpty()) {
                         val send = android.content.Intent(android.content.Intent.ACTION_SEND)
@@ -1785,16 +1793,7 @@ private fun RulesSheet(onClose: () -> Unit) {
                         )
                     }
                 }
-                ButtonChip(Copy.rulesPaste, "rules-paste") {
-                    val clip = (context.getSystemService(Context.CLIPBOARD_SERVICE)
-                        as? android.content.ClipboardManager)
-                        ?.primaryClip
-                        ?.takeIf { it.itemCount > 0 }
-                        ?.getItemAt(0)
-                        ?.coerceToText(context)
-                        ?.toString()
-                    importRulesFromClip(context, clip, rules, rulesLoaded, ::applyRules)
-                }
+                ButtonChip(Copy.rulesPaste, "rules-paste") { pasteClip() }
             }
             rules.forEachIndexed { index, rule ->
                 Row(
@@ -1939,7 +1938,7 @@ private fun RuleChip(
 ) {
     Box(
         Modifier
-            .heightIn(min = 44.dp)
+            .heightIn(min = 48.dp)
             .background(
                 if (selected) Color.White.copy(alpha = 0.92f)
                 else Color.White.copy(alpha = 0.10f),
@@ -3046,7 +3045,7 @@ internal fun QuestCard(board: QuestBoardUi) {
                             quest.title,
                             color = Color.White.copy(alpha = 0.85f),
                             fontSize = DuckTheme.Type.Caption,
-                            maxLines = 1,
+                            maxLines = if (duckLargeText()) 3 else 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
@@ -3190,7 +3189,7 @@ private fun LifeCard(life: LifeUi, onExport: () -> Unit) {
             fontSize = DuckTheme.Type.Label,
             fontWeight = FontWeight.SemiBold,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        DuckChipWrap {
             LifeStat("${life.metres.roundToInt()} m", Copy.walked, Modifier.weight(1f))
             LifeStat("${life.rolls}", Copy.rolls, Modifier.weight(1f))
             LifeStat("${life.pickups}", Copy.pickups, Modifier.weight(1f))
@@ -3368,7 +3367,7 @@ private fun InstrumentSheet(
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("sheet-title"),
+                        .testTag("sheet-title").duckSheetFirstFocus(),
                 )
                 // A deterministic dismissal: a portrait medium detent would
                 // otherwise make a swipe-down scroll the sheet instead.
@@ -3420,7 +3419,7 @@ private fun InstrumentSheet(
                         },
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = DuckTheme.Type.Caption,
-                        maxLines = 1,
+                        maxLines = if (duckLargeText()) 3 else 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -3465,7 +3464,7 @@ private fun InstrumentSheet(
                         },
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = DuckTheme.Type.Caption,
-                        maxLines = 1,
+                        maxLines = if (duckLargeText()) 3 else 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -3488,7 +3487,7 @@ private fun InstrumentSheet(
                     behaviorSummary,
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = DuckTheme.Type.Caption,
-                    maxLines = 1,
+                    maxLines = if (duckLargeText()) 3 else 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -3503,7 +3502,7 @@ private fun InstrumentSheet(
                     trickBook,
                     color = Color.White.copy(alpha = 0.6f),
                     fontSize = DuckTheme.Type.Caption,
-                    maxLines = 1,
+                    maxLines = if (duckLargeText()) 3 else 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
@@ -3574,7 +3573,7 @@ private fun InstrumentSheet(
                         summary,
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = DuckTheme.Type.Caption,
-                        maxLines = 1,
+                        maxLines = if (duckLargeText()) 3 else 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -3609,7 +3608,7 @@ private fun InstrumentSheet(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            DuckChipWrap {
                 ButtonChip(
                     if (paused) Copy.resume else Copy.freeze,
                     testTag = if (paused) "time-play.fill" else "time-pause.fill",
@@ -3634,12 +3633,12 @@ private fun InstrumentSheet(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            DuckChipWrap {
                 ButtonChip(Copy.drive + ": " + if (core.mode() == "roller") Copy.roller else Copy.walk) {
                     core.setMode(if (core.mode() == "roller") "walk" else "roller")
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            DuckChipWrap {
                 listOf(0.25, 0.5, 1.0, 2.0).forEach { option ->
                     ButtonChip(if (option == 1.0) "1×" else "${option}×") {
                         speed = option

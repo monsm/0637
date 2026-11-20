@@ -6,6 +6,7 @@ import SwiftUI
 struct RulesSheet: View {
     @ObservedObject var controller: DuckController
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var trigger = "clap"
     /// The timer's period, in whole simulated seconds.
     @State private var timerPeriod = 60
@@ -26,6 +27,7 @@ struct RulesSheet: View {
                 Text(Copy.blocks)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("rules-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button {
                     dismiss()
@@ -40,41 +42,15 @@ struct RulesSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: DuckSpace.lg) {
                     if controller.rules.isEmpty {
-                        Text(Copy.rulesEmpty)
-                            .font(.duckCaption)
-                            .foregroundStyle(.secondary)
+                        DuckEmptyState(
+                            title: Copy.rulesEmpty,
+                            actionTitle: Copy.rulesPaste,
+                            action: { pasteFromClipboard() },
+                            identifier: "rules-empty-state"
+                        )
                     } else {
                         ForEach(Array(controller.rules.enumerated()), id: \.offset) { index, rule in
-                            HStack(spacing: DuckSpace.sm) {
-                                Text("\(Copy.ruleWhen) \(Copy.ruleTrigger(rule.trigger))")
-                                    .font(.duckLabel.weight(.semibold))
-                                Image(systemName: "arrow.right")
-                                    .font(DuckIcon.xs)
-                                    .foregroundStyle(.secondary)
-                                Text(label(for: rule.value, kind: rule.action))
-                                    .font(.duckLabel.weight(.semibold))
-                                Spacer()
-                                Button {
-                                    var next = controller.rules
-                                    next.remove(at: index)
-                                    controller.saveRules(next)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .font(DuckIcon.xs)
-                                        .frame(width: 44, height: 44)
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.red.opacity(0.85))
-                                .accessibilityLabel(Copy.deleteRule)
-                            }
-                            .padding(.horizontal, DuckSpace.md)
-                            .frame(minHeight: 48)
-                            .background(
-                                Color.duckBgSurface,
-                                in: RoundedRectangle(cornerRadius: DuckRadius.thumb)
-                            )
-                            .accessibilityIdentifier("rule-\(index)")
+                            ruleView(rule, index: index)
                         }
                     }
 
@@ -93,28 +69,7 @@ struct RulesSheet: View {
                             .accessibilityIdentifier("rules-share")
                         }
                         Button {
-                            if let text = UIPasteboard.general.string,
-                               let result = controller.importRules(from: text) {
-                                if result.parsed == 0 && result.skippedTimers == 0 {
-                                    importNote = Copy.rulesPasteFailed
-                                } else {
-                                    // A timer the core would refuse is
-                                    // named, not silently absent from the
-                                    // imported set (the same rule Android
-                                    // follows): saving it would make the
-                                    // core reject the whole program.
-                                    var notes: [String] = []
-                                    if result.skippedTimers > 0 {
-                                        notes.append(Copy.rulesTimerPeriodBad)
-                                    }
-                                    if result.parsed > 0 {
-                                        notes.append(Copy.rulesPasted(result.added))
-                                    }
-                                    importNote = notes.joined(separator: "\n")
-                                }
-                            } else {
-                                importNote = Copy.rulesPasteFailed
-                            }
+                            pasteFromClipboard()
                         } label: {
                             Label(Copy.rulesPaste, systemImage: "doc.on.clipboard")
                                 .font(.duckCaption.weight(.semibold))
@@ -143,24 +98,26 @@ struct RulesSheet: View {
                     chipRow(triggers, selected: trigger, kind: "trigger") { trigger = $0 }
             if trigger == "timer" {
                 // The WHEN, in the duck's own clock: four honest beats.
-                HStack(spacing: DuckSpace.xs) {
-                    ForEach([30, 60, 120, 300], id: \.self) { seconds in
-                        Button {
-                            timerPeriod = seconds
-                        } label: {
-                            Text("\(seconds)s")
-                                .font(.duckCaption.weight(.semibold))
-                                .padding(.horizontal, DuckSpace.sm)
-                                .frame(minHeight: 32)
-                                .background(
-                                    timerPeriod == seconds
-                                        ? Color.white.opacity(0.28)
-                                        : Color.white.opacity(0.08),
-                                    in: Capsule()
-                                )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DuckSpace.xs) {
+                        ForEach([30, 60, 120, 300], id: \.self) { seconds in
+                            Button {
+                                timerPeriod = seconds
+                            } label: {
+                                Text("\(seconds)s")
+                                    .font(.duckCaption.weight(.semibold))
+                                    .padding(.horizontal, DuckSpace.sm)
+                                    .frame(minHeight: 44)
+                                    .background(
+                                        timerPeriod == seconds
+                                            ? Color.white.opacity(0.28)
+                                            : Color.white.opacity(0.08),
+                                        in: Capsule()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("rule-timer-\(seconds)")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("rule-timer-\(seconds)")
                     }
                 }
             }
@@ -258,14 +215,100 @@ struct RulesSheet: View {
         kind: String,
         onPick: @escaping (String) -> Void
     ) -> some View {
-        HStack(spacing: DuckSpace.sm) {
-            ForEach(options, id: \.self) { option in
-                chip(
-                    kind == "trigger" ? Copy.ruleTrigger(option) : Copy.ruleKind(option),
-                    selected: selected == option,
-                    id: "rule-\(kind == "trigger" ? "trigger" : "kind")-\(option)"
-                ) { onPick(option) }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: DuckSpace.sm) {
+                ForEach(options, id: \.self) { option in
+                    chip(
+                        kind == "trigger" ? Copy.ruleTrigger(option) : Copy.ruleKind(option),
+                        selected: selected == option,
+                        id: "rule-\(kind == "trigger" ? "trigger" : "kind")-\(option)"
+                    ) { onPick(option) }
+                }
             }
+            .padding(.vertical, DuckSpace.xxs)
+        }
+    }
+
+    /// One existing rule. The row becomes a column at accessibility sizes so
+    /// "when" and "then" never squeeze each other into an ellipsis.
+    @ViewBuilder private func ruleView(_ rule: DuckController.DuckRule, index: Int) -> some View {
+        if typeSize.duckIsAccessibility {
+            VStack(alignment: .leading, spacing: DuckSpace.xs) {
+                Text("\(Copy.ruleWhen) \(Copy.ruleTrigger(rule.trigger))")
+                    .font(.duckLabel.weight(.semibold))
+                Text(label(for: rule.value, kind: rule.action))
+                    .font(.duckLabel.weight(.semibold))
+                HStack {
+                    Spacer()
+                    deleteRuleButton(index: index)
+                }
+            }
+            .padding(.horizontal, DuckSpace.md)
+            .padding(.vertical, DuckSpace.sm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color.duckBgSurface,
+                in: RoundedRectangle(cornerRadius: DuckRadius.thumb)
+            )
+            .accessibilityIdentifier("rule-\(index)")
+        } else {
+            HStack(spacing: DuckSpace.sm) {
+                Text("\(Copy.ruleWhen) \(Copy.ruleTrigger(rule.trigger))")
+                    .font(.duckLabel.weight(.semibold))
+                Image(systemName: "arrow.right")
+                    .font(DuckIcon.xs)
+                    .foregroundStyle(.secondary)
+                Text(label(for: rule.value, kind: rule.action))
+                    .font(.duckLabel.weight(.semibold))
+                Spacer()
+                deleteRuleButton(index: index)
+            }
+            .padding(.horizontal, DuckSpace.md)
+            .frame(minHeight: 48)
+            .background(
+                Color.duckBgSurface,
+                in: RoundedRectangle(cornerRadius: DuckRadius.thumb)
+            )
+            .accessibilityIdentifier("rule-\(index)")
+        }
+    }
+
+    private func deleteRuleButton(index: Int) -> some View {
+        Button {
+            var next = controller.rules
+            next.remove(at: index)
+            controller.saveRules(next)
+        } label: {
+            Image(systemName: "trash")
+                .font(DuckIcon.xs)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.red.opacity(0.85))
+        .accessibilityLabel(Copy.deleteRule)
+    }
+
+    private func pasteFromClipboard() {
+        if let text = UIPasteboard.general.string,
+           let result = controller.importRules(from: text) {
+            if result.parsed == 0 && result.skippedTimers == 0 {
+                importNote = Copy.rulesPasteFailed
+            } else {
+                // A timer the core would refuse is named, not silently absent
+                // from the imported set (the same rule Android follows):
+                // saving it would make the core reject the whole program.
+                var notes: [String] = []
+                if result.skippedTimers > 0 {
+                    notes.append(Copy.rulesTimerPeriodBad)
+                }
+                if result.parsed > 0 {
+                    notes.append(Copy.rulesPasted(result.added))
+                }
+                importNote = notes.joined(separator: "\n")
+            }
+        } else {
+            importNote = Copy.rulesPasteFailed
         }
     }
 

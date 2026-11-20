@@ -25,6 +25,8 @@ struct InstrumentSheet: View {
     /// already owns the export file's share sheet, and SwiftUI is more
     /// reliable with one sheet per view.
     @State private var vetbookCardOpen = false
+    /// D4: rows of three collapse to one column at the accessibility sizes.
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         ScrollView {
@@ -119,7 +121,7 @@ struct InstrumentSheet: View {
     private var lifeRecord: some View {
         VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.lifeRecord, detail: nil)
-            HStack(spacing: DuckSpace.sm) {
+            DuckAdaptiveRow(spacing: DuckSpace.sm, verticalAlignment: .top) {
                 lifeStat("\(Int(controller.vetbookMetres.rounded())) m", Copy.walked)
                 lifeStat("\(controller.vetbookRolls)", Copy.rolls)
                 lifeStat("\(controller.vetbookPickups)", Copy.pickups)
@@ -208,8 +210,7 @@ struct InstrumentSheet: View {
                             Text(quest.title)
                                 .font(.duckCaption)
                                 .foregroundStyle(.white.opacity(0.85))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             Text(quest.done ? Copy.questDone : "\(Int(quest.progress * 100))%")
                                 .font(.duckMicro)
@@ -235,7 +236,7 @@ struct InstrumentSheet: View {
     private var careCard: some View {
         VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.care, detail: controller.careAsleep ? Copy.dozing : nil)
-            HStack(alignment: .top, spacing: DuckSpace.md) {
+            DuckAdaptiveRow(spacing: DuckSpace.md, verticalAlignment: .top) {
                 careBar(
                     Copy.fullness,
                     value: 1 - controller.careHunger,
@@ -280,8 +281,7 @@ struct InstrumentSheet: View {
                 Text(Copy.nightQuiet(nightMinutes))
                     .font(.duckCaption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("night-quiet")
                 Spacer()
                 nightChip(Copy.goodMorning, icon: "sun.max.fill", id: "night-wake") {
@@ -313,8 +313,7 @@ struct InstrumentSheet: View {
                     .font(DuckIcon.xs)
                 Text(title)
                     .font(.duckCaption.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, DuckSpace.md)
             .frame(minHeight: 44)
@@ -366,32 +365,66 @@ struct InstrumentSheet: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(Copy.thisDuck)
-                .accessibilityIdentifier("sheet-title")
-                .font(.duckTitle.weight(.semibold))
-            Spacer()
-            Button(Copy.language.rawValue) {
-                Copy.language = Copy.language == .english ? .chinese : .english
-                languageTick &+= 1
+        Group {
+            if typeSize.duckIsAccessibility {
+                VStack(alignment: .leading, spacing: DuckSpace.sm) {
+                    HStack(alignment: .firstTextBaseline) {
+                        titleText
+                        Spacer(minLength: DuckSpace.sm)
+                        closeButton
+                    }
+                    HStack(spacing: DuckSpace.sm) {
+                        languageButton
+                        sheetLabel
+                        Spacer(minLength: 0)
+                    }
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    titleText
+                    Spacer()
+                    languageButton
+                    sheetLabel
+                    closeButton
+                }
             }
-            .font(.duckCaption)
-            .buttonStyle(.bordered)
-            Text(controller.label)
-                .font(.duckData)
-                .foregroundStyle(.secondary)
-                .accessibilityIdentifier("sheet-label")
-            // A deterministic dismissal: the UI test used to swipe the sheet
-            // down, which in a portrait medium detent scrolls instead.
-            Button {
-                dismiss()
-            } label: {
-                DuckCloseGlyph()
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Copy.close)
-            .accessibilityIdentifier("sheet-close")
         }
+    }
+
+    private var titleText: some View {
+        Text(Copy.thisDuck)
+            .accessibilityIdentifier("sheet-title")
+            .font(.duckTitle.weight(.semibold))
+            .duckSheetFirstFocus()
+    }
+
+    private var languageButton: some View {
+        Button(Copy.language.rawValue) {
+            Copy.language = Copy.language == .english ? .chinese : .english
+            languageTick &+= 1
+        }
+        .font(.duckCaption)
+        .buttonStyle(.bordered)
+    }
+
+    private var sheetLabel: some View {
+        Text(controller.label)
+            .font(.duckData)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("sheet-label")
+    }
+
+    private var closeButton: some View {
+        // A deterministic dismissal: the UI test used to swipe the sheet
+        // down, which in a portrait medium detent scrolls instead.
+        Button {
+            dismiss()
+        } label: {
+            DuckCloseGlyph()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Copy.close)
+        .accessibilityIdentifier("sheet-close")
     }
 
     // MARK: - Time machine
@@ -430,7 +463,7 @@ struct InstrumentSheet: View {
                 .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: DuckSpace.sm) {
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
                 timeButton(
                     controller.paused ? "play.fill" : "pause.fill",
                     controller.paused ? Copy.resume : Copy.freeze
@@ -499,21 +532,38 @@ struct InstrumentSheet: View {
             row(Copy.trunkZ, String(format: "%.4f m", controller.trunk.z))
             row(Copy.gravityZ, String(format: "%.4f", controller.gravity.z))
             row(Copy.branches, "\(controller.branchCount)")
-            HStack {
-                Text(Copy.drive)
-                    .font(.duckCaption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Picker(Copy.drive, selection: Binding(
-                    get: { controller.driveMode },
-                    set: { controller.setMode($0) }
-                )) {
-                    Text(Copy.walk).tag("walk")
-                    Text(Copy.roller).tag("roller")
+            if typeSize.duckIsAccessibility {
+                VStack(alignment: .leading, spacing: DuckSpace.xs) {
+                    Text(Copy.drive)
+                        .font(.duckCaption)
+                        .foregroundStyle(.secondary)
+                    Picker(Copy.drive, selection: Binding(
+                        get: { controller.driveMode },
+                        set: { controller.setMode($0) }
+                    )) {
+                        Text(Copy.walk).tag("walk")
+                        Text(Copy.roller).tag("roller")
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("drive-mode")
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 150)
-                .accessibilityIdentifier("drive-mode")
+            } else {
+                HStack {
+                    Text(Copy.drive)
+                        .font(.duckCaption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker(Copy.drive, selection: Binding(
+                        get: { controller.driveMode },
+                        set: { controller.setMode($0) }
+                    )) {
+                        Text(Copy.walk).tag("walk")
+                        Text(Copy.roller).tag("roller")
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 150)
+                    .accessibilityIdentifier("drive-mode")
+                }
             }
             row(Copy.imu, controller.imuReady ? Copy.yes : Copy.no)
             row(Copy.held, controller.pickedUp ? Copy.yes : Copy.no)
@@ -720,8 +770,8 @@ struct InstrumentSheet: View {
                 Spacer()
                 Text(controller.heardText.isEmpty ? "—" : controller.heardText)
                     .font(.duckData)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(.trailing)
             }
         }
         .padding(DuckSpace.md)
@@ -780,26 +830,52 @@ struct InstrumentSheet: View {
     // MARK: - Pieces
 
     private func sectionTitle(_ title: String, detail: String?) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .font(.duckLabel.weight(.semibold))
-            Spacer()
-            if let detail {
-                Text(detail)
-                    .font(.duckMicro)
-                    .foregroundStyle(.secondary)
+        Group {
+            if typeSize.duckIsAccessibility {
+                VStack(alignment: .leading, spacing: DuckSpace.xxs) {
+                    Text(title)
+                        .font(.duckLabel.weight(.semibold))
+                    if let detail {
+                        Text(detail)
+                            .font(.duckMicro)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.duckLabel.weight(.semibold))
+                    Spacer()
+                    if let detail {
+                        Text(detail)
+                            .font(.duckMicro)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }
 
-    private func row(_ key: String, _ value: String) -> some View {
-        HStack {
-            Text(key)
-                .font(.duckCaption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.duckData)
+    @ViewBuilder private func row(_ key: String, _ value: String) -> some View {
+        if typeSize.duckIsAccessibility {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
+                Text(key)
+                    .font(.duckCaption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.duckData)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack {
+                Text(key)
+                    .font(.duckCaption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(value)
+                    .font(.duckData)
+            }
         }
     }
 }

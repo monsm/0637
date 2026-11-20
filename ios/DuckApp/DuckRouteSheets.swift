@@ -15,6 +15,9 @@ struct DuckRouteSheets: View {
     @Binding var languageTick: Int
     let photo: DuckController.CapturedPhoto?
     let onDanceStep: (DanceStep) -> Void
+    /// A surface switch underneath the sheet (postcards' empty state opens
+    /// Director, where the next real frame is captured).
+    var onOpenDirector: (() -> Void)? = nil
     /// A row inside the drawer or the instrument opens its page on top of the
     /// current sheet. Nesting is the behaviour the old UI tests pin (AI closes
     /// back to the instrument), so one vocabulary keeps the presentation
@@ -31,7 +34,8 @@ struct DuckRouteSheets: View {
                     stickMode: $stickMode,
                     languageTick: $languageTick,
                     photo: photo,
-                    onDanceStep: onDanceStep
+                    onDanceStep: onDanceStep,
+                    onOpenDirector: onOpenDirector
                 )
             }
     }
@@ -106,7 +110,10 @@ struct DuckRouteSheets: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         case .postcards:
-            PostcardShelfView(shelf: controller.postcards)
+            PostcardShelfView(
+                shelf: controller.postcards,
+                onOpenDirector: onOpenDirector
+            )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         case .dex:

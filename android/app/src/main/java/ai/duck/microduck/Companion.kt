@@ -293,6 +293,26 @@ internal fun importRulesFromClip(
 }
 
 /**
+ * The clipboard half of [importRulesFromClip]: the rules sheet's empty state
+ * and its paste chip share this one action.
+ */
+internal fun pasteRulesFromClip(
+    context: Context,
+    current: List<RuleUi>,
+    loaded: Boolean,
+    onApply: (List<RuleUi>) -> Unit,
+) {
+    val clip = (context.getSystemService(Context.CLIPBOARD_SERVICE)
+        as? android.content.ClipboardManager)
+        ?.primaryClip
+        ?.takeIf { it.itemCount > 0 }
+        ?.getItemAt(0)
+        ?.coerceToText(context)
+        ?.toString()
+    importRulesFromClip(context, clip, current, loaded, onApply)
+}
+
+/**
  * Merge an imported program into the child's own: an identical rule (the
  * same trigger, action and value) is not duplicated, the eight-block budget
  * is kept, and everything the child already had survives.

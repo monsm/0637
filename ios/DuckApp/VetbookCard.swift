@@ -260,6 +260,7 @@ struct VetbookCardSheet: View {
                 Text(Copy.vetbookCardShare)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("vetbook-card-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button {
                     dismiss()

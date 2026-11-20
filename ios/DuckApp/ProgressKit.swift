@@ -420,6 +420,7 @@ struct ProgressSheet: View {
     var controller: DuckController? = nil
     @ObservedObject private var store = ProgressStore.shared
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(controller: DuckController? = nil) {
         self.controller = controller
@@ -477,6 +478,7 @@ struct ProgressSheet: View {
                 .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(Color.duckTextPrimary)
                 .accessibilityIdentifier("progress-title")
+                .duckSheetFirstFocus()
             Spacer()
             Button { dismiss() } label: {
                 DuckCloseGlyph()
@@ -607,7 +609,9 @@ struct ProgressSheet: View {
     private var achievementSection: some View {
         VStack(alignment: .leading, spacing: DuckSpace.md) {
             sectionTitle("成就墙 · \(store.unlockedIDs.count)/\(Achievement.catalog.count)")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: DuckSpace.md), GridItem(.flexible(), spacing: DuckSpace.md)],
+            LazyVGrid(columns: typeSize.duckIsAccessibility
+                      ? [GridItem(.flexible(), spacing: DuckSpace.md)]
+                      : [GridItem(.flexible(), spacing: DuckSpace.md), GridItem(.flexible(), spacing: DuckSpace.md)],
                       spacing: DuckSpace.md) {
                 ForEach(Achievement.catalog) { achievement in
                     achievementCard(achievement)
@@ -631,8 +635,7 @@ struct ProgressSheet: View {
                 Text(achievement.name)
                     .font(.duckLabel.weight(.semibold))
                     .foregroundStyle(unlocked ? Color.duckTextPrimary : Color.duckTextPrimary.opacity(0.5))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
                 if unlocked, let date = store.unlockDates[achievement.id] {
                     Text("\(Self.unlockLabel(date))解锁")
                         .font(.duckCaption.weight(.medium))

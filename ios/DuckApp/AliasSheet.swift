@@ -221,6 +221,7 @@ enum AliasTargets {
 struct AliasSheet: View {
     @ObservedObject var controller: DuckController
     private let store: VoiceAliasStore
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     /// The table being edited. The saved table is the core's; this draft
     /// exists until the person presses Save.
@@ -302,6 +303,7 @@ struct AliasSheet: View {
             Text(Copy.aliasTitle)
                 .font(.duckTitle.weight(.semibold))
                 .accessibilityIdentifier("alias-title")
+                .duckSheetFirstFocus()
             Spacer()
             SheetCloseButton(identifier: "alias-close")
         }
@@ -325,41 +327,65 @@ struct AliasSheet: View {
 
     /// One learned pair. The target is the official label, not the wire
     /// spelling; an unknown manifest skill keeps its real name.
-    private func row(_ phrase: String, target: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
-            Text(phrase)
-                .font(.duckBody.weight(.medium))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-            Image(systemName: "arrow.right")
-                .font(DuckIcon.xs)
-                .foregroundStyle(.tertiary)
-            Text(SkillLabel.of(target))
-                .font(.duckBody)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Spacer(minLength: DuckSpace.sm)
-            Button {
-                draft.removeValue(forKey: phrase)
-                saved = false
-                error = ""
-            } label: {
-                Image(systemName: "trash")
-                    .font(DuckIcon.xs)
+    @ViewBuilder private func row(_ phrase: String, target: String) -> some View {
+        if typeSize.duckIsAccessibility {
+            VStack(alignment: .leading, spacing: DuckSpace.xs) {
+                Text(phrase)
+                    .font(.duckBody.weight(.medium))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(SkillLabel.of(target))
+                    .font(.duckBody)
                     .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    deleteButton(phrase)
+                }
             }
-            .buttonStyle(.plain)
-            // The dictionaries already own the one word for this action;
-            // a new Copy key would break key parity with Android.
-            .accessibilityLabel(Copy.deleteRule)
-            .accessibilityIdentifier("alias-delete-\(phrase)")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("alias-row-\(phrase)")
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: DuckSpace.sm) {
+                Text(phrase)
+                    .font(.duckBody.weight(.medium))
+                    .foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "arrow.right")
+                    .font(DuckIcon.xs)
+                    .foregroundStyle(.tertiary)
+                Text(SkillLabel.of(target))
+                    .font(.duckBody)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: DuckSpace.sm)
+                deleteButton(phrase)
+            }
+            .frame(minHeight: 44)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("alias-row-\(phrase)")
         }
-        .frame(minHeight: 44)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("alias-row-\(phrase)")
+    }
+
+    private func deleteButton(_ phrase: String) -> some View {
+        Button {
+            draft.removeValue(forKey: phrase)
+            saved = false
+            error = ""
+        } label: {
+            Image(systemName: "trash")
+                .font(DuckIcon.xs)
+                .foregroundStyle(.secondary)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // The dictionaries already own the one word for this action;
+        // a new Copy key would break key parity with Android.
+        .accessibilityLabel(Copy.deleteRule)
+        .accessibilityIdentifier("alias-delete-\(phrase)")
     }
 
     private var addRow: some View {

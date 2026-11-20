@@ -46,7 +46,7 @@ fun DexSheet(entries: List<DexEntryUi>, onClose: () -> Unit) {
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("dex-title"),
+                        .testTag("dex-title").duckSheetFirstFocus(),
                 )
                 CloseChip("dex-close", onClose)
             }

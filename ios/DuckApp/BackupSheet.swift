@@ -19,6 +19,7 @@ struct BackupSheet: View {
                 Text(Copy.backup)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("backup-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button {
                     dismiss()

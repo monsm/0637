@@ -18,6 +18,7 @@ struct DuckEmptyState: View {
                 .font(.duckBody)
                 .foregroundStyle(Color.duckTextPrimary)
                 .multilineTextAlignment(.center)
+                .accessibilityIdentifier(identifier)
             if let note {
                 Text(note)
                     .font(.duckCaption)
@@ -30,8 +31,9 @@ struct DuckEmptyState: View {
         }
         .padding(DuckSpace.xl)
         .frame(maxWidth: .infinity)
-        .accessibilityIdentifier(identifier)
-        .accessibilityElement(children: .combine)
+        // Contain, not combine: the action must stay its own VoiceOver
+        // element, exactly like DuckErrorCard's retry.
+        .accessibilityElement(children: .contain)
     }
 }
 

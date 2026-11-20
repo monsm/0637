@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -137,7 +137,7 @@ fun DiarySheet(onClose: () -> Unit) {
                     fontSize = DuckTheme.Type.Title,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("diary-title"),
+                        .testTag("diary-title").duckSheetFirstFocus(),
                 )
                 val shareText = if (modelText.isNotEmpty()) modelText else lines.joinToString("\n")
                 if (shareText.isNotEmpty()) {
@@ -174,9 +174,14 @@ fun DiarySheet(onClose: () -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
             if (lines.isEmpty()) {
-                Text(Copy.diaryEmpty, color = Color.White.copy(alpha = 0.6f), fontSize = DuckTheme.Type.Caption)
+                DuckEmptyState(
+                    title = Copy.diaryEmpty,
+                    actionTitle = Copy.emptyPlayAction,
+                    onAction = onClose,
+                    testTag = "diary-empty",
+                )
             } else {
-                LazyColumn(Modifier.height(160.dp)) {
+                LazyColumn(Modifier.heightIn(min = 120.dp, max = 260.dp)) {
                     items(lines) { line ->
                         Text(
                             "· $line",

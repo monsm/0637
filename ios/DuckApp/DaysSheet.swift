@@ -186,6 +186,8 @@ struct DaysBoard: Equatable {
 /// shows no zeros. The share button hands the whole board, as plain text,
 /// to the existing ShareSheet — nothing leaves the phone on its own.
 struct DaysSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     /// The parsed board. Nil before the core answers; `failed` says the
     /// answer never came or was unreadable, so the sheet never mistakes an
     /// offline core for a duck with no days.
@@ -225,6 +227,7 @@ struct DaysSheet: View {
                 .font(.duckTitle.weight(.semibold))
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("days-title")
+                .duckSheetFirstFocus()
             Spacer()
             SheetCloseButton(identifier: "days-close")
         }
@@ -273,14 +276,26 @@ struct DaysSheet: View {
                 .foregroundStyle(.white)
                 .accessibilityIdentifier("days-week")
             ForEach(week.lines) { line in
-                HStack {
-                    Text(line.label)
-                        .font(.duckCaption)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(line.value)
-                        .font(.duckCaption.weight(.semibold))
-                        .foregroundStyle(.white)
+                if typeSize.duckIsAccessibility {
+                    VStack(alignment: .leading, spacing: DuckSpace.xxs) {
+                        Text(line.label)
+                            .font(.duckCaption)
+                            .foregroundStyle(.secondary)
+                        Text(line.value)
+                            .font(.duckCaption.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    HStack {
+                        Text(line.label)
+                            .font(.duckCaption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(line.value)
+                            .font(.duckCaption.weight(.semibold))
+                            .foregroundStyle(.white)
+                    }
                 }
             }
         }
@@ -300,8 +315,7 @@ struct DaysSheet: View {
             Text(day.summary)
                 .font(.duckCaption)
                 .foregroundStyle(.secondary)
-                .lineLimit(3)
-                .minimumScaleFactor(0.8)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, DuckSpace.xs)
@@ -309,13 +323,14 @@ struct DaysSheet: View {
         .accessibilityIdentifier("days-row-\(day.day)")
     }
 
-    /// No finished day and no today: one true sentence, no zero table.
+    /// No finished day and no today: one true sentence, one real way out.
     private var empty: some View {
-        Text(Copy.daysEmpty)
-            .font(.duckBody)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .accessibilityIdentifier("days-empty")
+        DuckEmptyState(
+            title: Copy.daysEmpty,
+            actionTitle: Copy.emptyPlayAction,
+            action: { dismiss() },
+            identifier: "days-empty-state"
+        )
     }
 
     /// Read the board from the core's own local API. The sheet refreshes on

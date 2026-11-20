@@ -40,7 +40,7 @@ struct DuckButton: View {
                 if style != .icon {
                     Text(title)
                         .font(.duckLabel.weight(.medium))
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .padding(.horizontal, style == .icon ? DuckSpace.xs : DuckSpace.md)
@@ -93,7 +93,7 @@ struct DuckChip: View {
                 }
                 Text(title)
                     .font(.duckLabel.weight(.medium))
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, DuckSpace.md)
             .frame(minHeight: 48)

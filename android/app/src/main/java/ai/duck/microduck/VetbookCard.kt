@@ -331,7 +331,7 @@ internal fun VetbookCardDialog(onClose: () -> Unit) {
                     fontSize = DuckTheme.Type.Body,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("vetbook-title"),
+                        .testTag("vetbook-title").duckSheetFirstFocus(),
                 )
                 CloseChip("vetbook-close", onClose)
             }

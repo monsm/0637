@@ -219,7 +219,7 @@ internal fun VoiceChatSection(config: AIConfig) {
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f).testTag("chat-title"),
+                modifier = Modifier.weight(1f).testTag("chat-title").duckSheetFirstFocus(),
             )
             ButtonChip(Copy.heard, "chat-heard") {
                 scope.launch {

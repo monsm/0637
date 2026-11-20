@@ -40,6 +40,7 @@ struct DuckSheetHeader: View {
                 .font(.duckTitle)
                 .foregroundStyle(.white)
                 .accessibilityIdentifier(identifier)
+                .duckSheetFirstFocus()
             Spacer(minLength: DuckSpace.sm)
             DuckCloseControl(identifier: closeIdentifier, action: onClose)
         }

@@ -44,7 +44,7 @@ struct PhotoPreviewSheet: View {
                 Text(caption)
                     .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.75))
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("postcard-caption")
             }
             // The family credit: the ducks that were REALLY in the room when
@@ -55,7 +55,7 @@ struct PhotoPreviewSheet: View {
                 Text(Copy.photoFamily(controller.peers.filter(\.paired).map(\.name)))
                     .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.6))
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("photo-family")
             }
             HStack(spacing: DuckSpace.md) {

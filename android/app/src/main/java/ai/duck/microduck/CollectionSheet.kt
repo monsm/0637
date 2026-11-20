@@ -207,12 +207,25 @@ fun CollectionSheet(onClose: () -> Unit) {
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("collection-title"),
+                        .testTag("collection-title").duckSheetFirstFocus(),
                 )
                 CloseChip("collection-close", onClose)
             }
             val ui = data
-            if (ui != null) {
+            if (ui != null && ui.emotions.isEmpty() && ui.skills.isEmpty()) {
+                DuckEmptyState(
+                    title = Copy.collectionEmpty,
+                    actionTitle = Copy.emptyCollectionAction,
+                    onAction = {
+                        postDuckCommand("/skill", JSONObject().put("name", "curious").toString())
+                        scope.launch {
+                            delay(1200)
+                            reload += 1
+                        }
+                    },
+                    testTag = "collection-empty",
+                )
+            } else if (ui != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.md)) {
                     Text(
                         "${Copy.collectionMoods} ${ui.moodsUnlocked}/${ui.moodsTotal}",

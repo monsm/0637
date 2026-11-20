@@ -15,6 +15,7 @@ struct ABSheet: View {
                 Text(Copy.abTry)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("ab-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button {
                     dismiss()

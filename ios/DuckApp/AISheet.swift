@@ -79,6 +79,7 @@ final class ChatStore: ObservableObject {
 struct AISheet: View {
     @ObservedObject var controller: DuckController
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var enabled = false
     @State private var endpoint = ""
     @State private var model = ""
@@ -105,6 +106,7 @@ struct AISheet: View {
                 Text(Copy.ai)
                     .font(.duckTitle.weight(.semibold))
                     .accessibilityIdentifier("ai-title")
+                    .duckSheetFirstFocus()
                 Spacer()
                 Button {
                     dismiss()
@@ -209,20 +211,16 @@ struct AISheet: View {
                 .font(.duckBody.weight(.semibold))
                 .accessibilityIdentifier("chat-title")
 
-            HStack(spacing: DuckSpace.sm) {
-                TextField(Copy.chatHint, text: $composer.draft)
-                    .textFieldStyle(.roundedBorder)
-                    .autocorrectionDisabled()
-                    .submitLabel(.send)
-                    .onSubmit { sendChat() }
-                    .accessibilityIdentifier("chat-input")
-                Button(Copy.chatSend) {
-                    sendChat()
+            if typeSize.duckIsAccessibility {
+                VStack(alignment: .leading, spacing: DuckSpace.sm) {
+                    chatInput
+                    chatSendButton
                 }
-                .buttonStyle(.borderedProminent)
-                .frame(minHeight: 44)
-                .disabled(!canSend)
-                .accessibilityIdentifier("chat-send")
+            } else {
+                HStack(spacing: DuckSpace.sm) {
+                    chatInput
+                    chatSendButton
+                }
             }
 
             if !controller.heardText.isEmpty {
@@ -231,7 +229,7 @@ struct AISheet: View {
                 }
                 .font(.duckCaption)
                 .buttonStyle(.bordered)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("chat-heard")
             }
 
@@ -284,6 +282,27 @@ struct AISheet: View {
     /// Save what is on screen, take the draft (which clears the field), then
     /// ask. Saving first means a typed endpoint works without a separate tap
     /// on Save, exactly like "Think now".
+    /// One question, one plain-text answer. Extracted so the input and its
+    /// send can stack at accessibility sizes without duplicating behaviour.
+    private var chatInput: some View {
+        TextField(Copy.chatHint, text: $composer.draft)
+            .textFieldStyle(.roundedBorder)
+            .autocorrectionDisabled()
+            .submitLabel(.send)
+            .onSubmit { sendChat() }
+            .accessibilityIdentifier("chat-input")
+    }
+
+    private var chatSendButton: some View {
+        Button(Copy.chatSend) {
+            sendChat()
+        }
+        .buttonStyle(.borderedProminent)
+        .frame(minHeight: 44)
+        .disabled(!canSend)
+        .accessibilityIdentifier("chat-send")
+    }
+
     private func sendChat() {
         guard canSend, let question = composer.take() else { return }
         controller.saveAIConfig(config())
