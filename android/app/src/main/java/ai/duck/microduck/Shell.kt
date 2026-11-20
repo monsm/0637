@@ -82,6 +82,7 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -137,6 +138,7 @@ fun Shell(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val hapticView = LocalView.current
     // The pet-sound stream is only enabled when the official classifier was
     // actually staged (AssetStager copies assets/pet-detect before the core
     // exists). No model, no PCM frames: the mic stays the RMS room only.
@@ -304,6 +306,10 @@ fun Shell(
     }
     // Flipping this re-renders every Copy string in the shell.
     var languageTick by remember { mutableStateOf(0) }
+
+    // The haptic map (D3): the mode flip; first composition stays silent.
+    var hapticArmed by remember { mutableStateOf(false) }
+    LaunchedEffect(stick) { if (hapticArmed) DuckHaptics.selection(hapticView); hapticArmed = true }
 
     // One flip for both entries (the landscape menu and the duck panel):
     // persisted like iOS's UserDefaults setter, because a process death
@@ -481,6 +487,7 @@ fun Shell(
             // not the final count — is what says "finished".
             if (!pathNow.active && pathActive && !pathCancelRequested) {
                 soundLine = Copy.pathDone
+                DuckHaptics.success(hapticView)
             }
             if (!pathNow.active) pathCancelRequested = false
             pathProgress = pathNow.reached to pathNow.total
@@ -742,6 +749,7 @@ fun Shell(
                         quack = quack,
                         onFeed = {
                             dance.record("feed", label = Copy.feed)
+                            DuckHaptics.medium(hapticView)
                             onFeed?.invoke()
                         },
                         onWheee = onWheee,
@@ -2870,6 +2878,7 @@ private fun SkillHeading(label: String) {
 
 @Composable
 private fun SkillChip(name: String, onPick: (String) -> Unit) {
+    val hapticView = LocalView.current
     Box(
         Modifier
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
@@ -2879,7 +2888,10 @@ private fun SkillChip(name: String, onPick: (String) -> Unit) {
                 indication = null,
                 onClickLabel = skillLabel(name),
                 role = Role.Button,
-            ) { onPick(name) }
+            ) {
+                DuckHaptics.selection(hapticView)
+                onPick(name)
+            }
             .testTag("ring-$name")
             .padding(horizontal = DuckTheme.Space.lg, vertical = DuckTheme.Space.sm),
         contentAlignment = Alignment.Center,

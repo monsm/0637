@@ -82,7 +82,7 @@ struct InstrumentSheet: View {
                 // the export file already lives on the scroll view, and
                 // SwiftUI is more reliable with one sheet per view.
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { showDetails.toggle() }
+                    withDuckMotion(DuckMotion.quick) { showDetails.toggle() }
                 } label: {
                     Label(
                         showDetails ? Copy.showLess : Copy.showMore,

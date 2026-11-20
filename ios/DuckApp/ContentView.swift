@@ -147,20 +147,20 @@ struct ContentView: View {
         }
         .onChange(of: controller.awaySummary) { _, summary in
             guard let summary, !summary.isEmpty else { return }
-            withAnimation(.easeIn(duration: 0.2)) { moodText = summary }
+            withDuckMotion(DuckMotion.base) { moodText = summary }
             DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
                 guard moodText == summary else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // A clap or a whistle is answered visibly as well as audibly: the
         // same pill the away recap uses, for a shorter spell.
         .onChange(of: controller.roomSound) { _, sound in
             guard let sound, !sound.isEmpty else { return }
-            withAnimation(.easeIn(duration: 0.2)) { moodText = sound }
+            withDuckMotion(DuckMotion.base) { moodText = sound }
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 guard moodText == sound else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // What the duck heard you say, for a moment: without this, a spoken
@@ -168,38 +168,38 @@ struct ContentView: View {
         // screen said nothing, which reads as a deaf duck.
         .onChange(of: controller.heardText) { _, text in
             guard !text.isEmpty else { return }
-            withAnimation(.easeIn(duration: 0.2)) { moodText = text }
+            withDuckMotion(DuckMotion.base) { moodText = text }
             DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
                 guard moodText == text else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // A programmed block shows its work: "拍手 → 翻滚".
         .onChange(of: controller.ruleNotice) { _, notice in
             guard let notice, !notice.isEmpty else { return }
-            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            withDuckMotion(DuckMotion.base) { moodText = notice }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard moodText == notice else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // A greeting from the room next door, or the answer to ours.
         .onChange(of: controller.peerNotice) { _, notice in
             guard let notice, !notice.isEmpty else { return }
-            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            withDuckMotion(DuckMotion.base) { moodText = notice }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                 guard moodText == notice else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // A neighbour's gift — a treat or a cheer — in the same one-line
         // pill. The tick fires even when two gifts read the same.
         .onChange(of: controller.giftTick) { _, _ in
             guard let line = controller.giftLine, !line.isEmpty else { return }
-            withAnimation(.easeIn(duration: 0.2)) { moodText = line }
+            withDuckMotion(DuckMotion.base) { moodText = line }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard moodText == line else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         let withRoom = base
@@ -209,19 +209,19 @@ struct ContentView: View {
         .onChange(of: controller.chorusTick) { _, tick in
             guard tick > 0 else { return }
             let line = Copy.chorusLine(controller.chorusPeers)
-            withAnimation(.easeIn(duration: 0.2)) { moodText = line }
+            withDuckMotion(DuckMotion.base) { moodText = line }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                 guard moodText == line else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // The model's own line, when it decides something.
         .onChange(of: controller.aiDecision) { _, decision in
             guard !decision.isEmpty else { return }
-            withAnimation(.easeIn(duration: 0.2)) { moodText = decision }
+            withDuckMotion(DuckMotion.base) { moodText = decision }
             DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
                 guard moodText == decision else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // A painted route that ran its whole course gets the same pill the
@@ -229,10 +229,10 @@ struct ContentView: View {
         .onChange(of: controller.pathDoneTick) { _, tick in
             guard tick > 0 else { return }
             let notice = Copy.pathDone
-            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            withDuckMotion(DuckMotion.base) { moodText = notice }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard moodText == notice else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // The morning after a chosen night: the same one-line pill, saying
@@ -242,10 +242,10 @@ struct ContentView: View {
         .onChange(of: controller.nightWakeTick) { _, tick in
             guard tick > 0 else { return }
             let notice = Copy.goodMorningLine(controller.nightWakeMinutes)
-            withAnimation(.easeIn(duration: 0.2)) { moodText = notice }
+            withDuckMotion(DuckMotion.base) { moodText = notice }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard moodText == notice else { return }
-                withAnimation(.easeOut(duration: 0.5)) { moodText = nil }
+                withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
         }
         // The accepted walk renders from /state.path; the drawn draft has
@@ -255,6 +255,10 @@ struct ContentView: View {
                 pathDraft.removeAll()
             }
         }
+        // The haptic map (D3): real edges only, nothing on polling.
+        .onChange(of: controller.pathDoneTick) { _, tick in if tick > 0 { DuckHaptics.success() } }
+        .onChange(of: controller.fallen) { _, fell in if fell { DuckHaptics.error() } }
+        .onChange(of: stickMode) { _, _ in DuckHaptics.selection() }
         return withRoom
         .task {
             if controller.ready {
@@ -489,6 +493,7 @@ struct ContentView: View {
                         bottomAnchored: portrait
                     ) { name in
                         controller.trigger(name)
+                        DuckHaptics.selection()
                         setRing(false)
                     } onClose: {
                         setRing(false)
@@ -529,9 +534,9 @@ struct ContentView: View {
     private func presentHint() {
         guard !hintShown else { return }
         hintShown = true
-        withAnimation(.easeIn(duration: 0.25)) { showHint = true }
+        withDuckMotion(DuckMotion.base) { showHint = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
-            withAnimation(.easeOut(duration: 0.6)) { showHint = false }
+            withDuckMotion(DuckMotion.slow) { showHint = false }
         }
     }
 
@@ -731,7 +736,8 @@ struct ContentView: View {
     /// cannot drift apart.
     private var thumbDeck: some View {
         HStack(spacing: DuckSpace.sm) {
-            primaryButton("duck-feed", Copy.feed, Icons.feed) { controller.feed() }
+            primaryButton("duck-feed", Copy.feed, Icons.feed) { controller.feed()
+                DuckHaptics.medium() }
             primaryButton("duck-skills", Copy.skills, Icons.skills) { setRing(true) }
             primaryButton("duck-quack", Copy.quack, Icons.quack) { quackTapped() }
                 .simultaneousGesture(wheeeGesture)
@@ -816,9 +822,10 @@ struct ContentView: View {
     }
 
     private func toggleSurface() {
-        withAnimation(.snappy(duration: 0.2)) {
+        withDuckMotion(DuckMotion.quick) {
             surface = surface == .live ? .director : .live
         }
+        DuckHaptics.selection()
     }
 
     /// Tap = chirp, hold 0.3 s = the official wheee ride. Shared by the
@@ -921,7 +928,7 @@ struct ContentView: View {
                         && gesture.location.y < size.height * 0.68
                     if insideDuck {
                         controller.pet()
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        DuckHaptics.pet()
                     } else if stickMode == .drive {
                         let dx = gesture.location.x - size.width * 0.5
                         let dy = gesture.location.y - size.height * 0.5
@@ -1197,7 +1204,7 @@ struct ContentView: View {
             // time rail, inside the thumb's arc.
             if showSurface {
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) {
+                    withDuckMotion(DuckMotion.quick) {
                         surface = surface == .live ? .director : .live
                     }
                 } label: {

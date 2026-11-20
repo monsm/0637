@@ -19,6 +19,10 @@
     "count": 0,
     "direction": "max"
   },
+  "android_inline_motion": {
+    "count": 0,
+    "direction": "max"
+  },
   "android_modal_bools": {
     "count": 0,
     "direction": "max"
@@ -28,7 +32,7 @@
     "direction": "max"
   },
   "android_press_no_feedback": {
-    "count": 13,
+    "count": 12,
     "direction": "max"
   },
   "android_radius_literals": {
@@ -40,15 +44,19 @@
     "direction": "min"
   },
   "content_view_lines": {
-    "count": 1771,
+    "count": 1770,
     "direction": "max"
   },
   "controller_published": {
     "count": 107,
     "direction": "max"
   },
+  "haptics_sites": {
+    "count": 11,
+    "direction": "min"
+  },
   "ios_close_button_files": {
-    "count": 16,
+    "count": 1,
     "direction": "max"
   },
   "ios_color_literals": {
@@ -60,6 +68,10 @@
     "direction": "max"
   },
   "ios_font_literals": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_inline_motion": {
     "count": 0,
     "direction": "max"
   },
@@ -76,11 +88,11 @@
     "direction": "max"
   },
   "ios_reduce_motion": {
-    "count": 1,
+    "count": 3,
     "direction": "min"
   },
   "shell_kt_lines": {
-    "count": 3763,
+    "count": 3772,
     "direction": "max"
   }
 }
