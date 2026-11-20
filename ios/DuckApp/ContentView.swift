@@ -145,6 +145,13 @@ struct ContentView: View {
                 }
             }
         }
+        // D4: every event pill is announced too — the same words the eye
+        // gets, through one hook instead of eighteen call sites.
+        .onChange(of: moodText) { _, text in
+            if let text, !text.isEmpty {
+                UIAccessibility.post(notification: .announcement, argument: text)
+            }
+        }
         .onChange(of: controller.awaySummary) { _, summary in
             guard let summary, !summary.isEmpty else { return }
             withDuckMotion(DuckMotion.base) { moodText = summary }
@@ -458,6 +465,16 @@ struct ContentView: View {
                 // presses on a device.
                 scene
                     .contentShape(Rectangle())
+                    // D4: the stage is one accessible element with the four
+                    // actions a VoiceOver user needs to drive the duck.
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(Copy.duckStage)
+                    .accessibilityCustomActions([
+                        .init(name: Copy.walkStep) { pulseDrive(0, -0.6); return true },
+                        .init(name: Copy.turnLeft) { pulseDrive(-0.6, 0); return true },
+                        .init(name: Copy.turnRight) { pulseDrive(0.6, 0); return true },
+                        .init(name: Copy.petIt) { controller.pet(); DuckHaptics.pet(); return true },
+                    ])
                     // Both gestures stay installed; the mask picks the one
                     // for this composition. A ternary of AnyGesture erased
                     // two different `some Gesture` types and failed to infer.
@@ -529,6 +546,19 @@ struct ContentView: View {
                         .zIndex(4)
                 }
             }
+    }
+
+    /// A 250 ms joystick pulse — the same nudge a tap sends, exposed as an
+    /// accessibility action. A newer touch owns the stick; this never fights
+    /// it (the token matches what was set).
+    private func pulseDrive(_ x: CGFloat, _ y: CGFloat) {
+        guard controller.ready else { return }
+        controller.joystick = CGPoint(x: x, y: y)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            if controller.joystick == CGPoint(x: x, y: y) {
+                controller.joystick = .zero
+            }
+        }
     }
 
     private func presentHint() {

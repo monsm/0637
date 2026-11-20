@@ -744,6 +744,21 @@ COMPANION 头脑风暴里仅剩未做的两项落地：
 - **验证**：组件门禁 + 八道静态门禁绿；Android compile + JVM 绿（`68c4a07`）；iOS 编译绿（`feba979`）；Contracts 绿（`feba979`）。
 - **下一波（接入）**：把组件用进高频面（抽屉行、sheet 头、按钮），每屏独立绿；DuckTheme.kt/MoreSheet.kt 归老板领地，接入时由老板侧合并。
 
+### 四之三十四、D2 接入波 + D3 动效/触感（2026-11-20）
+
+- **D2 接入波**（`030cadc`/`61f93e8`）：iOS 抽屉页的 14 处 `PageRow` 委托 `DuckListRow`，四模式选择器改 `DuckSegmented`；Android 抽屉 16 处 `MoreRow` 委托升级后的 `DuckListRow`（吸收 icon/badge/chevron）。调用点测试锚点保留。留痕：`030cadc` 首推红在入口台账锚点被换组件吞掉（`play-more-mode-`），`61f93e8` 以 `play-more-mode-stick` 恢复；该提交的 iOS「红」实为被后续提交取消，非编译失败。
+- **D3 动效与触感**（`4cde149`，四工作流全绿）：`DuckMotion` 四档（quick 0.15 / base 0.25 / slow 0.40 / deliberate spring）双端；28 处内联动效全部收口（内联动效棘轮 0/0）。减动效单点：iOS `withDuckMotion` 与按压反馈、Android 在属地处读 animator scale。触感地图 12 个真实事件点（摸/技能/模式/表面切换/喂/路径完成/摔倒），路径与摔倒只在真实边沿响，首帧静默。棘轮新增 `ios/android_inline_motion`（0, max）与 `haptics_sites`（12, min）；`shell_kt_lines` 因真实接线两度有意重定（3772→3816→3831）。
+
+### 四之三十五、D4–D7 收口（2026-11-20，合并推送，逐项记账）
+
+四批文件在 `Shell.kt` 等同一文件上重叠（a11y 与 perf 同文件），无法按主题干净分推；合并为一次推送，CI 对整棵树判绿，账目逐项如下：
+
+- **D4 无障碍**：舞台一元素 + 四自定义动作（向前走一步/左转/右转/摸摸它），两端走同一手势路径（250ms 摇杆脉冲，pet 走真实 /pet）；事件播报单点化——iOS 在 `moodText` 一处 `UIAccessibility.post`，Android 给事件 pill 加 `liveRegion`。新增 `scripts/check-contrast.py`：从两端主题文件现算 12 组 WCAG 组合（11 组 UI token + 品牌喙/画布），全过（最低 4.83:1），并断言两端同名 token 同值；已接三工作流。新增 Copy 键 5 个两端同推（358=358）。棘轮 a11y 下限升至 customActions 3 / announcements 2。
+- **D5 状态接入**：Android 失败卡 → `DuckErrorCard`（retry 锚点保留）、唤醒文案 → `DuckLoading`；`DuckErrorCard` 增 `retryTag` 并修正 iOS 语义为 `.contain`（重试保持独立 VoiceOver 元素）。各表面三态矩阵仍为遗留（见下）。
+- **D6 断点与平台差异契约**：`contracts/adaptive.json`（<600 / 600–899 / ≥900 三档，同一 IA）+ `contracts/platform-differences.json`（返回手势、sheet detent、Toast、触感 API、语言存储五条，逐条带理由）+ `scripts/check-ui-parity.py`（断言三档完整、每条差异非两端同文、两壳的 600 断点唯一）；三工作流已接。
+- **D7 性能可测**：Android 调试构建挂壳层重组计数器（每 5s `duck-perf` 日志），冒烟读末值并记录（首个数值随 CI 落盘，**先记录后设上限**，未伪装成预算）；仪表 30 控件列的 Lazy 化与 iOS 107 `@Published` 拆分风险过高，明确列为遗留。
+- **验证**：本地 Android compile + JVM 绿；十道静态门禁绿（含 contrast/parity 新门）；总纲 §2 基线表已刷新为施工后实测。
+
 ---
 
 ## 八、仓库与复现

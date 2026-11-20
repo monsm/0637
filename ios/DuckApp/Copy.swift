@@ -55,6 +55,13 @@ enum Copy {
     static var actions: String { pick("Actions", "动作") }
     static var emotions: String { pick("Emotions", "情绪") }
     static var close: String { pick("Close", "关闭") }
+
+    // D4: the stage's accessibility face — one label and four actions.
+    static var duckStage: String { pick("Duck stage", "鸭子舞台") }
+    static var walkStep: String { pick("Walk forward a step", "向前走一步") }
+    static var turnLeft: String { pick("Turn left", "左转") }
+    static var turnRight: String { pick("Turn right", "右转") }
+    static var petIt: String { pick("Pet the duck", "摸摸它") }
     static var couldNotStart: String { pick("MicroDuck could not start", "MicroDuck 无法启动") }
     /// The failure card's one action. Android's core loader can retry; the
     /// key lives on both sides so the dictionaries stay aligned.

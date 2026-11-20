@@ -64,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -84,6 +85,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -139,6 +144,20 @@ fun Shell(
 ) {
     val context = LocalContext.current
     val hapticView = LocalView.current
+    // D7: debug-only recomposition counter (recorded by the smoke). The
+    // debuggable flag stands in for BuildConfig, which AGP 8 no longer
+    // generates for this module.
+    val debuggable = (context.applicationInfo.flags and
+        android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    if (debuggable) {
+        SideEffect { DuckPerf.shellCompositions++ }
+        LaunchedEffect(Unit) {
+            while (true) {
+                kotlinx.coroutines.delay(5000)
+                android.util.Log.i("duck-perf", "recompose=${DuckPerf.shellCompositions}")
+            }
+        }
+    }
     // The pet-sound stream is only enabled when the official classifier was
     // actually staged (AssetStager copies assets/pet-detect before the core
     // exists). No model, no PCM frames: the mic stays the RMS room only.
@@ -157,6 +176,20 @@ fun Shell(
     fun open(route: DuckRoute) {
         routeState = ShellOverlayReducer.reduce(routeState, ShellRouteAction.Open(route))
     }
+    // D4: a 250 ms drive pulse — the same nudge a tap sends, exposed as an
+    // accessibility action; it never fights a live touch (it only zeroes the
+    // stick it set).
+    fun pulseDrive(target: DuckInput, vx: Double, wz: Double) {
+        target.vx = vx
+        target.wz = wz
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (target.vx == vx && target.wz == wz) {
+                target.vx = 0.0
+                target.wz = 0.0
+            }
+        }, 250)
+    }
+
     fun closeSheet() {
         routeState = ShellOverlayReducer.reduce(routeState, ShellRouteAction.CloseSheet)
     }
@@ -636,7 +669,30 @@ fun Shell(
                                     onPathDraw = onPathDraw,
                                     ringOpen = { ringOpen },
                                     onLongPress = { setRing(true) },
-                                ),
+                                )
+                                // D4: the stage is one accessible element with
+                                // the four actions a TalkBack user needs.
+                                .semantics {
+                                    contentDescription = Copy.duckStage
+                                    customActions = listOf(
+                                        CustomAccessibilityAction(Copy.walkStep) {
+                                            pulseDrive(input, 0.6, 0.0)
+                                            true
+                                        },
+                                        CustomAccessibilityAction(Copy.turnLeft) {
+                                            pulseDrive(input, 0.0, 0.6)
+                                            true
+                                        },
+                                        CustomAccessibilityAction(Copy.turnRight) {
+                                            pulseDrive(input, 0.0, -0.6)
+                                            true
+                                        },
+                                        CustomAccessibilityAction(Copy.petIt) {
+                                            postDuckCommand("/pet")
+                                            true
+                                        },
+                                    )
+                                },
                         )
                         // The stroke is scene, not chrome: it draws over the
                         // stage and never takes a touch from the gesture.
@@ -675,6 +731,9 @@ fun Shell(
                             fontSize = DuckTheme.Type.Caption,
                             modifier = Modifier
                                 .padding(bottom = DuckTheme.Space.xs)
+                                // D4: every event the shell voices reaches
+                                // TalkBack through the same live region.
+                                .semantics { liveRegion = LiveRegionMode.Polite }
                                 .testTag(if (soundLine != null) "sound-pill" else "care-pill"),
                         )
                     }

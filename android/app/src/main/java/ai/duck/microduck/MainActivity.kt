@@ -533,16 +533,12 @@ private fun DuckScreen(
                     modifier = Modifier.align(Alignment.Center),
                 )
             } else {
-                // The loading screen is a promise, not an engineering log:
-                // no engine name, no port, no gain.
-                Text(
+                // The loading surface (D5): same promise in words, no engine
+                // name, no port, no gain.
+                DuckLoading(
                     Copy.waking,
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = DuckTheme.Type.Body,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(DuckTheme.Space.xxl)
-                        .testTag("waking-label"),
+                    modifier = Modifier.align(Alignment.Center),
+                    testTag = "waking-label",
                 )
             }
         }
@@ -705,34 +701,16 @@ private fun FailureCard(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .padding(DuckTheme.Space.xxl)
-            .background(DuckTheme.BgSurface, RoundedCornerShape(DuckTheme.Radius.card))
-            .padding(DuckTheme.Space.xl)
-            .testTag("failure-card"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
-    ) {
-        Text(
-            Copy.couldNotStart,
-            color = Color.White,
-            fontSize = DuckTheme.Type.Title,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            Copy.humanError(message),
-            color = Color.White.copy(alpha = 0.72f),
-            fontSize = DuckTheme.Type.Label,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-        )
-        Button(
-            onClick = onRetry,
-            modifier = Modifier.testTag("retry"),
-        ) {
-            Text(Copy.retry, fontSize = DuckTheme.Type.Label)
-        }
-    }
+    // One error surface (D5): the shared card, with the same "retry" tag the
+    // smoke already taps.
+    DuckErrorCard(
+        title = Copy.couldNotStart,
+        reason = Copy.humanError(message),
+        onRetry = onRetry,
+        modifier = modifier,
+        testTag = "failure-card",
+        retryTag = "retry",
+    )
 }
 
 /** robotd's AxisBinding::evaluate: inside 0.1 the axis reads zero, otherwise as-is. */

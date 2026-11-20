@@ -75,7 +75,8 @@ struct DuckErrorCard: View {
                 .stroke(Color.duckBad.opacity(0.35), lineWidth: 1)
         )
         .accessibilityIdentifier(identifier)
-        .accessibilityElement(children: .combine)
+        // Contain, not combine: the retry must stay its own element.
+        .accessibilityElement(children: .contain)
     }
 }
 
