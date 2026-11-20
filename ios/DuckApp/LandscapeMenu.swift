@@ -109,13 +109,13 @@ struct LandscapeMenu: View {
                 }
                 Divider()
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { surface = .live }
+                    withDuckMotion(DuckMotion.quick) { surface = .live }
             } label: {
                     Label(Copy.live, systemImage: "circle.dashed")
                 }
                 .accessibilityIdentifier("surface-live")
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { surface = .director }
+                    withDuckMotion(DuckMotion.quick) { surface = .director }
             } label: {
                     Label(Copy.director, systemImage: "viewfinder")
                 }

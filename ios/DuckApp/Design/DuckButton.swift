@@ -9,7 +9,7 @@ struct DuckPressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.82 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : DuckMotion.quick, value: configuration.isPressed)
     }
 }
 

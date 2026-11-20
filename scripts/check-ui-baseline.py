@@ -50,6 +50,11 @@ def collect(root):
         rx = re.compile(pattern)
         return sum(1 for text in files.values() for line in text.splitlines() if rx.search(line))
 
+    # Motion/haptic token files hold the definitions, not usage sites.
+    swift_sites = {p: t for p, t in swift_ui.items()
+                   if not p.endswith("/Design/DuckMotion.swift")}
+    kt_sites = {p: t for p, t in kt_ui.items() if not p.endswith("/DuckMotion.kt")}
+
     shell = kt.get(f"{KT_DIR}/Shell.kt", "")
     more_kt = kt.get(f"{KT_DIR}/MoreSheet.kt", "")
     controller = swift.get(f"{IOS_DIR}/DuckController.swift", "")
@@ -87,6 +92,13 @@ def collect(root):
         # Colour literals outside a theme file
         "android_color_literals": (total(kt_ui, r"Color\(0x"), "max"),
         "ios_color_literals": (total(swift_ui, r"Color\(red:"), "max"),
+        # Inline motion durations outside the token layer (D3: withDuckMotion/
+        # DuckMotion and DuckMotion.* are the only homes for a duration).
+        "ios_inline_motion": (count_lines(swift_sites, r"\.easeIn\(duration:|\.easeOut\(duration:|\(\.snappy\(|withAnimation\(\.spring"), "max"),
+        "android_inline_motion": (count_lines(kt_sites, r"tween\(\s*[0-9]+\)|tween\([0-9]+\)|withMillis"), "max"),
+        # The haptic map: every wired moment only adds (D3).
+        "haptics_sites": (total(swift_sites, r"DuckHaptics\.")
+                          + count_lines(kt_sites, r"DuckHaptics\."), "min"),
         # Guard metrics: these may only grow (a11y, state restoration, back handling)
         "android_remember_saveable": (total(kt, r"rememberSaveable"), "min"),
         "android_back_handler": (total(kt, r"BackHandler"), "min"),
