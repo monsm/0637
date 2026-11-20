@@ -1834,7 +1834,9 @@ for node in nodes:
     wide = (right - left) * 160.0 / density
     if tall < 47 or wide < 47:
         label = node.get('text') or node.get('content-desc') or '<control>'
-        bad.append(f"{label}: {wide:.0f}x{tall:.0f} dp")
+        cls = (node.get('class') or '').rsplit('.', 1)[-1]
+        rid = node.get('resource-id') or ''
+        bad.append(f"{label} [{cls} {rid}]: {wide:.0f}x{tall:.0f} dp")
 if bad:
     raise SystemExit(f"::error::{name}: hit-target or bounds violations: {bad[:8]}")
 print(f"{name}: first element focused; every clickable target >= 48 dp")

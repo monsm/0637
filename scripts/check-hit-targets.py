@@ -48,7 +48,7 @@ IOS_CONTROLS = [
 ]
 ANDROID_CONTROLS = [
     ("Shell.kt", r"\.size\(size\.coerceAtLeast\(48\.dp\)\)", "CloseChip/RoundChip floor"),
-    ("Shell.kt", r"\.heightIn\(min = 48\.dp\)", "ButtonChip floor"),
+    ("Shell.kt", r"\.sizeIn\(minWidth = 48\.dp, minHeight = 48\.dp\)", "ButtonChip/PathChip floor"),
     ("DuckComponents.kt", r"\.heightIn\(min = 48\.dp\)", "shared row/segmented floor"),
 ]
 

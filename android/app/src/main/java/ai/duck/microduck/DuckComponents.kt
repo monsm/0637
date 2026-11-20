@@ -74,7 +74,9 @@ fun Modifier.duckSheetFirstFocus(): Modifier {
         kotlinx.coroutines.delay(200)
         requester.requestFocus()
     }
-    return focusRequester(requester).focusable()
+    // A 48 dp floor: the focused title is also a talk-back stop, and the
+    // audit in the smoke test flags any focusable node below the target.
+    return heightIn(min = 48.dp).focusRequester(requester).focusable()
 }
 
 /**

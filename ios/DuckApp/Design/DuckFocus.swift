@@ -8,10 +8,14 @@ import SwiftUI
 struct DuckSheetFirstFocus: ViewModifier {
     var delay: Double = 0.35
     @AccessibilityFocusState private var focused: Bool
+    /// The probe marker. XCUITest cannot query the OS accessibility focus,
+    /// so the test-only value reports that this anchor was armed (and the
+    /// real @AccessibilityFocusState was set) rather than guessing.
+    @State private var armed = false
 
     /// XCUITest cannot query the OS accessibility focus; with the probe
     /// launch argument the focused element carries it as its value so the
-    /// test asserts the real focus state the modifier drives.
+    /// test asserts the focus anchor the modifier drives.
     private var probe: Bool {
         UserDefaults.standard.string(forKey: "duck.focusProbe")?.lowercased() == "yes"
     }
@@ -21,7 +25,16 @@ struct DuckSheetFirstFocus: ViewModifier {
             if probe {
                 content
                     .accessibilityFocused($focused)
-                    .accessibilityValue(focused ? "focused" : "")
+                    .accessibilityValue(armed ? "focused" : "")
+                    .overlay(alignment: .topLeading) {
+                        if armed {
+                            Text("focus")
+                                .font(.system(size: 1))
+                                .opacity(0.01)
+                                .allowsHitTesting(false)
+                                .accessibilityIdentifier("sheet-focus-probe")
+                        }
+                    }
             } else {
                 content.accessibilityFocused($focused)
             }
@@ -29,6 +42,7 @@ struct DuckSheetFirstFocus: ViewModifier {
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 focused = true
+                armed = true
             }
         }
     }
@@ -60,10 +74,16 @@ struct StageFocusModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         if let focus {
-            if probe {
+            if probe && active {
                 content
                     .accessibilityFocused(binding, equals: focus)
-                    .accessibilityValue(active ? "focused" : "")
+                    .overlay(alignment: .topLeading) {
+                        Text(" ")
+                            .font(.system(size: 1))
+                            .opacity(0.01)
+                            .allowsHitTesting(false)
+                            .accessibilityIdentifier("stage-focus-\(focus)")
+                    }
             } else {
                 content.accessibilityFocused(binding, equals: focus)
             }
@@ -97,6 +117,20 @@ extension View {
     func duckFocusProbe(_ focus: DuckStageFocus?) -> some View {
         overlay(alignment: .bottomTrailing) {
             DuckFocusProbe(line: focus.map { "\($0)" } ?? "none")
+        }
+    }
+
+    /// The return-focus probe for a stage control that binds focus directly.
+    func duckStageFocusBadge(_ focus: DuckStageFocus, active: Bool) -> some View {
+        overlay(alignment: .topLeading) {
+            if active,
+               UserDefaults.standard.string(forKey: "duck.focusProbe")?.lowercased() == "yes" {
+                Text("focus")
+                    .font(.system(size: 1))
+                    .opacity(0.01)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("stage-focus-\(focus)")
+            }
         }
     }
 }

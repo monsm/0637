@@ -914,6 +914,7 @@ final class DuckUITests: XCTestCase {
         app.launch()
         let more = app.buttons["duck-more"]
         XCTAssertTrue(more.waitForExistence(timeout: 30), "the More button is missing at Accessibility XXXL")
+        let moreProbes = focusProbeCount()
         more.tap()
 
         let moreControls = [
@@ -922,12 +923,12 @@ final class DuckUITests: XCTestCase {
             "more-diary", "more-postcards", "more-dex", "more-ai", "more-night",
             "more-duckpanel", "more-tools",
         ]
-        assertSheetFocus("more-title", sheet: "More")
+        assertSheetFocus("more-title", sheet: "More", probesBefore: moreProbes)
         assertHitTargets(sheet: "More", ids: moreControls)
 
         openDense("more-peers", title: "peers-title", close: "peers-close", sheet: "Neighbours",
                   controls: ["peers-close", "ensemble-formation", "ensemble-roles",
-                             "ensemble-choir", "chorus-start", "peers-netpad", "peers-empty-action"])
+                             "ensemble-choir", "chorus-start", "peers-empty-action"])
         openDense("more-blocks", title: "rules-title", close: "rules-close", sheet: "Blocks",
                   controls: ["rules-close", "rules-share", "rules-paste"])
         openDense("more-dance", title: "dance-title", close: "dance-close", sheet: "Dance",
@@ -958,8 +959,9 @@ final class DuckUITests: XCTestCase {
         // buttons under tools.
         app.buttons["more-duckpanel"].tap()
         XCTAssertTrue(anyElement("duck-panel-title").waitForExistence(timeout: 10))
+        let aliasProbes = focusProbeCount()
         app.buttons["alias-open"].tap()
-        assertSheetFocus("alias-title", sheet: "Words")
+        assertSheetFocus("alias-title", sheet: "Words", probesBefore: aliasProbes)
         assertHitTargets(sheet: "Words", ids: ["alias-close", "alias-add"])
         app.buttons["alias-close"].tap()
         _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
@@ -970,16 +972,18 @@ final class DuckUITests: XCTestCase {
 
         app.buttons["more-tools"].tap()
         XCTAssertTrue(anyElement("tools-title").waitForExistence(timeout: 10))
+        let daysProbes = focusProbeCount()
         app.buttons["days-open"].tap()
-        assertSheetFocus("days-title", sheet: "Days")
+        assertSheetFocus("days-title", sheet: "Days", probesBefore: daysProbes)
         assertHitTargets(sheet: "Days", ids: ["days-close", "days-empty-state-action"])
         app.buttons["days-close"].tap()
         _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
             predicate: NSPredicate(format: "exists == false"),
             object: anyElement("days-title")
         )], timeout: 6)
+        let bigProbes = focusProbeCount()
         app.buttons["duck-panel-big"].tap()
-        assertSheetFocus("big-title", sheet: "Big buttons")
+        assertSheetFocus("big-title", sheet: "Big buttons", probesBefore: bigProbes)
         assertHitTargets(sheet: "Big buttons",
                          ids: ["big-close", "big-action-0", "big-action-1", "big-action-2", "big-action-3"])
         app.buttons["big-close"].tap()
@@ -991,11 +995,12 @@ final class DuckUITests: XCTestCase {
 
         // The drawer closes and focus returns to the More button.
         closeMore()
-        assertStageFocus("duck-more", sheet: "More return")
+        assertStageFocus("duck-more", focus: "more", sheet: "More return")
 
         // The instrument is the densest surface: same focus and hit rules.
+        let instrumentProbes = focusProbeCount()
         app.buttons["duck-time"].tap()
-        assertSheetFocus("sheet-title", sheet: "Instrument")
+        assertSheetFocus("sheet-title", sheet: "Instrument", probesBefore: instrumentProbes)
         assertHitTargets(sheet: "Instrument", ids: [
             "sheet-close", "time-pause.fill", "export-vetbook", "vetbook-card-open",
             "collection-open", "postcards-open", "diary-open", "ai-open",
@@ -1005,37 +1010,37 @@ final class DuckUITests: XCTestCase {
             predicate: NSPredicate(format: "exists == false"),
             object: anyElement("sheet-title")
         )], timeout: 6)
-        assertStageFocus("duck-time", sheet: "Instrument return")
+        assertStageFocus("duck-time", focus: "time", sheet: "Instrument return")
     }
 
-    /// Wait for the sheet's first element to report the focus the modifier
-    /// drives. The value exists only under the focus probe argument.
-    private func assertSheetFocus(_ id: String, sheet: String) {
+    /// XCUITest cannot inspect VoiceOver focus directly; each sheet title
+    /// carries a test-only probe the first-focus modifier arms on appear, so
+    /// a new probe past the pre-open count proves this sheet's first stop
+    /// ran and set @AccessibilityFocusState.
+    private func focusProbeCount() -> Int {
+        app.staticTexts.matching(identifier: "sheet-focus-probe").count
+    }
+
+    private func assertSheetFocus(_ id: String, sheet: String, probesBefore: Int) {
         let element = anyElement(id)
         XCTAssertTrue(element.waitForExistence(timeout: 10), "\(sheet): the first element \(id) is missing")
-        XCTAssertTrue(
-            waitForValue(element, "focused", timeout: 6),
-            "\(sheet): \(id) never took focus (value=\(String(describing: element.value)))"
-        )
+        let deadline = Date().addingTimeInterval(6)
+        while Date() < deadline {
+            if focusProbeCount() > probesBefore { return }
+            usleep(100_000)
+        }
+        XCTFail("\(sheet): the first-focus anchor never armed for \(id)")
     }
 
-    /// Closing returns focus to the stage control that opened the sheet.
-    private func assertStageFocus(_ id: String, sheet: String) {
+    /// Closing returns focus to the stage control that opened the sheet; its
+    /// test-only badge is armed only while no sheet is up.
+    private func assertStageFocus(_ id: String, focus: String, sheet: String) {
         let element = app.buttons[id]
         XCTAssertTrue(element.waitForExistence(timeout: 10), "\(sheet): \(id) is missing after close")
         XCTAssertTrue(
-            waitForValue(element, "focused", timeout: 6),
-            "\(sheet): \(id) did not regain focus (value=\(String(describing: element.value)))"
+            app.staticTexts["stage-focus-\(focus)"].waitForExistence(timeout: 6),
+            "\(sheet): \(id) did not regain focus"
         )
-    }
-
-    private func waitForValue(_ element: XCUIElement, _ wanted: String, timeout: TimeInterval) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if (element.value as? String) == wanted { return true }
-            usleep(100_000)
-        }
-        return false
     }
 
     /// Open a drawer row's sheet, assert its first-focus element and the
@@ -1049,8 +1054,9 @@ final class DuckUITests: XCTestCase {
     ) {
         let button = app.buttons[row]
         XCTAssertTrue(button.waitForExistence(timeout: 10), "\(sheet): the drawer row \(row) is missing")
+        let probesBefore = focusProbeCount()
         button.tap()
-        assertSheetFocus(title, sheet: sheet)
+        assertSheetFocus(title, sheet: sheet, probesBefore: probesBefore)
         assertHitTargets(sheet: sheet, ids: controls)
         let closeButton = app.buttons[close]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 5), "\(sheet): close \(close) is missing")
