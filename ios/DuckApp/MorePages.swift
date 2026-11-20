@@ -79,7 +79,7 @@ struct PlayMoreSheet: View {
                     controller.setHead(yaw: 0, pitch: 0)
                     controller.releaseBody()
                 },
-                identifier: "play-more-mode"
+                identifier: "play-more-mode-stick"
             )
             PageRow(
                 title: Copy.abTry,
