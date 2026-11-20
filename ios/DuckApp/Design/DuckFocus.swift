@@ -29,7 +29,7 @@ struct DuckSheetFirstFocus: ViewModifier {
                     .overlay(alignment: .topLeading) {
                         if armed {
                             Text("focus")
-                                .font(.system(size: 1))
+                                .font(.duckMicro)
                                 .opacity(0.01)
                                 .allowsHitTesting(false)
                                 .accessibilityIdentifier("sheet-focus-probe")
@@ -79,7 +79,7 @@ struct StageFocusModifier: ViewModifier {
                     .accessibilityFocused(binding, equals: focus)
                     .overlay(alignment: .topLeading) {
                         Text(" ")
-                            .font(.system(size: 1))
+                            .font(.duckMicro)
                             .opacity(0.01)
                             .allowsHitTesting(false)
                             .accessibilityIdentifier("stage-focus-\(focus)")
@@ -126,7 +126,7 @@ extension View {
             if active,
                UserDefaults.standard.string(forKey: "duck.focusProbe")?.lowercased() == "yes" {
                 Text("focus")
-                    .font(.system(size: 1))
+                    .font(.duckMicro)
                     .opacity(0.01)
                     .allowsHitTesting(false)
                     .accessibilityIdentifier("stage-focus-\(focus)")
