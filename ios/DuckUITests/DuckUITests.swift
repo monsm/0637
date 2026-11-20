@@ -81,7 +81,14 @@ final class DuckUITests: XCTestCase {
     /// leaves the drawer underneath.
     private func closeMore() {
         let close = app.buttons["more-close"]
-        if close.waitForExistence(timeout: 5) { close.tap() }
+        if close.waitForExistence(timeout: 5) {
+            var swipes = 0
+            while !close.isHittable && swipes < 8 {
+                app.swipeDown()
+                swipes += 1
+            }
+            if close.isHittable { close.tap() }
+        }
         // The drawer has to be gone before the next drawer opens, or the tap
         // lands on a sheet that is still animating away.
         let gone = XCTNSPredicateExpectation(
@@ -960,7 +967,7 @@ final class DuckUITests: XCTestCase {
         app.buttons["more-duckpanel"].tap()
         XCTAssertTrue(anyElement("duck-panel-title").waitForExistence(timeout: 10))
         let aliasProbes = focusProbeCount()
-        app.buttons["alias-open"].tap()
+        XCTAssertTrue(tapWhenVisible(app.buttons["alias-open"]), "Words: alias row unreachable")
         assertSheetFocus("alias-title", sheet: "Words", probesBefore: aliasProbes)
         assertHitTargets(sheet: "Words", ids: ["alias-close", "alias-add"])
         app.buttons["alias-close"].tap()
@@ -973,7 +980,7 @@ final class DuckUITests: XCTestCase {
         app.buttons["more-tools"].tap()
         XCTAssertTrue(anyElement("tools-title").waitForExistence(timeout: 10))
         let daysProbes = focusProbeCount()
-        app.buttons["days-open"].tap()
+        XCTAssertTrue(tapWhenVisible(app.buttons["days-open"]), "Days: days row unreachable")
         assertSheetFocus("days-title", sheet: "Days", probesBefore: daysProbes)
         assertHitTargets(sheet: "Days", ids: ["days-close", "days-empty-state-action"])
         app.buttons["days-close"].tap()
@@ -982,7 +989,7 @@ final class DuckUITests: XCTestCase {
             object: anyElement("days-title")
         )], timeout: 6)
         let bigProbes = focusProbeCount()
-        app.buttons["duck-panel-big"].tap()
+        XCTAssertTrue(tapWhenVisible(app.buttons["duck-panel-big"]), "Big buttons: row unreachable")
         assertSheetFocus("big-title", sheet: "Big buttons", probesBefore: bigProbes)
         assertHitTargets(sheet: "Big buttons",
                          ids: ["big-close", "big-action-0", "big-action-1", "big-action-2", "big-action-3"])
@@ -1043,6 +1050,20 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// Tap an element that may have scrolled below the fold at AX3. Swipes
+    /// the topmost scroll view until the element is actually hittable; a
+    /// plain tap on an off-screen row fails without a useful message.
+    private func tapWhenVisible(_ element: XCUIElement, swipes: Int = 8) -> Bool {
+        var count = 0
+        while !(element.exists && element.isHittable) && count < swipes {
+            app.swipeUp()
+            count += 1
+        }
+        guard element.exists && element.isHittable else { return false }
+        element.tap()
+        return true
+    }
+
     /// Open a drawer row's sheet, assert its first-focus element and the
     /// 44 pt floor of the named controls, then close it back to the drawer.
     private func openDense(
@@ -1055,7 +1076,7 @@ final class DuckUITests: XCTestCase {
         let button = app.buttons[row]
         XCTAssertTrue(button.waitForExistence(timeout: 10), "\(sheet): the drawer row \(row) is missing")
         let probesBefore = focusProbeCount()
-        button.tap()
+        XCTAssertTrue(tapWhenVisible(button), "\(sheet): the drawer row \(row) never became reachable")
         assertSheetFocus(title, sheet: sheet, probesBefore: probesBefore)
         assertHitTargets(sheet: sheet, ids: controls)
         let closeButton = app.buttons[close]
