@@ -1982,10 +1982,17 @@ open_more_sheet() {
 
 # The skill ring can still be up when the sweep starts (the handover left
 # it open): close whatever is in front, then open the drawer for real.
-for _ in $(seq 1 4); do
+for _ in $(seq 1 6); do
   if drawer_present; then break; fi
-  adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-  sleep 0.6
+  # Only BACK when our app is actually the foreground: the 83f35d8 dump
+  # was the launcher — BACKing there walks deeper into the desktop.
+  if adb shell "dumpsys activity activities | grep -q 'mResumedActivity.*ai.duck.microduck'" 2>/dev/null; then
+    adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+    sleep 0.6
+  else
+    adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
+    sleep 2.5
+  fi
   tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
   sleep 1
 done
