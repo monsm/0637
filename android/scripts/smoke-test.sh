@@ -1816,7 +1816,7 @@ except Exception as exc:
 groups = [
     ('feed', ('喂食', 'Feed')), ('skills', ('技能', 'Skills')),
     ('quack', ('叫一声', 'Quack')), ('grab', ('拎起', 'Hold')),
-    ('more', ('更多', 'More')), ('time', ('时间', 'Time')),
+    ('more', ('更多', 'More')), ('clock', ('挂钟', 'Wall clock')),
 ]
 nodes = [node for node in root.iter('node')
          if node.get('package') == 'ai.duck.microduck']
