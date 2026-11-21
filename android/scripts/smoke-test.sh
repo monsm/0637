@@ -1943,6 +1943,11 @@ open_more_sheet() {
   # (any sheet has a drag handle, so that alone would lie).
   for _ in $(seq 1 3); do
     drawer_present && break
+    # A BACK from a page can land on the Live screen with the skill ring
+    # open (the 技能 card box sits where the hunt's taps land); close the
+    # ring by its 关闭 word before hunting 更多.
+    tap_text "关闭" > /dev/null 2>&1 || true
+    sleep 0.4
     tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
     sleep 1
   done
