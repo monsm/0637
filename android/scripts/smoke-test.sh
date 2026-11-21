@@ -1847,6 +1847,12 @@ if bad:
     raise SystemExit(f"::error::{name}: hit-target or bounds violations: {bad[:8]}")
 print(f"{name}: first element focused; every clickable target >= 48 dp")
 PY
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then
+    cp ui.xml dense-dump.xml 2>/dev/null || true
+    adb exec-out screencap -p > dense-screen.png 2>/dev/null || true
+  fi
+  return "$rc"
 }
 
 open_more_sheet() {
@@ -1920,7 +1926,9 @@ open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks"
 open_more_sheet "Dance Studio" "编舞铺" "Dance Studio" "编舞铺" "Dance Studio"
 open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more"
 open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours"
-open_more_sheet "Daily quests" "每日任务" "Today's quests" "今日小挑战" "Daily quests"
+# The sheet title is Copy.dailyQuests (the row's own words); "Today's
+# quests" is the card heading inside, and it is not the focus anchor.
+open_more_sheet "Daily quests" "每日任务" "Daily quests" "每日任务" "Daily quests"
 open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky diary"
 open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards"
 open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book"
