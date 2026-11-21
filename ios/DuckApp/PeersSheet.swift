@@ -12,30 +12,50 @@ struct PeersSheet: View {
     @State private var pairCode = ""
 
     var body: some View {
+        // Every dense sheet scrolls (D4 sweep): at Accessibility XXXL this
+        // sheet's content is taller than the sheet, and an unscrolled VStack
+        // gets centred — which puts the header (and its close) above the
+        // screen, unreachable. The header rides above the scroll, so the
+        // close is never scrolled away either.
         VStack(alignment: .leading, spacing: DuckSpace.md) {
-            HStack {
-                VStack(alignment: .leading, spacing: DuckSpace.xxs) {
-                    Text(Copy.peers)
-                        .font(.duckTitle.weight(.semibold))
-                        .accessibilityIdentifier("peers-title")
-                        .duckSheetFirstFocus()
-                    if !controller.peerName.isEmpty {
-                        Text("\(Copy.name) · \(controller.peerName)")
-                            .font(.duckCaption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    DuckCloseGlyph()
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Copy.close)
-                .accessibilityIdentifier("peers-close")
+            header
+            ScrollView {
+                content
             }
+        }
+        .padding(.horizontal, DuckSpace.xl)
+        .padding(.top, DuckSpace.md)
+        .padding(.bottom, DuckSpace.xl)
+    }
 
+    private var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: DuckSpace.xxs) {
+                Text(Copy.peers)
+                    .font(.duckTitle.weight(.semibold))
+                    .accessibilityIdentifier("peers-title")
+                    .duckSheetFirstFocus()
+                if !controller.peerName.isEmpty {
+                    Text("\(Copy.name) · \(controller.peerName)")
+                        .font(.duckCaption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Button {
+                dismiss()
+            } label: {
+                DuckCloseGlyph()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.close)
+            .accessibilityIdentifier("peers-close")
+        }
+    }
+
+    /// The sheet's body, scrolled as one piece.
+    @ViewBuilder private var content: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.md) {
             // Pairing: a stranger on the Wi-Fi is visible but cannot send
             // gifts or start a chorus until both sides typed this code.
             VStack(alignment: .leading, spacing: DuckSpace.xs) {
@@ -226,7 +246,7 @@ struct PeersSheet: View {
                 .font(.duckCaption)
                 .foregroundStyle(.tertiary)
         }
-        .padding(DuckSpace.xl)
+        .padding(.top, DuckSpace.md)
     }
 
     /// The sheet's one chip shape: the greeting's capsule, reused by gifts
