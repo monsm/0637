@@ -1368,12 +1368,10 @@ private fun AISheet(
         )
     }
     ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(DuckTheme.Space.xl),
-            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
-        ) {
+        // The header rides above the scroll (D4 swipe rule): at 2x fonts an
+        // IME or a focus pull can scroll the body, and a scrolled-away title
+        // is no focus anchor and no close.
+        Column(Modifier.padding(horizontal = DuckTheme.Space.xl)) {
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1389,6 +1387,12 @@ private fun AISheet(
                 )
                 CloseChip("ai-close", onClose)
             }
+            Column(
+                Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = DuckTheme.Space.xl),
+                verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
+            ) {
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -1468,6 +1472,7 @@ private fun AISheet(
             Text(Copy.aiHint, color = Color.White.copy(alpha = 0.5f), fontSize = DuckTheme.Type.Micro)
             Text(Copy.aiNote, color = Color.White.copy(alpha = 0.4f), fontSize = DuckTheme.Type.Micro)
             VoiceChatSection(config = current())
+            }
         }
     }
 }
