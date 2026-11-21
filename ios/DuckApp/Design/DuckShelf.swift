@@ -122,7 +122,7 @@ struct Diamond: Shape {
 struct DuckBell: View {
     var body: some View {
         ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: DuckRadius.tiny0)
+            RoundedRectangle(cornerRadius: DuckRadius.tiny)
                 .fill(
                     LinearGradient(
                         colors: [Color.duckBrass.opacity(0.95), Color.duckBrassDeep],
