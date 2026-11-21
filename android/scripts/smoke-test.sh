@@ -1961,6 +1961,23 @@ raise SystemExit(0 if {'动作', '关闭'} & texts else 1)
 SH
 }
 
+dense_sheet_title_present() {
+  rm -f title-check.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > title-check.xml 2>/dev/null || return 1
+  python3 - "$1" "$2" <<'SH'
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse('title-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+want = {sys.argv[1], sys.argv[2]}
+texts = {(n.get('text') or '') for n in root.iter('node')
+         if n.get('package') == 'ai.duck.microduck'}
+raise SystemExit(0 if want & texts else 1)
+SH
+}
+
 open_more_sheet() {
   local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
   local ok=0
@@ -1977,17 +1994,25 @@ open_more_sheet() {
     fi
     if drawer_present; then
       if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
-        ok=1
-        break
+        # The tap landed; the row only counts if its sheet really opened
+        # (a swipe-position miss can hit a different row).
+        sleep 1.2
+        if dense_sheet_title_present "$title_en" "$title_zh"; then
+          ok=1
+          break
+        fi
+        adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+        sleep 1
       fi
       adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
       sleep 0.4
       continue
     fi
     # Anything else is a feature page (the dump caught the Neighbours page
-    # open after the hunt brushed its row): BACK lands back on the drawer.
+    # open after the hunt brushed its row): BACK lands back on the drawer,
+    # and the next round re-reads the state after the sheet finishes.
     adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-    sleep 0.8
+    sleep 1.2
   done
 
   if [ "$ok" != "1" ]; then
