@@ -242,7 +242,10 @@ struct PeersSheet: View {
             Text(title)
                 .font(.duckCaption.weight(.semibold))
                 .padding(.horizontal, DuckSpace.md)
-                .frame(minHeight: 44)
+                // 48, not 44: the AX3 sweep measured this chip at 42.25 pt
+                // under the 44 floor (VoiceOver's hit frame trims a capsule),
+                // so the floor moves up with headroom instead of arguing.
+                .frame(minHeight: 48)
                 .background(Color.white.opacity(0.12), in: Capsule())
                 .contentShape(Capsule())
                 .opacity(enabled ? 1 : 0.45)
