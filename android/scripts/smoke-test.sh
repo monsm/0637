@@ -1946,8 +1946,12 @@ open_more_sheet() {
     # A BACK from a page can land on the Live screen with the skill ring
     # open (the 技能 card box sits where the hunt's taps land); close the
     # ring by its 关闭 word before hunting 更多.
-    tap_text "关闭" > /dev/null 2>&1 || true
-    sleep 0.4
+    # The ring's close chip does not answer uiautomator taps reliably
+    # (this Compose version's clickable never surfaces as clickable=true
+    # in the dump), but BACK closing the ring is product behaviour the
+    # earlier smoke sections already assert.
+    adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+    sleep 0.8
     tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
     sleep 1
   done
