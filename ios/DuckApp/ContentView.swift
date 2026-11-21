@@ -742,11 +742,6 @@ struct ContentView: View {
             languageTick: $languageTick,
             photo: photoPreview,
             onDanceStep: playDanceStep,
-            onToggleDirector: {
-                toggleSurface()
-                routeState = ShellOverlayReducer.reduce(routeState, .closeSheet)
-            },
-            surfaceIsDirector: surface == .director,
             onOpenDirector: {
                 // A sheet can hand over to Director (the postcards empty
                 // state); the switch belongs to ContentView, not the sheet.
@@ -754,7 +749,12 @@ struct ContentView: View {
                     routeState = ShellOverlayReducer.reduce(routeState, .closeSheet)
                     surface = .director
                 }
-            }
+            },
+            onToggleDirector: {
+                toggleSurface()
+                routeState = ShellOverlayReducer.reduce(routeState, .closeSheet)
+            },
+            surfaceIsDirector: surface == .director
         )
     }
 
