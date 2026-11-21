@@ -1934,9 +1934,15 @@ raise SystemExit(0 if titles & set(texts) and groups & set(texts) else 1)
 SH
 }
 
-# Foreground check: is OUR activity the resumed one?
+# Foreground check straight from the accessibility tree: dumpsys's
+# mResumedActivity line proved unreliable on this emulator (it kept saying
+# "not foreground" while the app was up, so the hunt relaunched every round
+# and drifted to the launcher).
 app_foreground() {
-  adb shell "dumpsys activity activities | grep -q 'mResumedActivity.*ai.duck.microduck'" 2>/dev/null
+  rm -f fg-check.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > fg-check.xml 2>/dev/null || return 1
+  grep -q 'package="ai.duck.microduck"' fg-check.xml
 }
 
 ring_open() {
