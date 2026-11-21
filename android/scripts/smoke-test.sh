@@ -1961,6 +1961,28 @@ raise SystemExit(0 if {'动作', '关闭'} & texts else 1)
 SH
 }
 
+# A page really opened: a sheet close chip is in the tree (every page has
+# one) AND the drawer's own group headers are gone or behind it. Matching on
+# a title that the row itself also carries (每日任务) proves nothing.
+dense_sheet_opened() {
+  rm -f sheet-check.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > sheet-check.xml 2>/dev/null || return 1
+  python3 - <<'SH'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('sheet-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+nodes = [n for n in root.iter('node') if n.get('package') == 'ai.duck.microduck']
+labels = {(n.get('text') or n.get('content-desc') or '') for n in nodes}
+# A page's close control; the drawer's own title is 更多/More.
+pages = {'关闭', 'Close'}
+drawer = {'更多', 'More'}
+raise SystemExit(0 if (pages & labels) and not (drawer & labels) else 1)
+SH
+}
+
 dense_sheet_title_present() {
   rm -f title-check.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
@@ -2030,7 +2052,7 @@ open_more_sheet() {
         # The tap landed; the row only counts if its sheet really opened
         # (a swipe-position miss can hit a different row).
         sleep 1.2
-        if dense_sheet_title_present "$title_en" "$title_zh"; then
+        if dense_sheet_opened; then
           ok=1
           break
         fi
