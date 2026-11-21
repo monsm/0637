@@ -1927,10 +1927,14 @@ try:
     root = ET.parse('dense-check.xml').getroot()
 except Exception:
     raise SystemExit(1)
-texts = [(n.get('text') or '') for n in root.iter('node')]
-titles = {'更多', 'More'}
+texts = {(n.get('text') or '') for n in root.iter('node')}
+# The drawer's title can be scrolled out of view; its group headers (or the
+# drag handle it shares with every sheet) are what proves the drawer is up.
 groups = {'玩', '一起', '记录', '这只鸭子', 'Play', 'Together', 'Records', 'This duck'}
-raise SystemExit(0 if titles & set(texts) and groups & set(texts) else 1)
+rows = {'画路走', '积木规则', '编舞铺', '邻居', '鸭子日记', '明信片', '情绪图鉴', 'AI 伙伴',
+        'Path painter', 'Blocks', 'Dance Studio', 'Neighbours', 'Ducky diary', 'Postcards',
+        'Mood book', 'AI companion'}
+raise SystemExit(0 if (groups | rows) & texts else 1)
 SH
 }
 
