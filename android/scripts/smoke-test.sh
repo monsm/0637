@@ -1967,7 +1967,37 @@ fi
 sleep 0.8
 adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
 
+# Back on the Live screen, whatever the previous sweep left behind: the
+# deck's own verbs are the fingerprint; a missing app is relaunched.
+ensure_live() {
+  for _ in $(seq 1 4); do
+    rm -f live-check.xml
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+    adb exec-out cat /sdcard/ui.xml > live-check.xml 2>/dev/null || true
+    if python3 - <<'SH'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('live-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = {(n.get('text') or '') for n in root.iter('node') if n.get('package') == 'ai.duck.microduck'}
+raise SystemExit(0 if ({'喂食', 'Feed'} & texts and {'更多', 'More'} & texts) else 1)
+SH
+    then
+      return 0
+    fi
+    adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+    sleep 0.8
+    if ! adb shell pidof ai.duck.microduck > /dev/null 2>&1; then
+      adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
+      sleep 8
+    fi
+  done
+  return 1
+}
+
 # The instrument, the densest surface of all.
+ensure_live || true
 tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1 || {
   echo "::error::no Time button for the dense-sheet sweep"
   exit 1
