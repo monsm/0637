@@ -1886,22 +1886,24 @@ open_more_sheet() {
     tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
     sleep 1
   done
-  # One way only: the drawer's own order is top to bottom, so a downward
-  # swipe is never needed — and a downward drag on a bottom sheet is the
-  # DISMISS gesture (the 572618a red dump was the Live screen: a reverse
-  # swipe had closed the drawer). If the sheet is gone, reopen it and keep
-  # scrolling from the top.
-  for _ in $(seq 1 12); do
+  # One way only (a downward drag on a bottom sheet is its DISMISS gesture).
+  # Closing a page does NOT reset the drawer's scroll, so the next row can sit
+  # ABOVE the viewport (the 83f35d8 dump showed the drawer at its bottom,
+  # hunting a row that was above). Every fourth round the drawer is closed
+  # and reopened — cheap, deterministic, and it puts the list back at the top.
+  for round in $(seq 1 16); do
     if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
       ok=1
       break
     fi
-    if ! drawer_present; then
+    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+    sleep 0.3
+    if [ $((round % 4)) -eq 0 ]; then
+      adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+      sleep 0.6
       tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
       sleep 1
     fi
-    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-    sleep 0.4
   done
   if [ "$ok" != "1" ]; then
     # Keep the scene: a missing row is either a product regression or a
