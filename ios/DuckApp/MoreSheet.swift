@@ -1,0 +1,309 @@
+import SwiftUI
+
+/// The stick modes the stage understands. It lives outside ContentView so
+/// the drawer and the stage share one vocabulary.
+enum StickMode: String, CaseIterable {
+    case drive, head, body, path
+}
+
+/// The one "More" drawer (B4 §2): four groups, at most four rows each.
+///
+/// Everything the first screen used to hide behind a menu lives here — one
+/// tap from Live, and nothing inside is a second layer of menus. The drawer
+/// is the same component on both platforms; only the icons are translated.
+///
+/// Decisions already taken: the "Together" group is one row — 邻居 — because
+/// the chorus and gifts are actions inside the neighbours page, not pages of
+/// their own; and tilt-to-look is a drive mode, so it stays in the "This
+/// duck" panel instead of the drawer.
+struct MoreSheet: View {
+    @ObservedObject var controller: DuckController
+    @Binding var stickMode: StickMode
+    /// The language tick: the chip flips Copy.language, and this sheet has to
+    /// read the new words.
+    @Binding var languageTick: Int
+    /// The dance sheet replays through the shell's own step runner.
+    let onDanceStep: (DanceStep) -> Void
+    /// Where a drawer row leads: the shell's one route table (B7). The
+    /// drawer no longer owns a second enum - the sheet host presents the
+    /// destination over the drawer, so closing it comes back here.
+    let onOpen: (DuckRoute) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let _ = languageTick
+        ScrollView {
+            VStack(alignment: .leading, spacing: DuckSpace.lg) {
+                header
+                group(Copy.groupPlay, id: "play") {
+                    row(
+                        Icons.path, Copy.pathMode,
+                        note: Copy.pathRowNote,
+                        check: stickMode == .path,
+                        id: "more-path"
+                    ) {
+                        stickMode = .path
+                        controller.setHead(yaw: 0, pitch: 0)
+                        controller.releaseBody()
+                        dismiss()
+                    }
+                    row(Icons.blocks, Copy.blocks, note: Copy.blocksRowNote, id: "more-blocks") {
+                        onOpen(.rules)
+                    }
+                    row(Icons.dance, Copy.dance, note: Copy.danceRowNote, id: "more-dance") {
+                        onOpen(.dance)
+                    }
+                    row(
+                        Icons.controls, Copy.playMore,
+                        note: Copy.stick(stickMode.rawValue),
+                        id: "more-playmore"
+                    ) {
+                        onOpen(.playMore)
+                    }
+                }
+                group(Copy.groupTogether, id: "together") {
+                    row(
+                        Icons.peers, Copy.peers,
+                        note: Copy.peersRowNote,
+                        badge: "\(controller.peers.count)/3",
+                        id: "more-peers"
+                    ) {
+                        onOpen(.peers)
+                    }
+                    row(Icons.chorus, Copy.chorus, id: "more-chorus") {
+                        onOpen(.peers)
+                    }
+                    row(Icons.gift, Copy.gifts, id: "more-gifts") {
+                        onOpen(.peers)
+                    }
+                    row(
+                        "person.2", Copy.twoPlayer,
+                        check: controller.p2On,
+                        showsChevron: false,
+                        id: "more-p2"
+                    ) {
+                        controller.p2On.toggle()
+                    }
+                }
+                group(Copy.groupRecord, id: "record") {
+                    row(
+                        Icons.quests, Copy.dailyQuests,
+                        note: Copy.questsRowNote,
+                        badge: questsLeft,
+                        id: "more-quests"
+                    ) {
+                        onOpen(.progress)
+                    }
+                    row(Icons.diary, Copy.diary, id: "more-diary") {
+                        onOpen(.diary)
+                    }
+                    row(
+                        Icons.postcards, Copy.postcardShelf,
+                        badge: "\(controller.postcards.cards.count)",
+                        id: "more-postcards"
+                    ) {
+                        onOpen(.postcards)
+                    }
+                    row(Icons.dex, Copy.collectionTitle, note: Copy.dexRowNote, id: "more-dex") {
+                        onOpen(.dex)
+                    }
+                }
+                group(Copy.thisDuck, id: "duck") {
+                    row(
+                        Icons.ai, Copy.ai,
+                        note: aiNote,
+                        dot: !aiConfigured,
+                        id: "more-ai"
+                    ) {
+                        onOpen(.ai)
+                    }
+                    row(
+                        controller.nightActive ? Icons.morning : Icons.night,
+                        controller.nightActive ? Copy.goodMorning : Copy.goodNight,
+                        note: controller.nightActive ? Copy.morningRowNote : Copy.nightRowNote,
+                        showsChevron: false,
+                        id: "more-night"
+                    ) {
+                        controller.postNight(on: !controller.nightActive)
+                    }
+                    row(
+                        Icons.preferences, Copy.duckFace,
+                        note: Copy.heartRowNote,
+                        id: "more-duckpanel"
+                    ) {
+                        onOpen(.duckPanel)
+                    }
+                    row(
+                        "wrench.and.screwdriver", Copy.tools,
+                        note: Copy.roomLampNote,
+                        id: "more-tools"
+                    ) {
+                        onOpen(.tools)
+                    }
+                }
+            }
+            .padding(.horizontal, DuckSpace.xl)
+            .padding(.top, DuckSpace.md)
+            .padding(.bottom, DuckSpace.xxl)
+        }
+        .background(Color.duckBgSurface)
+    }
+
+    // MARK: - Rows
+
+    private var header: some View {
+        HStack {
+            Text(Copy.more)
+                .font(.duckTitle.weight(.semibold))
+                .foregroundStyle(.white)
+                .accessibilityIdentifier("more-title")
+                .duckSheetFirstFocus()
+            Spacer()
+            SheetCloseButton(identifier: "more-close")
+        }
+    }
+
+    private func group<Content: View>(
+        _ title: String,
+        id: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: DuckSpace.xs) {
+            Text(title)
+                .font(.duckLabel.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, DuckSpace.xs)
+                .padding(.bottom, DuckSpace.xxs)
+            VStack(spacing: DuckSpace.xxs) { content() }
+        }
+    }
+
+    /// One row: 48 pt tall, a 20 pt icon, a 15 pt title, an optional 12 pt
+    /// note, and a badge on the right. Text capsules are for chips, not for
+    /// actions (B4 §3).
+    private func row(
+        _ icon: String,
+        _ title: String,
+        note: String? = nil,
+        badge: String? = nil,
+        dot: Bool = false,
+        check: Bool = false,
+        showsChevron: Bool = true,
+        id: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: DuckSpace.md) {
+                Image(systemName: icon)
+                    .font(DuckIcon.md)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 28)
+                VStack(alignment: .leading, spacing: DuckSpace.xxs) {
+                    Text(title)
+                        .font(.duckBody.weight(.medium))
+                        .foregroundStyle(.white)
+                    if let note {
+                        Text(note)
+                            .font(.duckCaption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: DuckSpace.sm)
+                if check {
+                    Image(systemName: "checkmark")
+                        .font(DuckIcon.xs)
+                        .foregroundStyle(Color.duckAction)
+                }
+                if dot {
+                    Circle()
+                        .fill(Color.duckAction)
+                        .frame(width: 8, height: 8)
+                }
+                if let badge {
+                    Text(badge)
+                        .font(.duckCaption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+                if showsChevron {
+                    Image(systemName: "chevron.right")
+                        .font(DuckIcon.xs)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
+    }
+
+    // MARK: - Badges
+
+    /// How many of today's goals are still open — the board's own counters.
+    private var questsLeft: String? {
+        let left = controller.quests.filter { !$0.done }.count
+        return controller.quests.isEmpty ? nil : "\(left)"
+    }
+
+    private var aiConfigured: Bool {
+        controller.aiConfig.enabled
+            && !controller.aiConfig.endpoint.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    private var aiNote: String {
+        aiConfigured ? Copy.aiOn : Copy.aiNeedEndpoint
+    }
+}
+
+/// The three stick modes, one tap each. Path has its own row in the drawer;
+/// this panel is the rest of the pad. Tilt-to-look is also a drive mode, but
+/// it lives in the "This duck" panel, not here.
+struct ModeSheet: View {
+    @ObservedObject var controller: DuckController
+    @Binding var stickMode: StickMode
+    @Environment(\.dismiss) private var dismiss
+
+    private let modes: [StickMode] = [.drive, .head, .body]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.xs) {
+            Text(Copy.stickModes)
+                .font(.duckTitle.weight(.semibold))
+                .foregroundStyle(.white)
+            ForEach(modes, id: \.self) { mode in
+                Button {
+                    stickMode = mode
+                    controller.setHead(yaw: 0, pitch: 0)
+                    controller.releaseBody()
+                    dismiss()
+                } label: {
+                    HStack(spacing: DuckSpace.md) {
+                        Image(systemName: Icons.stick(mode))
+                            .font(DuckIcon.md)
+                            .foregroundStyle(.white.opacity(0.85))
+                            .frame(width: 26)
+                        Text(Copy.stick(mode.rawValue))
+                            .font(.duckBody.weight(.medium))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        if stickMode == mode {
+                            Image(systemName: "checkmark")
+                                .font(DuckIcon.xs)
+                                .foregroundStyle(Color.duckAction)
+                        }
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("mode-option-\(mode.rawValue)")
+            }
+        }
+        .padding(DuckSpace.xl)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.duckBgSurface)
+    }
+}
+// 语义色已迁到 DuckTheme.swift（UI_TOKENS §7 的唯一落点）。
+

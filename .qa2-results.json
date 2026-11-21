@@ -1,0 +1,458 @@
+{
+ "findings": [
+  {
+   "id": "DEF-001",
+   "file": "core/duck-mobile-core/src/quests.rs",
+   "line": 263,
+   "title": "previous_day() is wrong on month starts, silently destroying streaks",
+   "repro": "Run the simulator/app. Complete all three quests on 2026-02-28 (last_completed_day=\"2026-02-28\", streak>=1). The next calendar day the shell POSTs /quests/day with day=\"2026-03-01\". In QuestBoard::update/roll_day, previous_day(\"2026-03-01\") returns \"2026-02-30\" (a date that never existed; Jan 1 returns \"2025-12-30\" instead of 2025-12-31), so the comparison `self.last_completed_day != previous_day(day)` is true and the streak is zeroed. Verified for 2026-03-01, 2026-01-01, 2026-04-01, 2026-08-01.",
+   "expected": "previous_day(\"2026-03-01\") = 2026-02-28, so a board completed yesterday keeps its streak after rolling the new day.",
+   "actual": "previous_day() hardcodes `parts[2] = 30` for any month-end, so it returns 2026-02-30 / 2025-12-30 / 2026-03-31 as 2026-03-30 etc. A user who completed all three quests on the last day of a 31-day month, February, or the prior year loses their streak on the 1st. Neither quests unit test nor sim-drive.sh/smoke-test.sh ever rolls across a month boundary (they only test \"2026-11-11\" and same-day restarts), so CI never sees it.",
+   "severity": "high"
+  },
+  {
+   "id": "DEF-002",
+   "file": "core/duck-mobile-core/src/ffi.rs",
+   "line": 1441,
+   "title": "Restore/seek while paused silently unpauses the duck: checkpoint's saved clock overrides the pause",
+   "repro": "1) Run the app. 2) POST /time {\"paused\":true}, sleep 0.4s. 3) POST /seek {\"ticks\":10} or POST /restore {\"tick\":<any older tick from /timeline>}. 4) Poll GET /state twice.",
+   "expected": "A paused duck stays paused after a rewind/restore: /state.paused stays true and the tick does not advance until the user resumes.",
+   "actual": "DuckRuntime::restore() sets `self.clock.paused = checkpoint.paused` (runtime.rs:1658), and every timeline checkpoint except one freshly taken during the pause was recorded while running with paused=false. In duck_core_tick the pending_restore is applied (ffi.rs:1427-1445) BEFORE the pause gate at ffi.rs:1447 reads `active_runtime(core).clock().paused`, so the gate sees false and the tick continues driving the duck: /state.paused becomes false and the duck starts walking again under a UI that still believes it is frozen. The shells' rewind button (DuckCore.seek -> duck_core_seek) hits the same path. sim-drive.sh only exercises /seek while unpaused (line 1189-1196), so this is never covered.",
+   "severity": "high"
+  },
+  {
+   "id": "DEF-003",
+   "file": "core/duck-mobile-core/src/lan.rs",
+   "line": 220,
+   "title": "LAN flood: hello/unknown datagrams bypass the greet throttle, forge \"replied\" state and evict real peers",
+   "repro": "Start the app with LAN on. Send 50 UDP datagrams to :8766 in one second: `{\"v\":1,\"type\":\"hello\",\"from\":\"f%02d\",\"name\":\"spoof\",\"to\":\"all\"}` with distinct from ids (or any bogus type such as \"junk\", same fields). Then GET /state and /peers.",
+   "expected": "A flood collapses into one greeting, as the code states for 'greet' (line 228-233 'A LAN flood must not become a chorus of emotions'); the peer table should only contain real announcing ducks, and only a duck we actually greeted can be marked replied.",
+   "actual": "ingest() calls upsert() (line 220) before validating the message type, so any v=1 packet with a non-empty `from` creates/refreshes a peer regardless of type, and the hello arm (lines 256-272) has no per-peer rate limit (only greet does) — it pushes a PeerEvent::Replied per datagram (up to 32 per tick, each triggering the duck's 'yes' reaction via runtime.peer_event) and sets `peer.replied = true` without any prior greet. 16 fake ids evict the real peers (MAX_PEERS drop-stalest in upsert).",
+   "severity": "medium"
+  },
+  {
+   "id": "DEF-004",
+   "file": "core/duck-mobile-core/src/quests.rs",
+   "line": 197,
+   "title": "restore() accepts boards that complete instantly and mint a streak from pure JSON; the 'corrupt file cannot invent a streak' guarantee is false",
+   "repro": "Any LAN client (API binds 0.0.0.0, no auth) POSTs /quests/day {\"day\":\"2026-11-12\",\"board\":{\"day\":\"2026-11-12\",\"quests\":[{metric:\"Pets\",target:0,baseline:0,done:false}, x3],\"completed_today\":0,\"last_completed_day\":\"\",\"streak\":0}}. Then GET /quests.",
+   "expected": "A restored board is validated so it cannot fabricate completions or a streak: targets must be > 0 (or the board rejected).",
+   "actual": "restore() only checks `board.day.len()==10 && board.quests.len()<=3` and clamps streak<=3650. With target 0 (or negative), the very next tick's update() sees `now - baseline >= target` true and marks all three quests done without any interaction, sets last_completed_day=day and streak+=1. Even without target 0, a payload with done:true x3, completed_today:3 and last_completed_day=<yesterday> mints streak+1 on the next tick. The module comment 'A shell-saved board, clamped: a corrupt file cannot invent a streak' does not hold.",
+   "severity": "medium"
+  },
+  {
+   "id": "DEF-005",
+   "file": "core/duck-mobile-core/src/ffi.rs",
+   "line": 1381,
+   "title": "Fork + quests: when a branch is selected, quest progress is measured on the original duck, not the branch the user is watching",
+   "repro": "1) POST /quests/day for today; force a Pets quest (board restore with metric Pets, target 1). 2) POST /fork {\"label\":\"a\"}; POST /branch/select {\"label\":\"a\"}. 3) POST /pet (fire-and-forget) 3 times. 4) Compare /state.life.pets (active branch) with /state.quests progress, and note no celebration fires.",
+   "expected": "Quests measure the duck the user is driving: branch actions advance quest progress and the completion celebration plays on the branch.",
+   "actual": "duck_core_tick builds the quest values from `core.runtime` (the original, unselected duck, ffi.rs:1381-1384) while the celebration is sent to the active branch via on_active(). Once a branch is selected, /state.life and /state.care publish the branch's counters (active_runtime), but quest progress stays frozen against the original's counters, so pets/skills done on the branch never count and the branch never celebrates.",
+   "severity": "medium"
+  },
+  {
+   "id": "DEF-006",
+   "file": "core/duck-mobile-core/src/intent.rs",
+   "line": 446,
+   "title": "Intent server spawns an unbounded thread per connection; a LAN flood kills the accept loop permanently",
+   "repro": "While the app runs, open ~1000+ TCP connections to <phone-ip>:8765 that send a partial header (`POST /twist HTTP/1.1\r\nContent-Length: 100000000`) then stall (or drip one byte per 100 ms). After 2 s each connection is stuck in the read timeout in handle(); every connection holds a thread. Continue until std::thread::spawn fails.",
+   "expected": "The HTTP surface survives floods: a bounded worker pool or connection cap, and no crash of the listener.",
+   "actual": "start_listener spawns a new thread per accepted connection with no limit (line 446), and handle() blocks up to 2 s on an undersized body (the content-length mismatch in the 'while buffer.len() < header_end + 4 + content_length' loop). On OS thread-exhaustion std::thread::spawn panics; the panic unwinds the accept-loop closure, dropping the TcpListener, so port 8765 stops accepting entirely and the intent API is dead for the rest of the process. Combined with POST /fork (deep-copies a MuJoCo model per call, 15 s budget) and no branch cap, one unauthenticated LAN client can also grow branches without bound — every tick then steps every branch (ffi.rs:1471).",
+   "severity": "medium"
+  }
+ ]
+}
+{
+ "findings": [
+  {
+   "actual": "Drag up sends pitch of the opposite sign: the head pitches down while the thumb moves up (and vice versa).",
+   "expected": "Drag up pitches the head up, matching iOS landscape (line 379, comment 'up looks up') and Android portrait (Shell.kt:1529-1533, which sends ny*0.6 without negation).",
+   "file": "ios/DuckApp/ContentView.swift",
+   "id": "ios-portrait-head-pitch-inverted",
+   "line": 725,
+   "repro": "Portrait phone, Live, core ready. Open the ellipsis Menu, pick the head stick mode. Drag straight up on the stage.",
+   "severity": "medium",
+   "title": "Portrait head-mode pitch is sign-inverted vs landscape iOS and Android"
+  },
+  {
+   "actual": "The next onChanged of the pre-existing drag computes carry from the original startLocation/translation, so the held hand jumps by the full distance accumulated before the grab.",
+   "expected": "Carry offset should be measured from the grab instant (or the drag should be cancelled on grab). Android restarts the gesture when carrying flips (pointerInput keyed on carrying, Shell.kt:1476), so no jump there.",
+   "file": "ios/DuckApp/ContentView.swift",
+   "id": "ios-carry-jump-mid-drag",
+   "line": 709,
+   "repro": "Portrait, Live, ready. Finger 1 presses the stage and drags ~150 pt to walk the duck. With finger 1 still down, finger 2 taps the deck Grab chip (duck-grab). Move finger 1 slightly (same hole at line 367 with startLocation in the landscape gesture).",
+   "severity": "medium",
+   "title": "Grabbing with a second finger mid-drag makes the carried hand teleport"
+  },
+  {
+   "actual": "The ongoing stream keeps updating input.vx/wz (and joystick on iOS) until finger 1 lifts, so the duck walks while the modal picker is open; portrait only guards longPressed, not showRing.",
+   "expected": "Once the ring is open, scene input must stop driving, as iOS portrait does with its !showRing guard (ContentView.swift:707).",
+   "file": "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+   "id": "android-drive-under-ring",
+   "line": 1513,
+   "repro": "Finger 1 starts a drive drag on the stage. With finger 1 still down, finger 2 taps the skills chip (duck-skills or ring via long-press). The SkillRing scrim opens; finger 1 keeps driving behind it. Landscape has the additional variant: hold still ~0.5 s so sceneLongPress opens the ring, then drag the same finger (detectDragGestures crosses slop and starts driving).",
+   "severity": "medium",
+   "title": "Duck keeps driving after the skill ring opens mid-drag (both compositions)"
+  },
+  {
+   "actual": "driveGesture.onChanged keeps setting controller.joystick while the ring is open; the ring stays open and the duck drives unseen until the finger lifts.",
+   "expected": "Portrait's own guard (!showRing at line 707) should apply here too: no drive input while the skill ring is up.",
+   "file": "ios/DuckApp/ContentView.swift",
+   "id": "ios-drive-under-ring",
+   "line": 365,
+   "repro": "Landscape (or rotation to landscape), Live. Finger 1 starts a drive drag on the scene. Finger 2 taps the duck-skills chip in the bottom bar. The SkillRing scrim opens while finger 1 continues moving.",
+   "severity": "low",
+   "title": "Landscape drive gesture lacks the showRing guard its portrait twin has"
+  },
+  {
+   "actual": "The scrim Box is an ancestor of the panel, so unconsumed taps anywhere inside the panel bubble to its detectTapGestures and close the ring; iOS (sibling scrim + picker on top) ignores panel taps.",
+   "expected": "Only taps outside the panel should dismiss (scrim); taps on panel padding, headings and gaps should be inert, as on iOS.",
+   "file": "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+   "id": "android-ring-panel-dismiss",
+   "line": 1783,
+   "repro": "Long-press the stage (or tap duck-skills) so the SkillRing opens bottom-anchored. Tap the 'Actions'/'Emotions' heading or any padding/gap between SkillChips inside the panel.",
+   "severity": "low",
+   "title": "Tapping anywhere inside the skills panel dismisses the ring"
+  },
+  {
+   "actual": "The unconditional asyncAfter zeroes controller.joystick while the newer drag is still holding a direction, so the duck stops mid-drive with the thumb parked.",
+   "expected": "A newer touch should invalidate the pending reset, exactly as Android does with pulseToken (Shell.kt:1482-1483 and 1572-1578: 'A new touch invalidates any pending pulse reset').",
+   "file": "ios/DuckApp/ContentView.swift",
+   "id": "ios-stale-pulse-reset",
+   "line": 753,
+   "repro": "Portrait, drive mode. Tap the floor (250 ms pulse starts). Within 250 ms press and drag up to drive, then hold the thumb still. At the 250 ms mark from the tap's lift the old timer fires.",
+   "severity": "low",
+   "title": "Tap-pulse timer is not invalidated by a newer touch, killing an active drive"
+  }
+ ]
+}
+{
+ "findings": [
+  {
+   "actual": "The background save has no gate: it persists the fresh process's /state (hunger 0.15, mood 0.35, bond 0.1 and a fresh life object) over duck_companion_v1 before the queued restore has been applied, so the next launch loads the clobbered values. Conversely, when the restore fails outright the gate never reopens and the 1 Hz save never persists at all.",
+   "expected": "No write to duck_companion_v1 until the saved payload has been handed back to the core, i.e. the same companionRestored gate enforced in saveCompanionState (line 735). Backgrounding must never replace the saved care/life with the new runtime's defaults.",
+   "file": "D:\\AI\\Duck\\ios\\DuckApp\\DuckController.swift",
+   "id": "IOS-COMPANION-SAVE-CLOBBER",
+   "line": 710,
+   "repro": "1. Play, background the app, and confirm a payload exists under UserDefaults key duck_companion_v1.\n2. Kill and relaunch with that saved duck. As soon as the duck appears (ready == true), press Home before companionRestored flips: the restore worker has just been dispatched to the global queue, so the queued /care and /life intents have not been drained by the 50 Hz tick yet.\n3. appWentBackground() calls saveCompanionNow() at line 710 unconditionally. saveCompanionNow (744-757) has no companionRestored check (contrast saveCompanionState at 735) and writes whatever GET /state currently contains.\n4. Relaunch: hunger/mood/bond are back to the defaults and the previous values are gone.",
+   "severity": "high",
+   "title": "Background save bypasses the restore gate and can overwrite the saved companion with the new process's defaults"
+  },
+  {
+   "actual": "startIntentServer(8765) returns -1 (ignored), so the new core has no HTTP API. Every GET /state in the shell hits the freed core's last snapshot; restoreCompanion() posts /care,/life into a queue nobody drains and /rules times out, so it fails all 40 attempts, companionReady stays false and the periodic saver never starts. Feed/Pet (which post /feed via HTTP) do nothing, and the care/quests/peers/AI panels show stale values until the process is killed.",
+   "expected": "Relaunching the app (new Activity, new DuckCore) gets a working intent server; restore, companion saves, /state reads and HTTP-driven actions (feed/pet) operate on the new core.",
+   "file": "D:\\AI\\Duck\\android\\app\\src\\main\\java\\ai\\duck\\microduck\\MainActivity.kt",
+   "id": "ANDROID-INTENT-SERVER-SURVIVES-CORE",
+   "line": 79,
+   "repro": "1. Launch the app and wait for the duck.\n2. Press Back. onDestroy() (MainActivity.kt:146-158) calls core.close(), which frees the Rust DuckCore, but the intent server thread started by duck_core_start_intent_server keeps the listener bound to 0.0.0.0:8765 because duck_core_free only drops the core object (ffi.rs) and intent::start holds its own Arc of the queue.\n3. Relaunch from the launcher while the process is still cached.\n4. onCoreCreated calls created.startIntentServer(8765) at line 79; bind fails because the old listener still owns the port and the returned -1 is discarded. The restore thread started right after then talks to the dead core's server.",
+   "severity": "high",
+   "title": "The intent server outlives its DuckCore, so relaunching in the same process leaves the new core with no API and the app talking to the dead core"
+  },
+  {
+   "actual": "The guard compares the timeline against core.runtime.clock().tick — the original runtime, which is never stepped while selected != 0 — so checkpoint_now() (which does swap in the selected branch) is never called. After ~5 s, /time reports tick advancing but newest checkpoint frozen at the selection tick, and POST /restore {\"tick\": <current>} returns {\"ok\":false,\"error\":\"no checkpoint at tick ...\"}.",
+   "expected": "Checkpoints continue to be recorded for the duck that is actually being driven (the selected branch), so its last minute stays rewindable.",
+   "file": "D:\\AI\\Duck\\core\\duck-mobile-core\\src\\ffi.rs",
+   "id": "BRANCH-CHECKPOINTS-USE-ORIGINAL-CLOCK",
+   "line": 1465,
+   "repro": "1. POST /fork {\"label\":\"b1\"}; note the returned tick F. Wait ~1 s.\n2. POST /branch/select {\"label\":\"b1\"}.\n3. Let the duck tick for 5 s, then GET /time. The reported tick advances (it is published from the selected branch), but checkpoints/newest stays within one tick of F.\n4. POST /restore {\"tick\": <current tick>} and observe the refusal.",
+   "severity": "high",
+   "title": "Selecting a branch freezes its time-machine checkpoints because the guard compares against the un-stepped original runtime"
+  },
+  {
+   "actual": "The POST body built at 783-785 contains only trigger/action/value, so the core stores the rule without then. GET /rules shows the chain missing; opening Blocks calls loadRules() and replaces controller.rules with the truncated core copy, and the next add/delete immediately writes the chain-less list back to duck_rules_v1.",
+   "expected": "Relaunch hands the core exactly the rules that were saved, including then (the same payload saveRules builds at 1152-1156), so follow-up steps survive a restart.",
+   "file": "D:\\AI\\Duck\\ios\\DuckApp\\DuckController.swift",
+   "id": "IOS-RULES-RESTORE-DROPS-CHAIN",
+   "line": 784,
+   "repro": "1. In Blocks create a rule with follow-up steps (e.g. clap -> roulade -> laugh). It is persisted in duck_rules_v1 and POSTed with then by saveRules.\n2. Kill and relaunch the app.\n3. restoreCompanionState decodes the full [DuckRule] array into savedRules but builds the /rules payload as [\"trigger\":..., \"action\":..., \"value\":...] (line 783-785) - then is dropped.\n4. GET /rules shows the rule with no follow-up steps; open Blocks (loadRules replaces the local list) and add or delete any rule: the truncated list is written back to UserDefaults.",
+   "severity": "high",
+   "title": "Launch restore posts rules without their then chains, silently truncating the child's saved program on every relaunch"
+  },
+  {
+   "actual": "ground_picks is never read in Intent::RestoreLife (the field list at 834-861 jumps from falls to pickups), so GET /state.life.ground_picks is 0 again, /export/vetbook.md reports 0 pecks, and a 'peck twice' quest whose baseline was 2 is reset to 0 on the next QuestBoard tick because now < baseline.",
+   "expected": "Every counter present in the saved life object round-trips, including ground_picks, as pickups/sit_downs/etc. do.",
+   "file": "D:\\AI\\Duck\\core\\duck-mobile-core\\src\\ffi.rs",
+   "id": "LIFE-RESTORE-DROPS-GROUND-PICKS",
+   "line": 842,
+   "repro": "1. Peck twice (POST /ground_pick or the skill ring). GET /state shows life.ground_picks == 2 and the shell's periodic companion save stores that life object.\n2. Kill and relaunch the app, or POST the saved life object to /life (both iOS saveCompanionState and Android saveCompanionFromState send the full /state.life).\n3. Read GET /state.life and the vetbook export after the restore.",
+   "severity": "medium",
+   "title": "Life restore never reads ground_picks, so a lifetime counter (and peck-quest progress) resets on every launch"
+  },
+  {
+   "actual": "The day is pinned to the launch day until the process restarts: GET /state.quests.day stays on the old date, the same three quests stay completed/partial, the new day's set never appears and the streak logic never advances. Android has the same one-shot post (MainActivity.kt 94 -> QuestBoard.kt 56, fetchRawState/POST /quests/day).",
+   "expected": "When the phone's calendar day changes, the shell tells the core the new ISO day (exactly what it does at launch) so QuestBoard::update rolls the board and advances the streak, without requiring a relaunch.",
+   "file": "D:\\AI\\Duck\\ios\\DuckApp\\DuckController.swift",
+   "id": "QUEST-DAY-NEVER-ROLLS-OVER",
+   "line": 778,
+   "repro": "1. Launch the app, let the day's quests load (note GET /state.quests.day) and leave it running in the foreground (or background and return).\n2. Cross local midnight, or move the device clock to the next day while the app keeps running.\n3. GET /state.quests.day and the quest list: the day never changes and the board is never re-rolled.",
+   "severity": "medium",
+   "title": "Quest day is posted only once at launch, so a duck left running never rolls over at midnight"
+  }
+ ]
+}
+{
+ "findings": [
+  {
+   "actual": "`ButtonChip(Copy.fork) { branches += 1 }` mutates a local @State; the core is never forked (DuckCore.fork is never called), the reported branch count is fabricated, and the sheet shows a fake success.",
+   "expected": "Fork must create a real branch via the core (DuckCore.fork exists) and report the core's own branch count, as iOS controller.fork() does.",
+   "file": "D:\\AI\\Duck\\android\\app\\src\\main\\java\\ai\\duck\\microduck\\Shell.kt",
+   "id": "F1",
+   "line": 2402,
+   "repro": "Open Menu > Time (instrument sheet), tap the Fork chip. The footer line changes from \"speed 1x · branches 0\" to \"branches 1\". Close and reopen the sheet: the count is back to 0, and GET /state shows no new branch.",
+   "severity": "high",
+   "title": "Instrument sheet's Fork button only increments a local counter; it never forks the core"
+  },
+  {
+   "actual": "Column(Modifier.padding(20.dp)) has no verticalScroll (every other sheet in Shell.kt has one); children after the grid are measured at 0 height and clipped below the sheet, so the dance cannot be recorded, played or cleared while in landscape.",
+   "expected": "The sheet content must scroll so the action row stays reachable at any size, like the other sheets.",
+   "file": "D:\\AI\\Duck\\android\\app\\src\\main\\java\\ai\\duck\\microduck\\DanceSheet.kt",
+   "id": "F2",
+   "line": 88,
+   "repro": "Record a few steps (or relaunch with saved steps), rotate the phone to landscape, open Menu > Dance Studio. The steps LazyVerticalGrid (heightIn max 220dp) consumes the remaining sheet height, so the \"Try these\" row and the Record/Play/Clear row are pushed past the sheet's bottom edge and cannot be tapped.",
+   "severity": "high",
+   "title": "Dance sheet has no vertical scroll: Record/Play/Clear are clipped off-screen in landscape"
+  },
+  {
+   "actual": "All custom chips use raw detectTapGestures, so they expose no Role.Button or OnClick accessibility action, and the close chip reads as \"x\" instead of Copy.close; TalkBack users cannot dismiss any new sheet or trigger any chip-built control.",
+   "expected": "Close announces \"Close\" and activates on double-tap; action chips expose a click action (Modifier.clickable / Role.Button) and a contentDescription.",
+   "file": "D:\\AI\\Duck\\android\\app\\src\\main\\java\\ai\\duck\\microduck\\Shell.kt",
+   "id": "F3",
+   "line": 1451,
+   "repro": "Enable TalkBack, open Blocks, Dance Studio, AI companion or any sheet. The close control is read as \"x\" (Text(\"x\") with no contentDescription) and a double-tap does nothing. The same applies to every ButtonChip/RoundChip/RuleChip/SkillChip action (Add, Add step, Record, Play, Save, ring skills): they are Boxes with detectTapGestures inside pointerInput, which adds no OnClick semantics.",
+   "severity": "high",
+   "title": "New sheets' controls are Box+pointerInput with no click semantics; TalkBack cannot activate them and Close reads only \"x\""
+  },
+  {
+   "actual": "`when (step.kind)` handles only \"skill\" and \"sound\"; other recorded kinds (feed, and any pet/sit added later) are silently dropped from playback.",
+   "expected": "Playback executes every recorded kind through the same intent path, the way iOS ContentView.playDanceStep handles \"skill\", \"sound\", \"pet\", \"feed\" and \"sit\".",
+   "file": "D:\\AI\\Duck\\android\\app\\src\\main\\java\\ai\\duck\\microduck\\DanceSheet.kt",
+   "id": "F4",
+   "line": 77,
+   "repro": "Open Dance Studio, tap Record, close the sheet (recording stays on), tap Feed on the thumb deck (Shell.kt ThumbDeck onFeed calls dance.record(\"feed\")), reopen Dance Studio and tap Play. The Feed tile highlights for 0.8 s but the duck does nothing, then playback continues with the next step.",
+   "severity": "medium",
+   "title": "Dance playback silently skips recorded Feed steps"
+  },
+  {
+   "actual": "`Toggle(\"\", isOn:).labelsHidden()` gives an empty label; VoiceOver announces \"Switch\" twice with no name, and a screen-reader user cannot tell which sensor they are enabling.",
+   "expected": "Each switch exposes a label (e.g. Copy.microphone / Copy.voiceEar), like every other labeled control in the sheet.",
+   "file": "D:\\AI\\Duck\\ios\\DuckApp\\InstrumentSheet.swift",
+   "id": "F5",
+   "line": 553,
+   "repro": "Turn on VoiceOver, open the instrument sheet and navigate the microphone row: the switch is announced as just \"Switch\" with no name. The voice-commands row's switch (line 585) announces identically, so the two toggles are indistinguishable and neither says what it controls.",
+   "severity": "medium",
+   "title": "Microphone and voice-command switches have empty accessibility labels"
+  },
+  {
+   "actual": "A 36 pt tap target below the 44 pt floor; single tap immediately removes a staged step with no confirmation, and the Text carries no button trait or hint, so VoiceOver users get no delete action and sighted users get no affordance.",
+   "expected": "At least a 44 pt target and an explicit, accessible delete control (a Button labelled Copy.deleteRule), matching the 48 pt close targets used elsewhere in the app.",
+   "file": "D:\\AI\\Duck\\ios\\DuckApp\\RulesSheet.swift",
+   "id": "F6",
+   "line": 135,
+   "repro": "Open Blocks, pick a trigger and action, then add 3-4 steps via \"then also\" > Add step. The staged capsules are frame(minHeight: 36) Texts with .onTapGesture; a single tap anywhere on one silently deletes that step. They are not Buttons, so VoiceOver offers no button trait, no delete action and no hint that tapping removes the step.",
+   "severity": "medium",
+   "title": "Rule-chain step chips are 36 pt tall and delete on a single tap with no button role or affordance"
+  }
+ ]
+}
+{
+ "findings": [
+  {
+   "id": "android-photo-caption-main-thread",
+   "file": "android/app/src/main/java/ai/duck/microduck/MainActivity.kt",
+   "line": 316,
+   "title": "Android photo preview fetches /state on the UI thread, so postcard captions always fall back to the quiet line",
+   "repro": "On an Android 10+ device, let the duck feed/pet/walk, open Director, tap the shutter, and read the caption under the preview image.",
+   "expected": "The caption cites the real life.events deltas and metres (pets/feeds/rituals/falls/moods and distance), as the iOS PhotoPreviewSheet does.",
+   "actual": "`val events = remember { fetchLifeEvents() }` (line 316) and the inline URL(\"http://127.0.0.1:8765/state\").openConnection()/inputStream fetch (lines 317-330) execute synchronously during Compose composition on the main thread. With targetSdk 35 the platform BlockGuard throws NetworkOnMainThreadException from inputStream; both `catch` blocks swallow it, so events is empty and metres is always 0.0, and postcardCaption always returns Copy.postcardQuiet (\"A quiet night.\"). On any path where the exception is suppressed, the dialog instead blocks the UI for up to 3 s (1.5 s connect + 1.5 s read).",
+   "severity": "medium"
+  },
+  {
+   "id": "ios-shutter-stuck-after-still-failure",
+   "file": "ios/DuckApp/CameraBackdrop.swift",
+   "line": 164,
+   "title": "iOS Director shutter stays permanently dead after a still capture that fails before processing",
+   "repro": "In Director with the camera live, press the shutter just as the capture cannot complete (incoming call, Control Center / another app takes the camera, or an AVCaptureSession error). No preview appears, and every later shutter press is ignored - even after leaving and reopening Director - until the app is relaunched.",
+   "expected": "A failed still reports failure (or times out) and clears the in-flight flag so the next shutter press starts a new capture, as CameraX's onError callback does on Android.",
+   "actual": "`self.photoCompletion = completion` (line 164) is only ever cleared in photoOutput(_:didFinishProcessingPhoto:error:) (lines 206-218). The delegate never implements photoOutput(_:didFinishCaptureFor:error:), which AVFoundation calls for a request that fails before a photo is processed, and there is no timeout. The completion therefore never runs, so DuckController.photoInFlight (DuckController.swift:1233) is never reset; the only other resets are the duck-nil and success completions, and stop()/start() do not clear it either.",
+   "severity": "medium"
+  },
+  {
+   "id": "ios-director-photos-never-pruned",
+   "file": "ios/DuckApp/DuckController.swift",
+   "line": 1303,
+   "title": "Every iOS Director photo is written to Documents/Photos and never deleted",
+   "repro": "Take 20 Director photos and close each preview with the X (or press Share/Keep). Inspect the app container: Documents/Photos holds 20 PNGs; repeat and it grows by a multi-MB file per shot. No screen in the app lists or removes them.",
+   "expected": "Delete the temporary PNG when the preview is dismissed (or keep it in Caches), leaving only what the user kept in Documents/Postcards or saved to Photos; Android already puts its share artifact in cacheDir/photos.",
+   "actual": "writePhoto always writes Documents/Photos/MicroDuck-yyyyMMdd-HHmmss.png (lines 1308-1315) and nothing in the app ever removes these files. Dismissed/unshared shots accumulate without bound and are included in iCloud device backups.",
+   "severity": "medium"
+  },
+  {
+   "id": "android-still-decode-rotate-on-main",
+   "file": "android/app/src/main/java/ai/duck/microduck/CameraBackdrop.kt",
+   "line": 185,
+   "title": "CameraX still is decoded, rotated and composited on the UI thread at full resolution",
+   "repro": "Take a Director photo on a phone whose camera captures full-resolution stills (e.g. 12 MP). Immediately after the shutter the UI freezes for roughly 0.5-1 s; on a low-memory device this can end in OutOfMemoryError.",
+   "expected": "Decode and rotate the still off the main thread (downsampled with inSampleSize or to the composite size), then publish the finished bitmap on the main thread.",
+   "actual": "takePicture is given ContextCompat.getMainExecutor(context) at line 186, so onCaptureSuccess runs on the UI thread: it copies the JPEG bytes and decodes the full-size image (line 193), rotates it into a second full-size bitmap (lines 210-212), and MainActivity then builds the screen-size composite (MainActivity.kt:282). A 12 MP ARGB_8888 buffer is ~48 MB, so one shot allocates close to 100 MB of bitmaps while the UI thread is blocked.",
+   "severity": "medium"
+  },
+  {
+   "id": "android-postcard-evicted-files-left-on-disk",
+   "file": "android/app/src/main/java/ai/duck/microduck/PostcardShelf.kt",
+   "line": 46,
+   "title": "Android postcard shelf drops evicted entries but leaves their PNGs on disk forever",
+   "repro": "Keep 31 or more Director photos. The shelf lists only the newest 30, but files/postcards contains all 31+ PNGs and grows with every further Keep.",
+   "expected": "Removing a card past MAX also deletes its PNG file, exactly as PostcardShelf.keep does on iOS.",
+   "actual": "`while (cards.size > MAX) cards.removeAt(cards.size - 1)` (line 46) discards only the metadata entry; the multi-megabyte full-screen PNG stays in files/postcards with no reference, so the app's data directory grows without bound.",
+   "severity": "low"
+  },
+  {
+   "id": "ios-camera-denied-never-clears",
+   "file": "ios/DuckApp/CameraBackdrop.swift",
+   "line": 57,
+   "title": "iOS camera denied state never clears after access is re-enabled in Settings",
+   "repro": "With the app running, open Director and deny the camera prompt. Go to Settings > MicroDuck and enable Camera, return to the app, and open Director: the live preview now works, but the instrument sheet's camera row still reads \"Denied\" (and depth on LiDAR hardware) until the app is relaunched.",
+   "expected": "The authorized path (start() lines 43-44 / activate() lines 73-90) resets denied to false, or the sheet reads the live authorization status, so the rows show the camera's readings once it works.",
+   "actual": "denied is only ever set true (lines 52 and 57); neither start()'s .authorized branch nor activate() clears it, so DuckController.cameraDenied stays true for the life of the process and both cameraSummary and depthSummary keep reporting Copy.denied.",
+   "severity": "low"
+  }
+ ]
+}
+{
+ "verdicts": [
+  {
+   "id": "DEF-001",
+   "real": true,
+   "severity": "medium",
+   "reason": "previous_day() (quests.rs:245-266) unconditionally sets parts[2]=30 whenever the day rolls below 1, so it returns garbage on month starts: 2026-03-01->2026-02-30, 2026-01-01->2025-12-30, 2026-04-01->2026-03-30, 2026-08-01->2026-07-30 (replicated the exact algorithm). Both callers roll_day (line 101) and update()'s pre-roll check (line 114) compare last_completed_day against it, so a board completed on 2026-02-28 / a 31-day month's last day is zeroed the next day. No test rolls a month boundary (unit test only '2026-11-11'; sim-drive.sh/smoke-test.sh use today's date with board:{}). Caveat that mutes the shipped-app impact: both shells persist the /state.quests summary (id/title_en/title_zh/target/done/progress — no metric/baseline/celebrated), which QuestBoard's Deserialize rejects, so restore() is currently a no-op on relaunch and the streak is lost there anyway; the previous_day defect still governs any in-process day change or any API-driven board and resurfaces the moment the save format is fixed.",
+   "fix": "Replace the hand-rolled arithmetic with real date logic (days-in-month + leap year, or an epoch-days helper); fix BOTH call sites (roll_day and the pre-check at lines 112-117); add tests for 2026-03-01->2026-02-28, 2026-01-01->2025-12-31, 2026-04-01->2026-03-31, 2026-08-01->2026-07-31, 2024-03-01->2024-02-29; and make the shell save/restore round-trip (include the full board fields) so the streak is reachable end-to-end."
+  },
+  {
+   "id": "DEF-002",
+   "real": false,
+   "severity": "low",
+   "reason": "The mechanics are exactly as described (pending_restore is applied at ffi.rs:1427-1445 before the pause gate at 1447; runtime.rs:1658 restore() writes clock.paused=checkpoint.paused; automatic checkpoints are only recorded after the gate so they always carry paused=false), but this is the documented, shell-endorsed behavior rather than a silent override. Intent::Seek is 'step back ticks and resume from there' and Intent::Restore is 'resume from a saved tick' (intent.rs:64-66); the tick comment says 'the duck resumes at the saved tick'; iOS rewind() is commented 'resume from there' and calls refreshClock() which immediately reads duck_core_paused and flips the toggle (DuckController.swift:1661-1695); Android's DuckLoop branches on core.paused() and the main shell polls it every 200 ms (Shell.kt:1322-1329). So /state.paused=false after a seek is the public contract, and restoring the checkpoint's own paused bit is exact-state restore (a /checkpoint taken while paused stays paused). The only real nit is that Android's InstrumentSheet keeps a private `paused` variable that is never re-polled (its LaunchedEffect only refreshes `status`), so its toggle can read 'Resume' after a rewind until the sheet is dismissed — a UI nit, not the claimed core defect.",
+   "fix": "No core change required if resume-on-rewind is the intended contract (it is documented and both shells reflect it). If the product wants a paused duck to stay paused across a rewind, capture active_runtime(core).clock().paused before applying pending_restore and re-apply it after restore(), and have Android's InstrumentSheet poll core.paused() like the rail chip. At minimum add a sim-drive assertion documenting the chosen pause/seek semantics."
+  },
+  {
+   "id": "DEF-003",
+   "real": true,
+   "severity": "medium",
+   "reason": "lan.rs:220 calls upsert() before the type match, so any v=1 datagram with a non-empty `from` creates/refreshes a peer regardless of kind (junk types included, per the `_ => None` arm still seeing the earlier upsert). The 'hello' arm (256-272) has no per-peer throttle (only 'greet' consults last_greet_ms), pushes one PeerEvent::Replied per datagram (up to the 32-event cap per tick) which triggers runtime.peer_event -> the duck's 'yes' emotion/sound (runtime.rs:1315-1333), and sets peer.replied=true with no prior greet — falsifying the 'replied' flag published in /state.peers. 16 spoofed ids evict real ducks via MAX_PEERS drop-stalest in upsert (277-303). This directly defeats the code's own 'A LAN flood must not become a chorus of emotions' guard, which only throttles greet.",
+   "fix": "Validate the type before upsert (only announce/greet/hello may create a peer); rate-limit hello per peer the same way greet does; track an awaiting-reply flag set by greet() so replied is only set for peers we actually greeted; and add a flood unit test (50 hellos over one 'tick' -> bounded events, no forged replied, no peer-table churn)."
+  },
+  {
+   "id": "DEF-004",
+   "real": true,
+   "severity": "low",
+   "reason": "restore() (quests.rs:195-204) validates only day.len()==10 and quests.len()<=3, then clamps streak/best_streak/completed_today; everything else in a serde-deserializable board is trusted. A fully-specified board with target:0 (or negative) makes every `now - baseline >= target` true on the very next tick — all three quests complete with no interaction, last_completed_day is set and streak increments; a board with completed_today:3 and last_completed_day=yesterday also mints +1 each tick it persists, so the comment 'a corrupt file cannot invent a streak' does not hold. The unauthenticated 0.0.0.0:8765 API makes this reachable from the LAN. Two caveats: the literal repro payload omits Quest fields serde requires (id/title_en/title_zh/celebrated), so serde_json rejects it as written — the exploit needs a complete board; and the same strictness means the shells' own summary-shaped saved board is also rejected, so legitimate restores are separately broken (see DEF-001). Impact is limited to the cosmetic streak/completion display.",
+   "fix": "In restore(), validate instead of trusting: each quest must have finite target > 0 and finite baseline; derive/integrity-check done/celebrated/completed_today/last_completed_day against the day (e.g. completed_today equals the count of done quests; last_completed_day is empty, today, or an earlier valid ISO date) and clamp streak before adopting the board; reject malformed boards rather than silently adopting them. Add tests for target 0/negative, done:true without baseline, and a well-formed board."
+  },
+  {
+   "id": "DEF-005",
+   "real": true,
+   "severity": "medium",
+   "reason": "duck_core_tick builds the quest values from core.runtime — the original, unselected duck (ffi.rs:1381-1384: 'life': core.runtime.book().summary(), 'care': core.runtime.care_summary()) — while /state.life and /state.care publish active_runtime (ffi.rs:1310/1314) and the completion celebration is sent via on_active to the selected branch (ffi.rs:1387-1390). When a branch is selected, the original runtime is no longer stepped (ffi.rs:1481-1495), so its counters freeze and every branch action (e.g. pet() increments the branch's own vet book, runtime.rs:1108-1109) never reaches the quest measurement: /state.quests progress stays 0 and no celebration fires. This violates the module's own invariant that 'every reader — /state, DuckStatus, render poses — must use [active_runtime]' (ffi.rs:1146-1148), an invariant the prior QA sweep deliberately extended to restore/pause/life publication but missed for quests.",
+   "fix": "Build the quest values from active_runtime(core) (care_summary + book().summary()) so quests measure the duck the client is driving, keep the celebration on_active, and add a fork+select test proving branch pets advance a Pets quest and the completion event fires on the branch."
+  },
+  {
+   "id": "DEF-006",
+   "real": true,
+   "severity": "medium",
+   "reason": "The intent server spawns one OS thread per accepted connection with no cap (intent.rs:442-451) and handle() blocks up to the 2 s per-read timeout on an undersized body; a byte-dripped connection (or repeated partial headers) keeps a handler thread alive indefinitely, so the live-thread count is attacker-controlled. std::thread::spawn panics when the OS refuses a new thread; that panic unwinds the accept-loop closure ('for stream in listener.incoming().flatten()' at 443-450) and drops the TcpListener, permanently killing the 8765 API for the process lifetime (with panic=abort the whole app dies instead). Separately, neither the intent fork path (ffi.rs:1089-1099) nor duck_core_fork (ffi.rs:2015-2034) caps branches, and every branch is stepped every tick (ffi.rs:1471-1478), so one unauthenticated LAN client can also grow branches/CPU/memory without bound. NOTE: the outer intent.rs:446 is the inner per-connection spawn; the listener itself is moved into the outer closure, so the panic-drop of the listener holds. Reachability of the thread-exhaustion leg is OS/resource-dependent but realistic given mobile thread limits.",
+   "fix": "Bound concurrent handlers (an AtomicUsize connection cap returning 503, or a small worker pool) and per-connection wall time; use std::thread::Builder::spawn and on Err close/drop in a way that cannot unwind the accept loop (or wrap the per-connection spawn in catch_unwind); cap branches in both fork paths (MAX_BRANCHES); and skip/swallow accept errors with a short sleep so EMFILE/FD exhaustion cannot hot-spin the loop."
+  }
+ ]
+}
+{
+ "verdicts": [
+  {
+   "fix": "In Shell.kt InstrumentSheet replace line 2402 with ButtonChip(Copy.fork) { core.fork() } and derive the footer count from the core: poll GET /branches (the core serves it at 127.0.0.1:8765, see core/duck-mobile-core/src/intent.rs:511) inside the sheet's existing 1 Hz LaunchedEffect loop using the same fetch pattern as fetchLifeEvents (Shell.kt:2469), or add a branchCount accessor to DuckCore. Mirror iOS DuckController.fork() (DuckController.swift:1696-1699) which increments branchCount only after duck_core_fork succeeds.",
+   "id": "F1",
+   "real": true,
+   "reason": "Verified: branches is a local remember state (Shell.kt:2109) and the chip is its only writer (Shell.kt:2402). DuckCore.fork exists (DuckCore.kt:48, nativeFork at 252) but grep of the whole android/ tree shows no caller; nothing reads a real branch count. iOS does the real thing (DuckController.swift:1696-1699 calls duck_core_fork then branchCount += 1). The footer (Shell.kt:2418) shows the fabricated number, and since it is remember-scoped it resets to 0 when the sheet recomposes, exactly as the repro describes. The GET /state detail in the repro is slightly off (branches live on GET /branches, intent.rs:511) but the core claim is accurate.",
+   "severity": "high"
+  },
+  {
+   "fix": "Add .verticalScroll(rememberScrollState()) to the DanceSheet Column modifier (DanceSheet.kt:89-90), matching the other sheets. The grid already carries .heightIn(max = 220.dp) (DanceSheet.kt:119) so nesting inside a scrollable column stays legal (bounded height, no infinite-constraint crash).",
+   "id": "F2",
+   "real": true,
+   "reason": "Verified structurally: DanceSheet's Column (DanceSheet.kt:88-91) has no verticalScroll while all five sheets in Shell.kt do (787, 905, 1014, 1823, 2182). I pulled the exact dependency sources (material3-android 1.3.1 from BOM 2024.10.01) and confirmed ModalBottomSheet's content Column has no built-in scroll — only nestedScroll/draggable for sheet dragging — so overflowing children are measured at 0 remaining height and become untappable. Manifestation is device-dependent: app is edge-to-edge (MainActivity.kt:69) with a safeDrawing bottom inset; content is roughly 380-440dp with steps vs ~365-390dp of landscape height on common phones, so with a fuller grid (2+ rows) or 3-button nav/smaller devices the Record/Play/Clear row is fully clipped, while on the largest phones with few steps it may only be partially cut. Portrait unaffected; rotate-to-portrait is a workaround — hence medium, not high.",
+   "severity": "medium"
+  },
+  {
+   "fix": "Convert the shared chips to clickable: ButtonChip/CloseChip/RoundChip/RuleChip/SkillChip/SurfaceChip should use Modifier.clickable(onClickLabel = ...) or add .semantics { role = Role.Button; contentDescription = ... }; for CloseChip set contentDescription = Copy.close (already exists, Copy.kt:89). Where a hold gesture matters (quack chip) keep detectTapGestures but add explicit semantics with Role.Button and an onClickLabel.",
+   "id": "F3",
+   "real": true,
+   "reason": "Verified every chip is Box + pointerInput { detectTapGestures } with no semantics, Role, contentDescription, or clickable: CloseChip (Shell.kt:1451-1462, Text is the literal \"×\"), ButtonChip (2437), RuleChip (1178), SurfaceChip (1665), RoundChip (1691), SkillChip (1861). Compose's detectTapGestures inside pointerInput adds no OnClick accessibility action, so TalkBack announces bare text and double-tap activates nothing. One nuance: the default ModalBottomSheet drag handle does expose an accessibility dismiss action (verified in material3 1.3.1 source), so sheets are not literally undismissible — but the close chip itself reads \"×\" and every chip-built action is unusable under TalkBack.",
+   "severity": "high"
+  },
+  {
+   "fix": "Extend the when in DanceSheet.kt:77 to execute every recorded kind through the path its tile came from — give DanceSheet an onFeed callback (wired to the same handler ThumbDeck uses) and dispatch \"feed\" to it; ideally take a generic onStep: (kind, value) -> Unit so future kinds (pet/sit) cannot be dropped, mirroring iOS ContentView.playDanceStep (ContentView.swift:687-699).",
+   "id": "F4",
+   "real": true,
+   "reason": "Verified: while recording, ThumbDeck's onFeed calls dance.record(\"feed\", label = Copy.feed) (Shell.kt:416-419); DanceStudio persists recording across sheet close (state lives on the studio, DanceStudio.kt:22). Playback's when (DanceSheet.kt:77-80) handles only \"skill\" and \"sound\", so a feed step gets activeStep = index and the 0.8 s delay but no action, then playback continues. iOS handles \"pet\", \"feed\", \"sit\" as well (ContentView.swift:687-699), confirming the expected parity. Today only \"feed\" is recordable-and-dropped on Android; pet/sit are forward-looking.",
+   "severity": "medium"
+  },
+  {
+   "fix": "Add .accessibilityLabel(Copy.microphone) to the mic toggle (InstrumentSheet.swift:558) and .accessibilityLabel(Copy.voiceEar) to the voice toggle (line 590) — both strings already exist in Copy.swift — or replace Toggle(\"\") with a properly labeled Toggle bound to the row text.",
+   "id": "F5",
+   "real": true,
+   "reason": "Verified: InstrumentSheet.swift:553-557 (mic) and 585-589 (voice commands) both use Toggle(\"\", isOn:...).labelsHidden(); the only accessibility modifiers on them are accessibilityIdentifier (not user-facing). The file's only accessibilityLabels are lines 314 (close) and 515 (flashlight), so both switches announce as an unnamed Switch, indistinguishable from each other. No parent element combines children.",
+   "severity": "medium"
+  },
+  {
+   "fix": "Raise the target to at least 44pt (the app's own convention is 48) and make the delete explicit and accessible: replace Text+onTapGesture with a Button (labelled, with accessibilityHint like \"Removes this step\") or add accessibilityAddTraits(.isButton) plus an explicit delete accessibilityAction; consider requiring a deliberate gesture (dedicated delete control or confirmation) instead of a bare single tap.",
+   "id": "F6",
+   "real": true,
+   "reason": "Verified: RulesSheet.swift:131-141 stages chain steps as Texts with .frame(minHeight: 36) (line 135) and a bare .onTapGesture that removes the step with no confirmation (137-139); no button trait, hint, or label is attached, while every other control in the same file is a proper Button with accessibilityLabel (e.g. lines 37, 70). One nuance: SwiftUI's onTapGesture is activatable via VoiceOver double-tap (unlike Compose), so \"no delete action\" overstates it — a VoiceOver user can trigger the delete, but silently and with no indication the element is destructive. The 36pt target, missing button trait/hint, and unconfirmed single-tap delete are all accurate.",
+   "severity": "medium"
+  }
+ ]
+}
+{
+ "verdicts": [
+  {
+   "fix": "Replace both remember{} fetches with a LaunchedEffect that runs on Dispatchers.IO (the pattern Shell.kt already uses), store events/metres in mutableStateOf, and compute the caption when they arrive, defaulting to the quiet line while loading.",
+   "id": "android-photo-caption-main-thread",
+   "real": true,
+   "reason": "Confirmed: MainActivity.kt:316-330 runs remember { fetchLifeEvents() } plus a second inline synchronous HttpURLConnection GET to 127.0.0.1:8765/state inside PhotoPreviewDialog's composition, which executes on the main thread. fetchLifeEvents (Shell.kt:2469-2487) is a plain blocking function; every other call site wraps it in Dispatchers.IO (Shell.kt:2143) or a background Thread, but this one does not. With targetSdk 35 (build.gradle.kts:15) BlockGuard throws NetworkOnMainThreadException on the first socket call; both catch blocks swallow it, so events is empty and metres is 0.0, and postcardCaption (PostcardShelf.kt:81) always returns Copy.postcardQuiet. One correction: the claimed 'blocks the UI up to 3 s' fallback path is not reachable on this app (minSdk 29/targetSdk 35 means the exception aborts the fetch immediately), so the observable symptom is the permanently quiet caption, not a freeze.",
+   "severity": "medium"
+  },
+  {
+   "fix": "Implement photoOutput(_:didFinishCaptureFor:error:) in the CameraFeed delegate: if photoCompletion is still set (not consumed by didFinishProcessingPhoto), nil it and dispatch completion(nil) on the main thread. Optionally add a watchdog (e.g., ~10 s DispatchWorkItem) that fires completion(nil) and clears photoCompletion if no callback arrived.",
+   "id": "ios-shutter-stuck-after-still-failure",
+   "real": true,
+   "reason": "Confirmed: photoCompletion is stored at CameraBackdrop.swift:164 and cleared only in photoOutput(_:didFinishProcessingPhoto:error:) (lines 212-213). The delegate never implements photoOutput(_:didFinishCaptureFor:error:) — AVFoundation's terminal callback that fires (with error) for capture requests that fail before any photo is processed (session interruption, camera taken by another process) — and CameraFeed has no timeout. photoInFlight (DuckController.swift:187) is reset only at DuckController.swift:1238 and 1243, both downstream of the camera completion, and camera.stop()/start() (CameraBackdrop.swift:36-71) never clear photoCompletion, so a pre-processing failure leaves the Director shutter permanently dead until relaunch. Processing-stage errors (error != nil in didFinishProcessingPhoto) are handled; the gap is exactly the pre-processing failure modes named in the finding.",
+   "severity": "medium"
+  },
+  {
+   "fix": "Delete photo.url when the preview is dismissed without a keep/save (or write captures to NSCachesDirectory and only promote kept postcards into Documents/Postcards, matching Android's cacheDir/photos artifact); optionally prune the directory on launch.",
+   "id": "ios-director-photos-never-pruned",
+   "real": true,
+   "reason": "Confirmed: writePhoto (DuckController.swift:1303-1320) writes every Director capture to Documents/Photos/MicroDuck-yyyyMMdd-HHmmss.png, and PhotoPreviewSheet never deletes photo.url — the X button just calls dismiss() (PhotoPreviewSheet.swift:24-36), Share hands the file to the system, and Keep writes a second copy into Documents/Postcards. A repo-wide search shows the only FileManager.removeItem call is PostcardShelf's own eviction (PostcardShelf.swift:61); nothing in the app lists or deletes Documents/Photos, so dismissed/unshared shots accumulate without bound and, being in Documents, are included in iCloud device backups.",
+   "severity": "medium"
+  },
+  {
+   "fix": "Pass a background executor (e.g., Executors.newSingleThreadExecutor()) to takePicture, decode with inSampleSize down to roughly the composite size, perform rotation and compositePhoto on that executor, and post only the finished bitmap to the main thread via the existing Handler(Looper.getMainLooper()) at MainActivity.kt:273.",
+   "id": "android-still-decode-rotate-on-main",
+   "real": true,
+   "reason": "Confirmed: CameraBackdrop.kt:186 passes ContextCompat.getMainExecutor(context) to takePicture, so onCaptureSuccess (lines 188-218) runs on the UI thread: it copies the JPEG bytes, decodes full-size via BitmapFactory.decodeByteArray (line 193), and rotates into a second full-size bitmap (lines 206-214); the callback then runs MainActivity.kt:282 compositePhoto (PhotoCapture.kt:20-50), allocating a third ARGB_8888 bitmap at screen size, all while the main thread is blocked. CameraX's documented default for ImageCapture without a resolution selector is the largest available resolution, so a 12 MP still (~48 MB per ARGB_8888 buffer, near 100 MB transient total) is the norm; the freeze is certain and OOM on low-memory devices is plausible.",
+   "severity": "medium"
+  },
+  {
+   "fix": "In the eviction loop in PostcardShelf.save, delete the evicted entry's file — File(dir(context), evicted.file).delete() — alongside cards.removeAt.",
+   "id": "android-postcard-evicted-files-left-on-disk",
+   "real": true,
+   "reason": "Confirmed: PostcardShelf.save (PostcardShelf.kt:43-58) inserts at index 0 and then 'while (cards.size > MAX) cards.removeAt(cards.size - 1)' (line 46) drops only the metadata entry; the PNG written at MainActivity.kt:396 stays in filesDir/postcards with no remaining reference, and load()'s existence filter (line 37) never removes files. iOS's PostcardShelf.keep does delete on eviction (PostcardShelf.swift:59-63), confirming the divergence. Growth is unbounded but only driven by user Keeps, hence low.",
+   "severity": "low"
+  },
+  {
+   "fix": "Set denied = false in activate() (or in start()'s .authorized branch) before publishing available; the existing camera.$denied subscriber (DuckController.swift:394-398) then updates the sheet automatically.",
+   "id": "ios-camera-denied-never-clears",
+   "real": true,
+   "reason": "Confirmed: CameraFeed.denied is set true at CameraBackdrop.swift:52 (requestAccess refusal) and 57 (the default branch for .denied/.restricted) and no code path ever sets it false — start()'s .authorized branch (lines 43-44) just calls activate() (73-90), which publishes available without touching denied, and stop() does not either. DuckController mirrors it into cameraDenied (DuckController.swift:394-398) and the instrument sheet renders Copy.denied whenever cameraDenied is true (InstrumentSheet.swift:532), with depth following on LiDAR (DuckController.swift:1486-1488). Re-enabling Camera in Settings and reopening Director (setDirector -> camera.start(), DuckController.swift:1804-1812) starts the preview while the rows keep reading 'Denied' until relaunch.",
+   "severity": "low"
+  }
+ ]
+}

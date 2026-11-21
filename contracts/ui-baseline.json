@@ -1,0 +1,98 @@
+{
+  "a11y_announcements": {
+    "count": 2,
+    "direction": "min"
+  },
+  "a11y_custom_actions": {
+    "count": 7,
+    "direction": "min"
+  },
+  "android_back_handler": {
+    "count": 2,
+    "direction": "min"
+  },
+  "android_color_literals": {
+    "count": 0,
+    "direction": "max"
+  },
+  "android_font_literals": {
+    "count": 0,
+    "direction": "max"
+  },
+  "android_inline_motion": {
+    "count": 0,
+    "direction": "max"
+  },
+  "android_modal_bools": {
+    "count": 0,
+    "direction": "max"
+  },
+  "android_offgrid_spacing": {
+    "count": 0,
+    "direction": "max"
+  },
+  "android_press_no_feedback": {
+    "count": 12,
+    "direction": "max"
+  },
+  "android_radius_literals": {
+    "count": 0,
+    "direction": "max"
+  },
+  "android_remember_saveable": {
+    "count": 2,
+    "direction": "min"
+  },
+  "content_view_lines": {
+    "count": 1813,
+    "direction": "max"
+  },
+  "controller_published": {
+    "count": 107,
+    "direction": "max"
+  },
+  "haptics_sites": {
+    "count": 12,
+    "direction": "min"
+  },
+  "ios_close_button_files": {
+    "count": 1,
+    "direction": "max"
+  },
+  "ios_color_literals": {
+    "count": 4,
+    "direction": "max"
+  },
+  "ios_dark_hardwrites": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_font_literals": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_inline_motion": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_missing_rounded": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_offgrid_spacing": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_radius_literals": {
+    "count": 0,
+    "direction": "max"
+  },
+  "ios_reduce_motion": {
+    "count": 3,
+    "direction": "min"
+  },
+  "shell_kt_lines": {
+    "count": 3836,
+    "direction": "max"
+  }
+}

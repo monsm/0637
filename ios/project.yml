@@ -1,0 +1,175 @@
+name: Duck
+options:
+  bundleIdPrefix: ai.duck
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+targets:
+  Duck:
+    type: application
+    platform: iOS
+    sources:
+      - path: DuckApp
+        excludes:
+          - "DuckResources/**"
+          # Shaders.metal is copied into DuckResources by
+          # stage-resources.sh and compiled at runtime. Excluded here so
+          # Xcode does not turn it into a root-level default.metallib
+          # (which Xcode 26 refuses to code sign).
+          - "Shaders/**"
+      # Shaders.metal lives inside the Resources folder reference, which is
+      # copied verbatim: Xcode never compiles it, so no default.metallib ends
+      # up at the bundle root (Xcode 26 refuses to code sign that), and the
+      # app compiles the shader at runtime instead.
+      - path: DuckApp/DuckResources
+        type: folder
+        buildPhase: resources
+      - path: DuckApp/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck
+        # CoreSimulator needs CFBundleVersion to identify the app; the
+        # generated Info.plist only carries it when these are set.
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        # Xcode 26 defaults Debug builds to the "debug dylib" layout
+        # (Duck.debug.dylib + __preview.dylib, stub executable). CLI-built
+        # apps in that mode are signed with Identifier=Duck-<hash> and an
+        # unbound Info.plist, and CoreSimulator then refuses to install them
+        # with a misleading "Missing bundle ID".
+        ENABLE_DEBUG_DYLIB: NO
+        ENABLE_PREVIEWS: NO
+        GENERATE_INFOPLIST_FILE: YES
+        # Dark, once, for the whole app (UI_TOKENS §7): the room, the stage
+        # and the viewfinder are all dark; a light screen is not a variant
+        # this product has. The 16 per-view .preferredColorScheme(.dark)
+        # hardwrites went away with this key.
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        # Portrait is the product; landscape stays as the two-hand instrument
+        # and demo layout. Upside-down is omitted on iPhone, as Apple expects.
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        # iPhone first. iPad gets its own adaptive pass before it is claimed.
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_CFBundleDisplayName: MicroDuck
+        # One single-size 1024 app icon (Xcode 14+): no hand-maintained
+        # size grid, the catalog ships just the 1024 PNG.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
+        INFOPLIST_KEY_NSMotionUsageDescription: "Shake your phone to push the digital duck."
+        # Director mode composites the 3D duck over the rear camera. The prompt is
+        # asked only when Director is opened, never at launch; the same grant
+        # also lets later launches run the one-second depth scan that keeps
+        # the duck off the furniture already in the room.
+        INFOPLIST_KEY_NSCameraUsageDescription: "Director mode puts the digital duck in your room, and the camera also lets a one-second scan at launch keep the duck off your furniture. The camera image never reaches the duck's senses."
+        # The microphone is the ROOM, never the duck's senses. Asked only when
+        # the user enables the mic row in the instrument sheet, never at launch.
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: "MicroDuck listens for loud sounds in the room so your AI can react. Audio stays on your phone and never reaches the duck's senses."
+        # The duck's ear: spoken Chinese becomes the duck's own verbs. The
+        # recognition is on this phone, so the audio never leaves it. Asked
+        # only when the user enables the voice-command row in the instrument
+        # sheet, never at launch.
+        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: "MicroDuck recognises spoken Chinese on this phone and hands the duck the words. The audio stays on your phone."
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "The local intent API lets your own AI agent drive the duck."
+        # Saving the Director photo. Asked only when the user taps Save in the
+        # photo preview; sharing needs no permission.
+        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "Save the Director photo of your duck to Photos."
+        SWIFT_OBJC_BRIDGING_HEADER: DuckApp/DuckCore-Bridging-Header.h
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/../core/duck-mobile-core/include
+        OTHER_LDFLAGS:
+          - -L$(SRCROOT)/Frameworks
+          - -lduck_mobile_core
+        LD_RUNPATH_SEARCH_PATHS:
+          - $(inherited)
+          - "@executable_path/Frameworks"
+        # The UI test target reads the status label and taps the buttons.
+        ENABLE_TESTABILITY: YES
+    dependencies:
+      # Embedded and signed by Xcode's own phases instead of script phases:
+      # a script-copied framework confused codesign into ignoring the app's
+      # Info.plist ("Info.plist=not bound"), and CoreSimulator then refuses
+      # the install with "Missing bundle ID".
+      - framework: Frameworks/libduck_mobile_core.dylib
+        embed: true
+        codeSign: true
+      # ONNX Runtime is linked statically INTO libduck_mobile_core.dylib, so
+      # the app only needs it at link time. Embedding the xcframework put an
+      # inert 33 KB stub (with a temp-path install name) in the bundle.
+      - framework: third_party/onnxruntime.xcframework
+        embed: false
+        codeSign: false
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: CoreMotion.framework
+      - sdk: AVFoundation.framework
+      # The one-second launch scan reads `sceneDepth` from an ARKit world
+      # tracking session on LiDAR phones; every other device skips it.
+      - sdk: ARKit.framework
+      # The duck's ear: SFSpeechRecognizer recognises Mandarin on the
+      # device. `import Speech` would autolink it, but the system frameworks
+      # this app uses are declared here, so this one is too.
+      - sdk: Speech.framework
+    preBuildScripts:
+      - name: Check Rust core
+        basedOnDependencyAnalysis: false
+        script: |
+          test -f "${SRCROOT}/Frameworks/libduck_mobile_core.dylib" || {
+            echo "error: run ios/scripts/build-rust-ios.sh first"; exit 1;
+          }
+
+  # Taps the app's own controls. The Python session proves the core through
+  # the intent API; this proves the buttons are wired to that same core.
+  DuckUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: DuckUITests
+    dependencies:
+      - target: Duck
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Duck
+
+  # Unit tests for the parts that need no screen: the progress store's
+  # achievement chain. XcodeGen derives TEST_HOST from the Duck dependency,
+  # so @testable import Duck reaches the app's own classes.
+  DuckTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: DuckTests
+    dependencies:
+      - target: Duck
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.duck.microduck.tests
+        GENERATE_INFOPLIST_FILE: YES
+        # The unit bundle scans the host app's bridging header (XcodeGen
+        # propagates it with TEST_HOST); without the core's include path
+        # the scan dies on 'duck_core.h' file not found.
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/../core/duck-mobile-core/include
+
+schemes:
+  Duck:
+    build:
+      targets:
+        Duck: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        # Unit first: the store's chain fails faster than a UI round trip.
+        - DuckTests
+        - DuckUITests
