@@ -191,11 +191,18 @@ struct DuckShelf: View {
             Button(action: onMore) {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
-                    HStack(spacing: DuckSpace.sm) {
-                        ForEach(0..<3, id: \.self) { _ in
-                            Circle()
-                                .fill(Color.duckTextPrimary.opacity(0.4))
-                                .frame(width: 3, height: 3)
+                    // The cabinet pull carries its own word: the drawer has to
+                    // be discoverable, not just a bare board of dots.
+                    VStack(spacing: DuckSpace.xxs) {
+                        Text(Copy.more)
+                            .font(.duckMicro)
+                            .foregroundStyle(Color.duckTextPrimary.opacity(0.55))
+                        HStack(spacing: DuckSpace.sm) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Circle()
+                                    .fill(Color.duckTextPrimary.opacity(0.4))
+                                    .frame(width: 3, height: 3)
+                            }
                         }
                     }
                     .padding(.bottom, DuckSpace.sm)
