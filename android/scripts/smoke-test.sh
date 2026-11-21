@@ -1976,10 +1976,12 @@ except Exception:
     raise SystemExit(1)
 nodes = [n for n in root.iter('node') if n.get('package') == 'ai.duck.microduck']
 labels = {(n.get('text') or n.get('content-desc') or '') for n in nodes}
-# A page's close control; the drawer's own title is 更多/More.
+# A page's close control is present; and the DRAWER's group headers are not
+# (更多 is useless as a signal — it is also the shelf board's caption, which
+# sits behind every sheet).
 pages = {'关闭', 'Close'}
-drawer = {'更多', 'More'}
-raise SystemExit(0 if (pages & labels) and not (drawer & labels) else 1)
+drawer_groups = {'玩', '一起', '记录', '这只鸭子', 'Play', 'Together', 'Records'}
+raise SystemExit(0 if (pages & labels) and not (drawer_groups & labels) else 1)
 SH
 }
 
