@@ -2078,8 +2078,14 @@ open_more_sheet() {
       # [56,619][169,640]): its centre lands in the system bar and the tap
       # is swallowed. Lift it above the gesture inset first.
       if row_near_bottom "$row_zh" || row_near_bottom "$row_en"; then
-        adb shell input swipe 160 520 160 380 250 > /dev/null 2>&1 || true
-        sleep 0.6
+        # Swipe starting below the rows was swallowed by a row's tap; start
+        # in a gutter between the row's text and its trailing badge, and
+        # repeat because a bottom sheet can absorb the first drag.
+        for _ in 1 2 3; do
+          adb shell input swipe 120 560 120 300 300 > /dev/null 2>&1 || true
+          sleep 0.5
+          row_near_bottom "$row_zh" || row_near_bottom "$row_en" || break
+        done
       fi
       if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
         # The tap landed; the row only counts if its sheet really opened
