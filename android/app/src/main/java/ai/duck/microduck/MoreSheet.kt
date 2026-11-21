@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -92,6 +93,11 @@ internal fun MoreSheet(
             Modifier
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = DuckTheme.Space.xl)
+                // The last row must be able to scroll clear of the system
+                // gesture inset: at 2x fonts 每日任务 measured [56,619][169,640]
+                // and its tap centre fell in the gesture bar (a real
+                // reachability defect, not only a test artefact).
+                .navigationBarsPadding()
                 .padding(top = DuckTheme.Space.xs, bottom = DuckTheme.Space.xxl),
             verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.lg),
         ) {
