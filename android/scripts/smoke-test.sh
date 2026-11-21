@@ -1982,25 +1982,21 @@ open_more_sheet() {
 
 # The skill ring can still be up when the sweep starts (the handover left
 # it open): close whatever is in front, then open the drawer for real.
-for _ in $(seq 1 6); do
-  if drawer_present; then break; fi
-  # Only BACK when our app is actually the foreground: the 83f35d8 dump
-  # was the launcher — BACKing there walks deeper into the desktop.
-  if adb shell "dumpsys activity activities | grep -q 'mResumedActivity.*ai.duck.microduck'" 2>/dev/null; then
-    adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-    sleep 0.6
-  else
-    adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
-    sleep 2.5
-  fi
-  # The handover leaves the skill ring open on the 2.0-font screen; the
-  # ring's 关闭 sits where 更多 used to, so a blind 更多 tap reopened the
-  # ring. Close the ring by its own word first.
-  tap_text "关闭" > /dev/null 2>&1 || true
-  sleep 0.4
-  tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
-  sleep 1
+# Deterministic reset: the handover leaves the ring open and 2.0-font
+# rearranges every hit target, so layered BACK/tap hunts kept losing races
+# (four dumps: launcher, ring, ring again, ring). force-stop and relaunch
+# is what every other section already does, and it cannot race.
+adb shell am force-stop ai.duck.microduck > /dev/null 2>&1 || true
+sleep 1
+adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
+STATE_OK=""
+for _ in $(seq 1 60); do
+  STATE_OK=$(curl -sf --max-time 5 http://127.0.0.1:8765/state || true)
+  [ -n "$STATE_OK" ] && break
+  sleep 2
 done
+[ -n "$STATE_OK" ] || { echo "::error::the core did not come back for the dense-sheet sweep"; exit 1; }
+sleep 2
 drawer_present || {
   # The 2.0-font Live screen is a different layout: dump it, so the next
   # run says where 更多/More went (off-screen? behind the ring? swallowed?).
