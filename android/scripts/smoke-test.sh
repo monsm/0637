@@ -1934,53 +1934,59 @@ raise SystemExit(0 if titles & set(texts) and groups & set(texts) else 1)
 SH
 }
 
+# Foreground check: is OUR activity the resumed one?
+app_foreground() {
+  adb shell "dumpsys activity activities | grep -q 'mResumedActivity.*ai.duck.microduck'" 2>/dev/null
+}
+
+ring_open() {
+  rm -f ring-check.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > ring-check.xml 2>/dev/null || return 1
+  python3 - <<'SH'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ring-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = {(n.get('text') or '') for n in root.iter('node')
+         if n.get('package') == 'ai.duck.microduck'}
+raise SystemExit(0 if {'动作', '关闭'} & texts else 1)
+SH
+}
+
 open_more_sheet() {
   local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
   local ok=0
-  # The row lives in the More drawer. A BACK from the previous page may
-  # have closed it on some device timings, so make sure the drawer is the
-  # surface in front: its title plus one group header is the fingerprint
-  # (any sheet has a drag handle, so that alone would lie).
-  for _ in $(seq 1 3); do
-    drawer_present && break
-    # A BACK from a page can land on the Live screen with the skill ring
-    # open (the 技能 card box sits where the hunt's taps land); close the
-    # ring by its 关闭 word before hunting 更多.
-    # The ring's close chip does not answer uiautomator taps reliably
-    # (this Compose version's clickable never surfaces as clickable=true
-    # in the dump), but BACK closing the ring is product behaviour the
-    # earlier smoke sections already assert.
-    adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-    sleep 0.8
-    tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
-    sleep 1
-  done
-  # One way only (a downward drag on a bottom sheet is its DISMISS gesture).
-  # Closing a page does NOT reset the drawer's scroll, so the next row can sit
-  # ABOVE the viewport (the 83f35d8 dump showed the drawer at its bottom,
-  # hunting a row that was above). Every fourth round the drawer is closed
-  # and reopened — cheap, deterministic, and it puts the list back at the top.
-  for round in $(seq 1 16); do
-    if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
-      ok=1
-      break
-    fi
-    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-    sleep 0.3
-    if [ $((round % 4)) -eq 0 ]; then
+
+  # Deterministic state machine, one state per round; every step reads the
+  # screen first (four previous runs each lost a race between BACK, captions
+  # and the ring).
+  for round in $(seq 1 14); do
+    app_foreground || { adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true; sleep 3; }
+    if ring_open; then
       adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-      sleep 0.6
-      tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
-      sleep 1
+      sleep 0.8
+      continue
     fi
+    if drawer_present; then
+      if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
+        ok=1
+        break
+      fi
+      adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+      sleep 0.4
+      continue
+    fi
+    adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+    sleep 1.2
   done
+
   if [ "$ok" != "1" ]; then
-    # Keep the scene: a missing row is either a product regression or a
-    # drawer that never came back.
     adb exec-out screencap -p > dense-screen.png 2>/dev/null || true
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
     adb exec-out cat /sdcard/ui.xml > dense-dump.xml 2>/dev/null || true
-    echo "::error::no $name row at font scale 2.0"
+    echo "::error::no $name row at font scale 2.0 (state machine exhausted; see dense-dump.xml)"
     exit 1
   fi
   sleep 1.5
