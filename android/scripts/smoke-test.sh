@@ -2236,7 +2236,7 @@ open_more_sheet "Daily quests" "每日任务" "Daily quests" "每日任务" "Dai
 open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky diary" "今天的真实记录|Today, for real"
 open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards" "去拍一张|Take a photo"
 open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book" "徽章|Badges"
-open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion" "接口地址|Endpoint"
+open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion" "保存|Save"
 # The door is the row 鸭子的脸 (Duck's face); "This duck" is the group
 # header above it AND the page title — tapping the header is a no-op.
 open_more_sheet "Duck's face" "鸭子的脸" "This duck" "这只鸭子" "This duck" "感受它的心|Feelings"
