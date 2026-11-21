@@ -2152,8 +2152,17 @@ SH
         adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
         sleep 1
       fi
+      # Not on screen: scroll down for the rest of the list, and once the
+      # bottom is reached go back to the top (a row can be above the
+      # viewport after the previous page's return — the 83f35d8 dump).
       adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
       sleep 0.4
+      if [ $((round % 3)) -eq 0 ]; then
+        for _ in 1 2 3 4; do
+          adb shell input swipe 160 200 160 560 250 > /dev/null 2>&1 || true
+          sleep 0.25
+        done
+      fi
       continue
     fi
     if live_screen; then
