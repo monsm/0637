@@ -1724,28 +1724,13 @@ PY
 #    from inside the duck sheet must close the duck sheet first, so two
 #    ModalBottomSheets never stack (P1-20). The time machine is the wall
 #    clock (duck-time) in direction A, not a Time word button.
-tap_tag duck-time > /dev/null 2>&1 || {
-  # Keep the scene: the clock is rendered (the acceptance screenshot shows
-  # it), so a missing tag here is a semantics-tree problem — the dump says
-  # which node carried what.
+# The wall clock's caption is 挂钟 (the tag resource-id never reaches
+# uiautomator without testTagsAsResourceIds, which this build does not set).
+tap_text "挂钟" > /dev/null 2>&1 || {
   adb exec-out screencap -p > wallclock-screen.png 2>/dev/null || true
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
   adb exec-out cat /sdcard/ui.xml > wallclock-dump.xml 2>/dev/null || true
-  python3 - <<'SH' || true
-import xml.etree.ElementTree as ET
-try:
-    root = ET.parse('wallclock-dump.xml').getroot()
-except Exception as exc:
-    raise SystemExit(f"cannot read the dump: {exc}")
-for n in root.iter('node'):
-    if n.get('package') != 'ai.duck.microduck':
-        continue
-    rid = (n.get('resource-id') or '').replace('ai.duck.microduck:id/', '')
-    if rid or (n.get('text') or '').strip() or (n.get('content-desc') or '').strip():
-        print('node:', rid or '-', '|', (n.get('text') or n.get('content-desc') or '')[:24],
-              n.get('bounds'), 'click=' + str(n.get('clickable')))
-SH
-  echo "::error::the wall clock (duck-time) is missing for the handover check"
+  echo "::error::the wall clock (挂钟) is missing for the handover check"
   grep -o 'text="[^"]*"\|content-desc="[^"]*"' ui.xml 2>/dev/null | sort -u | head -30 || true
   exit 1
 }
@@ -2093,7 +2078,7 @@ SH
 ensure_live || true
 TIME_OK=0
 for _ in $(seq 1 5); do
-  if tap_tag duck-readings > /dev/null 2>&1; then
+  if tap_text "读数" > /dev/null 2>&1 || tap_text "Readings" > /dev/null 2>&1; then
     TIME_OK=1
     break
   fi
