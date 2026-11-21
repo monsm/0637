@@ -1978,8 +1978,10 @@ open_more_sheet() {
       sleep 0.4
       continue
     fi
-    adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
-    sleep 1.2
+    # Anything else is a feature page (the dump caught the Neighbours page
+    # open after the hunt brushed its row): BACK lands back on the drawer.
+    adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+    sleep 0.8
   done
 
   if [ "$ok" != "1" ]; then
