@@ -1990,6 +1990,25 @@ for _ in $(seq 1 4); do
   sleep 1
 done
 drawer_present || {
+  # The 2.0-font Live screen is a different layout: dump it, so the next
+  # run says where 更多/More went (off-screen? behind the ring? swallowed?).
+  adb exec-out screencap -p > dense-screen.png 2>/dev/null || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > dense-dump.xml 2>/dev/null || true
+  python3 - <<'SH' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('dense-dump.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"cannot read the dump: {exc}")
+for n in root.iter('node'):
+    if n.get('package') != 'ai.duck.microduck':
+        continue
+    rid = (n.get('resource-id') or '').replace('ai.duck.microduck:id/', '')
+    label = (n.get('text') or n.get('content-desc') or '').strip()
+    if label or rid:
+        print('node:', rid or '-', '|', label[:24], n.get('bounds'), 'click=' + str(n.get('clickable')))
+SH
   echo "::error::the More drawer never opened for the dense-sheet sweep"
   exit 1
 }
