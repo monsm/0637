@@ -1,5 +1,5 @@
-run=44858227853
-sha=79ade0d59de53a675fe52357bb819efc7f50f8be
+run=44861893595
+sha=0de1de1f75ee70ba4ed25bb66b9c13db07f12fa8
 checkout=success
 upstream=success
 toolchain=success
@@ -10,7 +10,7 @@ rustcore=success
 xcodegen=success
 xcodebuild=success
 simsmoke=success
-uitest=failure
+uitest=success
 mujocodev=success
 rustdevice=success
 xcodebuilddev=success
