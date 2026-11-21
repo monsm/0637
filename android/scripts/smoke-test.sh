@@ -1993,6 +1993,11 @@ for _ in $(seq 1 6); do
     adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
     sleep 2.5
   fi
+  # The handover leaves the skill ring open on the 2.0-font screen; the
+  # ring's 关闭 sits where 更多 used to, so a blind 更多 tap reopened the
+  # ring. Close the ring by its own word first.
+  tap_text "关闭" > /dev/null 2>&1 || true
+  sleep 0.4
   tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
   sleep 1
 done
