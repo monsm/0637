@@ -1980,11 +1980,19 @@ open_more_sheet() {
   sleep 1
 }
 
-tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || {
-  echo "::error::no More button for the dense-sheet sweep"
+# The skill ring can still be up when the sweep starts (the handover left
+# it open): close whatever is in front, then open the drawer for real.
+for _ in $(seq 1 4); do
+  if drawer_present; then break; fi
+  adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+  sleep 0.6
+  tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+  sleep 1
+done
+drawer_present || {
+  echo "::error::the More drawer never opened for the dense-sheet sweep"
   exit 1
 }
-sleep 1.5
 dense_sheet_check "More" "更多" "More" || exit 1
 # The drawer's own order, top to bottom: a one-way scroll reaches every
 # row without having to scroll back up after a close.
