@@ -1990,10 +1990,12 @@ SH
     fi
     adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
     sleep 0.8
-    if ! adb shell pidof ai.duck.microduck > /dev/null 2>&1; then
-      adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
-      sleep 8
-    fi
+    # pidof proves the process, not the foreground: after one BACK too many
+    # the launcher owns the screen and the app is merely alive in back
+    # (observed: ensure_live held Apps list/Gallery/Phone). am start is
+    # idempotent and brings the task forward.
+    adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
+    sleep 2.5
   done
   # Explain a failed return: the last dump's texts, and the scene.
   adb exec-out screencap -p > dense-screen.png 2>/dev/null || true
@@ -2013,7 +2015,15 @@ SH
 
 # The instrument, the densest surface of all.
 ensure_live || true
-tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1 || {
+TIME_OK=0
+for _ in $(seq 1 5); do
+  if tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1; then
+    TIME_OK=1
+    break
+  fi
+  sleep 2
+done
+[ "$TIME_OK" = "1" ] || {
   echo "::error::no Time button for the dense-sheet sweep"
   exit 1
 }
