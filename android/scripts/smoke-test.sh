@@ -1978,6 +1978,26 @@ raise SystemExit(0 if want & texts else 1)
 SH
 }
 
+# Bare Live screen (the deck's own verbs are its fingerprint). This is what
+# tells "tap the board" apart from "a page is open, BACK out" — pressing
+# BACK on the bare Live screen exits the app, which is exactly how the hunt
+# spent four rounds in the launcher.
+live_screen() {
+  rm -f live-check.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > live-check.xml 2>/dev/null || return 1
+  python3 - <<'SH'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('live-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = {(n.get('text') or '') for n in root.iter('node')
+         if n.get('package') == 'ai.duck.microduck'}
+raise SystemExit(0 if {'喂食', 'Feed'} & texts and {'技能', 'Skills'} & texts else 1)
+SH
+}
+
 open_more_sheet() {
   local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
   local ok=0
@@ -1996,6 +2016,9 @@ open_more_sheet() {
         sleep 1
       done
       sleep 2
+      # Re-read next round: falling through here would act on a stale dump
+      # and BACK the fresh launch straight back out.
+      continue
     fi
     if ring_open; then
       adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
@@ -2018,9 +2041,14 @@ open_more_sheet() {
       sleep 0.4
       continue
     fi
+    if live_screen; then
+      # The board is the cabinet pull; tap the wood, never BACK here.
+      adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+      sleep 1.2
+      continue
+    fi
     # Anything else is a feature page (the dump caught the Neighbours page
-    # open after the hunt brushed its row): BACK lands back on the drawer,
-    # and the next round re-reads the state after the sheet finishes.
+    # open after the hunt brushed its row): BACK lands on the drawer.
     adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
     sleep 1.2
   done
