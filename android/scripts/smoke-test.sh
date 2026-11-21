@@ -1937,7 +1937,9 @@ open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky
 open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards"
 open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book"
 open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion"
-open_more_sheet "This duck" "这只鸭子" "This duck" "这只鸭子" "This duck"
+# The door is the row 鸭子的脸 (Duck's face); "This duck" is the group
+# header above it AND the page title — tapping the header is a no-op.
+open_more_sheet "Duck's face" "鸭子的脸" "This duck" "这只鸭子" "This duck"
 open_more_sheet "Tools" "工具" "Tools" "工具" "Tools"
 
 # The days board is a local sheet over the tools page; the two nested backs
