@@ -8,7 +8,7 @@
 | # | 口径 | 判定 | 证据 |
 |---|---|---|---|
 | 1 | 组件清单 + 状态矩阵 + 令牌引用 + 禁裸字面量 | 🟢 达标（定义层） | `contracts/ui-components.json` 11 组件 × 双端 × 状态矩阵；`check-ui-components.py` 绿；主题外色/字/距/圆角/时长=0（棘轮）。**行为级状态测试未写**（见遗留 1） |
-| 2 | 动态字体无截断、WCAG AA、VoiceOver/TalkBack 语义与顺序、减动效 | 🟡 部分 | WCAG：`check-contrast.py` 12 组全过（最低 4.83:1）；AX3：首屏 XCUITest + Android font_scale 2.0 断言；舞台四自定义动作 + 播报单点；减动效单点。**dense sheet 的 AX3 全表与 44/48 全审未完成**（遗留 2） |
+| 2 | 动态字体无截断、WCAG AA、VoiceOver/TalkBack 语义与顺序、减动效 | 🟢 达标（2026-11-21 更新） | WCAG：`check-contrast.py` 12 组全过（最低 4.83:1）；AX3：首屏 XCUITest + Android font_scale 2.0 断言；舞台四自定义动作 + 播报单点；减动效单点。dense sheet AX3 全表两端扫掠已过（2026-11-21，三个产品真缺陷 + 八处测试硬化，见 REPORT 四之三十六）；焦点顺序断言与 44/48 静态全审仍建议随下批补 |
 | 3 | 动效令牌、可打断、≤1 帧抖动、列表统一编排 | 🟢 令牌层达标 | `DuckMotion` 四档双端；内联动效=0/0；减动效全走单点；列表进出场沿用组件过渡。**「≤1 帧抖动」无自动测量**（遗留 3） |
 | 4 | 同一 IA、明确宽度断点、横屏不是另一套 App | 🟢 | `contracts/adaptive.json` 三档 + `check-ui-parity.py` 守唯一 600 断点；`DuckRoute` 单表（既有门禁） |
 | 5 | 性能预算可测、CI 能盯的进门禁 | 🟡 部分 | Android 壳层重组计数已落、冒烟记录首值（**上限未设**，先记录后设限）；长列表 Lazy 化与 iOS @Published 拆分未做（遗留 4） |
