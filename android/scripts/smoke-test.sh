@@ -979,6 +979,35 @@ PY
   [ -n "$coords" ] || return 1
   adb shell input tap $coords > /dev/null 2>&1
 }
+
+# Tap a control by its testTag (Compose puts it in resource-id). The
+# Live verbs became shelf objects, so their words live on the objects and
+# the reliable handle is the tag.
+tap_tag() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || return 1
+  coords=$(python3 - "$1" <<'PY'
+import sys, xml.etree.ElementTree as ET
+want = sys.argv[1]
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+for node in root.iter('node'):
+    if node.get('resource-id') == want:
+        bounds = node.get('bounds', '')
+        parts = bounds.replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4:
+            x = (int(parts[0]) + int(parts[2])) // 2
+            y = (int(parts[1]) + int(parts[3])) // 2
+            print(x, y)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+)
+  [ -n "$coords" ] || return 1
+  adb shell input tap $coords > /dev/null 2>&1
+}
 # Direction A moved the Director switch off the Live screen: the wall clock
 # opens the time machine, the brass gauge the readings, and the viewfinder
 # lives one page in (More -> Play more -> Director).
@@ -1690,9 +1719,10 @@ PY
 
 # 3) The instrument hands over to one sheet at a time: tapping Postcards
 #    from inside the duck sheet must close the duck sheet first, so two
-#    ModalBottomSheets never stack (P1-20).
-tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1 || {
-  echo "::error::the time rail has no Time button (handover check)"
+#    ModalBottomSheets never stack (P1-20). The time machine is the wall
+#    clock (duck-time) in direction A, not a Time word button.
+tap_tag duck-time > /dev/null 2>&1 || {
+  echo "::error::the wall clock (duck-time) is missing for the handover check"
   grep -o 'text="[^"]*"\|content-desc="[^"]*"' ui.xml 2>/dev/null | sort -u | head -30 || true
   exit 1
 }
@@ -2035,18 +2065,19 @@ SH
   return 1
 }
 
-# The instrument, the densest surface of all.
+# The instrument, the densest surface of all. Direction A opens it from the
+# brass gauge on the wall (duck-readings); the clock opens the time machine.
 ensure_live || true
 TIME_OK=0
 for _ in $(seq 1 5); do
-  if tap_text "时间" > /dev/null 2>&1 || tap_text "Time" > /dev/null 2>&1; then
+  if tap_tag duck-readings > /dev/null 2>&1; then
     TIME_OK=1
     break
   fi
   sleep 2
 done
 [ "$TIME_OK" = "1" ] || {
-  echo "::error::no Time button for the dense-sheet sweep"
+  echo "::error::no brass gauge (duck-readings) for the dense-sheet sweep"
   exit 1
 }
 sleep 1.5
