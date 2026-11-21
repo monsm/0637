@@ -1852,15 +1852,56 @@ PY
 open_more_sheet() {
   local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
   local ok=0
-  for _ in $(seq 1 10); do
+  # The row lives in the More drawer. A BACK from the previous page may
+  # have closed it on some device timings, so make sure the drawer is the
+  # surface in front: its title plus one group header is the fingerprint
+  # (any sheet has a drag handle, so that alone would lie).
+  for _ in $(seq 1 3); do
+    rm -f dense-check.xml
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+    adb exec-out cat /sdcard/ui.xml > dense-check.xml 2>/dev/null || true
+    if python3 - <<'SH'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('dense-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = [(n.get('text') or '') for n in root.iter('node')]
+titles = {'更多', 'More'}
+groups = {'玩', '一起', '记录', '这只鸭子', 'Play', 'Together', 'Records', 'This duck'}
+raise SystemExit(0 if titles & set(texts) and groups & set(texts) else 1)
+SH
+    then
+      break
+    fi
+    tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+    sleep 1
+  done
+  # Both directions: a one-way scroll can walk past a row that was above the
+  # fold after the previous page's return.
+  for _ in $(seq 1 12); do
     if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
       ok=1
       break
     fi
     adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
     sleep 0.4
+    if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
+      ok=1
+      break
+    fi
+    adb shell input swipe 160 160 160 560 300 > /dev/null 2>&1 || true
+    sleep 0.4
   done
-  [ "$ok" = "1" ] || { echo "::error::no $name row at font scale 2.0"; exit 1; }
+  if [ "$ok" != "1" ]; then
+    # Keep the scene: a missing row is either a product regression or a
+    # drawer that never came back.
+    adb exec-out screencap -p > dense-screen.png 2>/dev/null || true
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+    adb exec-out cat /sdcard/ui.xml > dense-dump.xml 2>/dev/null || true
+    echo "::error::no $name row at font scale 2.0"
+    exit 1
+  fi
   sleep 1.5
   dense_sheet_check "$title_en" "$title_zh" "$name" || exit 1
   adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
@@ -1934,6 +1975,14 @@ if [ -z "$RECOMP" ]; then
   echo "::error::the shell's recomposition counter never logged"
   exit 1
 fi
-echo "shell compositions since launch (last window): $RECOMP (recorded; ceiling after two green runs)"
+echo "shell compositions since launch (last window): $RECOMP (observed band: 2-3)"
+# The ceiling is set from real runs: 2-3 shell compositions per whole run
+# means state reads live in leaves, not the shell. 50 leaves every honest
+# variation alone and only fires if the 5 Hz poll starts recomposing the
+# whole tree (hundreds).
+if [ "$RECOMP" -gt 50 ]; then
+  echo "::error::the shell recomposed $RECOMP times — whole-tree recomposition returned"
+  exit 1
+fi
 
 echo "smoke test passed"

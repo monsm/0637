@@ -351,6 +351,8 @@ jobs:
           cp drawer-screen.png ci-logs/android/ 2>/dev/null || true
           cp window-dumpsys.txt ci-logs/android/ 2>/dev/null || true
           cp input-method.txt ci-logs/android/ 2>/dev/null || true
+          cp dense-dump.xml ci-logs/android/ 2>/dev/null || true
+          cp dense-screen.png ci-logs/android/ 2>/dev/null || true
           echo "run=${{ github.run_id }}" > ci-logs/android/smoke.txt
           echo "sha=${{ github.sha }}" >> ci-logs/android/smoke.txt
           echo "emulator=${{ steps.emulator.outcome }}" >> ci-logs/android/smoke.txt
@@ -426,6 +428,8 @@ jobs:
             drawer-screen.png
             window-dumpsys.txt
             input-method.txt
+            dense-dump.xml
+            dense-screen.png
             ui-b1-android.png
             ui-b1-android-zh.png
             ui-b4-android.png
