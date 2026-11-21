@@ -994,7 +994,10 @@ try:
 except Exception:
     raise SystemExit(1)
 for node in root.iter('node'):
-    if node.get('resource-id') == want:
+    # Compose writes testTag into resource-id with the package prefix:
+    # ai.duck.microduck:id/duck-time. Match on the suffix.
+    rid = node.get('resource-id') or ''
+    if rid == want or rid.endswith('/' + want):
         bounds = node.get('bounds', '')
         parts = bounds.replace('][', ',').strip('[]').split(',')
         if len(parts) == 4:
