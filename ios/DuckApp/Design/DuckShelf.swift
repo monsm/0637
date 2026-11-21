@@ -207,7 +207,7 @@ struct DuckShelf: View {
                     }
                     .padding(.bottom, DuckSpace.sm)
                 }
-                .frame(maxWidth: .infinity, minHeight: 118)
+                .frame(maxWidth: .infinity, minHeight: 82)
                 .background(
                     LinearGradient(
                         colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],

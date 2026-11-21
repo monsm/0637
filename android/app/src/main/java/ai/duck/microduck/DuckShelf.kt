@@ -178,7 +178,7 @@ fun DuckShelf(
         Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 118.dp)
+                .heightIn(min = 82.dp)
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -210,7 +210,7 @@ fun DuckShelf(
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 118.dp)
+                .heightIn(min = 82.dp)
                 .padding(horizontal = DuckTheme.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
