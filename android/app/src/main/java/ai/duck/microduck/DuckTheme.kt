@@ -33,6 +33,15 @@ object DuckTheme {
     /// state.bad #E8836B.
     val StateBad = Color(0xFFE8836B)
 
+    // Direction A: the bedtime shelf's materials (design-demos/A-complete.html).
+    val WoodHi = Color(0xFF4E3E2B)
+    val Wood = Color(0xFF3A2E21)
+    val WoodDeep = Color(0xFF1D1610)
+    val Ceramic = Color(0xFFEDE6D9)
+    val Food = Color(0xFFE9B45E)
+    val Brass = Color(0xFFC9A45C)
+    val BrassDeep = Color(0xFF8A6A2C)
+
     /// type.* — the seven text roles (UI_TOKENS §3). sp already scales with
     /// the system font scale; fixed dp containers must use heightIn(min).
     object Type {

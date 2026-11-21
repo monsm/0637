@@ -792,32 +792,42 @@ fun Shell(
                         }
                         }
                     }
-                    PortraitTimeRail(
-                        core = duck,
-                        surface = surface,
-                        onSurface = onSurface,
-                        onOpenSheet = { open(DuckRoute.Instrument) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = DuckTheme.Space.sm),
-                    )
-                    ThumbDeck(
-                        core = duck,
+                    DuckShelf(
+                        hunger = careUi?.hunger ?: 0.0,
                         carrying = carrying,
-                        onCarrying = { carrying = it },
-                        quack = quack,
                         onFeed = {
                             dance.record("feed", label = Copy.feed)
                             DuckHaptics.medium(hapticView)
                             onFeed?.invoke()
                         },
-                        onWheee = onWheee,
                         onSkills = { setRing(true) },
+                        onQuack = { quack?.invoke() },
+                        onGrab = {
+                            val next = !carrying
+                            carrying = next
+                            core.carry(0.0, 0.0, 0.0, next)
+                        },
                         onMore = { open(DuckRoute.More) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = DuckTheme.Space.sm, vertical = DuckTheme.Space.sm),
                     )
+                }
+                // Direction A: the wall carries the clock (time machine) and
+                // the brass gauge (readings), floating over the room.
+                Column(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(y = 70.dp)
+                        .padding(end = DuckTheme.Space.xs),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
+                ) {
+                    DuckWallClock(
+                        onOpen = { open(DuckRoute.Instrument) },
+                        onHold = { duck.setPaused(true) },
+                    )
+                    DuckWallGauge(onOpen = { open(DuckRoute.Instrument) })
                 }
             }
         } else {
@@ -1196,6 +1206,10 @@ fun Shell(
             core = core,
             input = input,
             stick = stick,
+            surfaceIsDirector = surface == Surface.Director,
+            onToggleDirector = {
+                onSurface(if (surface == Surface.Director) Surface.Live else Surface.Director)
+            },
             onMode = { mode ->
                 stick = mode
                 core?.setHead(0.0, 0.0, 0.0, 0.0)
@@ -2137,263 +2151,6 @@ private fun PortraitTitleBar(
             }
         }
         Spacer(Modifier.weight(1f))
-    }
-}
-
-/**
- * The portrait time rail (B4 §1): two buttons, icon only. Time opens the
- * time machine and a long press freezes at once; Director is the second.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun PortraitTimeRail(
-    core: DuckCore,
-    surface: Surface,
-    onSurface: (Surface) -> Unit,
-    onOpenSheet: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var tick by remember { mutableStateOf(core.tickIndex()) }
-    var oldest by remember { mutableStateOf(core.oldestTick()) }
-    LaunchedEffect(core) {
-        while (true) {
-            tick = core.tickIndex()
-            oldest = core.oldestTick()
-            delay(200)
-        }
-    }
-    // The share of retained history, not of the whole run: the bar fills as
-    // checkpoints age out of the ring buffer.
-    val newest = tick.coerceAtLeast(0L)
-    val oldestClamped = oldest.coerceIn(0L, newest)
-    val fraction = (
-        (newest - oldestClamped).toDouble() / newest.coerceAtLeast(1L).toDouble()
-        ).coerceIn(0.0, 1.0)
-    Row(
-        modifier.height(48.dp),
-        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .background(Color.White.copy(alpha = 0.10f), RoundedCornerShape(DuckTheme.Radius.control))
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClickLabel = Copy.timeMachine,
-                    onLongClickLabel = Copy.freeze,
-                    role = Role.Button,
-                    onClick = onOpenSheet,
-                    onLongClick = { core.setPaused(true) },
-                )
-                .testTag("duck-time")
-                .padding(horizontal = DuckTheme.Space.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
-        ) {
-            Icon(
-                Icons.time,
-                contentDescription = Copy.time,
-                tint = Color.White.copy(alpha = 0.85f),
-                modifier = Modifier.size(18.dp),
-            )
-            // The bar is about 60% of the row: it reads as a progress, not
-            // as a divider between the time and Director buttons.
-            Box(
-                Modifier.weight(1f),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(0.6f)
-                        .height(3.dp)
-                        .background(Color.White.copy(alpha = 0.08f), CircleShape),
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth(fraction.toFloat())
-                            .fillMaxHeight()
-                            // accent.data #7FB2D9, solid: the retained-history
-                            // fill must read against the track (P1-10).
-                            .background(DuckTheme.AccentData, CircleShape),
-                    )
-                }
-            }
-        }
-        IconChip(
-            Icons.director,
-            if (surface == Surface.Live) Copy.director else Copy.live,
-            size = 48.dp,
-            testTag = "surface-toggle",
-        ) {
-            onSurface(if (surface == Surface.Live) Surface.Director else Surface.Live)
-        }
-    }
-}
-
-/**
- * The portrait thumb deck (B4 §1): four verbs and the More drawer, all one
- * primary shape — a 52 dp circle, an 18 dp icon and an 11 sp label.
- */
-@Composable
-private fun ThumbDeck(
-    core: DuckCore,
-    carrying: Boolean,
-    onCarrying: (Boolean) -> Unit,
-    quack: (() -> Unit)?,
-    onFeed: (() -> Unit)?,
-    onWheee: ((Boolean) -> Unit)?,
-    onSkills: () -> Unit,
-    onMore: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier
-            .heightIn(min = 90.dp)
-            .background(DuckTheme.BgSurface.copy(alpha = 0.94f), RoundedCornerShape(DuckTheme.Radius.panel))
-            .padding(horizontal = DuckTheme.Space.xs),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs),
-    ) {
-        Spacer(Modifier.weight(1f))
-        PrimaryVerb(Copy.feed, Icons.feed, "duck-feed", onTap = { onFeed?.invoke() })
-        PrimaryVerb(Copy.skills, Icons.skills, "duck-skills", onTap = { onSkills() })
-        PrimaryVerb(
-            Copy.quack,
-            Icons.quack,
-            "duck-quack",
-            onTap = { quack?.invoke() },
-            onHold = onWheee,
-        )
-        PrimaryVerb(
-            if (carrying) Copy.putDown else Copy.grab,
-            if (carrying) Icons.drop else Icons.grab,
-            "duck-grab",
-            selected = carrying,
-            onTap = {
-                val next = !carrying
-                onCarrying(next)
-                core.carry(0.0, 0.0, 0.0, next)
-            },
-        )
-        PrimaryVerb(Copy.more, Icons.more, "duck-more", onTap = { onMore() })
-    }
-}
-
-/**
- * The one primary button (B4 §3): 52 dp circle, 18 dp icon, 11 sp label
- * underneath. Optional hold = the wheee ride on the quack button.
- */
-@Composable
-private fun PrimaryVerb(
-    label: String,
-    icon: ImageVector,
-    tag: String,
-    selected: Boolean = false,
-    onTap: () -> Unit,
-    onHold: ((Boolean) -> Unit)? = null,
-) {
-    // The quack's hold is the official wheee ride: it starts on the long
-    // press and has to end on the real lift, so it uses the same gesture as
-    // the old WheeeChip. Plain verbs are ordinary clicks.
-    val hold = onHold
-    val gesture = if (hold != null) {
-        Modifier.pointerInput(Unit) {
-            var riding = false
-            detectTapGestures(
-                onTap = { onTap() },
-                onLongPress = {
-                    riding = true
-                    hold(true)
-                },
-                onPress = {
-                    try {
-                        tryAwaitRelease()
-                    } finally {
-                        if (riding) {
-                            riding = false
-                            hold(false)
-                        }
-                    }
-                },
-            )
-        }
-    } else {
-        Modifier.clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            onClickLabel = label,
-            role = Role.Button,
-            onClick = onTap,
-        )
-    }
-    Column(
-        Modifier
-            .width(52.dp)
-            .then(gesture)
-            .testTag(tag),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
-    ) {
-        Box(
-            Modifier
-                .size(52.dp)
-                .background(
-                    if (selected) ActionAccent.copy(alpha = 0.35f)
-                    else Color.White.copy(alpha = 0.10f),
-                    CircleShape,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.9f),
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        Text(
-            label,
-            color = Color.White.copy(alpha = 0.85f),
-            fontSize = DuckTheme.Type.Caption,
-            fontWeight = FontWeight.Medium,
-            maxLines = 2, softWrap = true, textAlign = TextAlign.Center,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-/** A 48 dp secondary button: icon only, always with an accessibility label. */
-@Composable
-private fun IconChip(
-    icon: ImageVector,
-    label: String,
-    size: androidx.compose.ui.unit.Dp = 48.dp,
-    testTag: String? = null,
-    onClick: () -> Unit,
-) {
-    Box(
-        Modifier
-            .size(size.coerceAtLeast(48.dp))
-            .background(Color.White.copy(alpha = 0.10f), CircleShape)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClickLabel = label,
-                role = Role.Button,
-                onClick = onClick,
-            )
-            .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            icon,
-            contentDescription = label,
-            tint = Color.White.copy(alpha = 0.9f),
-            modifier = Modifier.size(18.dp),
-        )
     }
 }
 

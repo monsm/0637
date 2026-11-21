@@ -759,6 +759,33 @@ COMPANION 头脑风暴里仅剩未做的两项落地：
 - **D7 性能可测**：Android 调试构建挂壳层重组计数器（每 5s `duck-perf` 日志），冒烟读末值并记录（首个数值随 CI 落盘，**先记录后设上限**，未伪装成预算）；仪表 30 控件列的 Lazy 化与 iOS 107 `@Published` 拆分风险过高，明确列为遗留。
 - **验证**：本地 Android compile + JVM 绿；十道静态门禁绿（含 contrast/parity 新门）；总纲 §2 基线表已刷新为施工后实测。
 
+### 四之三十七、方向 A「房间里的物件」落地上线版（A1，2026-11-21）
+
+老板在 `design-demos/A-complete.html` 三稿打磨后拍板方向 A（`design-demos/direction-approved.md` 存原话），本轮把它落进两端真实界面：
+
+- **Live 主屏改骨架**：底部五个悬浮圆钮 → 床头柜木板上的四件东西（陶碗=喂食，碗里饭量=饥饿；卡盒=技能；铜铃=叫一声；摊开的手=拎起）。**木板本身就是抽屉把手**（点木头拉柜子，More 的 id/标签不变），首屏可点仍是 7 个。
+- **墙上的两件东西**：木壳长条挂钟（`duck-time`，点开时间机器、长按冻结）＋圆形黄铜气压表（`duck-readings`，双针、密刻度，开仪表）。钟表形体/材质拉开，不抢鸭子。
+- **取景挪位**：Live 不再有取景钮（7 个控件的预算），取景入口移到「更多 → 玩一玩 → 取景」（触发后页面自动交接进取景），`surface-toggle` 的 id 与台账锚点同步迁到 `MorePages.swift/.kt`。
+- **令牌**：新增木/陶/铜/食物色 7 个（两端同名同值）；新组件只引用 `DuckSpace/DuckRadius`，棘轮 offgrid/radius 保持 0。
+- **测试**：iOS 三处 Director 流程改走抽屉两跳（`openDirector()`）；Android 冒烟同一路径；首屏 `duck-time`/`duck-feed` 等 id 全部保留，AX3 首屏断言不变。
+- **验证**：Android compile + JVM 绿；十道静态门禁绿；`shell_kt_lines` 3836→3593（删掉旧轨与拇指台）。Swift 编译由 CI 裁决（本机无 macOS）。
+
+
+### 四之三十六、Dense-sheet AX3 扫掠收口（2026-11-21）
+
+D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI 全绿：Android `51e8193`、Contracts `51e8193`、iOS `0de1de1`（其后提交未触碰 iOS/core）。
+
+**产品侧真缺陷（3 处，全部有 AX3 实测证据）**
+1. **ensemble 芯片 42.25pt**：VoiceOver 命中框裁掉胶囊两端，低于 44 地板；地板抬到 48（全 App 控件标准高度）。
+2. **iOS Neighbours sheet 无滚动容器**：AX3 下内容高于 sheet，未滚动 VStack 被垂直居中，头部（含 `peers-close`）被挤出屏幕——头部固定、内容滚动。
+3. **Android AI sheet 头部在滚动内容里**：2x 字号 + IME/聚焦把标题与关闭钮顶出视野——头部固定、内容滚动（与 iOS 同一条规则）。
+
+**测试侧硬化（8 处，每次按 dump 证据修）**：Daily quests 期望标题误用卡片小标题；Duck panel 的门是「鸭子的脸」而非分组标题「这只鸭子」；反向滑动 = bottom sheet 关闭手势（改为单向 + 四轮关闭重开抽屉复位滚动）；关页返回不改滚动位置导致目标行在视口上方；多按 BACK 退到桌面（`ensure_live` 用首屏动词指纹 + 无条件 `am start` 拉回前台）；时间钮点击重试；失败落盘 `dense-dump.xml`/`dense-screen.png`；iOS 测试日志与断言进 artifact 与步骤摘要（ci-logs 发布竞态曾吞掉现场）。
+
+**性能可测层**：Android 调试壳层重组计数实测整轮 **2–3 次**（状态下沉本就达标），门禁设 50——只有整树重组回归才可能触发。
+
+**判分更新**：七条口径第 2 条（动态字体/AX3/命中区）由「部分」升为**达标（首屏 + dense sheets 两端全量扫掠）**；第 5 条获得真实可测上限（Lazy 化与 @Published 拆分仍为遗留）。
+
 ---
 
 ## 八、仓库与复现
