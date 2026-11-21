@@ -2080,12 +2080,12 @@ SH
 
 open_more_sheet() {
   local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5" witness="$6"
-  local ok=0
+  local ok=0 drawer_pass=0
 
   # Deterministic state machine, one state per round; every step reads the
   # screen first (four previous runs each lost a race between BACK, captions
   # and the ring).
-  for round in $(seq 1 14); do
+  for round in $(seq 1 20); do
     if ! app_foreground; then
       # Relaunch and wait for the core, not for a stopwatch: at 2.0 fonts the
       # first composition plus the core load can outlast a fixed sleep, and
@@ -2152,16 +2152,19 @@ SH
         adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
         sleep 1
       fi
-      # Not on screen: scroll down for the rest of the list, and once the
-      # bottom is reached go back to the top (a row can be above the
-      # viewport after the previous page's return — the 83f35d8 dump).
-      adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-      sleep 0.4
-      if [ $((round % 3)) -eq 0 ]; then
-        for _ in 1 2 3 4; do
-          adb shell input swipe 160 200 160 560 250 > /dev/null 2>&1 || true
-          sleep 0.25
+      # Not on screen. Sweep deterministically: first back to the top (a row
+      # can be above the viewport after the previous page's return), then one
+      # screen down each round. Two full passes cover every row.
+      if [ "$drawer_pass" = "0" ]; then
+        drawer_pass=1
+        for _ in 1 2 3 4 5; do
+          adb shell input swipe 160 200 160 560 200 > /dev/null 2>&1 || true
+          sleep 0.2
         done
+      else
+        adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+        sleep 0.4
+        if [ $((round % 5)) -eq 0 ]; then drawer_pass=0; fi
       fi
       continue
     fi
