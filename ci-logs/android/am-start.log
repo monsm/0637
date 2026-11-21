@@ -1,1 +1,1 @@
-Starting: Intent { cmp=ai.duck.microduck/.MainActivity (has extras) }
+cmd: Failure calling service activity: Broken pipe (32)
