@@ -1988,6 +1988,34 @@ raise SystemExit(1)
 SH
 }
 
+# Tap a row's own box, 8 px above its centre (out of the gesture inset).
+row_tap_nudged() {
+  rm -f row-tap.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > row-tap.xml 2>/dev/null || return 1
+  local coords
+  coords=$(python3 - "$1" <<'SH'
+import sys, xml.etree.ElementTree as ET
+want = sys.argv[1]
+try:
+    root = ET.parse('row-tap.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+for n in root.iter('node'):
+    if (n.get('text') or n.get('content-desc') or '') == want:
+        parts = n.get('bounds', '').replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4:
+            x = (int(parts[0]) + int(parts[2])) // 2
+            y = max(int(parts[1]) + 4, (int(parts[1]) + int(parts[3])) // 2 - 8)
+            print(x, y)
+            raise SystemExit(0)
+raise SystemExit(1)
+SH
+)
+  [ -n "$coords" ] || return 1
+  adb shell input tap $coords > /dev/null 2>&1
+}
+
 dense_sheet_opened() {
   rm -f sheet-check.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
@@ -2078,14 +2106,24 @@ open_more_sheet() {
       # [56,619][169,640]): its centre lands in the system bar and the tap
       # is swallowed. Lift it above the gesture inset first.
       if row_near_bottom "$row_zh" || row_near_bottom "$row_en"; then
-        # Swipe starting below the rows was swallowed by a row's tap; start
-        # in a gutter between the row's text and its trailing badge, and
-        # repeat because a bottom sheet can absorb the first drag.
-        for _ in 1 2 3; do
-          adb shell input swipe 120 560 120 300 300 > /dev/null 2>&1 || true
-          sleep 0.5
-          row_near_bottom "$row_zh" || row_near_bottom "$row_en" || break
-        done
+        # At 2.0 fonts the drawer's content is taller than the sheet and the
+        # last rows sit in the gesture inset; scrolling cannot move them
+        # (already at the end). Tap 8 px above the row's centre so the touch
+        # leaves the inset, and if that is still not enough use the row's
+        # own accessibility path: focus it with the keyboard and activate it
+        # (the way a TalkBack user reaches the same control).
+        row_tap_nudged "$row_zh" || row_tap_nudged "$row_en" || true
+        sleep 1.2
+        if ! dense_sheet_opened; then
+          for _ in 1 2 3 4 5 6; do
+            adb shell input keyevent KEYCODE_DPAD_DOWN > /dev/null 2>&1 || true
+            sleep 0.15
+          done
+          adb shell input keyevent KEYCODE_DPAD_CENTER > /dev/null 2>&1 || true
+          sleep 1.2
+        fi
+        if dense_sheet_opened; then ok=1; break; fi
+        continue
       fi
       if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
         # The tap landed; the row only counts if its sheet really opened
