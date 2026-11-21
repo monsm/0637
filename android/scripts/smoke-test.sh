@@ -1855,18 +1855,13 @@ PY
   return "$rc"
 }
 
-open_more_sheet() {
-  local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
-  local ok=0
-  # The row lives in the More drawer. A BACK from the previous page may
-  # have closed it on some device timings, so make sure the drawer is the
-  # surface in front: its title plus one group header is the fingerprint
-  # (any sheet has a drag handle, so that alone would lie).
-  for _ in $(seq 1 3); do
-    rm -f dense-check.xml
-    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-    adb exec-out cat /sdcard/ui.xml > dense-check.xml 2>/dev/null || true
-    if python3 - <<'SH'
+# True when the More drawer is the surface in front (its title plus one
+# group header; every sheet has a drag handle, so that alone would lie).
+drawer_present() {
+  rm -f dense-check.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > dense-check.xml 2>/dev/null || return 1
+  python3 - <<'SH'
 import xml.etree.ElementTree as ET
 try:
     root = ET.parse('dense-check.xml').getroot()
@@ -1877,26 +1872,35 @@ titles = {'更多', 'More'}
 groups = {'玩', '一起', '记录', '这只鸭子', 'Play', 'Together', 'Records', 'This duck'}
 raise SystemExit(0 if titles & set(texts) and groups & set(texts) else 1)
 SH
-    then
-      break
-    fi
+}
+
+open_more_sheet() {
+  local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
+  local ok=0
+  # The row lives in the More drawer. A BACK from the previous page may
+  # have closed it on some device timings, so make sure the drawer is the
+  # surface in front: its title plus one group header is the fingerprint
+  # (any sheet has a drag handle, so that alone would lie).
+  for _ in $(seq 1 3); do
+    drawer_present && break
     tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
     sleep 1
   done
-  # Both directions: a one-way scroll can walk past a row that was above the
-  # fold after the previous page's return.
+  # One way only: the drawer's own order is top to bottom, so a downward
+  # swipe is never needed — and a downward drag on a bottom sheet is the
+  # DISMISS gesture (the 572618a red dump was the Live screen: a reverse
+  # swipe had closed the drawer). If the sheet is gone, reopen it and keep
+  # scrolling from the top.
   for _ in $(seq 1 12); do
     if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
       ok=1
       break
     fi
-    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-    sleep 0.4
-    if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
-      ok=1
-      break
+    if ! drawer_present; then
+      tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+      sleep 1
     fi
-    adb shell input swipe 160 160 160 560 300 > /dev/null 2>&1 || true
+    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
     sleep 0.4
   done
   if [ "$ok" != "1" ]; then
