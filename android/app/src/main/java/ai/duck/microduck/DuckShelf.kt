@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -246,6 +247,10 @@ private fun WallObject(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
+            // uiautomator only reports testTag on nodes that carry their own
+            // semantics: without the merge, Compose folds this clickable Box
+            // into its children and the smoke's tap_tag finds nothing.
+            .semantics(mergeDescendants = true) {}
             .testTag(tag)
             ,
     ) {
