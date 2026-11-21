@@ -2125,14 +2125,26 @@ open_more_sheet() {
         if dense_sheet_opened "$witness"; then ok=1; break; fi
         continue
       fi
+      # Report what the tap did, so a red run explains itself.
       if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
-        # The tap landed; the row only counts if its sheet really opened
-        # (a swipe-position miss can hit a different row).
         sleep 1.2
         if dense_sheet_opened "$witness"; then
           ok=1
           break
         fi
+        echo "!! $name: row tapped but no page (witness=$witness)"
+        adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+        adb exec-out cat /sdcard/ui.xml > tap-miss.xml 2>/dev/null || true
+        python3 - <<'SH' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('tap-miss.xml').getroot()
+except Exception:
+    raise SystemExit(0)
+labels = [(n.get('text') or n.get('content-desc') or '') for n in root.iter('node')
+          if n.get('package') == 'ai.duck.microduck']
+print('!! after tap held:', [x for x in labels if x][:24])
+SH
         adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
         sleep 1
       fi
