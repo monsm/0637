@@ -1986,7 +1986,17 @@ open_more_sheet() {
   # screen first (four previous runs each lost a race between BACK, captions
   # and the ring).
   for round in $(seq 1 14); do
-    app_foreground || { adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true; sleep 3; }
+    if ! app_foreground; then
+      # Relaunch and wait for the core, not for a stopwatch: at 2.0 fonts the
+      # first composition plus the core load can outlast a fixed sleep, and
+      # the next dump then reads a stale frame.
+      adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
+      for _ in $(seq 1 30); do
+        curl -sf --max-time 3 http://127.0.0.1:8765/state > /dev/null 2>&1 && break
+        sleep 1
+      done
+      sleep 2
+    fi
     if ring_open; then
       adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
       sleep 0.8
