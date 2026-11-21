@@ -1995,6 +1995,19 @@ SH
       sleep 8
     fi
   done
+  # Explain a failed return: the last dump's texts, and the scene.
+  adb exec-out screencap -p > dense-screen.png 2>/dev/null || true
+  cp live-check.xml dense-dump.xml 2>/dev/null || true
+  python3 - <<'SH' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('live-check.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"cannot read the live dump: {exc}")
+held = sorted({(n.get('text') or n.get('content-desc') or '') for n in root.iter('node')
+               if (n.get('text') or n.get('content-desc'))})
+print("ensure_live held:", held[:30])
+SH
   return 1
 }
 
