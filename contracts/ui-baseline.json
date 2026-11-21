@@ -4,7 +4,7 @@
     "direction": "min"
   },
   "a11y_custom_actions": {
-    "count": 7,
+    "count": 3,
     "direction": "min"
   },
   "android_back_handler": {
@@ -92,7 +92,7 @@
     "direction": "min"
   },
   "shell_kt_lines": {
-    "count": 3836,
+    "count": 3831,
     "direction": "max"
   }
 }
