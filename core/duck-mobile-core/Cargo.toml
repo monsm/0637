@@ -1,0 +1,56 @@
+[package]
+name = "duck-mobile-core"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[lib]
+name = "duck_mobile_core"
+# staticlib and cdylib for the iOS and Android shells; rlib for this
+# crate's own test suite.
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+# Official control core: observation layout, ONNX policy runtime, safety, fall,
+# pickup. `default-features = false` drops the Dynamixel bus (rustypot/serialport)
+# so the same code compiles for iOS/Android.
+duck-control = { path = "../../upstream/microduck/duck-control", default-features = false }
+# Official skill config types used by robotd's control.rs.
+robotd-params = { path = "../../upstream/microduck/robotd-params" }
+# Forward kinematics from the training MJCF: `posture.rs` (boot pose) and the
+# gaze solver both speak this crate. Pure Rust, roxmltree only.
+kinematics = { path = "../../upstream/microduck/kinematics" }
+# The wire's joint-name table; `posture.rs` maps wire order to the MJCF's.
+duck-ipc-proto = { path = "../../upstream/microduck/duck-ipc-proto" }
+# The robot's own contact odometry: where it is, from its legs and IMU. Pure
+# Rust (MJCF parsed with roxmltree), so it compiles for both mobile targets.
+odometry = { path = "../../upstream/microduck/odometry" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+tracing = "0.1"
+# The official pet-detect CNN (`pet_detect.onnx`) runs through the same ONNX
+# Runtime the policies link. Pinned to duck-control's exact version so the
+# workspace keeps one `ort`/`ort-sys`; `default-features = false` lets
+# duck-control's onnx-dynamic/onnx-static features decide how it loads.
+ort = { version = "=2.0.0-rc.11", default-features = false }
+
+[features]
+# Desktop builds dlopen ONNX Runtime (ORT_DYLIB_PATH). iOS builds link the
+# static XCFramework (ORT_IOS_XCFWK_LOCATION) and must disable defaults.
+default = ["onnx-dynamic"]
+onnx-dynamic = ["duck-control/onnx-dynamic"]
+onnx-static = ["duck-control/onnx-static"]
+# The in-process MuJoCo body. Desktop tests need MUJOCO_INCLUDE_DIR and
+# MUJOCO_LIB_DIR; iOS CI supplies a static MuJoCo 3.10 library.
+mujoco = []
+
+[build-dependencies]
+cc = "1"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+
+# No [[bin]] targets: the product is iOS + Android, and the desktop sim
+# harnesses (sim_inproc, sim_runtime, sim_walk, fall_probe) are gone with
+# it. The crate types keep rlib for this crate's own tests.

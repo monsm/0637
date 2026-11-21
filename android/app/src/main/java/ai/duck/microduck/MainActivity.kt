@@ -1,0 +1,717 @@
+package ai.duck.microduck
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.opengl.GLSurfaceView
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.viewinterop.AndroidView
+import java.io.File
+import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+
+class MainActivity : ComponentActivity() {
+    private var core: DuckCore? = null
+    private var loop: DuckLoop? = null
+    private var voice: Voice? = null
+    private lateinit var input: DuckInput
+    private var sensorManager: android.hardware.SensorManager? = null
+    private var shakeListener: android.hardware.SensorEventListener? = null
+    private var shakeUsesRaw = false
+    private val shakeDetector = ShakeDetector()
+    private val gravitySeparator = GravitySeparator()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        companionReady = false
+        // Edge-to-edge: the GL scene runs under the bars, the chrome insets
+        // itself (safeDrawing in portrait, systemBarsPadding in landscape).
+        enableEdgeToEdge()
+        super.onCreate(savedInstanceState)
+        Copy.load(this)
+        // The voice-chat speaker belongs to the activity: its engine is
+        // created here and shut down in onDestroy. A phone without a speech
+        // engine stays silent; the chat bubbles still show the text.
+        ChatVoice.init(this)
+        // The growth ledger lives beside the app's other local facts; the
+        // first read only sets the walk/roll baselines (no back-filled
+        // history, docs/PROGRESS_ANDROID.md).
+        DuckProgress.init(java.io.File(filesDir, "progress.json"))
+        // The stage's daylight is a function of the local hour. A launch
+        // extra pins it, so screenshots and frame checks do not change with
+        // the clock of whoever runs CI (`--ef daylight_hour 12`).
+        if (intent.hasExtra("daylight_hour")) {
+            val hour = intent.getFloatExtra("daylight_hour", Float.NaN)
+            if (hour.isFinite() && hour in 0f..24f) Daylight.hourOverride = hour
+        }
+        input = DuckInput()
+        // The room's lamp, when the device has a real lux sensor: the scale
+        // follows the room, clamped to the readable band. No sensor leaves
+        // the sheet's manual stops in charge — the number is never invented.
+        val sensorManager = getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+        this.sensorManager = sensorManager
+        // The compass, when the device has a rotation vector: the azimuth's
+        // delta from the bearing at switch-on becomes the room's yaw offset.
+        // No sensor, no row - the number is never invented. The listeners are
+        // explicit SensorEventListener objects: registerListener's overloads
+        // make a bare lambda's SAM conversion ambiguous.
+        val compassPrefs = getSharedPreferences("duck", Context.MODE_PRIVATE)
+        val compassListener = object : android.hardware.SensorEventListener {
+            private var bearing = Float.NaN
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                if (event.sensor.type != android.hardware.Sensor.TYPE_ROTATION_VECTOR) return
+                if (!compassPrefs.getBoolean("duck_compass_on", false)) {
+                    bearing = Float.NaN
+                    input.compassYawRad = 0f
+                    return
+                }
+                val matrix = FloatArray(9)
+                android.hardware.SensorManager.getRotationMatrixFromVector(matrix, event.values)
+                val orientation = FloatArray(3)
+                android.hardware.SensorManager.getOrientation(matrix, orientation)
+                val azimuth = orientation[0]
+                if (bearing.isNaN()) bearing = azimuth
+                input.compassYawRad = -(azimuth - bearing)
+            }
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+        }
+        sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR)?.let { rotation ->
+            sensorManager.registerListener(compassListener, rotation, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        // The room's lamp, when the device has a real lux sensor: the scale
+        // follows the room, clamped to the readable band. No sensor leaves
+        // the sheet's manual stops in charge; the number is never invented.
+        val luxListener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                if (event.sensor.type != android.hardware.Sensor.TYPE_LIGHT) return
+                input.ambientLux = event.values[0]
+                input.ambientScale = (event.values[0] / 200f).coerceIn(0.55f, 1.15f)
+            }
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+        }
+        sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_LIGHT)?.let { light ->
+            sensorManager.registerListener(luxListener, light, android.hardware.SensorManager.SENSOR_DELAY_NORMAL)
+        }
+        setContent {
+            MaterialTheme(colorScheme = darkColorScheme()) {
+                DuckScreen(
+                    coreProvider = { core },
+                    onCoreCreated = { created ->
+                        core = created
+                        // A recreate races the previous core's accept loop
+                        // exiting, so the port can still be closing when the
+                        // new core binds. Retry on a worker thread instead of
+                        // blocking composition; after 40 tries it logs and
+                        // gives up rather than throwing.
+                        Thread {
+                            for (attempt in 0 until 40) {
+                                if (created.startIntentServer(8765) == 0) {
+                                    // The depth scan's floor estimate goes to
+                                    // the core once the server answers. No
+                                    // depth source, no post: the core keeps
+                                    // its own floor.
+                                    postFloorIfKnown()
+                                    return@Thread
+                                }
+                                try {
+                                    Thread.sleep(50)
+                                } catch (_: InterruptedException) {
+                                    return@Thread
+                                }
+                            }
+                            android.util.Log.w("duck", "intent server did not bind 8765 after 40 attempts")
+                        }.start()
+                        loop = DuckLoop(created, input).also { it.start() }
+                        // The duck's own voice: the core decides when it
+                        // quacks, this owns the speaker.
+                        voice = Voice(created).also { it.start() }
+                        // Restore and the periodic save belong to the app,
+                        // not to a composable: the shell can be recomposed or
+                        // stopped, and losing this thread is how the duck
+                        // woke up as a stranger. The saver runs only after a
+                        // restore (or on a first launch with nothing saved),
+                        // so it can never overwrite the file with defaults.
+                        val activity = this@MainActivity
+                        Thread {
+                            // The core's walk-slot override is process
+                            // memory; the phone's copy is in the "duck"
+                            // preferences. Hand it back before the care
+                            // restore, so the duck wakes on the gait it
+                            // went to sleep on.
+                            replayWalkPolicy(activity, created)
+                            // The words the person taught are the phone's
+                            // copy too; the core's alias table is process
+                            // memory, so replay it once the core answers.
+                            replayVoiceAliases(VoiceAliasStore.prefs(activity))
+                            // The phone's calendar day with the saved quest
+                            // board; this is independent of care restore.
+                            postQuestDay(activity)
+                            if (restoreCompanion(activity)) {
+                                companionReady = true
+                                while (companionReady) {
+                                    saveCompanionNow(activity)
+                                    val boardState = fetchRawState()
+                                    if (boardState != null) saveQuestBoard(activity, boardState)
+                                    // A midnight rollover reaches the core
+                                    // within one save period; same-day calls
+                                    // are skipped inside postQuestDay.
+                                    postQuestDay(activity)
+                                    try {
+                                        Thread.sleep(3_000)
+                                    } catch (_: InterruptedException) {
+                                        break
+                                    }
+                                }
+                            }
+                        }.start()
+                    },
+                    input = input,
+                    onQuack = { voice?.play("chirp") },
+                    onWheee = { held -> core?.wheee(held) },
+                    onFeed = {
+                        DuckProgress.record(ProgressEvent.Feed)
+                        postDuckCommand("/feed")
+                    },
+                )
+            }
+        }
+    }
+
+    /**
+     * The floor intent for the scan, if it found the plane the duck stands
+     * on. The body is `{"z":0.0}`: the core's z is an offset from the scene's
+     * default ground (it accepts -0.1..0.3 and moves plane and duck
+     * together). A scan that saw no plane, or none ran, posts nothing.
+     */
+    private fun postFloorIfKnown() {
+        val body = floorPostBody(DepthStatus.last) ?: return
+        postDuckCommand("/floor", body)
+    }
+
+    companion object {
+        /** The shell sets this while its restore has had time to land. */
+        @Volatile @JvmStatic var companionReady = false
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The phone's IMU is the duck's disturbance channel, as on iOS: a
+        // shake is a shove on the trunk. Registered only while the activity
+        // is in front; a sensor-less device stays quiet.
+        startShake()
+    }
+
+    /**
+     * The shake listener. `TYPE_LINEAR_ACCELERATION` already has gravity
+     * removed, the same signal CoreMotion's `userAcceleration` gives iOS;
+     * a device without it falls back to the raw accelerometer with the
+     * documented low-pass gravity estimate. The axes are the device's own
+     * (x right, y up, z out of the screen), the frame `duck_core_push`
+     * expects.
+     */
+    private fun startShake() {
+        val manager = sensorManager ?: return
+        if (shakeListener != null) return
+        val linear = manager.getDefaultSensor(android.hardware.Sensor.TYPE_LINEAR_ACCELERATION)
+        val raw = manager.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+        val sensor = linear ?: raw ?: return
+        shakeUsesRaw = linear == null
+        val listener = object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(event: android.hardware.SensorEvent) {
+                val values = if (shakeUsesRaw) {
+                    gravitySeparator.linear(event.values)
+                } else {
+                    if (event.values.size < 3) return
+                    doubleArrayOf(
+                        event.values[0].toDouble(),
+                        event.values[1].toDouble(),
+                        event.values[2].toDouble(),
+                    )
+                }
+                // SensorEvent.timestamp is a monotonic boot clock in ns; the
+                // wall clock is never read here.
+                val now = if (event.timestamp > 0) {
+                    event.timestamp / 1_000_000_000.0
+                } else {
+                    android.os.SystemClock.elapsedRealtimeNanos() / 1_000_000_000.0
+                }
+                val push = shakeDetector.onSample(values[0], values[1], values[2], now) ?: return
+                // The same impulse iOS sends: axis * 0.8 in CoreMotion's g,
+                // at most once per 0.4 s.
+                core?.push(push[0], push[1], push[2])
+            }
+
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+        }
+        val registered = runCatching {
+            manager.registerListener(
+                listener,
+                sensor,
+                android.hardware.SensorManager.SENSOR_DELAY_GAME,
+            )
+        }.getOrDefault(false)
+        if (registered) shakeListener = listener
+    }
+
+    private fun stopShake() {
+        val listener = shakeListener ?: return
+        runCatching { sensorManager?.unregisterListener(listener) }
+        shakeListener = null
+    }
+
+    override fun onPause() {
+        // Background means no disturbance channel: the phone is not being
+        // shaken at a duck it cannot see.
+        stopShake()
+        super.onPause()
+        // Remember what the duck had done by now; onResume's sheet reads the
+        // diff as "while you were away".
+        Thread {
+            val events = fetchLifeEvents()
+            if (events.isNotEmpty()) AwayStore.atBackground = events.toSet()
+        }.start()
+        // The companion state is the duck's, not the activity's: hunger, mood
+        // and the bond must survive the process being killed at any moment.
+        // Wait for the write: force-stop can follow this callback immediately,
+        // and a fire-and-forget thread would die with the process.
+        if (core != null && MainActivity.companionReady) {
+            val save = Thread { saveCompanionNow(this) }
+            save.start()
+            try {
+                save.join(1500)
+            } catch (_: InterruptedException) {
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        companionReady = false
+        stopShake()
+        ChatVoice.shutdown()
+        voice?.stop()
+        voice = null
+        loop?.stop()
+        loop = null
+        // A held ride must not stick past the shell: let go before the core
+        // frees, so the controller never keeps the hold it was left in.
+        core?.wheee(false)
+        core?.close()
+        core = null
+        super.onDestroy()
+    }
+}
+
+@Composable
+private fun DuckScreen(
+    coreProvider: () -> DuckCore?,
+    onCoreCreated: (DuckCore) -> Unit,
+    input: DuckInput,
+    onQuack: () -> Unit,
+    onWheee: (Boolean) -> Unit,
+    onFeed: () -> Unit,
+) {
+    val context = LocalContext.current
+    var core by remember { mutableStateOf(coreProvider()) }
+    var error by remember { mutableStateOf<String?>(null) }
+    // A retry is a fresh attempt, not a no-op: bumping this key reruns the
+    // loader that built the core.
+    var attempt by remember { mutableStateOf(0) }
+    var skills by remember { mutableStateOf(emptyList<String>()) }
+    var surface by remember { mutableStateOf(Surface.Live) }
+    // Director's photo path: the shutter reads the GL frame, CameraX supplies
+    // the room, and the preview sheet saves or shares the composite.
+    var renderer by remember { mutableStateOf<DuckRenderer?>(null) }
+    val cameraCapture = remember { CameraCapture() }
+    var photo by remember { mutableStateOf<Bitmap?>(null) }
+    var photoInFlight by remember { mutableStateOf(false) }
+    var cameraAvailable by remember { mutableStateOf(false) }
+    val cameraActive = surface == Surface.Director && cameraAvailable
+    LaunchedEffect(cameraActive) { input.cameraActive = cameraActive }
+
+    // MuJoCo scene + ONNX policy loading takes seconds; doing it on the main
+    // thread froze the UI (Choreographer: Skipped 40 frames) and stalled the
+    // loader. Create the core on a worker thread. `attempt` is the retry key:
+    // a failure card's Try again reruns exactly this block.
+    LaunchedEffect(attempt) {
+        if (core != null) return@LaunchedEffect
+        error = null
+        val created = withContext(Dispatchers.IO) {
+            runCatching {
+                // Depth obstacles (#4) must be on disk before the core
+                // compiles the scene; the floor (#20) rides DepthStatus and
+                // posts the contract's zero offset once the intent server
+                // answers. The scan starts before the asset copy so it costs
+                // the launch's first second, not the copy's. A scan failure
+                // is a state, not a crash: nothing is written, nothing posts.
+                val scan = try {
+                    DepthScanner(context).scan()
+                } catch (_: Throwable) {
+                    DepthScan(false, false, null, emptyList(), DepthScan.LOOKUP)
+                }
+                val root = AssetStager.stage(context)
+                DepthStatus.last = scan
+                // The obstacle file is written or removed here, before the
+                // core compiles the scene. It is staged on its own: a full
+                // or read-only filesDir degrades this launch's furniture,
+                // but must never stop DuckCore below ("scan never affects
+                // startup"). The Tools row checks obstaclesWritten so it
+                // does not count furniture the core did not load.
+                val obstacles = File(root, "robot/microduck/obstacles.xml")
+                val staged = stageObstacles(obstacles, scan)
+                when (val stage = staged.getOrNull()) {
+                    ObstacleStage.WRITTEN -> {
+                        DepthStatus.obstaclesWritten = true
+                        android.util.Log.i(
+                            "duck",
+                            "depth: ground plane ${scan.floorDistance} m away, ${scan.boxes.size} obstacle(s)",
+                        )
+                    }
+                    ObstacleStage.ABSENT -> DepthStatus.obstaclesWritten = null
+                    null, ObstacleStage.DEGRADED -> {
+                        DepthStatus.obstaclesWritten = false
+                        android.util.Log.w(
+                            "duck",
+                            "depth: obstacles.xml not staged; starting without this scan's furniture",
+                            staged.exceptionOrNull(),
+                        )
+                    }
+                }
+                val core = DuckCore(
+                    File(root, "robot/microduck/scene_backlash.xml").path,
+                    File(root, "policies").path,
+                )
+                // The pickup classifier: the duck pauses its policy in a hand
+                // for the same reason the physical one does.
+                val pickup = File(root, "models/pickup_detector.onnx")
+                if (pickup.exists()) {
+                    core.loadPickup(pickup.path)
+                }
+                // `robot.do curious` and the other twelve: the official
+                // keyframe timelines and their 48 kHz voices, staged as
+                // assets/emotions next to the policies.
+                val emotions = File(root, "emotions")
+                if (emotions.isDirectory) {
+                    android.util.Log.i("duck", "emotions loaded: ${core.loadEmotions(emotions.path)}")
+                }
+                core
+            }
+        }
+        created.onSuccess { if (it.ready) { onCoreCreated(it); core = it } else { error = "core failed" } }
+            .onFailure { error = it.message ?: "core failed" }
+    }
+
+    LaunchedEffect(core) {
+        val active = core ?: return@LaunchedEffect
+        skills = (0 until active.skillCount()).mapNotNull { active.skillName(it) }
+    }
+
+    Box(Modifier.fillMaxSize().background(DuckTheme.BgRoot)) {
+        val active = core
+        if (active != null) {
+            // Director: the room, then the duck over it. CameraX renders into
+            // a TextureView behind the GL surface; the camera never feeds the
+            // control loop.
+            if (surface == Surface.Director) {
+                CameraBackdrop(
+                    active = true,
+                    onAvailability = { cameraAvailable = it },
+                    capture = cameraCapture,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            AndroidView(
+                factory = { ctx ->
+                    GLSurfaceView(ctx).apply {
+                        setEGLContextClientVersion(3)
+                        // Alpha in the surface: Director clears to alpha 0 so
+                        // the camera behind shows through.
+                        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+                        holder.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+                        setZOrderMediaOverlay(true)
+                        val duckRenderer = DuckRenderer(ctx, active, input)
+                        renderer = duckRenderer
+                        setRenderer(duckRenderer)
+                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            // The fused shell owns the chrome: live duck, instrument sheet,
+            // viewfinder.
+            Shell(
+                core = active,
+                skills = skills,
+                input = input,
+                surface = surface,
+                onSurface = { surface = it },
+                quack = onQuack,
+                onWheee = onWheee,
+                onFeed = onFeed,
+                onPhoto = {
+                    val duckRenderer = renderer
+                    if (duckRenderer != null && !photoInFlight) {
+                        photoInFlight = true
+                        val main = Handler(Looper.getMainLooper())
+                        duckRenderer.captureFrame { duck ->
+                            main.post {
+                                if (duck == null) {
+                                    photoInFlight = false
+                                    return@post
+                                }
+                                if (cameraActive) {
+                                    cameraCapture.take(context) { room ->
+                                        photo = compositePhoto(room, duck)
+                                        DuckProgress.record(ProgressEvent.Photo)
+                                        photoInFlight = false
+                                    }
+                                } else {
+                                    photo = duck
+                                    DuckProgress.record(ProgressEvent.Photo)
+                                    photoInFlight = false
+                                }
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+            photo?.let { shot ->
+                PhotoPreviewDialog(shot) { photo = null }
+            }
+        } else {
+            val failure = error
+            if (failure != null) {
+                FailureCard(
+                    failure,
+                    onRetry = { attempt += 1 },
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            } else {
+                // The loading surface (D5): same promise in words, no engine
+                // name, no port, no gain.
+                DuckLoading(
+                    Copy.waking,
+                    modifier = Modifier.align(Alignment.Center),
+                    testTag = "waking-label",
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotoPreviewDialog(photo: Bitmap, onClose: () -> Unit) {
+    // The family credit: the PAIRED ducks in the room right now, by their
+    // published names. No neighbour, no line.
+    var family by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        family = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            fetchPeers()?.peers?.filter { it.paired }?.map { it.name } ?: emptyList()
+        }
+    }
+    val context = LocalContext.current
+    var saved by remember { mutableStateOf(false) }
+    var saveFailed by remember { mutableStateOf(false) }
+    var kept by remember { mutableStateOf(false) }
+    // One honest line from the deltas the duck actually logged. The fetches
+    // run on IO: a composition-time HttpURLConnection throws
+    // NetworkOnMainThreadException, and the catch would swallow it into the
+    // quiet line every single time.
+    var events by remember { mutableStateOf(emptyList<String>()) }
+    var metres by remember { mutableStateOf(0.0) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            events = fetchLifeEvents()
+            metres = fetchLifeRecord()?.metres ?: 0.0
+        }
+    }
+    val caption = postcardCaption(
+        rituals = events.count { it == "idle_ritual" },
+        falls = events.count { isFall(it) },
+        feeds = events.count { it == "feed" },
+        pets = events.count { it == "pet" },
+        moods = events.count { it.startsWith("emotion:") },
+        metres = metres,
+    )
+    Dialog(onDismissRequest = onClose) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(DuckTheme.BgRoot, RoundedCornerShape(DuckTheme.Radius.card))
+                .padding(DuckTheme.Space.lg),
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
+        ) {
+            if (family.isNotEmpty()) {
+                Text(
+                    Copy.photoFamily(family),
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = DuckTheme.Type.Caption,
+                )
+            }
+            Text(
+                Copy.photoTitle,
+                color = Color.White,
+                fontSize = DuckTheme.Type.Body,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Image(
+                bitmap = photo.asImageBitmap(),
+                contentDescription = Copy.photoTitle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp)
+                    .testTag("photo-preview"),
+                contentScale = ContentScale.Fit,
+            )
+            Text(
+                caption,
+                color = Color.White.copy(alpha = 0.75f),
+                fontSize = DuckTheme.Type.Caption,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("postcard-caption"),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+                Button(
+                    onClick = {
+                        saved = savePhoto(context, photo)
+                        saveFailed = !saved
+                    },
+                    enabled = !saved,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("photo-save"),
+                ) {
+                    Text(
+                        if (saved) Copy.saved else if (saveFailed) Copy.saveFailed else Copy.savePhoto,
+                        fontSize = DuckTheme.Type.Label,
+                        maxLines = 1,
+                    )
+                }
+                Button(
+                    onClick = {
+                        // Keep to the local shelf: PNG in files/postcards plus
+                        // the caption, shareable from the sheet later.
+                        val dir = PostcardShelf.dir(context)
+                        val name = "card-${System.currentTimeMillis()}.png"
+                        val ok = try {
+                            File(dir, name).outputStream().use {
+                                photo.compress(Bitmap.CompressFormat.PNG, 100, it)
+                            }
+                            true
+                        } catch (_: Throwable) {
+                            false
+                        }
+                        if (ok) {
+                            PostcardShelf.save(
+                                context,
+                                Postcard(
+                                    file = name,
+                                    caption = caption,
+                                    day = java.time.LocalDate.now().toString(),
+                                ),
+                            )
+                        }
+                        kept = ok
+                    },
+                    enabled = !kept,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("photo-keep"),
+                ) {
+                    Text(
+                        if (kept) Copy.postcardSaved else Copy.postcardKeep,
+                        fontSize = DuckTheme.Type.Label,
+                        maxLines = 1,
+                    )
+                }
+                Button(
+                    onClick = { sharePhoto(context, photo) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("photo-share"),
+                ) {
+                    Text(Copy.share, fontSize = DuckTheme.Type.Label)
+                }
+            }
+            Button(
+                onClick = onClose,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("photo-close"),
+            ) {
+                Text(Copy.close, fontSize = DuckTheme.Type.Label)
+            }
+        }
+    }
+}
+/**
+ * The one failure exit. The reason is translated to what a person can do
+ * about it; the raw exception stays in the log. The retry reruns the loader.
+ */
+@Composable
+private fun FailureCard(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    // One error surface (D5): the shared card, with the same "retry" tag the
+    // smoke already taps.
+    DuckErrorCard(
+        title = Copy.couldNotStart,
+        reason = Copy.humanError(message),
+        onRetry = onRetry,
+        modifier = modifier,
+        testTag = "failure-card",
+        retryTag = "retry",
+    )
+}
+
+/** robotd's AxisBinding::evaluate: inside 0.1 the axis reads zero, otherwise as-is. */
+internal fun deadzone(value: Float): Float = if (kotlin.math.abs(value) < 0.1f) 0f else value

@@ -1,0 +1,2616 @@
+//! The app's intent API: a small HTTP server on the local network.
+//!
+//! The duck's control loop is the only thing that touches the runtime; this
+//! server only enqueues intents and publishes a snapshot. A user's LLM, script
+//! or agent can drive the duck with plain JSON:
+//!
+//! ```text
+//! POST /twist       {"vx":0.4,"vy":0,"wz":0}
+//! POST /path        {"points":[[0,0],[0.4,0.1],...]}   body frame, metres
+//! POST /path/cancel {}
+//! POST /skill       {"name":"roulade"}
+//! POST /sit         {}
+//! POST /ground_pick {}
+//! POST /push        {"vx":0.6,"vy":0,"vz":0}
+//! POST /night       {"on":true}                         good night / morning
+//! POST /reload      {"dir":"/path/to/policies"}
+//! GET  /state
+//! GET  /skills
+//! GET  /days                                           the parent's day view
+//! ```
+//!
+//! `POST /config` also takes `custom_skills` — an array of manifest policy
+//! entries (file, name, kind, duration_s, …) that replaces the duck's own
+//! skill table, exactly what `robot.setSkill`/`robot.removeSkill` serve over
+//! the `robot.*` face. The next `/reload` is what loads the files.
+//!
+//! No authentication: it binds to the local network for a phone or a desktop
+//! agent. Treat it as a development API, not an internet-facing service.
+
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
+use std::time::{Duration, Instant};
+
+use serde_json::{Value, json};
+
+use crate::speech::VoiceAliases;
+
+/// How long a one-shot route waits for the tick to decide. The loop runs at
+/// 50 Hz, so a live duck answers in 20 ms; the margin is for a slow frame, and
+/// the timeout is what a backgrounded app looks like.
+const ACTION_TIMEOUT: Duration = Duration::from_millis(300);
+
+/// A mode switch loads a second MJCF and a whole policy set, then enables the
+/// body: the same work as core creation, and worth waiting for.
+const MODE_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The sender keeps the wire's one-gift-per-peer window here too, so a tap
+/// repeated three times in a second is refused before it reaches the tick.
+const GIFT_INTERVAL: Duration = Duration::from_millis(crate::lan::GIFT_EVERY_MS as u64);
+
+#[derive(Debug, Clone)]
+pub enum Intent {
+    Twist([f64; 3]),
+    /// A painted route: body-frame points in metres at the path's start
+    /// (+x forward, +y left). The route layer has already dropped the duck's
+    /// own origin, thinned the points and checked the caps.
+    Path(Vec<[f32; 2]>),
+    /// Stop the painted route; answered ok whether or not one is walking.
+    PathCancel,
+    Head([f64; 4]),
+    Body(f64, f64, f64),
+    BodyRelease,
+    Skill(String),
+    Sit,
+    GroundPick,
+    Push([f64; 3]),
+    /// Beak opening, 0..1. The mouth is not part of any policy: on the robot
+    /// it is a client's intent (or the idle yawn), written by the loop.
+    Mouth(f64),
+    Reload(String),
+    /// A hand on the duck: hold the trunk at `offset` from where it was picked
+    /// up (`active: false` lets go).
+    Carry([f64; 3], bool),
+    /// Time machine: freeze the duck.
+    Pause(bool),
+    /// Time machine: advance exactly this many 20 ms ticks while paused.
+    Step(u32),
+    /// Time machine: 0.05x .. 4x.
+    Speed(f64),
+    /// Time machine: save the whole duck at this tick.
+    Checkpoint,
+    /// Time machine: resume from a saved tick.
+    Restore(u64),
+    /// Time machine: step back `ticks` and resume from there.
+    Seek(u64),
+    /// Fork the duck at this instant; `label` names the branch.
+    Fork(String),
+    /// Drop a branch.
+    DropBranch(String),
+    /// Drive one branch, or the original when empty.
+    SelectBranch(String),
+    /// Play one of the duck's sounds: greet, chirp, coo, peck, inquire, alarm.
+    Sound(String),
+    /// Switch drive bundles: "walk" or "roller". A whole-policy-set switch,
+    /// exactly as `robotd`'s mode line, not a per-command filter.
+    Mode(String),
+    /// `robot.shutdown`: sit, ease into the rest pose, cut torque.
+    Shutdown,
+    /// Power back on after a shutdown.
+    PowerOn,
+    /// A phone sensor reading (camera, microphone, depth, IMU).
+    Sensor(crate::sensors::Reading),
+    /// `robot.flashlight`: the virtual face LED, one of robotd's seven colours.
+    Flashlight {
+        toggle: bool,
+        on: bool,
+        color: String,
+    },
+    /// The held wheee ride: `hold` starts it, releasing ends it.
+    Wheee(bool),
+    /// A stroke of the hand on the duck.
+    Pet,
+    Feed,
+    /// The night: put the duck to bed on purpose (`true`), or end it with the
+    /// morning (`false`) and learn how quiet the night was.
+    Night(bool),
+    /// Start a chorus: the listed official moves, performed by every duck in
+    /// the room together. One to three moves, already validated by the route.
+    Chorus(Vec<String>),
+    /// A room-wide score: official mood names, and optional sound tags.
+    /// The lead plays role 0; paired neighbours get their own roles.
+    Ensemble(Vec<String>, Vec<String>),
+    /// The lifetime record a shell saved across launches, handed back so the
+    /// duck's history survives an app restart.
+    RestoreLife(serde_json::Value),
+    /// The care state a shell saved across launches (hunger, mood, bond).
+    RestoreCare(serde_json::Value),
+    /// How fast care ages against real time; 1.0 is normal.
+    CareScale(f64),
+    /// A child's block program: triggers and actions in the duck's own verbs.
+    SetRules(serde_json::Value),
+    GetRules,
+    /// Sit down (`true`) or stand up (`false`), idempotently. `/sit` is the
+    /// button's toggle; a model must not invert its own request.
+    Posture(bool),
+    /// Say hello to another duck on the LAN (None = every duck).
+    GreetPeer(Option<String>),
+    /// The person's six-digit pairing code, and the peer to offer it to.
+    /// Setting the code alone never pairs anyone; the answer does.
+    PairPeer(String, Option<String>),
+    /// A treat or an official emotion for one known peer, unicast to the
+    /// address its announce/greet came from.
+    SendGift {
+        id: String,
+        gift: crate::lan::GiftKind,
+        value: String,
+    },
+    /// The name this duck announces.
+    PeerName(String),
+    /// Open the LAN socket and announce as `name`. On-demand because iOS
+    /// asks for local-network permission the first time one is opened.
+    StartLan(String),
+    /// Enable or disable the official UDP pad. Gated by a pair code in ffi.rs.
+    PadSwitch(bool),
+    /// The parent's daily play allowance, in minutes; zero clears it.
+    ParentBudget(u32),
+    /// The whole timeline between the rewind window's ends, for an export
+    /// file. Read-only: the duck's history leaves, nothing writes in.
+    TrajectoryExport,
+    /// The AR floor: the world's ground moves to this height in metres.
+    /// Twin observation never sees it; the physics does.
+    FloorHeight(f64),
+    /// The whole duck's portable state: care, quests and rules, packed for
+    /// a file the person carries to another phone.
+    Backup,
+    /// A backup read back from that file. Every part goes through the same
+    /// intent it came from - the format field is the only thing new here.
+    RestoreBackup(serde_json::Value),
+    /// The shell's calendar day, plus the quest board it saved. Quests are
+    /// the person's day, not simulated time; a rewind must not rewrite them.
+    QuestDay(String, serde_json::Value),
+    /// How long the duck waits before doing something by itself, in seconds.
+    IdleRitual(f64),
+    /// `robot.look`: aim the head at a trunk-frame point with a neck pitch.
+    Look {
+        target: [f64; 3],
+        neck_pitch: f64,
+    },
+    /// Recognized speech, as text. The core maps it to one of its own verbs,
+    /// so a phone's recognizer, a typed word and an AI client all take the
+    /// same path.
+    Heard(String),
+}
+
+/// An intent with the ticket its client is waiting on.
+#[derive(Debug, Clone)]
+pub struct QueuedIntent {
+    pub id: u64,
+    pub intent: Intent,
+}
+
+struct Commands {
+    items: VecDeque<QueuedIntent>,
+    /// The core's answers, by ticket. Bounded: a route that gave up waiting
+    /// must not grow this map without end.
+    answers: HashMap<u64, Value>,
+    /// Tickets somebody is actually waiting on. A fire-and-forget stream
+    /// (`/twist` at 50 Hz) must not fill the answer map with results nobody
+    /// reads — and, worse, evict the result a long mode-switch is waiting for.
+    awaited: HashSet<u64>,
+    next_id: u64,
+}
+
+pub struct IntentQueue {
+    commands: Mutex<Commands>,
+    answered: Condvar,
+    state: Mutex<Value>,
+    skills: Mutex<Vec<String>>,
+    fingerprint: Mutex<String>,
+    /// The LAN peers as the loop last published them.
+    peers: Mutex<Value>,
+    /// The official emotion names this build loaded, as the core last
+    /// published them. The gift route refuses a mood that is not in here.
+    emotions: Mutex<Vec<String>>,
+    /// The words a person taught the duck: phrase -> a verb it already has.
+    /// Whole-table state the client owns and replays on launch, so nothing
+    /// here is written to disk by the core.
+    voice_aliases: Mutex<VoiceAliases>,
+    /// The manifest's one-shot skills, as the core last published them. The
+    /// collection page's tricks: `/skills` also carries the emotions and the
+    /// loop's own verbs, so that list cannot stand in for this one.
+    manifest_skills: Mutex<Vec<String>>,
+    /// When each peer last got a gift from this duck, for the sender's
+    /// one-per-peer window. Keyed by peer id.
+    gifts_sent: Mutex<HashMap<String, Instant>>,
+    /// The last gift that arrived from another duck, as /state publishes it.
+    gift_event: Mutex<Value>,
+    /// The chorus as the loop last published it, so the route can refuse a
+    /// second one without waiting a tick.
+    chorus: Mutex<Value>,
+    /// The time machine's answers, filled by the core on the next tick.
+    time: Mutex<Value>,
+    /// The forks: one entry per branch, filled by the core.
+    branches: Mutex<Value>,
+    /// The latest phone-sensor readings.
+    sensors: Mutex<Value>,
+    /// The duck's lifetime record, shared with the loop that counts it.
+    life: Mutex<crate::vetbook::Book>,
+    /// Daily quests: the board the loop publishes and the day the shell owns.
+    quests: Mutex<Value>,
+    day: Mutex<String>,
+    /// The token a client that is not the phone has to say. The phone's own
+    /// apps are trusted over the loopback address; this is for the rest of
+    /// the network.
+    token: Mutex<String>,
+}
+
+impl Default for IntentQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IntentQueue {
+    pub fn new() -> Self {
+        Self {
+            commands: Mutex::new(Commands {
+                items: VecDeque::new(),
+                answers: HashMap::new(),
+                awaited: HashSet::new(),
+                next_id: 0,
+            }),
+            answered: Condvar::new(),
+            state: Mutex::new(json!({
+                "label": "idle",
+                "bringup": 0,
+                "fallen": false,
+                "gain": 200,
+                "trunk": [0.0, 0.0, 0.0],
+                "gravity": [0.0, 0.0, -1.0],
+            })),
+            skills: Mutex::new(Vec::new()),
+            fingerprint: Mutex::new("{}".to_owned()),
+            peers: Mutex::new(json!({ "peers": [] })),
+            emotions: Mutex::new(Vec::new()),
+            voice_aliases: Mutex::new(VoiceAliases::new()),
+            manifest_skills: Mutex::new(Vec::new()),
+            gifts_sent: Mutex::new(HashMap::new()),
+            gift_event: Mutex::new(Value::Null),
+            chorus: Mutex::new(json!({ "active": false })),
+            branches: Mutex::new(json!({ "branches": [], "selected": "" })),
+            sensors: Mutex::new(json!({ "mode": "twin" })),
+            life: Mutex::new(crate::vetbook::Book::default()),
+            quests: Mutex::new(json!({ "day": "", "quests": [], "streak": 0 })),
+            day: Mutex::new(String::new()),
+            token: Mutex::new(String::new()),
+            time: Mutex::new(json!({
+                "tick": 0,
+                "paused": false,
+                "speed": 1.0,
+                "checkpoints": [],
+            })),
+        }
+    }
+
+    /// Enqueue an intent; the id is the ticket the core answers. Nobody waits
+    /// on a plain push — streams use this — so its answer is dropped.
+    pub fn push(&self, intent: Intent) -> u64 {
+        self.enqueue(intent, false)
+    }
+
+    fn enqueue(&self, intent: Intent, awaited: bool) -> u64 {
+        let mut commands = self.commands.lock().expect("intent queue");
+        commands.next_id += 1;
+        let id = commands.next_id;
+        if awaited {
+            commands.awaited.insert(id);
+        }
+        commands.items.push_back(QueuedIntent { id, intent });
+        id
+    }
+
+    pub fn drain(&self) -> Vec<QueuedIntent> {
+        self.commands
+            .lock()
+            .expect("intent queue")
+            .items
+            .drain(..)
+            .collect()
+    }
+
+    /// The core's answer to one queued intent.
+    pub fn answer(&self, id: u64, result: Value) {
+        let mut commands = self.commands.lock().expect("intent answers");
+        // Only keep an answer somebody asked for. Otherwise 50 Hz streams
+        // would grow the map (and its eviction would discard a real waiter's
+        // result).
+        if commands.awaited.remove(&id) {
+            commands.answers.insert(id, result);
+        }
+        drop(commands);
+        self.answered.notify_all();
+    }
+
+    /// Wait for the tick that applies `id`. `None` means no tick ran in time —
+    /// the duck may be backgrounded, not broken.
+    pub fn await_result(&self, id: u64, timeout: Duration) -> Option<Value> {
+        let deadline = Instant::now() + timeout;
+        let mut commands = self.commands.lock().expect("intent answers");
+        loop {
+            if let Some(result) = commands.answers.remove(&id) {
+                return Some(result);
+            }
+            let now = Instant::now();
+            if now >= deadline {
+                // Give up cleanly: the core may still answer later, and the
+                // answer would have nowhere to go.
+                commands.awaited.remove(&id);
+                return None;
+            }
+            let (guard, _) = self
+                .answered
+                .wait_timeout(commands, deadline - now)
+                .expect("intent answers");
+            commands = guard;
+        }
+    }
+
+    /// Enqueue, then answer with what the duck actually did.
+    ///
+    /// One-shot actions are answered after the next tick has decided, so a
+    /// refusal ("a scripted move is already running") reaches the client
+    /// instead of an `ok` that meant nothing more than "the queue took it".
+    /// Control streams (`/twist`, `/head`, `/body`) stay fire-and-forget: a
+    /// 50 Hz stream cannot wait half a tick for every sample, and a twist has
+    /// no decision to report.
+    pub fn request(&self, intent: Intent) -> Value {
+        self.request_within(intent, ACTION_TIMEOUT)
+    }
+
+    /// [`Self::request`] with an explicit budget. A mode switch loads a second
+    /// MJCF and a policy set on the tick thread, which is seconds, not ticks.
+    pub fn request_within(&self, intent: Intent, timeout: Duration) -> Value {
+        let id = self.enqueue(intent, true);
+        self.await_result(id, timeout).unwrap_or_else(|| {
+            json!({
+                "ok": false,
+                "pending": true,
+                "error": "the duck did not answer within 300 ms; is the app running?",
+            })
+        })
+    }
+
+    pub fn set_state(&self, state: Value) {
+        *self.state.lock().expect("intent state") = state;
+    }
+
+    pub fn state_json(&self) -> String {
+        self.state.lock().expect("intent state").to_string()
+    }
+
+    /// The token a client from outside this machine has to present.
+    pub fn token(&self) -> String {
+        self.token.lock().expect("intent token").clone()
+    }
+
+    /// Give the API its token. The server is started once per core, and the
+    /// token is what a client that is not the phone has to say.
+    pub fn set_token(&self, token: String) {
+        if let Ok(mut slot) = self.token.lock() {
+            *slot = token;
+        }
+    }
+
+    pub fn set_skills(&self, skills: Vec<String>) {
+        *self.skills.lock().expect("intent skills") = skills;
+    }
+
+    pub fn skills_json(&self) -> String {
+        json!({ "skills": *self.skills.lock().expect("intent skills") }).to_string()
+    }
+
+    /// Replace the whole taught-word table.
+    ///
+    /// Every target must name something this duck currently has, checked
+    /// against the snapshots the core last published — `sit`/`stand`/
+    /// `ground_pick`, a built-in sound tag, a loaded skill, or a loaded
+    /// emotion. The table is refused whole, with the phrase and target
+    /// named, rather than half applied. An empty map clears it; the shell
+    /// replays the list on launch, so the core keeps it in memory only.
+    pub fn set_voice_aliases(&self, pairs: BTreeMap<String, String>) -> Result<(), String> {
+        let aliases = VoiceAliases::from_pairs(pairs)?;
+        let skills = self.skills.lock().expect("intent skills").clone();
+        let emotions = self.emotions.lock().expect("intent emotions").clone();
+        for (phrase, target) in aliases.iter() {
+            if !crate::speech::target_is_valid(target, &skills, &emotions) {
+                return Err(format!(
+                    "voice alias {phrase:?}: {target:?} is not a loaded skill, emotion, sound or the duck's own sit/stand/ground_pick"
+                ));
+            }
+        }
+        *self.voice_aliases.lock().expect("intent voice aliases") = aliases;
+        Ok(())
+    }
+
+    /// The taught words as `/heard` reads them. Cloned so the caller never
+    /// holds the lock while the verb runs.
+    pub fn voice_aliases(&self) -> VoiceAliases {
+        self.voice_aliases
+            .lock()
+            .expect("intent voice aliases")
+            .clone()
+    }
+
+    pub fn set_fingerprint(&self, document: String) {
+        *self.fingerprint.lock().expect("intent fingerprint") = document;
+    }
+
+    pub fn fingerprint_json(&self) -> String {
+        self.fingerprint.lock().expect("intent fingerprint").clone()
+    }
+
+    pub fn set_time(&self, value: Value) {
+        *self.time.lock().expect("intent time") = value;
+    }
+
+    pub fn time_json(&self) -> String {
+        self.time.lock().expect("intent time").to_string()
+    }
+
+    pub fn set_branches(&self, value: Value) {
+        *self.branches.lock().expect("intent branches") = value;
+    }
+
+    pub fn branches_json(&self) -> String {
+        self.branches.lock().expect("intent branches").to_string()
+    }
+
+    pub fn set_sensors(&self, value: Value) {
+        *self.sensors.lock().expect("intent sensors") = value;
+    }
+
+    /// The lifetime record as JSON. The queue owns the book so the shell can
+    /// read it without going through the core's FFI.
+    /// The lifetime record, as the core last published it.
+    pub fn life_json(&self) -> String {
+        self.life.lock().expect("intent life").summary().to_string()
+    }
+
+    /// The parent's day view, from the same snapshot `/life` serves: the
+    /// completed rows the rollover wrote, today's deltas so far, and the
+    /// week's totals. The day is the quest day the shell posted — the same
+    /// day the roll and the unlocks date by; with no day posted there is no
+    /// `today`, and the book's own emptiness is served as it is (no rows, no
+    /// invented zeros).
+    pub fn days_json(&self) -> String {
+        let book = self.life.lock().expect("intent life").clone();
+        book.days_report(&self.day()).to_string()
+    }
+
+    /// Hand the loop's book over, so a client sees the same numbers the
+    /// duck has been counting.
+    pub fn set_life(&self, book: &crate::vetbook::Book) {
+        if let Ok(mut slot) = self.life.lock() {
+            *slot = book.clone();
+        }
+    }
+
+    /// The collection page: every loaded mood and every manifest trick with
+    /// its real count and the day it was first unlocked.
+    ///
+    /// Nothing here is invented. A count of zero is a move that has not
+    /// happened, and it has no `first_day` at all — there is no date for
+    /// something never done. A positive count with an empty `first_day` is a
+    /// count that predates the record (the shell shows "—"), never a guessed
+    /// date; an entry whose value is not a real calendar day is served as
+    /// unknown rather than echoed. The lists come from the names the core
+    /// loaded, sorted by name; a queue that has never heard from a core
+    /// answers with empty tables, not an error.
+    pub fn collection_json(&self) -> String {
+        /// The official release's thirteen moods: the figure the page shows
+        /// as the denominator even before a build has loaded them.
+        const MOODS_TOTAL: usize = 13;
+
+        let book = self.life.lock().expect("intent life").clone();
+        let mut emotions = self.emotions.lock().expect("intent emotions").clone();
+        let mut skills = self
+            .manifest_skills
+            .lock()
+            .expect("intent manifest skills")
+            .clone();
+        emotions.sort();
+        emotions.dedup();
+        skills.sort();
+        skills.dedup();
+
+        // One row per loaded name, with the count the duck really has and
+        // the day the collection really recorded, if it recorded one.
+        let rows = |names: &[String], counts: &BTreeMap<String, u64>, prefix: &str| {
+            let mut unlocked = 0u64;
+            let rows: Vec<Value> = names
+                .iter()
+                .map(|name| {
+                    let count = counts.get(name).copied().unwrap_or(0);
+                    if count == 0 {
+                        return json!({ "name": name, "count": 0 });
+                    }
+                    unlocked += 1;
+                    let first_day = book
+                        .life
+                        .unlocks
+                        .get(&format!("{prefix}:{name}"))
+                        .filter(|day| crate::vetbook::is_unlock_day(day))
+                        .cloned()
+                        .unwrap_or_default();
+                    json!({ "name": name, "count": count, "first_day": first_day })
+                })
+                .collect();
+            (rows, unlocked)
+        };
+        let (emotion_rows, moods_unlocked) = rows(&emotions, &book.life.emotions, "emotion");
+        let (skill_rows, tricks_unlocked) = rows(&skills, &book.life.skills, "skill");
+        json!({
+            "ok": true,
+            "emotions": emotion_rows,
+            "skills": skill_rows,
+            "moods": { "unlocked": moods_unlocked, "total": MOODS_TOTAL },
+            "tricks": { "unlocked": tricks_unlocked, "total": skills.len() },
+        })
+        .to_string()
+    }
+
+    pub fn sensors_json(&self) -> String {
+        self.sensors.lock().expect("intent sensors").to_string()
+    }
+
+    pub fn quests_json(&self) -> String {
+        self.quests.lock().expect("intent quests").to_string()
+    }
+
+    pub fn set_quests(&self, value: Value) {
+        *self.quests.lock().expect("intent quests") = value;
+    }
+
+    pub fn set_day(&self, value: String) {
+        *self.day.lock().expect("intent day") = value;
+    }
+
+    pub fn day(&self) -> String {
+        self.day.lock().expect("intent day").clone()
+    }
+
+    pub fn set_peers(&self, value: Value) {
+        *self.peers.lock().expect("intent peers") = value;
+    }
+
+    pub fn peers_json(&self) -> String {
+        self.peers.lock().expect("intent peers").to_string()
+    }
+
+    pub fn peers_value(&self) -> Value {
+        self.peers.lock().expect("intent peers").clone()
+    }
+
+    /// The official emotion names the core has loaded. The gift route reads
+    /// this snapshot so a client's typo is refused before anything is queued.
+    pub fn set_emotions(&self, names: Vec<String>) {
+        *self.emotions.lock().expect("intent emotions") = names;
+    }
+
+    /// The manifest's one-shot skills, as the core last published them. The
+    /// collection page lists these as tricks; the published `/skills` list
+    /// also holds every emotion and the loop's own verbs.
+    pub fn set_manifest_skills(&self, names: Vec<String>) {
+        *self.manifest_skills.lock().expect("intent manifest skills") = names;
+    }
+
+    fn emotion_loaded(&self, name: &str) -> bool {
+        self.emotions
+            .lock()
+            .expect("intent emotions")
+            .iter()
+            .any(|loaded| loaded == name)
+    }
+
+    /// Claim one peer's sender window. False means a gift went to that peer
+    /// less than three seconds ago. The window is spent only when this
+    /// returns true, so callers validate first and never lose it to a
+    /// refused gift.
+    pub fn take_gift_window(&self, id: &str) -> bool {
+        let now = Instant::now();
+        let mut sent = self.gifts_sent.lock().expect("intent gifts");
+        // Entries outside the window throttle nothing any more; dropping
+        // them keeps the map the size of the peers actually in play.
+        sent.retain(|_, last| now.saturating_duration_since(*last) < GIFT_INTERVAL);
+        if sent.contains_key(id) {
+            return false;
+        }
+        sent.insert(id.to_owned(), now);
+        true
+    }
+
+    /// Validate one `/peers/gift` body. `Ok` carries the peer id, the kind
+    /// and the value to send; `Err` is the client-facing reason. Nothing is
+    /// queued and no sender window is spent here.
+    fn validate_gift(
+        &self,
+        value: &Value,
+    ) -> Result<(String, crate::lan::GiftKind, String), String> {
+        let id = value["id"].as_str().unwrap_or_default();
+        // A gift's address is the one greet uses, so the peer must still be
+        // in the published table. No table row, no send.
+        let known = self
+            .peers_value()
+            .get("peers")
+            .and_then(Value::as_array)
+            .is_some_and(|rows| {
+                rows.iter()
+                    .any(|row| row.get("id").and_then(Value::as_str) == Some(id))
+            });
+        if id.is_empty() || !known {
+            return Err("no such peer".to_owned());
+        }
+        match value["gift"].as_str() {
+            Some("treat") => Ok((id.to_owned(), crate::lan::GiftKind::Treat, String::new())),
+            Some("emotion") => {
+                let mood = value["value"].as_str().unwrap_or_default();
+                // Official names only: the same set the runtime loads, so a
+                // gift can never invent a mood the duck does not have.
+                if !self.emotion_loaded(mood) {
+                    return Err("no such emotion".to_owned());
+                }
+                Ok((
+                    id.to_owned(),
+                    crate::lan::GiftKind::Emotion,
+                    mood.to_owned(),
+                ))
+            }
+            _ => Err("gift must be treat or emotion".to_owned()),
+        }
+    }
+
+    /// The latest received gift for `/state.gift_event`; `null` until one
+    /// arrives this session.
+    pub fn set_gift_event(&self, event: Value) {
+        *self.gift_event.lock().expect("intent gift") = event;
+    }
+
+    pub fn gift_event_value(&self) -> Value {
+        self.gift_event.lock().expect("intent gift").clone()
+    }
+
+    /// The chorus as last published; the route reads `active` from here.
+    pub fn set_chorus(&self, value: Value) {
+        *self.chorus.lock().expect("intent chorus") = value;
+    }
+
+    pub fn chorus_active(&self) -> bool {
+        self.chorus
+            .lock()
+            .expect("intent chorus")
+            .get("active")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    }
+
+    /// The care slice of the published state: one GET for a shell that wants
+    /// to save the duck's tummy and mood without parsing the whole snapshot.
+    pub fn care_json(&self) -> String {
+        let state = self.state.lock().expect("intent state");
+        json!({
+            "care": state.get("care").cloned().unwrap_or(Value::Null),
+            "care_time_scale": state.get("care_time_scale").cloned().unwrap_or(json!(1.0)),
+        })
+        .to_string()
+    }
+
+    /// What the duck's ear last heard, for GET /heard.
+    pub fn heard_json(&self) -> String {
+        let state = self.state.lock().expect("intent state");
+        json!({
+            "last_heard": state.get("last_heard").cloned().unwrap_or(Value::Null),
+        })
+        .to_string()
+    }
+
+    /// The duck's care numbers as the core's own value, for an export.
+    fn care_snapshot(&self) -> crate::care::Care {
+        let state = self.state.lock().expect("intent state");
+        let mut care = crate::care::Care::default();
+        if let Some(value) = state.get("care") {
+            care.restore(value);
+        }
+        care
+    }
+
+    fn build_fingerprint(&self) -> String {
+        let document = self.fingerprint.lock().expect("intent fingerprint");
+        serde_json::from_str::<Value>(&document)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("fingerprint")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .unwrap_or_default()
+    }
+
+    /// A shareable document, built from the same counters /life serves.
+    pub fn vetbook_markdown(&self) -> String {
+        let book = self.life.lock().expect("intent life").clone();
+        crate::export::markdown(&book.life, &self.care_snapshot(), &self.build_fingerprint())
+    }
+
+    pub fn vetbook_json(&self) -> String {
+        let book = self.life.lock().expect("intent life").clone();
+        crate::export::json(&book.life, &self.care_snapshot(), &self.build_fingerprint())
+            .to_string()
+    }
+}
+
+/// Start the server on `0.0.0.0:port`.
+///
+/// The phone's own apps reach it over the loopback address and are trusted.
+/// Everything else on the network has to say the token, which the queue
+/// carries: `queue.set_token(new_token())` before the server starts.
+pub fn start(port: u16, queue: Arc<IntentQueue>) -> std::io::Result<IntentServer> {
+    let listener = TcpListener::bind(("0.0.0.0", port))?;
+    Ok(start_listener(listener, queue))
+}
+
+/// A running intent server. Dropping it (or calling `stop`) ends the accept
+/// loop and closes the port, so a freed core cannot leave :8765 bound to a
+/// queue nobody drains any more.
+pub struct IntentServer {
+    shutdown: Arc<AtomicBool>,
+}
+
+impl IntentServer {
+    pub fn stop(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+        // The accept loop notices within one poll interval; joining here
+        // would only stall the caller, and the thread ends on its own.
+    }
+}
+
+impl Drop for IntentServer {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+const ACCEPT_POLL_MS: u64 = 20;
+
+/// Start the server on an already-bound listener (port 0 in tests).
+///
+/// The API is on the LAN with no login, so the server itself must survive
+/// abuse: concurrent handlers are capped (extra connections get 503), a
+/// refused thread only drops that connection, and an accept error sleeps
+/// rather than hot-spinning. Nothing here may unwind and kill the listener.
+pub fn start_listener(listener: TcpListener, queue: Arc<IntentQueue>) -> IntentServer {
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let flag = shutdown.clone();
+    // Non-blocking accept so the loop can watch the shutdown flag: the port
+    // is closed the moment the flag is set and the loop falls through.
+    listener.set_nonblocking(true).ok();
+    let thread = std::thread::Builder::new()
+        .name("duck-intent".to_owned())
+        .spawn(move || {
+            // A cap on concurrent handlers bounds the thread count under a
+            // flood. It must sit well above the shells' own appetite: every
+            // idle pooled connection (URLSession keeps several per session)
+            // holds a handler for up to the read timeout before the client
+            // speaks, and a busy CI simulator was observed outgrowing a
+            // smaller cap — the 503s came back as empty reads.
+            const MAX_CONNECTIONS: usize = 64;
+            let live = Arc::new(AtomicUsize::new(0));
+            loop {
+                if flag.load(Ordering::SeqCst) {
+                    break;
+                }
+                let (mut stream, remote) = match listener.accept() {
+                    Ok((stream, peer)) => {
+                        // The peer decides whether this connection is the
+                        // phone talking to itself or somebody on the network.
+                        let remote = peer.ip();
+                        (stream, remote)
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(ACCEPT_POLL_MS));
+                        continue;
+                    }
+                    Err(_) => {
+                        // FD pressure and friends: back off instead of
+                        // spinning on an error the next poll repeats.
+                        std::thread::sleep(Duration::from_millis(10));
+                        continue;
+                    }
+                };
+                // BSD and macOS hand back a stream that inherited the
+                // listener's non-blocking mode (Linux does not): left that
+                // way, a read before the client's bytes arrive returns
+                // WouldBlock and the connection dies unanswered. The handler
+                // owns the stream and wants blocking reads with its own
+                // timeouts.
+                stream.set_nonblocking(false).ok();
+                if live.load(Ordering::SeqCst) >= MAX_CONNECTIONS {
+                    let _ = respond(&mut stream, 503, "Service Unavailable", "{}");
+                    continue;
+                }
+                let live = live.clone();
+                let queue = queue.clone();
+                // A refused thread drops only this connection, never the
+                // listener: Builder::spawn returns Err instead of panicking.
+                let _ = std::thread::Builder::new()
+                    .name("duck-intent-conn".to_owned())
+                    .spawn(move || {
+                        live.fetch_add(1, Ordering::SeqCst);
+                        let _ = handle(stream, queue, remote);
+                        live.fetch_sub(1, Ordering::SeqCst);
+                    });
+            }
+            // Dropping the listener closes the socket.
+        });
+    // If even the accept thread cannot start, the API is absent but the duck
+    // still runs — the same deal as a taken LAN port. The handle still stops
+    // cleanly; the flag is simply never read.
+    drop(thread);
+    IntentServer { shutdown }
+}
+
+/// The chorus's moves, read strictly.
+///
+/// A list that is not a list, or that holds something which is not a name,
+/// is an error rather than a shorter song: quietly dropping what could not
+/// be read would sing something other than what was asked for, and the
+/// caller would never know.
+fn chorus_moves(value: &Value) -> Result<Vec<String>, String> {
+    let items = value
+        .as_array()
+        .ok_or_else(|| "moves must be a list of emotion names".to_owned())?;
+    let mut names = Vec::with_capacity(items.len());
+    for item in items {
+        let name = item
+            .as_str()
+            .ok_or_else(|| "moves must be a list of emotion names".to_owned())?;
+        names.push(name.to_owned());
+    }
+    Ok(names)
+}
+
+/// A token for the clients that are not the phone.
+///
+/// The intent API answers on the LAN, and the duck's own state — its
+/// history, its rules, its body — is behind it. The phone talks to itself
+/// over the loopback address and is the duck's owner; anyone else has to
+/// say this. It is built from what the machine can offer (the clock, the
+/// process, the OS's hash seed, the heap's address) and hashed, so it is not
+/// guessable from outside.
+pub fn new_token() -> String {
+    use sha2::Digest;
+    use std::hash::{BuildHasher, Hasher};
+
+    let clock = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_nanos() as u64)
+        .unwrap_or(0);
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u64(clock);
+    hasher.write_u32(std::process::id());
+    let seed = hasher.finish();
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    hasher.write_u64(seed);
+    hasher.write_usize(std::process::id() as usize);
+    hasher.write_usize(&seed as *const u64 as usize);
+    let digest = sha2::Sha256::digest(hasher.finish().to_le_bytes());
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Whether this connection may use the API.
+///
+/// Two things decide it.
+///
+/// **The peer.** The phone's own apps reach the duck over the loopback
+/// address and are the duck's owner; they are trusted. A connection from
+/// anywhere else is on the network, and has to say the token.
+///
+/// **The origin.** A browser sends an `Origin` header, and a web page is
+/// not the owner of the duck, whatever address it reaches the duck from —
+/// including a page open on the phone itself. Only a page served from this
+/// machine may talk to it: the origin's host must be exactly localhost or
+/// 127.0.0.1, not merely start with those names (`localhost.attacker.tld`
+/// is a different machine's page).
+fn authorised(
+    peer: std::net::IpAddr,
+    origin: Option<&str>,
+    presented: Option<&str>,
+    token: &str,
+) -> bool {
+    if let Some(origin) = origin {
+        // Exact-host match on scheme://host — anything after (port aside,
+        // kept only when written) means the page is served elsewhere.
+        let local = (|| {
+            let (scheme, rest) = origin.split_once("://")?;
+            if scheme != "http" && scheme != "https" {
+                return None;
+            }
+            // Bracketed IPv6 comes as one token: `[::1]:9000` splits at the
+            // closing bracket, not at the colons inside the address.
+            let host = if let Some(stripped) = rest.strip_prefix('[') {
+                let (inside, _) = stripped.split_once("]")?;
+                inside
+            } else {
+                rest.split(':').next().unwrap_or(rest)
+            };
+            let host = host.trim_end_matches('.').to_ascii_lowercase();
+            (host == "localhost" || host == "127.0.0.1" || host == "::1").then_some(())
+        })()
+        .is_some();
+        if !local {
+            return false;
+        }
+    }
+    let loopback = match peer {
+        std::net::IpAddr::V4(v4) => v4.is_loopback(),
+        std::net::IpAddr::V6(v6) => v6.is_loopback(),
+    };
+    if loopback {
+        return true;
+    }
+    match presented {
+        Some(given) if !token.is_empty() => {
+            // Compared byte by byte: a token is not long enough for a
+            // cleverer attack, but there is no reason to leak its prefix.
+            let given = given.as_bytes();
+            let token = token.as_bytes();
+            given.len() == token.len()
+                && given
+                    .iter()
+                    .zip(token.iter())
+                    .fold(0u8, |diff, (a, b)| diff | (a ^ b))
+                    == 0
+        }
+        _ => false,
+    }
+}
+
+/// `POST /config`'s policy half: the official `[policy]` keys, one request.
+///
+/// `walk_policy` is the older mobile spelling of the walk slot: a file name
+/// pins it, an empty string clears the override, and `"none"` is refused
+/// because the walking policy is what every other slot falls back to
+/// (`robotd/src/main.rs`' `load_policy_request`). `slot_overrides` is the general
+/// shape — an object of slot name to file name or `"none"` — and is applied
+/// after `walk_policy`, so a `walk` key there wins. `custom_skills` is the
+/// skill table: an array of manifest policy entries, replacing the whole
+/// table (an empty array clears it), validated per entry — kind episodic, a
+/// name, a positive duration, and a file that is a bare name and really in
+/// the policies directory — the same door `robot.setSkill`'s merged entries
+/// go through. Both leave the overrides process-global, as the official
+/// config keys are one machine-level config; the reload that follows is what
+/// resolves them. Keys are applied in order, so a refusal names the slot and
+/// leaves any earlier key applied.
+fn apply_policy_config(value: &Value) -> Result<(), String> {
+    if let Some(name) = value.get("walk_policy").and_then(Value::as_str) {
+        let name = (!name.is_empty()).then(|| name.to_owned());
+        crate::manifest::set_slot_override("walk", name)
+            .map_err(|error| format!("walk: {error}"))?;
+    }
+    if let Some(overrides) = value.get("slot_overrides") {
+        let overrides = overrides
+            .as_object()
+            .ok_or("slot_overrides must be an object of slot name to file name")?;
+        for (slot, name) in overrides {
+            let name = name.as_str().ok_or_else(|| {
+                format!("{slot}: slot_overrides values are file names or \"none\"")
+            })?;
+            // Empty clears, the same reading `walk_policy` has.
+            let name = (!name.is_empty()).then(|| name.to_owned());
+            crate::manifest::set_slot_override(slot, name)
+                .map_err(|error| format!("{slot}: {error}"))?;
+        }
+    }
+    if let Some(entries) = value.get("custom_skills") {
+        let entries = entries
+            .as_array()
+            .ok_or("custom_skills must be an array of manifest policy entries")?;
+        crate::manifest::set_custom_skills(entries.clone())?;
+    }
+    Ok(())
+}
+
+/// `POST /config`'s voice half: the person's whole taught-word table.
+///
+/// `voice_aliases` is an object of phrase to target — a sibling of the
+/// policy keys, not a policy — and an empty object clears the table.
+/// Targets are checked against the snapshots the core last published, so a
+/// word can only name a move the duck really has. A table with one bad word
+/// is refused whole; the table already in force stays.
+fn apply_voice_aliases(queue: &IntentQueue, value: &Value) -> Result<(), String> {
+    let Some(table) = value.get("voice_aliases") else {
+        return Ok(());
+    };
+    let table = table
+        .as_object()
+        .ok_or("voice_aliases must be an object of phrase to target")?;
+    let pairs = table
+        .iter()
+        .map(|(phrase, target)| {
+            target
+                .as_str()
+                .map(|target| (phrase.clone(), target.to_owned()))
+                .ok_or_else(|| format!("voice alias {phrase:?}: the target must be a name"))
+        })
+        .collect::<Result<BTreeMap<String, String>, String>>()?;
+    queue.set_voice_aliases(pairs)
+}
+
+fn handle(
+    mut stream: TcpStream,
+    queue: Arc<IntentQueue>,
+    remote: std::net::IpAddr,
+) -> std::io::Result<()> {
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
+    let mut buffer = Vec::new();
+    let mut chunk = [0u8; 4096];
+    let header_end;
+    loop {
+        let read = stream.read(&mut chunk)?;
+        if read == 0 {
+            return Ok(());
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+        if let Some(position) = find_headers_end(&buffer) {
+            header_end = position;
+            break;
+        }
+        if buffer.len() > 64 * 1024 {
+            return respond(&mut stream, 413, "Payload Too Large", "{}");
+        }
+    }
+
+    let headers = String::from_utf8_lossy(&buffer[..header_end]).into_owned();
+    let mut lines = headers.lines();
+    let request_line = lines.next().unwrap_or_default();
+    let mut parts = request_line.split_whitespace();
+    let method = parts.next().unwrap_or_default();
+    let path = parts
+        .next()
+        .unwrap_or_default()
+        .split('?')
+        .next()
+        .unwrap_or_default();
+
+    // The headers, once: the length and the access rules both read them.
+    let headers: Vec<(String, String)> = lines
+        .filter_map(|line| line.split_once(':'))
+        .map(|(name, value)| (name.trim().to_owned(), value.trim().to_owned()))
+        .collect();
+    let header = |name: &str| {
+        headers
+            .iter()
+            .find(|(header, _)| header.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
+    };
+
+    // The phone talks to itself over the loopback address and is the duck's
+    // owner. A connection from anywhere else has to say the token: without
+    // it, anybody on the same Wi-Fi could rewrite the duck's history, drive
+    // its body, or change its rules. A page is never the owner, so a
+    // request with an origin from elsewhere is refused outright.
+    let origin = header("origin");
+    let presented = header("x-duck-token");
+    if !authorised(remote, origin, presented, &queue.token()) {
+        return respond(
+            &mut stream,
+            403,
+            "Forbidden",
+            "{\"ok\":false,\"error\":\"the duck's API needs the token\"}",
+        );
+    }
+
+    let content_length = header("content-length")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(0)
+        .min(1024 * 1024);
+
+    while buffer.len() < header_end + 4 + content_length {
+        let read = stream.read(&mut chunk)?;
+        if read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&chunk[..read]);
+    }
+    let body_start = header_end + 4;
+    let body =
+        String::from_utf8_lossy(&buffer[body_start..buffer.len().min(body_start + content_length)])
+            .into_owned();
+
+    if method == "OPTIONS" {
+        return respond(&mut stream, 204, "No Content", "");
+    }
+
+    let value: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+    let result = match (method, path) {
+        ("GET", "/state") => Ok(queue.state_json()),
+        ("GET", "/skills") => Ok(queue.skills_json()),
+        ("GET", "/fingerprint") => Ok(queue.fingerprint_json()),
+        ("GET", "/time") => Ok(queue.time_json()),
+        ("GET", "/timeline") => Ok(queue.time_json()),
+        ("GET", "/branches") => Ok(queue.branches_json()),
+        ("GET", "/sensors") => Ok(queue.sensors_json()),
+        // The lifetime record, the same counters the shell keeps in storage.
+        ("GET", "/life") => Ok(queue.life_json()),
+        // The parent's day view: one row per closed day, today's deltas so
+        // far, the week's totals. A read, like /life: nothing is queued.
+        ("GET", "/days") => Ok(queue.days_json()),
+        // The collection page: every loaded mood and manifest trick with its
+        // real count and first day. A read, like /life: nothing is queued.
+        ("GET", "/collection") => Ok(queue.collection_json()),
+        ("GET", "/quests") => Ok(queue.quests_json()),
+        // The same record as a file a person can share, in the two shapes a
+        // share sheet wants. No new counting path: both call vetbook/export.
+        ("GET", "/export/vetbook.md") => Ok(queue.vetbook_markdown()),
+        ("GET", "/export/vetbook.json") => Ok(queue.vetbook_json()),
+        // The lifetime record a shell saved across launches. A restore is
+        // fire-and-forget: a launch can beat the first tick, and a loaded
+        // phone must not turn a hand-back into a 300 ms timeout.
+        ("POST", "/life") => {
+            queue.push(Intent::RestoreLife(value.clone()));
+            Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
+        ("POST", "/mcp") => Ok(crate::mcp::handle(&body, &queue)),
+        ("GET", "/mcp") => Ok(crate::mcp::handle(
+            r#"{"jsonrpc":"2.0","id":0,"method":"tools/list"}"#,
+            &queue,
+        )),
+        ("POST", "/sensor") => match value["sensor"].as_str() {
+            Some(sensor) => {
+                let reading = crate::sensors::Reading {
+                    sensor: sensor.to_owned(),
+                    mode: value["mode"].as_str().unwrap_or("twin").to_owned(),
+                    value: value["value"].clone(),
+                    tick_ms: value["tick_ms"].as_u64().unwrap_or(0),
+                    in_observation: false,
+                };
+                queue.push(Intent::Sensor(reading));
+                Ok(json!({ "ok": true }).to_string())
+            }
+            None => Err("missing sensor".to_owned()),
+        },
+        ("POST", "/fork") => {
+            let label = value["label"]
+                .as_str()
+                .map(str::to_owned)
+                .unwrap_or_else(|| "branch".to_owned());
+            // A fork deep-copies a MuJoCo model and reloads the policy set.
+            Ok(queue
+                .request_within(Intent::Fork(label), Duration::from_secs(15))
+                .to_string())
+        }
+        ("POST", "/branch/drop") => match value["label"].as_str() {
+            Some(label) => Ok(queue
+                .request(Intent::DropBranch(label.to_owned()))
+                .to_string()),
+            None => Err("missing label".to_owned()),
+        },
+        ("POST", "/branch/select") => {
+            let label = value["label"].as_str().unwrap_or("").to_owned();
+            Ok(queue.request(Intent::SelectBranch(label)).to_string())
+        }
+        ("POST", "/time") => {
+            let paused = value["paused"].as_bool();
+            let speed = value["speed"].as_f64();
+            match (paused, speed) {
+                (Some(paused), _) => Ok(queue.request(Intent::Pause(paused)).to_string()),
+                (None, Some(speed)) => Ok(queue.request(Intent::Speed(speed)).to_string()),
+                _ => Err("send {paused:true|false} or {speed:0.05..4}".to_owned()),
+            }
+        }
+        ("POST", "/step") => {
+            let ticks = value["ticks"].as_u64().unwrap_or(1).clamp(1, 500) as u32;
+            // Each tick is 20 ms of work plus whatever the policy costs;
+            // 500 ticks is far past the one-shot budget.
+            Ok(queue
+                .request_within(
+                    Intent::Step(ticks),
+                    Duration::from_millis(500 + u64::from(ticks) * 20),
+                )
+                .to_string())
+        }
+        ("POST", "/checkpoint") => Ok(queue.request(Intent::Checkpoint).to_string()),
+        ("POST", "/restore") => match value["tick"].as_u64() {
+            Some(tick) => Ok(queue.request(Intent::Restore(tick)).to_string()),
+            None => Err("missing tick".to_owned()),
+        },
+        ("POST", "/seek") => match value["ticks"].as_u64() {
+            Some(ticks) => Ok(queue.request(Intent::Seek(ticks)).to_string()),
+            None => Err("missing ticks".to_owned()),
+        },
+        ("POST", "/twist") => {
+            queue.push(Intent::Twist([
+                value["vx"].as_f64().unwrap_or(0.0),
+                value["vy"].as_f64().unwrap_or(0.0),
+                value["wz"].as_f64().unwrap_or(0.0),
+            ]));
+            Ok(json!({ "ok": true }).to_string())
+        }
+        // The Path Painter: a drawn route the walk policy follows. The caps
+        // are checked here, so an over-budget drawing is refused instead of
+        // queued and half-walked.
+        ("POST", "/path") => match crate::runtime::path_points(&value) {
+            Ok(points) => {
+                let kept = points.len();
+                queue.push(Intent::Path(points));
+                Ok(json!({ "ok": true, "queued": true, "points": kept }).to_string())
+            }
+            Err(error) => Ok(json!({ "ok": false, "error": error }).to_string()),
+        },
+        // Stop the route. Fire-and-forget like /pet: the answer is always
+        // ok, exactly as it is when nothing was walking.
+        ("POST", "/path/cancel") => {
+            queue.push(Intent::PathCancel);
+            Ok(json!({ "ok": true }).to_string())
+        }
+        ("POST", "/head") => {
+            queue.push(Intent::Head([
+                value["neck"].as_f64().unwrap_or(0.0),
+                value["head"].as_f64().unwrap_or(0.0),
+                value["yaw"].as_f64().unwrap_or(0.0),
+                value["roll"].as_f64().unwrap_or(0.0),
+            ]));
+            Ok(json!({ "ok": true }).to_string())
+        }
+        ("POST", "/body") => {
+            // `active: false` releases the pose (robotd's B-button exit).
+            if value["active"].as_bool() == Some(false) {
+                queue.push(Intent::BodyRelease);
+            } else {
+                queue.push(Intent::Body(
+                    value["z"].as_f64().unwrap_or(0.0),
+                    value["roll"].as_f64().unwrap_or(0.0),
+                    value["pitch"].as_f64().unwrap_or(0.0),
+                ));
+            }
+            Ok(json!({ "ok": true }).to_string())
+        }
+        ("POST", "/skill") => match value["name"].as_str() {
+            Some(name) => Ok(queue.request(Intent::Skill(name.to_owned())).to_string()),
+            None => Err("missing name".to_owned()),
+        },
+        ("POST", "/sit") => Ok(queue.request(Intent::Sit).to_string()),
+        ("POST", "/posture") => Ok(queue
+            .request(Intent::Posture(value["sit"].as_bool().unwrap_or(true)))
+            .to_string()),
+        ("POST", "/ground_pick") => Ok(queue.request(Intent::GroundPick).to_string()),
+        ("POST", "/shutdown") => Ok(queue
+            .request_within(Intent::Shutdown, Duration::from_secs(15))
+            .to_string()),
+        ("POST", "/power") => Ok(queue.request(Intent::PowerOn).to_string()),
+        // The backup document is an idempotent read, so both verbs answer
+        // it: the shells GET it, and the boundary probes POST it through
+        // the same pipeline every other route is verified with.
+        ("GET", "/backup") => Ok(queue.request(Intent::Backup).to_string()),
+        // The trajectory export is a plain read of the timeline the rewind
+        // machine already keeps: one JSON object per simulated tick in the
+        // requested window, no interpolation, no invention.
+        ("GET", "/export/trajectory") => Ok(queue.request(Intent::TrajectoryExport).to_string()),
+        ("POST", "/backup") => Ok(queue.request(Intent::Backup).to_string()),
+        ("POST", "/backup/restore") => {
+            // The format check lives HERE, before anything is queued: a
+            // document without the version, or with somebody else's, is
+            // refused at the door and the duck never sees a field of it.
+            match value.get("format").and_then(Value::as_str) {
+                Some("microduck-backup/1") => Ok(queue
+                    .request(Intent::RestoreBackup(value.clone()))
+                    .to_string()),
+                _ => Ok(json!({
+                    "ok": false,
+                    "error": "that file is not a microduck-backup/1",
+                })
+                .to_string()),
+            }
+        }
+        // The AR floor, in ONE dimension, pinned here because the shells
+        // measured different things: `z` is the walkable plane's **offset in
+        // metres from the scene's default floor** (0 = unchanged), not the
+        // camera's height over that plane and not an absolute world z. The
+        // core moves the plane and the duck together, so a standing duck
+        // still stands on its floor. `-0.1 ..= 0.3 m` is the accepted band;
+        // anything else is refused with a reason rather than clamped.
+        ("POST", "/floor") => {
+            let z = value["z"].as_f64().unwrap_or(f64::NAN);
+            if !z.is_finite() || !(-0.1..=0.3).contains(&z) {
+                Ok(json!({
+                    "ok": false,
+                    "error": "the floor offset lives between -0.1 and 0.3 m from the scene's floor",
+                })
+                .to_string())
+            } else {
+                Ok(queue.request(Intent::FloorHeight(z)).to_string())
+            }
+        }
+        ("POST", "/parent") => Ok(queue
+            .request(Intent::ParentBudget(
+                value["minutes"].as_u64().unwrap_or(0).min(600) as u32,
+            ))
+            .to_string()),
+        ("POST", "/pad") => Ok(queue
+            .request(Intent::PadSwitch(value["on"].as_bool().unwrap_or(false)))
+            .to_string()),
+        ("POST", "/mode") => match value["mode"].as_str() {
+            // The switch rebuilds MuJoCo and the policy set: seconds, not the
+            // 300 ms a one-shot gets.
+            Some(mode) => Ok(queue
+                .request_within(Intent::Mode(mode.to_owned()), MODE_TIMEOUT)
+                .to_string()),
+            None => Err("missing mode".to_owned()),
+        },
+        // The voice, by tag: `robotctl quack` is a chirp, and the others are
+        // the duck's own vocabulary.
+        ("POST", "/sound") => match value["tag"].as_str() {
+            Some(tag) => Ok(queue.request(Intent::Sound(tag.to_owned())).to_string()),
+            None => Err("missing tag".to_owned()),
+        },
+        // Petting and opening discovery are fire-and-forget: the duck's
+        // answer is its coo and the peer list, which /state publishes. A
+        // loaded phone must not turn a tap into a 300 ms timeout.
+        ("POST", "/pet") => {
+            queue.push(Intent::Pet);
+            Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
+        ("POST", "/feed") => Ok(queue.request(Intent::Feed).to_string()),
+        // A good night is a tap: the next tick applies it, so its answer is
+        // the queue's, like /pet. Morning must answer how quiet the night
+        // was, which only the tick knows, so it waits for the verdict.
+        // Anything but a boolean `on` is refused before the queue.
+        ("POST", "/night") => match value["on"].as_bool() {
+            Some(true) => {
+                queue.push(Intent::Night(true));
+                Ok(json!({ "ok": true, "queued": true }).to_string())
+            }
+            Some(false) => Ok(queue.request(Intent::Night(false)).to_string()),
+            None => Ok(json!({ "ok": false, "error": "send {on:true|false}" }).to_string()),
+        },
+        // A chorus is a tap for the whole room: validated here, broadcast,
+        // and the tick starts the countdown. Defaults to laugh + yes_fast.
+        ("POST", "/ensemble") => {
+            let strings = |key: &str| -> Vec<String> {
+                value[key]
+                    .as_array()
+                    .map(|rows| {
+                        rows.iter()
+                            .filter_map(serde_json::Value::as_str)
+                            .take(8)
+                            .map(str::to_owned)
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            let moves = strings("moves");
+            let sounds = strings("sounds");
+            if moves.is_empty() && sounds.is_empty() {
+                Ok(
+                    json!({ "ok": false, "error": "an ensemble needs a move or a sound" })
+                        .to_string(),
+                )
+            } else {
+                Ok(queue.request(Intent::Ensemble(moves, sounds)).to_string())
+            }
+        }
+        ("POST", "/chorus") => {
+            // A body without `moves` sings the default pair. A body *with*
+            // `moves` must be a list of names: a malformed list is refused
+            // rather than quietly reinterpreted. Silently dropping the
+            // moves it could not read would sing a different song than the
+            // one that was asked for, and a client that asked for one beat
+            // would get two.
+            let requested = match value.get("moves") {
+                None => Ok(crate::lan::CHORUS_DEFAULT_MOVES
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect()),
+                Some(list) => chorus_moves(list),
+            };
+            match requested {
+                Err(error) => Ok(json!({ "ok": false, "error": error }).to_string()),
+                Ok(moves) => {
+                    if moves.is_empty() || moves.len() > crate::lan::CHORUS_MAX_MOVES {
+                        Ok(json!({
+                            "ok": false,
+                            "error": "a chorus needs 1 to 3 moves",
+                        })
+                        .to_string())
+                    } else if !moves.iter().all(|name| queue.emotion_loaded(name)) {
+                        Ok(json!({ "ok": false, "error": "no such emotion" }).to_string())
+                    } else if queue.chorus_active() {
+                        Ok(json!({
+                            "ok": false,
+                            "error": "a chorus is already playing",
+                        })
+                        .to_string())
+                    } else {
+                        queue.push(Intent::Chorus(moves.clone()));
+                        Ok(json!({ "ok": true, "queued": true, "moves": moves }).to_string())
+                    }
+                }
+            }
+        }
+        // The companion state is public read / restore-only write: a client
+        // can hand back what it saved, but cannot claim the duck loves it.
+        ("GET", "/care") => Ok(queue.care_json()),
+        ("GET", "/heard") => Ok(queue.heard_json()),
+        ("GET", "/rules") => Ok(queue.request(Intent::GetRules).to_string()),
+        ("POST", "/rules") => Ok(queue.request(Intent::SetRules(value.clone())).to_string()),
+        ("GET", "/peers") => Ok(queue.peers_json()),
+        ("POST", "/peers/start") => {
+            queue.push(Intent::StartLan(
+                value["name"].as_str().unwrap_or("MicroDuck").to_owned(),
+            ));
+            Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
+        ("POST", "/peers/pair") => match value["code"].as_str() {
+            Some(code) => Ok(queue
+                .request(Intent::PairPeer(
+                    code.to_owned(),
+                    value["id"]
+                        .as_str()
+                        .filter(|id| !id.is_empty())
+                        .map(str::to_owned),
+                ))
+                .to_string()),
+            None => Err("missing code".to_owned()),
+        },
+        ("POST", "/peers/greet") => Ok(queue
+            .request(Intent::GreetPeer(
+                value["id"]
+                    .as_str()
+                    .filter(|id| !id.is_empty())
+                    .map(str::to_owned),
+            ))
+            .to_string()),
+        // A gift is fire-and-forget like /pet: the duck answers with its body,
+        // and a tap must not become a 300 ms timeout. Everything a client can
+        // get wrong is refused here, before the queue and before the sender's
+        // window is spent.
+        ("POST", "/peers/gift") => match queue.validate_gift(&value) {
+            Err(error) => Ok(json!({ "ok": false, "error": error }).to_string()),
+            Ok((id, gift, gift_value)) => {
+                if !queue.take_gift_window(&id) {
+                    Ok(json!({ "ok": false, "error": "too soon" }).to_string())
+                } else {
+                    queue.push(Intent::SendGift {
+                        id,
+                        gift,
+                        value: gift_value,
+                    });
+                    Ok(json!({ "ok": true, "queued": true }).to_string())
+                }
+            }
+        },
+        ("POST", "/peers/name") => match value["name"].as_str() {
+            Some(name) => Ok(queue.request(Intent::PeerName(name.to_owned())).to_string()),
+            None => Err("missing name".to_owned()),
+        },
+        // The companion state is public read / restore-only write: a client
+        // can hand back what it saved, but cannot claim the duck loves it.
+        // A restore is fire-and-forget: a launch can beat the first tick and
+        // must not leave a client blocked for 300 ms waiting for an answer.
+        ("POST", "/care") => {
+            queue.push(Intent::RestoreCare(
+                value.get("care").cloned().unwrap_or(value.clone()),
+            ));
+            Ok(json!({ "ok": true, "queued": true }).to_string())
+        }
+        ("POST", "/quests/day") => {
+            let day = value["day"].as_str().unwrap_or("");
+            // The day dates the duck's own records, so it has to be a real
+            // calendar day. A truncated or made-up string is refused whole:
+            // taking the first ten characters of "2026-02-30..." would put a
+            // day that never happened into the book.
+            if !crate::vetbook::is_calendar_day(day) {
+                Ok(json!({ "ok": false, "error": "quest day must be yyyy-mm-dd" }).to_string())
+            } else {
+                let board = value.get("board").cloned().unwrap_or(json!({}));
+                queue.set_day(day.to_owned());
+                Ok(queue
+                    .request(Intent::QuestDay(day.to_owned(), board))
+                    .to_string())
+            }
+        }
+        ("POST", "/config") => {
+            let idle = value.get("idle_ritual_s").and_then(Value::as_f64);
+            let care = value.get("care_time_scale").and_then(Value::as_f64);
+            // The taught words go first: their validation reads the loaded
+            // skill/emotion snapshots, and a refused table must leave the
+            // policy keys untouched.
+            match apply_voice_aliases(&queue, &value).and_then(|()| apply_policy_config(&value)) {
+                Err(error) => Err(error),
+                Ok(()) => {
+                    // Keep the old shape working: /config with only
+                    // idle_ritual_s. A care scale travels as its own
+                    // fire-and-forget intent so one response still means
+                    // "the configuration was taken".
+                    if let Some(scale) = care {
+                        queue.push(Intent::CareScale(scale));
+                    }
+                    // **Idle is only touched when it was named.** A request
+                    // that carries only policy keys (`walk_policy`,
+                    // `slot_overrides`) must not reset the duck's idle
+                    // interval to the historical 30 s default — that would
+                    // turn a policy configuration into an unrelated behaviour
+                    // change.
+                    if let Some(seconds) = idle {
+                        Ok(queue.request(Intent::IdleRitual(seconds)).to_string())
+                    } else {
+                        Ok(json!({ "ok": true }).to_string())
+                    }
+                }
+            }
+        }
+        ("POST", "/wheee") => Ok(queue
+            .request(Intent::Wheee(value["hold"].as_bool().unwrap_or(false)))
+            .to_string()),
+        ("POST", "/look") => Ok(queue
+            .request(Intent::Look {
+                target: [
+                    value["x"].as_f64().unwrap_or(1.0),
+                    value["y"].as_f64().unwrap_or(0.0),
+                    value["z"].as_f64().unwrap_or(0.15),
+                ],
+                neck_pitch: value["neck"].as_f64().unwrap_or(0.0),
+            })
+            .to_string()),
+        ("POST", "/heard") => match value["text"].as_str() {
+            Some(text) => Ok(queue.request(Intent::Heard(text.to_owned())).to_string()),
+            None => Err("missing text".to_owned()),
+        },
+        ("POST", "/flashlight") => Ok(queue
+            .request(Intent::Flashlight {
+                toggle: value["toggle"].as_bool().unwrap_or(true),
+                on: value["on"].as_bool().unwrap_or(false),
+                color: value["color"].as_str().unwrap_or("white").to_owned(),
+            })
+            .to_string()),
+        ("POST", "/mouth") => {
+            let open = value["open"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0);
+            Ok(queue.request(Intent::Mouth(open)).to_string())
+        }
+        ("POST", "/push") => {
+            queue.push(Intent::Push([
+                value["vx"].as_f64().unwrap_or(0.0),
+                value["vy"].as_f64().unwrap_or(0.0),
+                value["vz"].as_f64().unwrap_or(0.0),
+            ]));
+            Ok(json!({ "ok": true }).to_string())
+        }
+        ("POST", "/reload") => match value["dir"].as_str() {
+            // Loading a policy set is seconds of ONNX work.
+            Some(dir) => Ok(queue
+                .request_within(Intent::Reload(dir.to_owned()), Duration::from_secs(30))
+                .to_string()),
+            None => Err("missing dir".to_owned()),
+        },
+        // A hand on the duck, for the shell's grab gesture and for an agent
+        // that wants to pick the robot up. `dx/dy/dz` are metres from where it
+        // was grabbed; `active:false` sets it down.
+        ("POST", "/carry") => {
+            let offset = [
+                value["dx"].as_f64().unwrap_or(0.0),
+                value["dy"].as_f64().unwrap_or(0.0),
+                value["dz"].as_f64().unwrap_or(0.0),
+            ];
+            let active = value["active"].as_bool().unwrap_or(true);
+            Ok(queue.request(Intent::Carry(offset, active)).to_string())
+        }
+        _ => {
+            return respond(
+                &mut stream,
+                404,
+                "Not Found",
+                "{\"ok\":false,\"error\":\"not found\"}",
+            );
+        }
+    };
+
+    match result {
+        Ok(body) => respond(&mut stream, 200, "OK", &body),
+        Err(error) => respond(
+            &mut stream,
+            400,
+            "Bad Request",
+            &json!({ "ok": false, "error": error }).to_string(),
+        ),
+    }
+}
+
+fn find_headers_end(buffer: &[u8]) -> Option<usize> {
+    buffer.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+fn respond(stream: &mut TcpStream, status: u16, reason: &str, body: &str) -> std::io::Result<()> {
+    // No CORS headers: the clients are the phone's own apps and the tools
+    // that know the token, and a browser has no business driving a duck.
+    // A page that asks anyway is refused by the origin rule.
+    let response = format!(
+        "HTTP/1.1 {status} {reason}\r\n\
+         Content-Type: application/json\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\
+         \r\n{body}",
+        body.len()
+    );
+    stream.write_all(response.as_bytes())?;
+    stream.flush()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Who may use the duck's API.
+    ///
+    /// The phone is the owner and reaches the duck over the loopback
+    /// address. Anybody else on the network has to say the token, and a web
+    /// page is never the owner, wherever it runs.
+    #[test]
+    fn only_the_phone_or_the_token_may_use_the_api() {
+        let loopback = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+        let remote = std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, 20));
+
+        assert!(authorised(loopback, None, None, "t0ken"));
+        assert!(authorised(remote, None, Some("t0ken"), "t0ken"));
+        assert!(!authorised(remote, None, None, "t0ken"));
+        assert!(!authorised(remote, None, Some("wrong"), "t0ken"));
+        assert!(!authorised(remote, None, Some("t0ken"), ""));
+        // A page is not the owner, even from the phone's own address.
+        assert!(!authorised(
+            loopback,
+            Some("https://example.com"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            loopback,
+            Some("http://localhost:8000"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            remote,
+            Some("http://127.0.0.1"),
+            Some("t0ken"),
+            "t0ken"
+        ));
+        // The origin match is on the exact host, not a prefix: a page served
+        // from a machine merely *named* like ours is not ours.
+        assert!(!authorised(
+            loopback,
+            Some("http://localhost.attacker.tld"),
+            None,
+            "t0ken"
+        ));
+        assert!(!authorised(
+            loopback,
+            Some("http://127.0.0.1.evil.example"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            loopback,
+            Some("http://[::1]:9000"),
+            None,
+            "t0ken"
+        ));
+        assert!(authorised(
+            loopback,
+            Some("http://LOCALHOST."),
+            None,
+            "t0ken"
+        ));
+    }
+
+    /// The token is not a constant, and two cores do not share one.
+    #[test]
+    fn the_token_is_fresh() {
+        let first = new_token();
+        let second = new_token();
+        assert_eq!(first.len(), 64, "a sha256 in hex");
+        assert_ne!(first, second, "two cores do not share a token");
+    }
+
+    fn request(port: u16, method: &str, path: &str, body: &str) -> String {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect");
+        let request = format!(
+            "{method} {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).expect("write");
+        let mut response = String::new();
+        stream.read_to_string(&mut response).expect("read");
+        response
+    }
+
+    #[test]
+    fn http_enqueues_intents_and_serves_state() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_state(json!({ "label": "walk", "gain": 200 }));
+        queue.set_skills(vec!["roulade".to_owned()]);
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        // Keep the handle: dropping it stops the server.
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(port, "POST", "/twist", r#"{"vx":0.4,"vy":0.0,"wz":0.2}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(response.contains(r#""ok":true"#), "{response}");
+
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::Twist(twist) => assert_eq!(*twist, [0.4, 0.0, 0.2]),
+            other => panic!("unexpected intent: {other:?}"),
+        }
+
+        let response = request(port, "GET", "/state", "");
+        assert!(response.contains(r#""label":"walk""#), "{response}");
+        let response = request(port, "GET", "/skills", "");
+        assert!(response.contains("roulade"), "{response}");
+    }
+
+    /// The AR floor's dimension is pinned at the route: `z` is a **scene-
+    /// relative offset** in metres, accepted only in `-0.1 ..= 0.3`. The
+    /// shells' measured camera heights are not this number; QA aligns them.
+    /// A legal offset reaches the duck as `Intent::FloorHeight`; an
+    /// impossible one is refused at the door, never clamped.
+    #[test]
+    fn the_floor_route_speaks_scene_offsets_and_refuses_impossible_ones() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for z in [-0.1, 0.0, 0.3] {
+            let response = request(port, "POST", "/floor", &format!(r#"{{"z":{z}}}"#));
+            assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+            assert!(!response.contains("floor offset lives"), "{response}");
+            let queued = queue.drain();
+            assert_eq!(queued.len(), 1, "{z} must be queued: {response}");
+            match &queued[0].intent {
+                Intent::FloorHeight(queued) => assert!((queued - z).abs() < 1e-12),
+                other => panic!("unexpected intent: {other:?}"),
+            }
+        }
+
+        for body in [r#"{"z":0.31}"#, r#"{"z":-0.11}"#, "{}"] {
+            let response = request(port, "POST", "/floor", body);
+            assert!(
+                response.contains("the floor offset lives between -0.1 and 0.3 m"),
+                "{body} must be refused at the route: {response}"
+            );
+            assert!(queue.drain().is_empty(), "{body} must not reach the duck");
+        }
+    }
+
+    /// The collection page: each loaded mood and manifest trick with the
+    /// duck's real count and the first day it was recorded, sorted by name.
+    /// A move that never happened has count 0 and no first day at all — the
+    /// page shows its locked state; the totals are the official thirteen
+    /// moods and the manifest's own tricks.
+    #[test]
+    fn http_serves_the_collection_with_real_counts_and_days() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_emotions(vec![
+            "sad".to_owned(),
+            "curious".to_owned(),
+            "laugh".to_owned(),
+        ]);
+        queue.set_manifest_skills(vec!["roulade".to_owned(), "kick_left".to_owned()]);
+        let mut book = crate::vetbook::Book::default();
+        for _ in 0..3 {
+            book.emotion("curious");
+        }
+        for _ in 0..5 {
+            book.skill("roulade");
+        }
+        book.life
+            .unlocks
+            .insert("emotion:curious".to_owned(), "2026-11-18".to_owned());
+        book.life
+            .unlocks
+            .insert("skill:roulade".to_owned(), String::new());
+        queue.set_life(&book);
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(port, "GET", "/collection", "");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let body = response.split("\r\n\r\n").nth(1).expect("a body");
+        let value: Value = serde_json::from_str(body).expect("collection JSON");
+        let names = |rows: &Value| -> Vec<String> {
+            rows.as_array()
+                .expect("rows")
+                .iter()
+                .map(|row| row["name"].as_str().expect("name").to_owned())
+                .collect()
+        };
+
+        assert_eq!(value["ok"], json!(true));
+        assert_eq!(
+            names(&value["emotions"]),
+            vec!["curious".to_owned(), "laugh".to_owned(), "sad".to_owned()]
+        );
+        assert_eq!(value["emotions"][0]["count"], json!(3));
+        assert_eq!(value["emotions"][0]["first_day"], json!("2026-11-18"));
+        assert_eq!(value["emotions"][2]["count"], json!(0));
+        assert!(
+            value["emotions"][2].get("first_day").is_none(),
+            "a move that never happened has no date to send: {value}"
+        );
+        assert_eq!(value["moods"], json!({ "unlocked": 1, "total": 13 }));
+
+        assert_eq!(
+            names(&value["skills"]),
+            vec!["kick_left".to_owned(), "roulade".to_owned()]
+        );
+        assert_eq!(value["skills"][0]["count"], json!(0));
+        assert!(
+            value["skills"][0].get("first_day").is_none(),
+            "a trick that never happened has no date to send: {value}"
+        );
+        assert_eq!(value["skills"][1]["count"], json!(5));
+        assert_eq!(value["skills"][1]["first_day"], json!(""));
+        assert_eq!(value["tricks"], json!({ "unlocked": 1, "total": 2 }));
+    }
+
+    /// A queue with no core behind it still answers the page — empty tables,
+    /// not an error — and a day learned through the same route the shell uses
+    /// is the day the next unlock gets.
+    #[test]
+    fn a_day_from_the_route_dates_the_next_unlock() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        // Nothing has been loaded and no core has published a book: the page
+        // is an empty table, not an error.
+        let response = request(port, "GET", "/collection", "");
+        let empty: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("collection JSON");
+        assert_eq!(empty["emotions"], json!([]));
+        assert_eq!(empty["skills"], json!([]));
+        assert_eq!(empty["moods"], json!({ "unlocked": 0, "total": 13 }));
+        assert_eq!(empty["tricks"], json!({ "unlocked": 0, "total": 0 }));
+
+        // The core then publishes the names it loaded.
+        queue.set_emotions(vec!["curious".to_owned()]);
+        queue.set_manifest_skills(vec!["roulade".to_owned()]);
+
+        // The route hands the day to the queue immediately, before the queued
+        // intent waits for a tick (the test drain never runs one).
+        let _ = request(
+            port,
+            "POST",
+            "/quests/day",
+            r#"{"day":"2026-11-18","board":{}}"#,
+        );
+        assert_eq!(queue.day(), "2026-11-18");
+
+        // What the core's tick does after the same day: backfill once, then
+        // date the mood that happens now.
+        let mut book = crate::vetbook::Book::default();
+        book.note_unlocks(&queue.day());
+        book.emotion("curious");
+        book.note_unlocks(&queue.day());
+        queue.set_life(&book);
+
+        let response = request(port, "GET", "/collection", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("collection JSON");
+        assert_eq!(value["emotions"][0]["name"], json!("curious"));
+        assert_eq!(value["emotions"][0]["count"], json!(1));
+        assert_eq!(value["emotions"][0]["first_day"], json!("2026-11-18"));
+        assert_eq!(value["moods"], json!({ "unlocked": 1, "total": 13 }));
+    }
+
+    /// The parent's day view over HTTP: the rows the rollover wrote, today's
+    /// deltas against the day the shell posted, and the week's totals. With
+    /// no day posted there is no `today` at all, and a book without rows is
+    /// an empty array — never a zero-filled row.
+    #[test]
+    fn http_days_serves_the_rows_today_and_the_week() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        // Nothing published yet: an empty array and no today.
+        let response = request(port, "GET", "/days", "");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let empty: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("days JSON");
+        assert_eq!(empty["ok"], json!(true));
+        assert_eq!(empty["days"], json!([]));
+        assert!(empty.get("today").is_none(), "{empty}");
+        assert!(empty["week"].is_object(), "{empty}");
+
+        // A book with two closed days and a live third: today is the deltas
+        // since the day_started baseline, the week is the rows plus today.
+        let book: crate::vetbook::Book = serde_json::from_str(
+            &json!({
+                "days": [
+                    {"day": "2026-11-17", "metres": 12.3, "powered_s": 600.0, "rolls": 2,
+                     "pets": 5, "pickups": 1, "falls": 0, "fed": 2, "claps": 3,
+                     "whistles": 1, "ground_picks": 0, "sit_downs": 1},
+                    {"day": "2026-11-18", "metres": 1.4, "powered_s": 240.5, "rolls": 0,
+                     "pets": 1, "pickups": 0, "falls": 1, "fed": 0, "claps": 0,
+                     "whistles": 0, "ground_picks": 2, "sit_downs": 0}
+                ],
+                "day_started": {"day": "2026-11-19", "metres": 0.2, "powered_s": 60.0,
+                     "rolls": 0, "pets": 0, "pickups": 0, "falls": 0, "fed": 0,
+                     "claps": 0, "whistles": 0, "ground_picks": 0, "sit_downs": 0},
+                "life": {"metres": 1.5, "powered_s": 120.0, "skills": {}, "pets": 1}
+            })
+            .to_string(),
+        )
+        .expect("book");
+        queue.set_life(&book);
+        queue.set_day("2026-11-19".to_owned());
+
+        let response = request(port, "GET", "/days", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("days JSON");
+        let rows = value["days"].as_array().expect("rows");
+        assert_eq!(rows.len(), 2, "{value}");
+        assert_eq!(rows[0]["day"], json!("2026-11-17"));
+        assert_eq!(rows[0]["pets"], json!(5));
+        assert_eq!(rows[0]["sit_downs"], json!(1));
+        assert_eq!(rows[1]["ground_picks"], json!(2));
+
+        let today = &value["today"];
+        assert_eq!(today["day"], json!("2026-11-19"));
+        assert_eq!(today["metres"], json!(1.3), "{value}");
+        assert_eq!(today["powered_s"], json!(60.0), "{value}");
+        assert_eq!(today["pets"], json!(1), "{value}");
+
+        // The week: the two rows plus today, every field summed.
+        let week = &value["week"];
+        assert_eq!(week["metres"], json!(15.0), "{value}");
+        assert_eq!(week["powered_s"], json!(900.5), "{value}");
+        assert_eq!(week["rolls"], json!(2), "{value}");
+        assert_eq!(week["pets"], json!(7), "{value}");
+        assert_eq!(week["pickups"], json!(1), "{value}");
+        assert_eq!(week["falls"], json!(1), "{value}");
+        assert_eq!(week["ground_picks"], json!(2), "{value}");
+
+        // The day the shell posts is what dates today; no day, no today key,
+        // and the rows stand alone.
+        queue.set_day(String::new());
+        let response = request(port, "GET", "/days", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("days JSON");
+        assert!(value.get("today").is_none(), "{value}");
+        assert_eq!(value["days"].as_array().expect("rows").len(), 2);
+    }
+
+    /// A date that never existed is never served, even if a book carries one
+    /// (an old save, a hostile POST). The row keeps its real count and says
+    /// the day is unknown.
+    #[test]
+    fn the_collection_never_serves_a_day_that_never_existed() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_emotions(vec!["curious".to_owned(), "laugh".to_owned()]);
+        let mut book = crate::vetbook::Book::default();
+        book.emotion("curious");
+        book.emotion("laugh");
+        book.life
+            .unlocks
+            .insert("emotion:curious".to_owned(), "2026-02-30".to_owned());
+        book.life
+            .unlocks
+            .insert("emotion:laugh".to_owned(), "I flew to Paris".to_owned());
+        queue.set_life(&book);
+
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(port, "GET", "/collection", "");
+        let value: Value = serde_json::from_str(response.split("\r\n\r\n").nth(1).expect("a body"))
+            .expect("collection JSON");
+        for row in value["emotions"].as_array().expect("emotions") {
+            assert_eq!(row["count"], json!(1));
+            assert_eq!(
+                row["first_day"], "",
+                "an unreal day is served as unknown: {row}"
+            );
+        }
+    }
+
+    /// The day route validates before it writes: a malformed or impossible
+    /// day is refused whole and must not become the queue's calendar.
+    #[test]
+    fn a_day_that_is_not_a_calendar_day_is_refused() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for body in [
+            r#"{"day":"2026-02-30"}"#,
+            r#"{"day":"1999-12-31"}"#,
+            r#"{"day":"2026-11-18 and more"}"#,
+            r#"{"day":"today"}"#,
+            r#"{"day":""}"#,
+            r#"{}"#,
+        ] {
+            let response = request(port, "POST", "/quests/day", body);
+            assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+            assert!(
+                response.contains(r#""ok":false"#),
+                "{body} was not refused: {response}"
+            );
+            assert_eq!(queue.day(), "", "{body} became the duck's day");
+            assert!(queue.drain().is_empty(), "{body} still reached the duck");
+        }
+
+        let response = request(port, "POST", "/quests/day", r#"{"day":"2026-11-18"}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(queue.day(), "2026-11-18");
+    }
+
+    #[test]
+    fn http_rejects_unknown_routes() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue);
+        let response = request(port, "GET", "/nope", "");
+        assert!(response.starts_with("HTTP/1.1 404"), "{response}");
+    }
+
+    /// `POST /config` carries the official `[policy]` keys: the older
+    /// `walk_policy` and the per-slot object together, with the same refusal
+    /// for a walking policy switched off. The overrides are process-global,
+    /// so the override tests' lock keeps this out of their way.
+    #[test]
+    fn http_config_takes_walk_and_slot_overrides() {
+        let _lock = crate::manifest::override_test_lock();
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{
+                "idle_ritual_s": 12,
+                "walk_policy": "chosen.onnx",
+                "slot_overrides": { "sitstand": "none", "ground_pick": "pick.onnx" }
+            }"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(
+            crate::manifest::walk_override().as_deref(),
+            Some("chosen.onnx")
+        );
+        assert_eq!(
+            crate::manifest::slot_override("sitstand").as_deref(),
+            Some("none")
+        );
+        assert_eq!(
+            crate::manifest::slot_override("ground_pick").as_deref(),
+            Some("pick.onnx")
+        );
+        let intents = queue.drain();
+        assert!(
+            intents.iter().any(
+                |queued| matches!(&queued.intent, Intent::IdleRitual(seconds) if *seconds == 12.0)
+            ),
+            "{intents:?}"
+        );
+
+        // `walk_policy = "none"` is refused — the official loadPolicy rule —
+        // and the refusal names the slot.
+        let response = request(port, "POST", "/config", r#"{"walk_policy":"none"}"#);
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("walk:"), "{response}");
+        assert!(response.contains("cannot be switched off"), "{response}");
+        // The refused request changed nothing.
+        assert_eq!(
+            crate::manifest::walk_override().as_deref(),
+            Some("chosen.onnx")
+        );
+
+        // An empty string is the official "unset", not a file name.
+        let response = request(port, "POST", "/config", r#"{"walk_policy":""}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(crate::manifest::walk_override(), None);
+        // A policy-only request must not queue an idle change: the old code
+        // fell back to `IdleRitual(30.0)` whenever the key was absent, so a
+        // person configuring a slot reset the duck's idle interval.
+        let intents = queue.drain();
+        assert!(
+            !intents
+                .iter()
+                .any(|queued| matches!(queued.intent, Intent::IdleRitual(_))),
+            "a /config without idle_ritual_s queued an idle change: {intents:?}"
+        );
+
+        // A slot-only request is a policy change and nothing else: it must
+        // not carry an idle side effect either.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"slot_overrides":{"sitstand":"none"}}"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert_eq!(
+            crate::manifest::slot_override("sitstand").as_deref(),
+            Some("none")
+        );
+        let intents = queue.drain();
+        assert!(
+            !intents
+                .iter()
+                .any(|queued| matches!(queued.intent, Intent::IdleRitual(_))),
+            "a slot-only /config queued an idle change: {intents:?}"
+        );
+
+        // A key that is not one of this core's slots is refused with its name.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"slot_overrides":{"kick_left":"x.onnx"}}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("kick_left"), "{response}");
+    }
+
+    /// The skill table through `/config`: each entry is validated against the
+    /// policies directory the last load ran against — a file that was never
+    /// there is refused with the entry and the reason, one bad row refuses
+    /// the whole request and leaves the table in force, and the reload that
+    /// follows (not this route) is what loads the files.
+    #[test]
+    fn http_config_takes_custom_skills() {
+        let _lock = crate::manifest::override_test_lock();
+        // The set-time file checks resolve against the directory of the most
+        // recent load; the tests' lock cleared that state, so give it one
+        // here — the same setup the manifest tests' `write_set` builds.
+        let dir = std::env::temp_dir().join(format!("duck-intent-custom-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp policies dir");
+        std::fs::write(dir.join("velstand.onnx"), b"stub").expect("stub walk file");
+        std::fs::write(dir.join("spin.onnx"), b"stub").expect("stub skill file");
+        crate::manifest::load_mode(&dir, robotd_params::Mode::Walk).expect("the set loads");
+
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"custom_skills":[{"file":"spin.onnx","name":"spin_left","kind":"episodic","duration_s":1.5,"chain":true}]}"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let table = crate::manifest::custom_skills();
+        assert_eq!(table["spin_left"].duration, 1.5);
+        assert!(table["spin_left"].chain);
+        // Configuring the table queues no intent: the reload is a separate
+        // route, the same way a slot override waits for one.
+        assert!(queue.drain().is_empty());
+
+        // A file that was never there: 400, the entry named, the table in
+        // force unchanged.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"custom_skills":[{"file":"gone.onnx","name":"phantom","kind":"episodic","duration_s":1.0}]}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("phantom"), "{response}");
+        assert!(response.contains("no such file"), "{response}");
+        assert_eq!(crate::manifest::custom_skills()["spin_left"].duration, 1.5);
+
+        // A shape the door refuses: not episodic, not even an array.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"custom_skills":[{"file":"spin.onnx","name":"hold_still","kind":"perpetual","duration_s":1.0}]}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("episodic"), "{response}");
+        let response = request(port, "POST", "/config", r#"{"custom_skills":{}}"#);
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("array"), "{response}");
+        assert_eq!(crate::manifest::custom_skills()["spin_left"].duration, 1.5);
+
+        // An empty array is the whole-table reset.
+        let response = request(port, "POST", "/config", r#"{"custom_skills":[]}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(crate::manifest::custom_skills().is_empty());
+
+        crate::manifest::clear_custom_skills();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The person's own words, taught through `/config`: a phrase names a
+    /// verb the duck really has, and the duck hears it through the same
+    /// `/heard` path as a built-in one. A bad table is refused whole, and
+    /// an empty object clears it back to the built-in words.
+    #[test]
+    fn http_config_takes_taught_voice_words() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_skills(vec!["roulade".to_owned(), "sit".to_owned()]);
+        queue.set_emotions(vec!["excited".to_owned()]);
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"voice_aliases":{"转圈圈":"roulade","开心极了":"excited","蹲下":"sit","打招呼":"greet"}}"#,
+        );
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        let aliases = queue.voice_aliases();
+        assert_eq!(aliases.get("转圈圈"), Some("roulade"));
+        assert_eq!(aliases.get("开心极了"), Some("excited"));
+        assert_eq!(aliases.get("蹲下"), Some("sit"));
+        assert_eq!(aliases.get("打招呼"), Some("greet"));
+        assert_eq!(aliases.len(), 4);
+        // Teaching words is neither a policy change nor an idle reset.
+        assert!(queue.drain().is_empty());
+
+        // The taught word is heard like a built-in one; the phrase reported
+        // is the one that matched, and the target is the person's skill.
+        let (phrase, heard) = crate::speech::interpret_with(&aliases, "转圈圈！").expect("taught");
+        assert_eq!(phrase, "转圈圈");
+        assert_eq!(heard, crate::speech::HeardWord::Skill("roulade".to_owned()));
+
+        // Nothing about the table leaks into /state. The pipe is proven
+        // first: a marker put in the state comes back out, so the no-leak
+        // assertions below could actually fail if a phrase ever leaked.
+        queue.set_state(json!({ "label": "state-leak-marker" }));
+        let response = request(port, "GET", "/state", "");
+        assert!(response.contains("state-leak-marker"), "{response}");
+        for phrase in ["转圈圈", "开心极了", "蹲下", "打招呼"] {
+            assert!(!response.contains(phrase), "{phrase} leaked: {response}");
+        }
+
+        // A target the duck does not have refuses the whole table, naming
+        // the phrase and the target; the table already in force stays.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"voice_aliases":{"转圈圈":"backflip"}}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("转圈圈"), "{response}");
+        assert!(response.contains("backflip"), "{response}");
+        assert_eq!(queue.voice_aliases().get("转圈圈"), Some("roulade"));
+
+        // A phrase that is empty after trimming is refused.
+        let response = request(
+            port,
+            "POST",
+            "/config",
+            r#"{"voice_aliases":{"   ":"roulade"}}"#,
+        );
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("empty"), "{response}");
+        assert_eq!(queue.voice_aliases().len(), 4);
+
+        // A target that is not even a string is refused at the door.
+        let response = request(port, "POST", "/config", r#"{"voice_aliases":{"转":7}}"#);
+        assert!(response.contains("400 Bad Request"), "{response}");
+        assert!(response.contains("must be a name"), "{response}");
+        assert_eq!(queue.voice_aliases().len(), 4);
+
+        // An empty object is the person clearing the list; the built-in
+        // words are all that is left.
+        let response = request(port, "POST", "/config", r#"{"voice_aliases":{}}"#);
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(queue.voice_aliases().is_empty());
+        let cleared = queue.voice_aliases();
+        let (phrase, heard) = crate::speech::interpret_with(&cleared, "翻滚").expect("built in");
+        assert_eq!(phrase, "翻滚");
+        assert_eq!(heard, crate::speech::HeardWord::Skill("roulade".to_owned()));
+    }
+
+    /// A painted route is queued with its origin and thinned points, and an
+    /// over-cap drawing is refused before anything reaches the queue.
+    #[test]
+    fn http_queues_a_path_and_refuses_one_over_the_caps() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        let response = request(
+            port,
+            "POST",
+            "/path",
+            r#"{"points":[[0,0],[0.5,0],[0.5,0.4]]}"#,
+        );
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        assert!(response.contains(r#""points":2"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::Path(points) => {
+                assert_eq!(points.len(), 2);
+                assert_eq!(points[0], [0.5, 0.0]);
+            }
+            other => panic!("unexpected intent: {other:?}"),
+        }
+
+        // An origin alone is not a route: refused with an error, and the
+        // queue stays empty so the duck never sees it.
+        let response = request(port, "POST", "/path", r#"{"points":[[0,0]]}"#);
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(queue.drain().is_empty(), "a refused route was queued");
+
+        // Cancel is a no-op answered ok, and it does reach the queue.
+        let response = request(port, "POST", "/path/cancel", "{}");
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        assert!(matches!(intents[0].intent, Intent::PathCancel));
+    }
+
+    /// A one-shot route answers with the tick's verdict, not "the queue took
+    /// it": a client that asks for a skill while another is running must learn
+    /// that it was refused.
+    #[test]
+    fn a_one_shot_route_answers_with_what_the_tick_decided() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        // The duck's side of the conversation: take the request, answer it.
+        let worker = {
+            let queue = queue.clone();
+            std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while Instant::now() < deadline {
+                    let queued = queue.drain();
+                    for item in queued {
+                        let answer = match item.intent {
+                            Intent::Skill(name) => {
+                                json!({ "ok": false, "error": format!("no such skill: {name}") })
+                            }
+                            _ => json!({ "ok": true }),
+                        };
+                        queue.answer(item.id, answer);
+                    }
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            })
+        };
+
+        let response = request(port, "POST", "/skill", r#"{"name":"fly"}"#);
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("no such skill"), "{response}");
+        let _ = worker.join();
+    }
+
+    /// `/peers/gift` validates before queueing and keeps the sender's window:
+    /// an unknown peer, a bad kind or an emotion this build did not load are
+    /// refused without spending it, and one gift per peer per three seconds
+    /// is enforced at the route.
+    #[test]
+    fn http_queues_a_gift_and_refuses_bad_or_early_ones() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_peers(json!({
+            "peers": [
+                { "id": "peer01", "name": "Sunny" },
+                { "id": "peer02", "name": "Rainy" },
+            ]
+        }));
+        queue.set_emotions(vec!["excited".to_owned()]);
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        // An unknown peer is refused before the queue and before any window.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"ghost","gift":"treat","value":""}"#,
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("no such peer"), "{response}");
+        assert!(queue.drain().is_empty(), "an unknown peer was queued");
+
+        // An emotion this build did not load is refused too, and the refusal
+        // does not spend peer01's window: the treat right after is accepted.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer01","gift":"emotion","value":"flying"}"#,
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("no such emotion"), "{response}");
+        assert!(queue.drain().is_empty(), "an unknown emotion was queued");
+
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer01","gift":"treat","value":""}"#,
+        );
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        assert!(response.contains(r#""queued":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::SendGift { id, gift, value } => {
+                assert_eq!(id, "peer01");
+                assert_eq!(*gift, crate::lan::GiftKind::Treat);
+                assert!(value.is_empty());
+            }
+            other => panic!("unexpected intent: {other:?}"),
+        }
+
+        // The window is spent: a second gift inside three seconds is refused
+        // without queueing.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer01","gift":"emotion","value":"excited"}"#,
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("too soon"), "{response}");
+        assert!(queue.drain().is_empty(), "a throttled gift was queued");
+
+        // A different peer has its own window and an official emotion rides
+        // along with its name.
+        let response = request(
+            port,
+            "POST",
+            "/peers/gift",
+            r#"{"id":"peer02","gift":"emotion","value":"excited"}"#,
+        );
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::SendGift { id, gift, value } => {
+                assert_eq!(id, "peer02");
+                assert_eq!(*gift, crate::lan::GiftKind::Emotion);
+                assert_eq!(value, "excited");
+            }
+            other => panic!("unexpected intent: {other:?}"),
+        }
+    }
+
+    /// `/chorus` validates the move budget and the loaded official emotions
+    /// before anything is queued, and a running chorus refuses a second one.
+    #[test]
+    fn http_queues_a_chorus_and_refuses_bad_moves() {
+        let queue = Arc::new(IntentQueue::new());
+        queue.set_emotions(vec!["laugh".to_owned(), "yes_fast".to_owned()]);
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for body in [
+            r#"{"moves":[]}"#,
+            r#"{"moves":["moonwalk"]}"#,
+            r#"{"moves":["laugh","laugh","laugh","laugh"]}"#,
+        ] {
+            let response = request(port, "POST", "/chorus", body);
+            assert!(response.contains(r#""ok":false"#), "{body}: {response}");
+            assert!(
+                queue.drain().is_empty(),
+                "a refused chorus was queued: {body}"
+            );
+        }
+
+        // A body without moves sings the default two.
+        let response = request(port, "POST", "/chorus", r#"{}"#);
+        assert!(response.contains(r#""queued":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        match &intents[0].intent {
+            Intent::Chorus(moves) => assert_eq!(
+                moves,
+                &vec!["laugh".to_owned(), "yes_fast".to_owned()],
+                "the default chorus is laugh then yes_fast"
+            ),
+            other => panic!("unexpected intent: {other:?}"),
+        }
+
+        // While one is playing, the route refuses without queueing.
+        queue.set_chorus(json!({ "active": true }));
+        let response = request(port, "POST", "/chorus", r#"{"moves":["laugh"]}"#);
+        assert!(response.contains("already playing"), "{response}");
+        assert!(queue.drain().is_empty(), "a second chorus was queued");
+    }
+
+    /// A route whose tick never runs says so instead of pretending success.
+    #[test]
+    fn a_silent_core_is_reported_as_pending() {
+        let queue = IntentQueue::new();
+        let result = queue.request(Intent::Sit);
+        assert_eq!(result["ok"], json!(false));
+        assert_eq!(result["pending"], json!(true));
+    }
+
+    /// `/night` is a two-state switch: a body without a boolean `on` is
+    /// refused before the queue, a good night is queued like a tap, and the
+    /// morning passes the tick's quiet span through untouched.
+    #[test]
+    fn http_queues_a_night_and_refuses_a_body_without_on() {
+        let queue = Arc::new(IntentQueue::new());
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let _server = start_listener(listener, queue.clone());
+
+        for body in [r#"{}"#, r#"{"on":null}"#, r#"{"on":1}"#, r#"{"on":"true"}"#] {
+            let response = request(port, "POST", "/night", body);
+            assert!(response.contains(r#""ok":false"#), "{body}: {response}");
+            assert!(response.contains(r#""error":"#), "{body}: {response}");
+            assert!(
+                queue.drain().is_empty(),
+                "a refused night was queued: {body}"
+            );
+        }
+
+        let response = request(port, "POST", "/night", r#"{"on":true}"#);
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        assert!(response.contains(r#""queued":true"#), "{response}");
+        let intents = queue.drain();
+        assert_eq!(intents.len(), 1);
+        assert!(matches!(intents[0].intent, Intent::Night(true)));
+
+        // Morning waits for the tick because only it knows the quiet span;
+        // the duck's side of the conversation answers as the tick would.
+        let worker = {
+            let queue = queue.clone();
+            std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while Instant::now() < deadline {
+                    for item in queue.drain() {
+                        let answer = match item.intent {
+                            Intent::Night(false) => {
+                                json!({ "ok": true, "queued": true, "quiet_s": 12.5 })
+                            }
+                            _ => json!({ "ok": true }),
+                        };
+                        queue.answer(item.id, answer);
+                    }
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            })
+        };
+        let response = request(port, "POST", "/night", r#"{"on":false}"#);
+        assert!(response.contains(r#""quiet_s":12.5"#), "{response}");
+        let _ = worker.join();
+    }
+}

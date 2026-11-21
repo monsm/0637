@@ -1,0 +1,85 @@
+# Rust / native build output
+core/target/
+ios/Frameworks/
+ios/third_party/
+android/third_party/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/jniLibs/
+android/app/src/main/assets/
+ios/DuckApp/Resources/
+
+# Fetched upstream sources and policies (CI downloads them)
+upstream/
+policies/
+
+# Python workspace
+work/.venv/
+work/traces/
+work/android/
+work/ort-ios/
+work/mujoco-lib/
+work/*.zip
+work/*.exe
+__pycache__/
+*.pyc
+
+# IDE / OS
+.DS_Store
+*.iml
+.idea/
+*.xcuserstate
+
+# Local copies of CI artifacts
+dist/
+
+# Scratch space: extracted artifacts and source clones
+work/ipa-inspect-*/
+work/mujoco-grep/
+
+# Local CI screenshot copies
+work/ci-shot/
+
+# Reference renders for visual comparison
+work/refrender/
+
+# Audit scratch from workflow agents
+work/audit-backlash/
+work/audit_tmp/
+
+# Scratch patch scripts
+work/patch_*.py
+
+# Workflow agents' scratch
+work/scratch/
+
+# MuJoCo writes this beside the model
+MUJOCO_LOG.TXT
+
+# Session drafts at the repo root (screenshots, scratch Swift/JSON dumps)
+/ddg*.html
+/gh_cv.*
+/gh_xcodebuild.log
+/lpg.json
+/o1.swift
+/o2.swift
+/old_cv.swift
+/old_quack.swift
+/osu_*.swift
+/runs_now.json
+
+# Toolchain and scratch dirs under work/ (portable rust, mingw, test scratch)
+work/.rustup/
+work/.cargo/
+work/mingw-binutils/
+work/dlltest/
+work/tmp/
+work/gnubin/
+work/duck-ipc-harness/
+work/*_msg.txt
+work/FRAGMENT_SHADER.glsl
+work/VERTEX_SHADER.glsl
+work/baseline_*.txt
+/regress.log

@@ -1,0 +1,25 @@
+<!--
+  The AR depth scan's reference output, used by the core's obstacle tests.
+
+  This is the shape both shells write to <staging>/obstacles.xml: a complete
+  MJCF document whose <worldbody> holds the scanned boxes directly (no
+  <body> wrapper), each at its absolute world position. The core strips the
+  outer <mujoco>/<worldbody> and merges the geom entries into the scene.
+
+  Contract:
+    * geom type="box"; size="half-x half-y half-z" in metres;
+    * pos = the box's centre in world coordinates;
+    * condim="3", the floor's own;
+    * <= 3 geoms (the shells cap the scan);
+    * a body-less geom under worldbody is static — no joint, no qpos.
+
+  This one is a 0.20 x 0.40 x 0.10 m piece of furniture raised 0.05 m
+  (centre z = 0.05, top at 0.10 m) 0.40 m in front of the duck. The duck
+  faces +x in the official MJCF; its trunk starts at x = 0.
+-->
+<mujoco model="duck-depth-obstacles">
+  <worldbody>
+    <geom name="depth_obstacle_0" type="box" size="0.10 0.20 0.05"
+          pos="0.4 0 0.05" condim="3"/>
+  </worldbody>
+</mujoco>

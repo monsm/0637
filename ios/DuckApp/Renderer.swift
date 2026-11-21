@@ -1,0 +1,819 @@
+import Foundation
+import MetalKit
+import UIKit
+import simd
+import SwiftUI
+
+private struct Uniforms {
+    var mvp: simd_float4x4
+    var model: simd_float4x4
+    var color: SIMD4<Float>
+    var light: SIMD4<Float>
+    /// x: metalness, y: roughness, z: exposure.
+    var material: SIMD4<Float>
+    /// Live 舞台的"房间"字段。只允许追加在尾部，且必须与 Shaders.metal
+    /// 的 Uniforms 逐字段对齐，两边谁都不能单独改。
+    /// x: 地板观感（0 = Live 暖石，1 = Instrument 冷棋盘）；y: 全屏背景板标志。
+    var stage: SIMD4<Float>
+    /// xy: 鸭子投到屏幕的 NDC（背景光晕中心）；z: 光晕半径；w: 屏幕宽高比。
+    var halo: SIMD4<Float>
+    /// rgb: 晨昏光色；w: 曝光系数。Swift 按 Date() 算好，shader 只做乘法。
+    var daylight: SIMD4<Float>
+    /// xy: 鸭子躯干的世界 xy（接触阴影中心）；z: 影子浓度；w 备用。
+    var shadow: SIMD4<Float>
+}
+
+private struct Mesh {
+    let buffer: MTLBuffer
+    let vertices: Int
+    /// The soup's bounds in mesh space: the jaw's hinge is derived from them
+    /// (the model has no jaw joint to ask).
+    let boundsMin: SIMD3<Float>
+    let boundsMax: SIMD3<Float>
+}
+
+private struct Instance {
+    let mesh: Mesh
+    let body: Int
+    let local: simd_float4x4
+    let color: SIMD4<Float>
+    /// The lower beak: the one geom the shell animates itself. Rotation is
+    /// composed BEFORE the geom's own local, in mesh space, so nothing else
+    /// in the head body moves with it — the upper beak, the eyes and the
+    /// bottom shell share that body and must stay put.
+    let isJaw: Bool
+    let jawPivot: SIMD3<Float>
+}
+
+/// Why the renderer could not start. Every one of these used to end in a
+/// silent `nil`: the view was created, no delegate was attached, and the
+/// screen stayed black with nothing in the log. The app now reports the
+/// reason on screen instead.
+enum RendererError: Error, CustomStringConvertible {
+    case noDevice
+    case noQueue
+    case noLibrary(String)
+    case noFunction(String)
+    case noPipeline
+    case noDepthState
+
+    var description: String {
+        switch self {
+        case .noDevice:
+            return "Metal device unavailable"
+        case .noQueue:
+            return "Metal command queue unavailable"
+        case .noLibrary(let detail):
+            return "Metal library unavailable: \(detail)"
+        case .noFunction(let name):
+            return "Metal function '\(name)' missing"
+        case .noPipeline:
+            return "Metal pipeline creation failed"
+        case .noDepthState:
+            return "Metal depth stencil state failed"
+        }
+    }
+}
+
+/// Metal renderer: one draw per visual geom, transforms read from MuJoCo
+/// bodies each frame. Physics runs at 50 Hz; rendering at the display rate.
+final class Renderer: NSObject, MTKViewDelegate {
+    private let device: MTLDevice
+    private let queue: MTLCommandQueue
+    private let controller: DuckController
+    private let pipeline: MTLRenderPipelineState
+    private let depthState: MTLDepthStencilState
+    private var meshes: [Int32: Mesh] = [:]
+    private var instances: [Instance] = []
+    private let floor: Mesh
+    private let backdrop: Mesh
+    private var aspect: Float = 1
+    /// The body model this renderer's meshes and instances were built for.
+    /// A mode switch loads a different MJCF, so everything cached has to go.
+    private var builtGeneration: UInt64 = 0
+    /// After a rebuild, ask the core for meshes: the controller's off-thread
+    /// parse describes the model the app started with.
+    private var meshesFromCore = false
+    private let yaw: Float = .pi
+    private let pitch: Float = 0.32
+    private let distance: Float = 0.85
+    /// Set once by the Director shutter: the next completed frame is read back
+    /// instead of simply presented.
+    private var captureCompletion: ((UIImage?) -> Void)?
+
+    /// Why the last `init?` failed. A renderer that could not start used to
+    /// leave a black screen with nothing to look at.
+    fileprivate static var lastError: String?
+
+    init?(controller: DuckController, view: MTKView) {
+        Renderer.lastError = nil
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            Renderer.lastError = RendererError.noDevice.description
+            return nil
+        }
+        guard let queue = device.makeCommandQueue() else {
+            Renderer.lastError = RendererError.noQueue.description
+            return nil
+        }
+        let library: MTLLibrary
+        do {
+            library = try Renderer.makeLibrary(device)
+        } catch {
+            Renderer.lastError = (error as? RendererError)?.description ?? "\(error)"
+            return nil
+        }
+        guard let vertexFunction = library.makeFunction(name: "duck_vertex") else {
+            Renderer.lastError = RendererError.noFunction("duck_vertex").description
+            return nil
+        }
+        guard let fragmentFunction = library.makeFunction(name: "duck_fragment") else {
+            Renderer.lastError = RendererError.noFunction("duck_fragment").description
+            return nil
+        }
+        self.device = device
+        self.queue = queue
+        self.controller = controller
+
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.vertexFunction = vertexFunction
+        descriptor.fragmentFunction = fragmentFunction
+        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        descriptor.depthAttachmentPixelFormat = .depth32Float
+        guard let pipeline = try? device.makeRenderPipelineState(descriptor: descriptor) else {
+            Renderer.lastError = RendererError.noPipeline.description
+            return nil
+        }
+        self.pipeline = pipeline
+
+        let depthDescriptor = MTLDepthStencilDescriptor()
+        depthDescriptor.depthCompareFunction = .less
+        depthDescriptor.isDepthWriteEnabled = true
+        guard let depthState = device.makeDepthStencilState(descriptor: depthDescriptor) else {
+            Renderer.lastError = RendererError.noDepthState.description
+            return nil
+        }
+        self.depthState = depthState
+        self.floor = Renderer.makeFloor(device: device)
+        self.backdrop = Renderer.makeBackdrop(device: device)
+        super.init()
+
+        view.device = device
+        view.colorPixelFormat = .bgra8Unorm
+        view.depthStencilPixelFormat = .depth32Float
+        // The Director shutter reads the drawable back with a blit. A
+        // framebuffer-only drawable cannot be used as a copy source on device.
+        view.framebufferOnly = false
+        // 房间底色：STAGE_LOOK §2.2 的暖褐地平线色乘晨昏光。渐变墙由
+        // 背景板每帧画满整屏，这里只是它画上之前的第一帧兜底。
+        view.clearColor = Renderer.roomClear()
+        // **Clear, not the studio colour.** The view must be able to composite
+        // over the camera in Director mode; an opaque background colour would
+        // paint the studio over the room even with a transparent clear colour.
+        // The studio look comes from `clearColor`, which is drawn every frame.
+        view.backgroundColor = .clear
+        view.preferredFramesPerSecond = 60
+        view.delegate = self
+        buildInstances()
+    }
+
+    // MARK: - Scene building
+
+    private func buildInstances() {
+        guard let core = controller.core else { return }
+        let count = Int(duck_core_geom_count(core))
+        for geom in 0..<count {
+            var body: Int32 = 0
+            var type: Int32 = 0
+            var meshID: Int32 = -1
+            var group: Int32 = 0
+            var position = [Double](repeating: 0, count: 3)
+            var rotation = [Double](repeating: 0, count: 4)
+            var color = [Float](repeating: 0, count: 4)
+
+            let result = position.withUnsafeMutableBufferPointer { pos in
+                rotation.withUnsafeMutableBufferPointer { quat in
+                    color.withUnsafeMutableBufferPointer { rgba in
+                        duck_core_geom_info(
+                            core, Int32(geom), &body, &type, &meshID, &group,
+                            pos.baseAddress, quat.baseAddress, rgba.baseAddress
+                        )
+                    }
+                }
+            }
+            guard result == 0, group == 2, type == 7, meshID >= 0 else { continue }
+            guard let mesh = loadMesh(meshID: meshID) else { continue }
+
+            let local = translation(SIMD3<Float>(
+                Float(position[0]), Float(position[1]), Float(position[2])
+            )) * quaternionMatrix(SIMD4<Float>(
+                Float(rotation[0]), Float(rotation[1]),
+                Float(rotation[2]), Float(rotation[3])
+            ))
+            let alpha = color[3] > 0 ? color[3] : 1
+            // The visible lower beak is the geom whose MESH is `jaw` — the
+            // `jaw_soft` mesh is the servo rack inside the head, and the
+            // `jaw` geom shares its body with the upper beak, the eyes and
+            // the bottom shell. The rendered vertices come from MuJoCo's
+            // COMPILED mesh (re-centred and re-oriented to principal axes at
+            // compile time), not the raw STL — so the hinge is read off the
+            // compiled frame: lateral is mesh Z (STL lateral X maps to
+            // compiled Z under the compiler's principal-axis rotation),
+            // front tip is mesh +Y, up is mesh +X. The hinge is the lateral
+            // axis through the rear-TOP corner of the mesh bounds; a POSITIVE
+            // angle swings the front tip down. Verified in the compiled model
+            // (robot_walk_backlash): +0.30 rad drops the tip 17.5 mm with
+            // 0.05 mm lateral drift; the old mesh-X axis yawed the beak
+            // sideways instead.
+            let meshName = duck_core_mesh_name(core, meshID).map { String(cString: $0) } ?? ""
+            let isJaw = meshName == "jaw"
+            var jawPivot = SIMD3<Float>(0, 0, 0)
+            if isJaw {
+                jawPivot = SIMD3<Float>(mesh.boundsMax.x, mesh.boundsMin.y, 0)
+            }
+            instances.append(Instance(
+                mesh: mesh,
+                body: Int(body),
+                local: local,
+                color: SIMD4<Float>(color[0], color[1], color[2], alpha),
+                isJaw: isJaw,
+                jawPivot: jawPivot
+            ))
+        }
+        // NSLog, not print: the CI session reads this from the unified log,
+        // and print() to a pipe can sit in a buffer until the app exits.
+        NSLog("duck: renderer: %d visual geoms", instances.count)
+    }
+
+    private func loadMesh(meshID: Int32) -> Mesh? {
+        if let cached = meshes[meshID] { return cached }
+        // The controller builds every soup off the main thread while the core
+        // is created; fall back to the core if one is missing.
+        if !meshesFromCore,
+           let vertices = controller.meshVertices[meshID], !vertices.isEmpty {
+            return storeMesh(id: meshID, vertices: vertices)
+        }
+        guard let core = controller.core else { return nil }
+        let floats = Int(duck_core_mesh_soup(core, meshID, nil, 0))
+        guard floats > 0 else { return nil }
+        var soup = [Float](repeating: 0, count: floats)
+        let written = soup.withUnsafeMutableBufferPointer { buffer in
+            duck_core_mesh_soup(core, meshID, buffer.baseAddress, Int32(buffer.count))
+        }
+        guard Int(written) == floats else { return nil }
+        return storeMesh(id: meshID, vertices: soup)
+    }
+
+    private func storeMesh(id: Int32, vertices: [Float]) -> Mesh? {
+        guard let buffer = device.makeBuffer(
+            bytes: vertices,
+            length: vertices.count * MemoryLayout<Float>.stride,
+            options: .storageModeShared
+        ) else {
+            return nil
+        }
+        // Position + normal per vertex: bounds come from the positions only.
+        var low = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var high = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        var index = 0
+        while index + 2 < vertices.count {
+            let point = SIMD3<Float>(vertices[index], vertices[index + 1], vertices[index + 2])
+            low = simd_min(low, point)
+            high = simd_max(high, point)
+            index += 6
+        }
+        let mesh = Mesh(
+            buffer: buffer,
+            vertices: vertices.count / 6,
+            boundsMin: low,
+            boundsMax: high
+        )
+        meshes[id] = mesh
+        return mesh
+    }
+
+    /// Compile Shaders.metal at runtime. Shipping the source as a resource
+    /// avoids a root-level default.metallib, which Xcode 26 refuses to code
+    /// sign ("code object is not signed at all"). Falls back to the compiled
+    /// library when the source is absent.
+    private static func makeLibrary(_ device: MTLDevice) throws -> MTLLibrary {
+        let candidates = [
+            Bundle.main.url(forResource: "Shaders", withExtension: "metal", subdirectory: "DuckResources"),
+            Bundle.main.url(forResource: "Shaders", withExtension: "metal"),
+        ]
+        var sourceProblem = "Shaders.metal not found in the bundle"
+        for case let url? in candidates {
+            guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                sourceProblem = "\(url.lastPathComponent) is not readable"
+                continue
+            }
+            do {
+                return try device.makeLibrary(source: source, options: nil)
+            } catch {
+                sourceProblem = "Shaders.metal failed to compile: \(error.localizedDescription)"
+            }
+        }
+        // The compiled library is the fallback. `makeDefaultLibrary()` has
+        // changed shape across SDKs (optional or not), so widen it first.
+        let fallback: MTLLibrary? = device.makeDefaultLibrary()
+        if let library = fallback {
+            return library
+        }
+        throw RendererError.noLibrary(sourceProblem)
+    }
+
+    private static func makeFloor(device: MTLDevice) -> Mesh {
+        let extent: Float = 4
+        let z: Float = -0.002
+        let vertices: [Float] = [
+            -extent, -extent, z, 0, 0, 1,
+             extent, -extent, z, 0, 0, 1,
+             extent,  extent, z, 0, 0, 1,
+            -extent, -extent, z, 0, 0, 1,
+             extent,  extent, z, 0, 0, 1,
+            -extent,  extent, z, 0, 0, 1,
+        ]
+        let buffer = device.makeBuffer(
+            bytes: vertices,
+            length: vertices.count * MemoryLayout<Float>.stride,
+            options: .storageModeShared
+        )!
+        return Mesh(
+            buffer: buffer,
+            vertices: vertices.count / 6,
+            boundsMin: SIMD3<Float>(repeating: -extent),
+            boundsMax: SIMD3<Float>(repeating: extent)
+        )
+    }
+
+    /// 全屏背景板：一个盖住 NDC 的大三角，顶点直接给 NDC 坐标，MVP 用
+    /// 单位阵；深度贴着远平面，先画它，地板和鸭子都赢得过它。相机打开
+    /// 时它不参与绘制——画面底是真实的房间（Director 合成模式不许挡）。
+    private static func makeBackdrop(device: MTLDevice) -> Mesh {
+        let z: Float = 0.9995
+        let vertices: [Float] = [
+            -1, -1, z, 0, 0, 1,
+             3, -1, z, 0, 0, 1,
+            -1,  3, z, 0, 0, 1,
+        ]
+        let buffer = device.makeBuffer(
+            bytes: vertices,
+            length: vertices.count * MemoryLayout<Float>.stride,
+            options: .storageModeShared
+        )!
+        return Mesh(
+            buffer: buffer,
+            vertices: vertices.count / 6,
+            boundsMin: SIMD3<Float>(-1, -1, z),
+            boundsMax: SIMD3<Float>(3, 3, z)
+        )
+    }
+
+    // MARK: - 晨昏光
+
+    /// 晨昏光锚点：(本地小时, 光色 rgb, 曝光)。夜里深暖褐加低曝光，清晨
+    /// 暖金，正午中性全曝光，傍晚橙红，入夜再落回去。任务 §4：时间在
+    /// Swift 侧算好，shader 只做混合。夜间曝光有 0.80 的下限：0.72 叠在
+    /// 本来就暗的暖石房间上，凌晨三点的鸭子会看不清。
+    private static let daylightStops: [(hour: Float, tint: SIMD3<Float>, exposure: Float)] = [
+        (0,    SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
+        (5,    SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
+        (6.5,  SIMD3<Float>(1.12, 0.92, 0.72), 0.90),
+        (9,    SIMD3<Float>(1.00, 1.00, 1.00), 1.00),
+        (16,   SIMD3<Float>(1.00, 1.00, 1.00), 1.00),
+        (18,   SIMD3<Float>(1.15, 0.78, 0.55), 0.88),
+        (20,   SIMD3<Float>(1.05, 0.80, 0.62), 0.80),
+        (21.5, SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
+        (24,   SIMD3<Float>(0.95, 0.72, 0.55), 0.80),
+    ]
+
+    /// The floor under the curve. Raising the anchors alone would not stop a
+    /// future edit from dipping below it.
+    private static let daylightExposureFloor: Float = 0.80
+
+    /// 按真实本地时间在锚点之间做 smoothstep 插值，整点不跳变。
+    ///
+    /// `at` 是可注入的：测试与 CI 传固定时间，截图和判帧就不随时钟漂移
+    /// （`-duck.daylightHour 12` 走 NSArgumentDomain）。生产调用不传参，
+    /// 用本地墙钟。
+    private static func daylight(at date: Date = Date())
+        -> (tint: SIMD3<Float>, exposure: Float) {
+        let hour: Float
+        if UserDefaults.standard.object(forKey: "duck.daylightHour") != nil {
+            hour = Float(UserDefaults.standard.double(forKey: "duck.daylightHour"))
+        } else {
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+            hour = Float(parts.hour ?? 12) + Float(parts.minute ?? 0) / 60
+        }
+        for index in 0..<(daylightStops.count - 1) {
+            let from = daylightStops[index]
+            let to = daylightStops[index + 1]
+            guard hour >= from.hour, hour <= to.hour else { continue }
+            let span = to.hour - from.hour
+            let raw = span > 0 ? (hour - from.hour) / span : 0
+            let t = raw * raw * (3 - 2 * raw)
+            return (
+                from.tint + (to.tint - from.tint) * t,
+                max(from.exposure + (to.exposure - from.exposure) * t, daylightExposureFloor)
+            )
+        }
+        return (daylightStops[0].tint, daylightExposureFloor)
+    }
+
+    /// 房间的清屏底色：STAGE_LOOK §2.2 的暖褐地平线色 #1A1714，乘上
+    /// 当下的晨昏光。init、每帧的清屏和 MetalView 的层底色都走这里，
+    /// 三处颜色才不会各说各话。
+    fileprivate static func roomClear(at date: Date = Date()) -> MTLClearColor {
+        let light = daylight(at: date)
+        let base = SIMD3<Float>(0.102, 0.090, 0.078)
+        let color = base * light.tint * light.exposure
+        return MTLClearColor(
+            red: Double(color.x),
+            green: Double(color.y),
+            blue: Double(color.z),
+            alpha: 1
+        )
+    }
+
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        aspect = Float(size.width / max(size.height, 1))
+    }
+
+    func draw(in view: MTKView) {
+        controller.noteFrame()
+        // Director mode composites the duck over the live camera. The clear
+        // colour must be transparent *and* black: CAMetalLayer's contents are
+        // premultiplied, so any opaque clear would veil the image. 其余时刻
+        // 是晨昏光调过的暖房间，与背景板同一套颜色。
+        let camera = controller.cameraActive
+        // Instrument is the lab, not the room: cold dark behind the sheet,
+        // and neutral light, whatever the hour is (STAGE_LOOK §3).
+        let instrument = controller.instrumentOpen
+        view.clearColor = camera
+            ? MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
+            : instrument
+                ? MTLClearColor(red: 0.055, green: 0.075, blue: 0.10, alpha: 1)
+                : Renderer.roomClear()
+        guard let core = controller.core,
+              let drawable = view.currentDrawable,
+              let descriptor = view.currentRenderPassDescriptor,
+              let buffer = queue.makeCommandBuffer(),
+              let encoder = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return
+        }
+
+        // A roller duck has different feet and meshes. Rebuild before drawing
+        // a frame against the old model.
+        let generation = duck_core_model_generation(core)
+        if generation != builtGeneration {
+            // A different model: nothing cached describes it. (The first
+            // build happened in `init` at generation 0, so any difference
+            // here is a mode switch.)
+            instances.removeAll()
+            meshes.removeAll()
+            meshesFromCore = true
+            buildInstances()
+            builtGeneration = generation
+        }
+
+        encoder.setRenderPipelineState(pipeline)
+        encoder.setDepthStencilState(depthState)
+        encoder.setCullMode(.none)
+
+        // The camera follows the interpolated trunk, not the 10 Hz status
+        // sample: a camera locked to a slower clock than the duck makes the
+        // whole room judder even when the duck itself is smooth.
+        let alpha = controller.interpolationAlpha()
+        let trunkPose = controller.interpolatedPose(body: 1, alpha: alpha)
+        let focus = trunkPose?.position ?? controller.trunk
+        // Portrait narrows the horizontal field to a third of landscape's.
+        // Backing off slightly keeps a side-stepping or carried duck in
+        // frame without shrinking it vertically (fovY is unchanged).
+        let eyeDistance = aspect < 1 ? distance * 1.15 : distance
+        let eye = focus + SIMD3<Float>(
+            eyeDistance * cos(pitch) * sin(yaw + controller.compassYaw),
+            eyeDistance * cos(pitch) * cos(yaw + controller.compassYaw),
+            eyeDistance * sin(pitch)
+        )
+        let viewMatrix = lookAt(eye: eye, center: focus, up: SIMD3<Float>(0, 0, 1))
+        let projection = perspective(
+            fovY: 45 * .pi / 180,
+            aspect: aspect,
+            near: 0.01,
+            far: 100
+        )
+        let viewProjection = projection * viewMatrix
+
+        // A headlight, like MuJoCo's own viewer: the light travels along the
+        // camera's forward axis, so whatever the camera sees is lit. A fixed
+        // world light left the front of the duck almost black.
+        let forward = simd_normalize(focus - eye)
+
+        // —— Live 房间的三件套，每个 draw call 都带一份 ——
+        // 晨昏光：Swift 按真实本地时间算好光色与曝光，shader 只做乘法。
+        let day = Renderer.daylight()
+        // The room's lamp: the shell's own scale on the exposure, clamped so
+        // the room can dim but never go black (the floor stays readable).
+        let lamp = Float(max(0.55, min(1.15, controller.ambientScale)))
+        let daylight = instrument
+            ? SIMD4<Float>(1, 1, 1, 1)
+            : SIMD4<Float>(day.tint.x, day.tint.y, day.tint.z, day.exposure * lamp)
+        // 接触阴影跟着鸭子走：躯干的世界 xy 就是脚的位置（任务 §3）。
+        // 0.62 是 STAGE_LOOK §2.1 的影子浓度。
+        let shadow = SIMD4<Float>(focus.x, focus.y, 0.62, 0)
+        // 光晕中心：把躯干投到屏幕 NDC（STAGE_LOOK §2.2 的暖光晕）。
+        let clip = viewProjection * SIMD4<Float>(focus.x, focus.y, focus.z, 1)
+        let haloNDC = abs(clip.w) > 1e-4
+            ? SIMD2<Float>(clip.x / clip.w, clip.y / clip.w)
+            : SIMD2<Float>(0, 0.1)
+        let halo = SIMD4<Float>(haloNDC.x, haloNDC.y, 0.8, aspect)
+
+        // The studio floor is the one thing that must not be drawn over a
+        // camera image: a 4 m opaque plane at z=-0.002 hides the room and the
+        // duck's feet. Physics ground stays at z=0 either way. 背景板排在
+        // 地板之前：它贴着远平面，地板和鸭子都赢得过它。
+        if !camera {
+            // The room's wall belongs to Live only; the instrument keeps its
+            // cold void behind the sheet.
+            if !instrument {
+                draw(mesh: backdrop, model: matrix_identity_float4x4,
+                     color: SIMD4<Float>(1, 1, 1, 1),
+                     light: forward, look: 3, viewProjection: viewProjection,
+                     halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
+            }
+            // Live 暖石地板 #38322C（STAGE_LOOK §2.1）；Instrument 的冷棋盘
+            // 是 look 2，控制器把 surface 标志交给渲染器，两套语言不再混用。
+            draw(mesh: floor, model: matrix_identity_float4x4,
+                 color: SIMD4<Float>(0.220, 0.196, 0.173, 1),
+                 light: forward, look: instrument ? 2 : 1, viewProjection: viewProjection,
+                 halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
+        }
+
+        var poses: [Int: (SIMD3<Float>, SIMD4<Float>)] = [:]
+        for instance in instances {
+            if poses[instance.body] == nil {
+                if let sample = controller.interpolatedPose(body: instance.body, alpha: alpha) {
+                    poses[instance.body] = (sample.position, sample.rotation)
+                } else {
+                    poses[instance.body] = bodyPose(core: core, body: instance.body)
+                }
+            }
+            guard let (position, rotation) = poses[instance.body] else { continue }
+            var jaw = matrix_identity_float4x4
+            if instance.isJaw, controller.visualMouth > 0.01 {
+                // 0.30 rad fully open ≈ 17.5 mm at the front tip — a quack,
+                // not a yawl. The hinge axis is mesh Z (lateral in the
+                // compiled frame); a POSITIVE angle swings the tip down.
+                // Rotation in MESH space, before the geom's own local: only
+                // this geom moves.
+                let pivot = instance.jawPivot
+                let angle = Float(controller.visualMouth) * 0.30
+                jaw = translation(pivot)
+                    * simd_float4x4(simd_quatf(angle: angle, axis: SIMD3<Float>(0, 0, 1)))
+                    * translation(SIMD3<Float>(-pivot.x, -pivot.y, -pivot.z))
+            }
+            let model = translation(position) * quaternionMatrix(rotation) * instance.local * jaw
+            draw(mesh: instance.mesh, model: model, color: instance.color,
+                 light: forward, look: 0, viewProjection: viewProjection,
+                 halo: halo, daylight: daylight, shadow: shadow, encoder: encoder)
+        }
+
+        encoder.endEncoding()
+        // A photo is one frame read back instead of presented: the drawable
+        // already holds exactly what the screen shows — the duck over the
+        // room, or over the studio — so the composite is the user's view, not
+        // a second rendering that could disagree with it.
+        if let completion = captureCompletion {
+            captureCompletion = nil
+            // Encode the copy into the same command buffer, before the
+            // present: a drawable may be recycled as soon as it is shown.
+            let texture = drawable.texture
+            let width = texture.width
+            let height = texture.height
+            let bytesPerRow = ((width * 4 + 255) / 256) * 256
+            if let readback = device.makeBuffer(
+                length: bytesPerRow * height,
+                options: .storageModeShared
+            ),
+                let blit = buffer.makeBlitCommandEncoder()
+            {
+                blit.copy(
+                    from: texture,
+                    sourceSlice: 0,
+                    sourceLevel: 0,
+                    sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+                    sourceSize: MTLSize(width: width, height: height, depth: 1),
+                    to: readback,
+                    destinationOffset: 0,
+                    destinationBytesPerRow: bytesPerRow,
+                    destinationBytesPerImage: bytesPerRow * height
+                )
+                blit.endEncoding()
+                buffer.present(drawable)
+                buffer.commit()
+                buffer.waitUntilCompleted()
+                completion(image(
+                    from: readback,
+                    width: width,
+                    height: height,
+                    bytesPerRow: bytesPerRow
+                ))
+            } else {
+                buffer.present(drawable)
+                buffer.commit()
+                completion(nil)
+            }
+        } else {
+            buffer.present(drawable)
+            buffer.commit()
+        }
+    }
+
+    /// Ask the next frame to hand back its pixels, once. Used by the Director
+    /// shutter; the callback runs on the main thread, where `draw` runs.
+    func snapshot(_ completion: @escaping (UIImage?) -> Void) {
+        captureCompletion = completion
+    }
+
+    private func image(
+        from readback: MTLBuffer,
+        width: Int,
+        height: Int,
+        bytesPerRow: Int
+    ) -> UIImage? {
+        guard width > 0, height > 0 else { return nil }
+        let data = Data(
+            bytes: UnsafeRawPointer(readback.contents()),
+            count: bytesPerRow * height
+        )
+        guard let provider = CGDataProvider(data: data as CFData),
+              let image = CGImage(
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bitsPerPixel: 32,
+                bytesPerRow: bytesPerRow,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGBitmapInfo(
+                    rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
+                        | CGBitmapInfo.byteOrder32Little.rawValue
+                ),
+                provider: provider,
+                decode: nil,
+                shouldInterpolate: true,
+                intent: .defaultIntent
+              )
+        else { return nil }
+        // Scale 1: the file is the drawable's own pixel grid, not points.
+        return UIImage(cgImage: image, scale: 1, orientation: .up)
+    }
+
+    private func bodyPose(core: OpaquePointer, body: Int) -> (SIMD3<Float>, SIMD4<Float>) {
+        var position = [Double](repeating: 0, count: 3)
+        var rotation = [Double](repeating: 0, count: 4)
+        position.withUnsafeMutableBufferPointer { pos in
+            rotation.withUnsafeMutableBufferPointer { quat in
+                _ = duck_core_body_pose(core, Int32(body), pos.baseAddress, quat.baseAddress)
+            }
+        }
+        return (
+            SIMD3<Float>(Float(position[0]), Float(position[1]), Float(position[2])),
+            SIMD4<Float>(Float(rotation[0]), Float(rotation[1]),
+                         Float(rotation[2]), Float(rotation[3]))
+        )
+    }
+
+    private func draw(
+        mesh: Mesh,
+        model: simd_float4x4,
+        color: SIMD4<Float>,
+        light: SIMD3<Float>,
+        look: Int,
+        viewProjection: simd_float4x4,
+        halo: SIMD4<Float>,
+        daylight: SIMD4<Float>,
+        shadow: SIMD4<Float>,
+        encoder: MTLRenderCommandEncoder
+    ) {
+        // look：0 = 鸭子部件；1 = Live 暖石地板；2 = Instrument 冷棋盘地板；
+        // 3 = 全屏背景板。light.w 继续当"这是地板"的标志用，棋盘与否由
+        // stage.x 再分一次（STAGE_LOOK §7.1）。
+        var uniforms = Uniforms(
+            // The backdrop's vertices are already NDC: its MVP is the model
+            // (identity), not the camera. Multiplying NDC by viewProjection
+            // treated them as world metres near the duck, which shrank the
+            // triangle and left the top of the screen on the clear colour.
+            mvp: look == 3 ? model : viewProjection * model,
+            model: model,
+            color: color,
+            // The shader negates this and dots it with the normal, so the
+            // vector points the way the light travels; w carries the floor's
+            // flag.
+            light: SIMD4<Float>(light.x, light.y, light.z, look == 1 || look == 2 ? 1 : 0),
+            // The duck is painted plastic over a few metal parts; the floor is
+            // matte. Roughness is what keeps the shells from looking like chrome.
+            // Live 的地板按 STAGE_LOOK §2.1 提到 0.92（哑光打磨水泥地），
+            // Instrument 维持 0.85，背景板不走 PBR、参数只是占位。
+            material: look == 1
+                ? SIMD4<Float>(0.0, 0.92, 1.0, 0)
+                : look == 2
+                    ? SIMD4<Float>(0.0, 0.85, 1.0, 0)
+                    : look == 3
+                        ? SIMD4<Float>(0.0, 1.0, 1.0, 0)
+                        : SIMD4<Float>(0.05, 0.42, 1.0, 0),
+            stage: SIMD4<Float>(look == 2 ? 1 : 0, look == 3 ? 1 : 0, 0, 0),
+            halo: halo,
+            daylight: daylight,
+            shadow: shadow
+        )
+        encoder.setVertexBuffer(mesh.buffer, offset: 0, index: 0)
+        encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: mesh.vertices)
+    }
+}
+
+// MARK: - Math
+
+private func translation(_ value: SIMD3<Float>) -> simd_float4x4 {
+    var matrix = matrix_identity_float4x4
+    matrix.columns.3 = SIMD4<Float>(value.x, value.y, value.z, 1)
+    return matrix
+}
+
+private func quaternionMatrix(_ value: SIMD4<Float>) -> simd_float4x4 {
+    // MuJoCo quaternions are [w, x, y, z].
+    let quaternion = simd_quatf(ix: value.y, iy: value.z, iz: value.w, r: value.x)
+    return simd_float4x4(quaternion)
+}
+
+private func perspective(fovY: Float, aspect: Float, near: Float, far: Float) -> simd_float4x4 {
+    let y = 1 / tan(fovY * 0.5)
+    let x = y / max(aspect, 0.001)
+    let z = far / (near - far)
+    return simd_float4x4(
+        SIMD4<Float>(x, 0, 0, 0),
+        SIMD4<Float>(0, y, 0, 0),
+        SIMD4<Float>(0, 0, z, -1),
+        SIMD4<Float>(0, 0, z * near, 0)
+    )
+}
+
+private func lookAt(eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) -> simd_float4x4 {
+    let forward = simd_normalize(center - eye)
+    let side = simd_normalize(simd_cross(forward, up))
+    let trueUp = simd_cross(side, forward)
+    return simd_float4x4(
+        SIMD4<Float>(side.x, trueUp.x, -forward.x, 0),
+        SIMD4<Float>(side.y, trueUp.y, -forward.y, 0),
+        SIMD4<Float>(side.z, trueUp.z, -forward.z, 0),
+        SIMD4<Float>(-simd_dot(side, eye), -simd_dot(trueUp, eye), simd_dot(forward, eye), 1)
+    )
+}
+
+// MARK: - SwiftUI bridge
+
+struct MetalView: UIViewRepresentable {
+    let controller: DuckController
+
+    func makeUIView(context: Context) -> MTKView {
+        let view = MTKView()
+        // 与舞台同一套暖色底（roomClear，含晨昏光）：层在 drawable 之下，
+        // 只在 Metal 画上第一帧之前可见。isOpaque 仍要关——Director 得能
+        // 把相机垫在这层后面。
+        let room = Renderer.roomClear()
+        view.backgroundColor = UIColor(
+            red: room.red, green: room.green, blue: room.blue, alpha: 1
+        )
+        // Able to composite over a camera preview: an opaque layer would
+        // paint the studio colour over the room in Director mode.
+        view.isOpaque = false
+        view.layer.isOpaque = false
+        // A UIView inside SwiftUI keeps its own hit-testing; without this the
+        // MTKView swallows the SwiftUI gestures layered over it.
+        view.isUserInteractionEnabled = false
+        context.coordinator.renderer = Renderer(controller: controller, view: view)
+        // The Director shutter needs the renderer: the photo is a read-back of
+        // the frame already on screen, not a second camera or a re-render.
+        controller.renderer = context.coordinator.renderer
+        if context.coordinator.renderer == nil {
+            // A renderer that failed to start used to leave a black screen
+            // with nothing to look at. Report it instead.
+            let message = Renderer.lastError ?? "the renderer could not start"
+            NSLog("duck: renderer failed: %@", message)
+            DispatchQueue.main.async {
+                controller.renderError = message
+            }
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: MTKView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator {
+        var renderer: Renderer?
+    }
+}

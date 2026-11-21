@@ -1,0 +1,16 @@
+<!--
+  Three scanned boxes in the shells' full-document shape: the core's merge
+  test asserts all three geom entries land in the world, in order.
+  Sizes/positions are furniture-scale, not a scene: 0.4 m ahead, 0.8 m
+  ahead-left, and 0.6 m behind.
+-->
+<mujoco model="duck-depth-obstacles">
+  <worldbody>
+    <geom name="depth_obstacle_0" type="box" size="0.10 0.20 0.05"
+          pos="0.4 0 0.05" condim="3"/>
+    <geom name="depth_obstacle_1" type="box" size="0.15 0.15 0.20"
+          pos="0.8 0.3 0.20" condim="3"/>
+    <geom name="depth_obstacle_2" type="box" size="0.12 0.25 0.15"
+          pos="-0.6 0 0.15" condim="3"/>
+  </worldbody>
+</mujoco>

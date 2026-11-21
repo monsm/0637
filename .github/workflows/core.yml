@@ -1,0 +1,263 @@
+name: Core
+
+# The core is the heart both platforms share: the official control stack plus
+# everything the companion features sit on. Its test suite existed, but it
+# only ever ran on one developer's machine — the fixtures pointed at
+# `D:\AI\Duck`, and the workspace could not even build without MuJoCo. So a
+# core regression was caught by the app smoke tests only if the smoke tests
+# happened to walk over it.
+#
+# This workflow is that gate. It runs the core's own tests on every change
+# to the core, the upstream patch, or the scripts that fetch the official
+# assets, with no simulator, no emulator and no signing identity — the
+# cheapest job in the repository, and the one that watches the code both
+# platforms depend on.
+
+on:
+  push:
+    paths:
+      - "core/**"
+      - "patches/**"
+      - "scripts/**"
+      - ".github/workflows/core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fetch upstream sources
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
+          git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
+          git -C upstream/microduck checkout da34a22
+          # The patch is what the core compiles against; a clean clone plus
+          # the patch is exactly what the platform workflows build.
+          git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
+
+      - name: Fetch the official policies
+        run: bash scripts/fetch-policies.sh
+
+      - name: ONNX Runtime (linux-x64)
+        id: ort
+        run: |
+          set -euo pipefail
+          LIB="$(bash scripts/fetch-ort-linux.sh)"
+          echo "lib=$LIB" >> "$GITHUB_OUTPUT"
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+          rustup target list --toolchain 1.99.1 --installed
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-tests
+
+      - name: Format the crate (blocking)
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          # Only the files this repository owns. rustfmt follows `#[path]`
+          # modules, and duck-mobile-core compiles robotd's control.rs and
+          # idle_head.rs straight from the upstream checkout — those are not
+          # ours to reformat, and the clean clone CI uses differs from any
+          # local formatting pass. `skip_children` keeps each invocation
+          # local to the file named.
+          mapfile -t files < <(git ls-files 'core/duck-mobile-core/src/*.rs' 'core/duck-mobile-core/tests/*.rs' 'core/duck-mobile-core/build.rs')
+          rustfmt --edition 2024 --check --config skip_children=true "${files[@]}"
+
+      - name: Format the full workspace (advisory)
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          cd core
+          # Advisory until the pre-existing formatting debt is paid down. It
+          # is deliberately visible in the log rather than silently skipped.
+          cargo fmt --all --check
+
+      - name: Clippy (blocking, pre-existing debt allowlisted)
+        run: |
+          set -euo pipefail
+          cd core
+          # `-D warnings` is the official gate. The allowlist below is the
+          # pre-existing warning inventory in files outside this work order
+          # (runtime.rs, lan.rs, pad.rs, care.rs, the upstream idle_head.rs
+          # compiled in via #[path], and build.rs). Allowing exactly those
+          # lint classes is the documented downgrade; any other warning —
+          # including any new warning class in sensors.rs — still fails.
+          cargo clippy --locked --workspace --all-targets -- \
+            -D warnings \
+            -A clippy::bind_instead_of_map \
+            -A clippy::chunks_exact_to_as_chunks \
+            -A clippy::cloned_ref_to_slice_refs \
+            -A clippy::collapsible_if \
+            -A clippy::derivable_impls \
+            -A clippy::field_reassign_with_default \
+            -A clippy::if_same_then_else \
+            -A clippy::items_after_test_module \
+            -A clippy::large_enum_variant \
+            -A clippy::let_unit_value \
+            -A clippy::manual_contains \
+            -A clippy::manual_is_multiple_of \
+            -A clippy::manual_ok_err \
+            -A clippy::needless_range_loop \
+            -A clippy::question_mark \
+            -A clippy::too_many_arguments \
+            -A clippy::type_complexity \
+            -A clippy::unnecessary_cast \
+            -A clippy::while_let_loop \
+            -A unused_imports \
+            -A unused_mut
+
+      - name: Core unit tests
+        env:
+          # The policy tests load the official ONNX networks, so the runtime
+          # has to be the one this build links against.
+          ORT_DYLIB_PATH: ${{ steps.ort.outputs.lib }}
+          # The assets are fetched above, so a missing one is a broken
+          # build — not a reason to skip the test and call it green.
+          DUCK_REQUIRE_FIXTURES: "1"
+          # Upstream's own control tests load their networks from its
+          # checkout; this file is compiled into our crate, so it needs to be
+          # told where that checkout is.
+          DUCK_UPSTREAM_FIXTURES: ${{ github.workspace }}/upstream/microduck/duck-control/tests/fixtures
+        run: |
+          set -euo pipefail
+          cd core
+          # --include-ignored: upstream marks eight of its own control tests
+          # "requires ONNX Runtime >= 1.23", which is why they never ran on
+          # the machine that wrote them. This job ships 1.24.2, so they run
+          # here — they are the sit/stand and move-in-flight rules, which are
+          # exactly the semantics worth having a gate on.
+          cargo test --locked --workspace -- --include-ignored 2>&1 | tee "$RUNNER_TEMP/cargo-test.log"
+
+      - name: Publish the test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Duck-core-test-logs
+          path: ${{ runner.temp }}/cargo-test.log
+          if-no-files-found: ignore
+
+  mujoco:
+    # Deviation #26: the Core job compiles no MuJoCo, so ffi.rs and mujoco.rs
+    # are behind `#[cfg(feature = "mujoco")]` and never built. This job
+    # builds MuJoCo 3.10.0 (the version the iOS/Android libraries pin), points
+    # build.rs at it, and runs the ignored MuJoCo tests as well.
+    #
+    # The Ubuntu half of this job could not be run on the development
+    # machine; the first CI run adjudicates it.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fetch upstream sources
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/pollen-robotics/microduck_rl.git upstream/microduck_rl
+          git clone https://github.com/pollen-robotics/microduck.git upstream/microduck
+          git -C upstream/microduck checkout da34a22
+          git -C upstream/microduck apply "$GITHUB_WORKSPACE/patches/duck-control-mobile.patch"
+
+      - name: Fetch the official policies
+        run: bash scripts/fetch-policies.sh
+
+      - name: ONNX Runtime (linux-x64)
+        id: ort
+        run: |
+          set -euo pipefail
+          LIB="$(bash scripts/fetch-ort-linux.sh)"
+          echo "lib=$LIB" >> "$GITHUB_OUTPUT"
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target list --toolchain 1.99.1 --installed
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+          prefix-key: duck-core-mujoco
+
+      - name: Build MuJoCo 3.10.0 (shared)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+          SRC="$RUNNER_TEMP/mujoco-src"
+          BUILD="$RUNNER_TEMP/mujoco-build"
+          LIBDIR="$RUNNER_TEMP/mujoco-lib"
+          git clone --depth 1 --branch 3.10.0 https://github.com/google-deepmind/mujoco.git "$SRC"
+
+          # Build MuJoCo as the shared library it ships as by default: the
+          # static archive path was a dead end on this runner (rust-lld
+          # resolves -l against it but every mj_* stayed undefined, through
+          # both ld -r folding and direct whole-archive). The test binary is
+          # the only consumer; rpath points it at the directory. Mobile keeps
+          # its own static slices via the NDK/XCFramework branches.
+          cmake -S "$SRC" -B "$BUILD" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SKIP_INSTALL_RULES=ON \
+            -DMUJOCO_BUILD_EXAMPLES=OFF \
+            -DMUJOCO_BUILD_TESTS=OFF \
+            -DMUJOCO_BUILD_SIMULATE=OFF \
+            -DMUJOCO_BUILD_PYTHON=OFF \
+            -DMUJOCO_BUILD_CSHARP=OFF
+          cmake --build "$BUILD" --target mujoco -j"$(nproc)"
+
+          mkdir -p "$LIBDIR"
+          MUJOCO_SO="$(find "$BUILD" -maxdepth 3 -name 'libmujoco.so*' -print -quit)"
+          if [ -z "$MUJOCO_SO" ]; then
+            echo "::error::libmujoco.so not found under $BUILD" >&2
+            exit 1
+          fi
+          cp -a "$(dirname "$MUJOCO_SO")"/libmujoco.so* "$LIBDIR/"
+          ls -l "$LIBDIR"
+
+          {
+            echo "MUJOCO_INCLUDE_DIR=$SRC/include"
+            echo "MUJOCO_LIB_DIR=$LIBDIR"
+          } >> "$GITHUB_ENV"
+          echo "MuJoCo 3.10.0 shared library: $LIBDIR"
+
+      - name: Core MuJoCo tests
+        env:
+          ORT_DYLIB_PATH: ${{ steps.ort.outputs.lib }}
+          DUCK_REQUIRE_FIXTURES: "1"
+          DUCK_UPSTREAM_FIXTURES: ${{ github.workspace }}/upstream/microduck/duck-control/tests/fixtures
+          # The rpath build.rs adds covers the test binary; this covers any
+          # helper the harness spawns.
+          LD_LIBRARY_PATH: ${{ runner.temp }}/mujoco-lib
+        run: |
+          set -euo pipefail
+          cd core
+          # --features mujoco compiles ffi.rs and mujoco.rs. This closes the
+          # ffi half of #26; jni.rs is Android-only and stays out on ubuntu.
+          cargo test --locked -p duck-mobile-core --features mujoco -- --include-ignored 2>&1 | tee "$RUNNER_TEMP/cargo-test-mujoco.log"
+
+      - name: Publish the test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Duck-core-mujoco-test-logs
+          path: ${{ runner.temp }}/cargo-test-mujoco.log
+          if-no-files-found: ignore
