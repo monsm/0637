@@ -2016,24 +2016,24 @@ SH
   adb shell input tap $coords > /dev/null 2>&1
 }
 
+# A page really opened when a string only that page shows is in the tree.
+# (ModalBottomSheet keeps the drawer composed behind it, so "the drawer's
+# headers are gone" can never be true; and 更多 is also the shelf caption.)
+# The witness is argv[1]: one or two alternatives, pipe-separated.
 dense_sheet_opened() {
   rm -f sheet-check.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
   adb exec-out cat /sdcard/ui.xml > sheet-check.xml 2>/dev/null || return 1
-  python3 - <<'SH'
-import xml.etree.ElementTree as ET
+  python3 - "$1" <<'SH'
+import sys, xml.etree.ElementTree as ET
+witnesses = {w for w in sys.argv[1].split('|') if w}
 try:
     root = ET.parse('sheet-check.xml').getroot()
 except Exception:
     raise SystemExit(1)
-nodes = [n for n in root.iter('node') if n.get('package') == 'ai.duck.microduck']
-labels = {(n.get('text') or n.get('content-desc') or '') for n in nodes}
-# A page's close control is present; and the DRAWER's group headers are not
-# (更多 is useless as a signal — it is also the shelf board's caption, which
-# sits behind every sheet).
-pages = {'关闭', 'Close'}
-drawer_groups = {'玩', '一起', '记录', '这只鸭子', 'Play', 'Together', 'Records'}
-raise SystemExit(0 if (pages & labels) and not (drawer_groups & labels) else 1)
+labels = {(n.get('text') or n.get('content-desc') or '')
+          for n in root.iter('node') if n.get('package') == 'ai.duck.microduck'}
+raise SystemExit(0 if witnesses & labels else 1)
 SH
 }
 
@@ -2075,7 +2075,7 @@ SH
 }
 
 open_more_sheet() {
-  local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5"
+  local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5" witness="$6"
   local ok=0
 
   # Deterministic state machine, one state per round; every step reads the
@@ -2114,7 +2114,7 @@ open_more_sheet() {
         # (the way a TalkBack user reaches the same control).
         row_tap_nudged "$row_zh" || row_tap_nudged "$row_en" || true
         sleep 1.2
-        if ! dense_sheet_opened; then
+        if ! dense_sheet_opened "$witness"; then
           for _ in 1 2 3 4 5 6; do
             adb shell input keyevent KEYCODE_DPAD_DOWN > /dev/null 2>&1 || true
             sleep 0.15
@@ -2122,14 +2122,14 @@ open_more_sheet() {
           adb shell input keyevent KEYCODE_DPAD_CENTER > /dev/null 2>&1 || true
           sleep 1.2
         fi
-        if dense_sheet_opened; then ok=1; break; fi
+        if dense_sheet_opened "$witness"; then ok=1; break; fi
         continue
       fi
       if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
         # The tap landed; the row only counts if its sheet really opened
         # (a swipe-position miss can hit a different row).
         sleep 1.2
-        if dense_sheet_opened; then
+        if dense_sheet_opened "$witness"; then
           ok=1
           break
         fi
@@ -2201,22 +2201,21 @@ drawer_present || {
 dense_sheet_check "More" "更多" "More" || exit 1
 # The drawer's own order, top to bottom: a one-way scroll reaches every
 # row without having to scroll back up after a close.
-open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks"
-open_more_sheet "Dance Studio" "编舞铺" "Dance Studio" "编舞铺" "Dance Studio"
-open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more"
-open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours"
+open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks" "拍手|Clap"
+open_more_sheet "Dance Studio" "编舞铺" "Dance Studio" "编舞铺" "Dance Studio" "录制|Record"
+open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more" "驱动|Driving"
+open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours" "配对码|Pairing code"
 # The sheet title is Copy.dailyQuests (the row's own words); "Today's
 # quests" is the card heading inside, and it is not the focus anchor.
-open_more_sheet "Daily quests" "每日任务" "Daily quests" "每日任务" "Daily quests"
-open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky diary"
-open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards"
-open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book"
-open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion"
+open_more_sheet "Daily quests" "每日任务" "Daily quests" "每日任务" "Daily quests" "今日小挑战|Today's quests"
+open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky diary" "还没写过日记|No diary"
+open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards" "还没有明信片|No postcards"
+open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book" "徽章|Badges"
+open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion" "接口地址|Endpoint"
 # The door is the row 鸭子的脸 (Duck's face); "This duck" is the group
 # header above it AND the page title — tapping the header is a no-op.
-open_more_sheet "Duck's face" "鸭子的脸" "This duck" "这只鸭子" "This duck"
-open_more_sheet "Tools" "工具" "Tools" "工具" "Tools"
-
+open_more_sheet "Duck's face" "鸭子的脸" "This duck" "这只鸭子" "This duck" "感受它的心|Feelings"
+open_more_sheet "Tools" "工具" "Tools" "工具" "Tools" "家长|Parent"
 # The days board is a local sheet over the tools page; the two nested backs
 # return tools, then the drawer.
 tap_text "工具" > /dev/null 2>&1 || tap_text "Tools" > /dev/null 2>&1 || true
