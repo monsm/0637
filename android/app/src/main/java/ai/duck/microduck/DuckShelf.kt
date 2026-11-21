@@ -192,12 +192,17 @@ fun DuckShelf(
                 ),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Row(
+            // The cabinet pull carries its own word: discoverable, not a bare
+            // board of dots.
+            Column(
                 Modifier.padding(bottom = DuckTheme.Space.sm),
-                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
+                verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
             ) {
-                repeat(3) {
-                    Box(Modifier.size(3.dp).background(DuckTheme.TextPrimary.copy(alpha = 0.4f), CircleShape))
+                Text(Copy.more, color = DuckTheme.TextPrimary.copy(alpha = 0.55f), fontSize = DuckTheme.Type.Micro)
+                Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+                    repeat(3) {
+                        Box(Modifier.size(3.dp).background(DuckTheme.TextPrimary.copy(alpha = 0.4f), CircleShape))
+                    }
                 }
             }
         }
