@@ -262,6 +262,10 @@ jobs:
             -exec cp {} ci-logs/ios/ \; 2>/dev/null || true
           cp ios/build/xcodebuild.log ci-logs/ios/ 2>/dev/null || true
           cp ios/build/xcodebuild-test.log ci-logs/ios/ 2>/dev/null || true
+          # The summary's tail -20 only reaches the suite epilogue; the
+          # assertion that failed sits earlier in the log.
+          grep -nE 'error: -\[|Assertion Failure|is less than|is greater than' \
+            ios/build/xcodebuild-test.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
           cp ios/build-device/xcodebuild.log ci-logs/ios/xcodebuild-device.log 2>/dev/null || true
           {
             echo "run=${{ github.run_id }}"
@@ -660,6 +664,7 @@ jobs:
         with:
           name: Duck-ios-smoke-logs
           path: |
+            ios/build/xcodebuild-test.log
             sim-screenshot.png
             ui-b1-ios.png
             ui-b4-ios.png
