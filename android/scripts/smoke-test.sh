@@ -979,8 +979,30 @@ PY
   [ -n "$coords" ] || return 1
   adb shell input tap $coords > /dev/null 2>&1
 }
-tap_text "Director" || tap_text "取景" || {
-  echo "::error::no Director switch in the shell"
+# Direction A moved the Director switch off the Live screen: the wall clock
+# opens the time machine, the brass gauge the readings, and the viewfinder
+# lives one page in (More -> Play more -> Director).
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || {
+  echo "::error::no More button for the Director handover"
+  exit 1
+}
+sleep 1.5
+PLAYMORE_OK=0
+for _ in $(seq 1 8); do
+  if tap_text "玩一玩" > /dev/null 2>&1 || tap_text "Play more" > /dev/null 2>&1; then
+    PLAYMORE_OK=1
+    break
+  fi
+  adb shell input swipe 160 560 160 160 300 > /dev/null 2>&1 || true
+  sleep 0.4
+done
+[ "$PLAYMORE_OK" = "1" ] || {
+  echo "::error::the drawer has no Play-more page for the Director handover"
+  exit 1
+}
+sleep 1.5
+tap_text "取景" > /dev/null 2>&1 || tap_text "Director" > /dev/null 2>&1 || {
+  echo "::error::no Director switch on the play-more page"
   grep -o 'text="[^"]*"' ui.xml 2>/dev/null | sort -u | head -60 || true
   exit 1
 }

@@ -108,14 +108,14 @@
       "ios": {
         "implemented": true,
         "anchor": [
-          "ios/DuckApp/ContentView.swift",
+          "ios/DuckApp/MorePages.swift",
           "surface-toggle"
         ]
       },
       "android": {
         "implemented": true,
         "anchor": [
-          "android/app/src/main/java/ai/duck/microduck/Shell.kt",
+          "android/app/src/main/java/ai/duck/microduck/MorePages.kt",
           "surface-toggle"
         ]
       }

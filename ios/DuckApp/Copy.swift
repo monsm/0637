@@ -101,6 +101,9 @@ enum Copy {
     static var thisDuck: String { pick("This duck", "这只鸭子") }
     static var duckFace: String { pick("Duck's face", "鸭子的脸") }
     static var timeMachine: String { pick("Time machine", "时间机器") }
+    /// Direction A: the wall clock and the brass barometer.
+    static var wallClock: String { pick("Wall clock", "挂钟") }
+    static var readings: String { pick("Readings", "读数") }
     static var freeze: String { pick("Freeze", "冻结") }
     static var resume: String { pick("Resume", "继续") }
     static var step: String { pick("Step", "单步") }

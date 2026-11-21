@@ -130,6 +130,8 @@ internal fun PlayMoreSheet(
     core: DuckCore?,
     input: DuckInput,
     stick: String,
+    surfaceIsDirector: Boolean,
+    onToggleDirector: () -> Unit,
     onMode: (String) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -151,6 +153,15 @@ internal fun PlayMoreSheet(
             verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),
         ) {
             PageHeader(Copy.playMore, "play-more-close", onClose)
+            // Direction A moved the Director switch off the Live screen onto
+            // this page; toggling hands the sheet over to the viewfinder.
+            ButtonChip(
+                Copy.director,
+                testTag = "surface-toggle",
+            ) {
+                onToggleDirector()
+                onClose()
+            }
             if (duckLargeText()) {
                 Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xs)) {
                     listOf("drive", "head", "body").forEach { mode ->

@@ -66,6 +66,18 @@ final class DuckUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: id).firstMatch
     }
 
+    /// Direction A moved the Director switch off the Live screen: the door
+    /// is More -> Play more -> Director, and the page closes itself into the
+    /// viewfinder (same handover the postcards empty state uses).
+    private func openDirector() {
+        let more = app.buttons["duck-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "the More button is missing")
+        more.tap()
+        let playMore = app.buttons["more-playmore"]
+        XCTAssertTrue(playMore.waitForExistence(timeout: 10), "the Play-more row is missing")
+        playMore.tap()        openDirector()
+    }
+
     /// Open the More drawer: one tap from the stage (B4 §2).
     private func openMore() {
         let more = app.buttons["duck-more"]
@@ -303,9 +315,7 @@ final class DuckUITests: XCTestCase {
         // The camera is one tap on the top bar (the rest of the old chips
         // live behind the shell menu). Entering Director must not stop the
         // duck even though the simulator has no camera.
-        let director = app.buttons["surface-toggle"]
-        XCTAssertTrue(director.waitForExistence(timeout: 10), "no Director switch")
-        director.tap()
+        openDirector()
         usleep(1_500_000)
         let inDirector = waitForLabel(["walk", "stand"], timeout: 20)
         XCTAssertTrue(
@@ -352,7 +362,7 @@ final class DuckUITests: XCTestCase {
             shutter.waitForExistence(timeout: 10),
             "the shutter did not return after the photo preview closed"
         )
-        app.buttons["surface-toggle"].tap()
+        openDirector()
         let backLive = waitForLabel(["walk", "stand"], timeout: 20)
         XCTAssertTrue(
             ["walk", "stand"].contains(backLive),
@@ -580,9 +590,7 @@ final class DuckUITests: XCTestCase {
             labelElement().waitForExistence(timeout: 120),
             "the app did not get past loading"
         )
-        let director = app.buttons["surface-toggle"]
-        XCTAssertTrue(director.waitForExistence(timeout: 10), "no Director switch")
-        director.tap()
+        openDirector()
         usleep(1_500_000)
         let shutter = app.buttons["duck-photo"]
         XCTAssertTrue(shutter.waitForExistence(timeout: 10), "no Director shutter")

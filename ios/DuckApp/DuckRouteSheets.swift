@@ -18,6 +18,10 @@ struct DuckRouteSheets: View {
     /// A surface switch underneath the sheet (postcards' empty state opens
     /// Director, where the next real frame is captured).
     var onOpenDirector: (() -> Void)? = nil
+    /// Direction A moved the Director switch from the old time rail onto the
+    /// drawer's Play-more page; the shell hands the same toggle down here.
+    var onToggleDirector: (() -> Void)? = nil
+    var surfaceIsDirector = false
     /// A row inside the drawer or the instrument opens its page on top of the
     /// current sheet. Nesting is the behaviour the old UI tests pin (AI closes
     /// back to the instrument), so one vocabulary keeps the presentation
@@ -35,7 +39,9 @@ struct DuckRouteSheets: View {
                     languageTick: $languageTick,
                     photo: photo,
                     onDanceStep: onDanceStep,
-                    onOpenDirector: onOpenDirector
+                    onOpenDirector: onOpenDirector,
+                    onToggleDirector: onToggleDirector,
+                    surfaceIsDirector: surfaceIsDirector
                 )
             }
     }
@@ -132,6 +138,8 @@ struct DuckRouteSheets: View {
             PlayMoreSheet(
                 controller: controller,
                 stickMode: $stickMode,
+                directorOn: surfaceIsDirector,
+                onToggleDirector: { onToggleDirector?() },
                 onOpen: { child = $0 }
             )
             .presentationDetents([.medium, .large])

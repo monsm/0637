@@ -32,6 +32,22 @@ extension Color {
     static let duckWarn = Color(red: 0.910, green: 0.706, blue: 0.369)
     /// state.bad #E8836B.
     static let duckBad = Color(red: 0.910, green: 0.514, blue: 0.420)
+    // Direction A (design-demos/A-complete.html): the bedtime shelf's
+    // materials — the objects on it are the stage's verbs.
+    /// #4E3E2B — the shelf board's light wood.
+    static let duckWoodHi = Color(red: 0.306, green: 0.243, blue: 0.169)
+    /// #3A2E21 — the board's mid wood.
+    static let duckWood = Color(red: 0.227, green: 0.180, blue: 0.129)
+    /// #1D1610 — the board's shadow wood (case edges, dark recesses).
+    static let duckWoodDeep = Color(red: 0.114, green: 0.086, blue: 0.063)
+    /// #EDE6D9 — the ceramic bowl and hand.
+    static let duckCeramic = Color(red: 0.929, green: 0.902, blue: 0.851)
+    /// #E9B45E — the food in the bowl.
+    static let duckFood = Color(red: 0.914, green: 0.706, blue: 0.369)
+    /// #C9A45C — brass: bell, clock bob, gauge rim.
+    static let duckBrass = Color(red: 0.788, green: 0.643, blue: 0.361)
+    /// #8A6A2C — brass in shadow.
+    static let duckBrassDeep = Color(red: 0.541, green: 0.416, blue: 0.173)
     /// The Instrument stage's cold clear colour (STAGE_LOOK §3 look 2):
     /// a stage value, mirrored here so the UI layers behind the 3D view
     /// never invent a second cold black. Renderer keeps its own copy.

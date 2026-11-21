@@ -68,6 +68,8 @@ private struct PageRow: View {
 struct PlayMoreSheet: View {
     @ObservedObject var controller: DuckController
     @Binding var stickMode: StickMode
+    var directorOn = false
+    var onToggleDirector: () -> Void = {}
     let onOpen: (DuckRoute) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -85,6 +87,11 @@ struct PlayMoreSheet: View {
                 },
                 identifier: "play-more-mode-stick"
             )
+            PageRow(
+                title: Copy.director,
+                selected: directorOn,
+                id: "surface-toggle"
+            ) { onToggleDirector() }
             PageRow(
                 title: Copy.abTry,
                 note: Copy.abNote,

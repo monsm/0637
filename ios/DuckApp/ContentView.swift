@@ -629,16 +629,46 @@ struct ContentView: View {
                     ))
                 }
             }
-            timeRail
-                .disabled(!usable)
-                .opacity(usable ? 1 : 0.4)
-            thumbDeck
-                .disabled(!usable)
-                .opacity(usable ? 1 : 0.4)
+            DuckShelf(
+                hunger: controller.careHunger,
+                carrying: controller.carrying,
+                sheetClosed: routeState.sheet == nil,
+                lastOpener: lastSheetOpener,
+                stageFocus: $stageFocus,
+                onFeed: {
+                    controller.feed()
+                    DuckHaptics.medium()
+                },
+                onSkills: { setRing(true) },
+                onQuack: quackTapped,
+                onGrab: {
+                    if controller.carrying { controller.release() } else { controller.grab() }
+                },
+                onMore: { open(.more, from: .more) },
+                wheee: AnyGesture(wheeeGesture.map { _ in true })
+            )
+            .disabled(!usable)
+            .opacity(usable ? 1 : 0.4)
         }
         .padding(.horizontal, DuckSpace.lg)
         .padding(.top, DuckSpace.sm)
         .padding(.bottom, DuckSpace.sm)
+        // Direction A: the wall clock is the time machine and the brass
+        // barometer is the readings; both float over the room, not a rail.
+        .overlay(alignment: .topTrailing) {
+            VStack(spacing: DuckSpace.sm) {
+                DuckWallClock(
+                    focusActive: routeState.sheet == nil && lastSheetOpener == .time,
+                    stageFocus: $stageFocus
+                ) { openInstrument() }
+                    .simultaneousGesture(timeHoldGesture)
+                DuckWallGauge { open(.instrument, from: .time) }
+            }
+            .offset(y: 56)
+            .padding(.trailing, DuckSpace.sm)
+            .disabled(!usable)
+            .opacity(usable ? 1 : 0.4)
+        }
     }
 
     /// The whole story layer from the companion direction, reduced to one
@@ -656,61 +686,6 @@ struct ContentView: View {
             .padding(.bottom, DuckSpace.xs)
             .transition(.opacity)
             .accessibilityIdentifier("mood-pill")
-    }
-
-    /// The portrait time rail: two buttons, icon only (B4 §1). The time
-    /// button keeps the retained-history bar; a long press on it is the
-    /// quick freeze, so freeze and resume live in the time machine and one
-    /// hold away.
-    private var timeRail: some View {
-        HStack(spacing: DuckSpace.sm) {
-            Button {
-                openInstrument()
-            } label: {
-                HStack(spacing: DuckSpace.sm) {
-                    Image(systemName: Icons.time)
-                        .font(DuckIcon.md)
-                    GeometryReader { proxy in
-                        // 历史条只占约 60% 宽，右侧留白：它读起来是"进度"，
-                        // 不是一条把时间钮和取景钮分开的分割线。
-                        let barWidth = max(1, proxy.size.width * 0.6)
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.08))
-                                .frame(width: barWidth, height: 3)
-                            Capsule()
-                                // accent.data #7FB2D9，实色：保留历史的
-                                // 进度条必须读得出来（原 60% 系统蓝 2.11:1）。
-                                .fill(Color.duckData)
-                                .frame(width: barWidth * railFraction, height: 3)
-                        }
-                        .frame(maxHeight: .infinity, alignment: .center)
-                    }
-                    .frame(height: 18)
-                }
-                .padding(.horizontal, DuckSpace.md)
-                .frame(maxWidth: .infinity, minHeight: 48)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .simultaneousGesture(timeHoldGesture)
-            .accessibilityLabel(Copy.timeMachine)
-            .accessibilityIdentifier("duck-time")
-            .accessibilityFocused($stageFocus, equals: .time)
-            .accessibilityValue(UserDefaults.standard.string(forKey: "duck.focusProbe")?.lowercased() == "yes" && routeState.sheet == nil && lastSheetOpener == .time ? "focused" : "")
-
-            secondaryButton(
-                "surface-toggle",
-                surface == .live ? Copy.director : Copy.live,
-                surface == .live ? Icons.director : Icons.live,
-                focus: .surface
-            ) {
-                toggleSurface()
-            }
-        }
-        .frame(minHeight: 48)
-        .padding(.top, DuckSpace.xs)
-        .padding(.bottom, DuckSpace.sm)
     }
 
     /// The time button opens the time machine — unless the press was a hold,
@@ -767,6 +742,11 @@ struct ContentView: View {
             languageTick: $languageTick,
             photo: photoPreview,
             onDanceStep: playDanceStep,
+            onToggleDirector: {
+                toggleSurface()
+                routeState = ShellOverlayReducer.reduce(routeState, .closeSheet)
+            },
+            surfaceIsDirector: surface == .director,
             onOpenDirector: {
                 // A sheet can hand over to Director (the postcards empty
                 // state); the switch belongs to ContentView, not the sheet.
@@ -775,90 +755,6 @@ struct ContentView: View {
                     surface = .director
                 }
             }
-        )
-    }
-
-    /// The share of retained history, not of the whole run: the bar fills as
-    /// checkpoints age out of the ring buffer.
-    private var railFraction: CGFloat {
-        let newest = Double(controller.simTick)
-        guard newest > 0 else { return 0 }
-        let oldest = Double(min(controller.oldestTick, controller.simTick))
-        return CGFloat(max(0, min(1, (newest - oldest) / newest)))
-    }
-
-    private func railProgress(width: CGFloat) -> CGFloat {
-        width * railFraction
-    }
-
-    /// The portrait thumb deck (B4 §1): four verbs and the More drawer.
-    /// Every button is the same primary shape — a 52 pt circle, an 18 pt
-    /// icon and an 11 pt label — so the deck and (later) both platforms
-    /// cannot drift apart.
-    private var thumbDeck: some View {
-        HStack(spacing: DuckSpace.sm) {
-            primaryButton("duck-feed", Copy.feed, Icons.feed, focus: .feed) { controller.feed()
-                DuckHaptics.medium() }
-            primaryButton("duck-skills", Copy.skills, Icons.skills, focus: .skills) { setRing(true) }
-            primaryButton("duck-quack", Copy.quack, Icons.quack, focus: .quack) { quackTapped() }
-                .simultaneousGesture(wheeeGesture)
-            primaryButton(
-                "duck-grab",
-                controller.carrying ? Copy.putDown : Copy.grab,
-                controller.carrying ? Icons.drop : Icons.grab,
-                selected: controller.carrying,
-                focus: .grab
-            ) {
-                if controller.carrying {
-                    controller.release()
-                } else {
-                    controller.grab()
-                }
-            }
-            primaryButton("duck-more", Copy.more, Icons.more, focus: .more) { open(.more, from: .more) }
-        }
-        .frame(minHeight: 82)
-        .padding(.horizontal, DuckSpace.sm)
-        .background(
-            Color.duckBgSurface.opacity(0.94),
-            in: RoundedRectangle(cornerRadius: DuckRadius.panel)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: DuckRadius.panel)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-    }
-
-    /// The one primary button (B4 §3): 52 pt circle, 18 pt icon, 11 pt label
-    /// underneath. The pixels live in DuckStageButtons.swift.
-    private func primaryButton(
-        _ id: String,
-        _ label: String,
-        _ icon: String,
-        selected: Bool = false,
-        focus: DuckStageFocus? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        DuckPrimaryButton(
-            id: id, label: label, icon: icon, selected: selected,
-            focus: focus, focusActive: routeState.sheet == nil && focus == lastSheetOpener,
-            stageFocus: $stageFocus, action: action
-        )
-    }
-
-    /// A secondary button (B4 §3): 48 pt circle, icon only, and always an
-    /// accessibility label.
-    private func secondaryButton(
-        _ id: String,
-        _ label: String,
-        _ icon: String,
-        focus: DuckStageFocus? = nil,
-        action: @escaping () -> Void
-    ) -> some View {
-        DuckSecondaryButton(
-            id: id, label: label, icon: icon,
-            focus: focus, focusActive: routeState.sheet == nil && focus == lastSheetOpener,
-            stageFocus: $stageFocus, action: action
         )
     }
 
