@@ -1964,6 +1964,30 @@ SH
 # A page really opened: a sheet close chip is in the tree (every page has
 # one) AND the drawer's own group headers are gone or behind it. Matching on
 # a title that the row itself also carries (每日任务) proves nothing.
+# True when the named row's bounding box is within 60 px of the screen
+# bottom: at 2.0 fonts rows are tall enough that the last visible one can
+# touch the system gesture inset, where taps are lost.
+row_near_bottom() {
+  rm -f row-check.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > row-check.xml 2>/dev/null || return 1
+  python3 - "$1" "$FONT_H" <<'SH'
+import sys, xml.etree.ElementTree as ET
+want, height = sys.argv[1], int(sys.argv[2])
+try:
+    root = ET.parse('row-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+for n in root.iter('node'):
+    label = n.get('text') or n.get('content-desc') or ''
+    if label == want:
+        parts = n.get('bounds', '').replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4:
+            raise SystemExit(0 if height - int(parts[3]) < 60 else 1)
+raise SystemExit(1)
+SH
+}
+
 dense_sheet_opened() {
   rm -f sheet-check.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
@@ -2050,6 +2074,13 @@ open_more_sheet() {
       continue
     fi
     if drawer_present; then
+      # A row can sit against the bottom edge at 2.0 fonts (每日任务 measured
+      # [56,619][169,640]): its centre lands in the system bar and the tap
+      # is swallowed. Lift it above the gesture inset first.
+      if row_near_bottom "$row_zh" || row_near_bottom "$row_en"; then
+        adb shell input swipe 160 520 160 380 250 > /dev/null 2>&1 || true
+        sleep 0.6
+      fi
       if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
         # The tap landed; the row only counts if its sheet really opened
         # (a swipe-position miss can hit a different row).
