@@ -2234,8 +2234,8 @@ open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours" "配对
 # quests" is the card heading inside, and it is not the focus anchor.
 open_more_sheet "Daily quests" "每日任务" "Daily quests" "每日任务" "Daily quests" "今日小挑战|Today's quests"
 open_more_sheet "Ducky diary" "鸭子日记" "Ducky diary" "鸭子日记" "Ducky diary" "今天的真实记录|Today, for real"
-open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards" "拍照|Take photo"
-open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book" "种心情|moods collected|见过"
+open_more_sheet "Postcards" "明信片" "Postcards" "明信片" "Postcards" "去拍一张|Take a photo"
+open_more_sheet "Mood book" "情绪图鉴" "Mood book" "情绪图鉴" "Mood book" "图鉴还是空的|去练一练|Nothing in the mood book|Give it a try"
 open_more_sheet "AI companion" "AI 伙伴" "AI companion" "AI 伙伴" "AI companion" "接口地址|Endpoint"
 # The door is the row 鸭子的脸 (Duck's face); "This duck" is the group
 # header above it AND the page title — tapping the header is a no-op.
