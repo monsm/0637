@@ -2183,9 +2183,18 @@ open_more_sheet() {
       # 更多 word's bounds move with the font scale and the pill above it,
       # so every attempt reads its CURRENT bounds from a fresh dump and
       # taps its centre (both fixed fractions landed off the wood).
-      echo "!! $name round $round: bare Live -> tapping 更多"
-      tap_text "更多" > /dev/null 2>&1 && echo "!! tap hit 更多" || echo "!! tap MISSED 更多"
-      sleep 1.2
+      echo "!! $name round $round: bare Live -> tapping the board"
+      # The board is a full-width pull with the 更多 word inside it; the word's
+      # own centre has been unreliable (the tap lands but the pull does not
+      # fire), so tap the word and then two points on the wood above it.
+      tap_text "更多" > /dev/null 2>&1 || true
+      sleep 0.5
+      drawer_present || {
+        adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+        sleep 0.6
+        drawer_present || adb shell input tap $((FONT_W / 4)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+      }
+      sleep 1
       continue
     fi
     # Anything else is a feature page (the dump caught the Neighbours page
