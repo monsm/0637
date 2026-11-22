@@ -2112,6 +2112,19 @@ open_more_sheet() {
       continue
     fi
     if drawer_present; then
+      # The sheet's content composes after its title: a dump taken mid-entrance
+      # holds 更多 and the room behind it but none of the rows (the gg3 dump).
+      # Wait for two consecutive dumps with a settled row count.
+      prev=-1
+      for _ in 1 2 3 4 5 6; do
+        rm -f settle.xml
+        adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+        adb exec-out cat /sdcard/ui.xml > settle.xml 2>/dev/null || true
+        n=$(grep -o 'text="[^"]\+"' settle.xml 2>/dev/null | wc -l)
+        if [ "$n" -ge 8 ] && [ "$n" = "$prev" ]; then break; fi
+        prev=$n
+        sleep 0.4
+      done
       # A row can sit against the bottom edge at 2.0 fonts (每日任务 measured
       # [56,619][169,640]): its centre lands in the system bar and the tap
       # is swallowed. Lift it above the gesture inset first.
