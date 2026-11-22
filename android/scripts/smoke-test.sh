@@ -1934,10 +1934,14 @@ SH
 # "not foreground" while the app was up, so the hunt relaunched every round
 # and drifted to the launcher).
 app_foreground() {
+  # The launcher has no floating pill over the stage; the duck always does
+  # (心情不错 / a mood line). dumpsys's mResumedActivity proved unreliable
+  # here, and uiautomator writes package= only on the top node, so the
+  # fingerprint — not a package check — is what tells foreground.
   rm -f fg-check.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
   adb exec-out cat /sdcard/ui.xml > fg-check.xml 2>/dev/null || return 1
-  grep -q 'package="ai.duck.microduck"' fg-check.xml
+  grep -qE '心情不错|in a good mood|有点饿了|散步中|MicroDuck' fg-check.xml
 }
 
 ring_open() {
