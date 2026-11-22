@@ -2125,6 +2125,7 @@ open_more_sheet() {
         row_tap_nudged "$row_zh" || row_tap_nudged "$row_en" || true
         sleep 1.2
         if ! dense_sheet_opened "$witness"; then
+          echo "!! $name: nudged tap did not open (witness=$witness)"
           for _ in 1 2 3 4 5 6; do
             adb shell input keyevent KEYCODE_DPAD_DOWN > /dev/null 2>&1 || true
             sleep 0.15
@@ -2133,6 +2134,7 @@ open_more_sheet() {
           sleep 1.2
         fi
         if dense_sheet_opened "$witness"; then ok=1; break; fi
+        echo "!! $name: even the keyboard path did not open the page"
         continue
       fi
       # The row may sit above the viewport: earlier rounds' swipes left the
