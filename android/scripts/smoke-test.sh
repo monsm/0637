@@ -1918,23 +1918,21 @@ PY
 # True when the More drawer is the surface in front (its title plus one
 # group header; every sheet has a drag handle, so that alone would lie).
 drawer_present() {
-  rm -f dense-check.xml
+  rm -f drawer-check.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
-  adb exec-out cat /sdcard/ui.xml > dense-check.xml 2>/dev/null || return 1
+  adb exec-out cat /sdcard/ui.xml > drawer-check.xml 2>/dev/null || return 1
   python3 - <<'SH'
 import xml.etree.ElementTree as ET
 try:
-    root = ET.parse('dense-check.xml').getroot()
+    root = ET.parse('drawer-check.xml').getroot()
 except Exception:
     raise SystemExit(1)
 texts = {(n.get('text') or '') for n in root.iter('node')}
-# The drawer's title can be scrolled out of view; its group headers (or the
-# drag handle it shares with every sheet) are what proves the drawer is up.
-groups = {'玩', '一起', '记录', '这只鸭子', 'Play', 'Together', 'Records', 'This duck'}
-rows = {'画路走', '积木规则', '编舞铺', '邻居', '鸭子日记', '明信片', '情绪图鉴', 'AI 伙伴',
-        'Path painter', 'Blocks', 'Dance Studio', 'Neighbours', 'Ducky diary', 'Postcards',
-        'Mood book', 'AI companion'}
-raise SystemExit(0 if (groups | rows) & texts else 1)
+# The drawer's own title 更多 sits at the top of the sheet. A feature page
+# opened on top of it keeps the drawer composed behind it (its group
+# headers and rows stay in the tree), so the headers alone prove nothing —
+# the title is what distinguishes the drawer from a page over it.
+raise SystemExit(0 if '更多' in texts or 'More' in texts else 1)
 SH
 }
 
