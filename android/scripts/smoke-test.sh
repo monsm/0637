@@ -1925,12 +1925,12 @@ texts = {(n.get('text') or '') for n in root.iter('node')}
 # opened on top of it keeps the drawer composed behind it (its group
 # headers and rows stay in the tree), so the headers alone prove nothing —
 # the title is what distinguishes the drawer from a page over it.
-# A sheet always carries the drag handle; the bare Live screen carries the
-# 更多 word on its board (so the word alone is not proof — that misread the
-# Live screen as an open drawer and the hunt never tapped the board).
-handle = any((n.get('content-desc') or n.get('text') or '') == 'Drag handle'
-             for n in root.iter('node'))
-raise SystemExit(0 if handle and ('更多' in texts or 'More' in texts) else 1)
+# The bare Live screen carries the 更多 word on its board, so the word alone
+# is not proof; the drawer's group headers are (the Live screen has none).
+# The drag handle is not reliable: the smoke's own screenshot shows the
+# sheet open with the handle drawn but no matching node in the dump.
+groups = {'玩', '一起', '记录', '这只鸭子', 'Play', 'Together', 'Records'}
+raise SystemExit(0 if ('更多' in texts or 'More' in texts) and (groups & texts) else 1)
 SH
 }
 
