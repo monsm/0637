@@ -2169,9 +2169,16 @@ SH
       continue
     fi
     if live_screen; then
-      # The board is the cabinet pull; tap the wood, never BACK here.
-      adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+      # The board is the cabinet pull; tap the wood, never BACK here. The
+      # board sits at the screen's bottom (its 更多 word measured y 491 at
+      # 2.0 fonts), so the tap is four-fifths down — three-quarters lands
+      # above it on the stage.
+      adb shell input tap $((FONT_W / 2)) $((FONT_H * 4 / 5)) > /dev/null 2>&1 || true
       sleep 1.2
+      if ! drawer_present; then
+        adb shell input tap $((FONT_W / 2)) $((FONT_H * 17 / 20)) > /dev/null 2>&1 || true
+        sleep 1
+      fi
       continue
     fi
     # Anything else is a feature page (the dump caught the Neighbours page
