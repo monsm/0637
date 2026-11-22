@@ -2091,129 +2091,69 @@ SH
 
 open_more_sheet() {
   local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5" witness="$6"
-  local ok=0 drawer_pass=0
+  local ok=0 attempt=0
 
-  # Deterministic state machine, one state per round; every step reads the
-  # screen first (four previous runs each lost a race between BACK, captions
-  # and the ring).
-  for round in $(seq 1 24); do
-    if ! app_foreground; then
-      # Relaunch and wait for the core, not for a stopwatch: at 2.0 fonts the
-      # first composition plus the core load can outlast a fixed sleep, and
-      # the next dump then reads a stale frame.
-      adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
-      for _ in $(seq 1 30); do
-        curl -sf --max-time 3 http://127.0.0.1:8765/state > /dev/null 2>&1 && break
-        sleep 1
-      done
-      sleep 2
-      # Re-read next round: falling through here would act on a stale dump
-      # and BACK the fresh launch straight back out.
-      continue
-    fi
-    if ring_open; then
-      adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-      sleep 0.8
-      continue
-    fi
-    if drawer_present; then
-      # The sheet's content composes after its title: a dump taken mid-entrance
-      # holds 更多 and the room behind it but none of the rows (the gg3 dump).
-      # Wait for two consecutive dumps with a settled row count.
-      prev=-1
-      for _ in 1 2 3 4 5 6; do
-        rm -f settle.xml
-        adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-        adb exec-out cat /sdcard/ui.xml > settle.xml 2>/dev/null || true
-        n=$(grep -o 'text="[^"]\+"' settle.xml 2>/dev/null | wc -l)
-        if [ "$n" -ge 8 ] && [ "$n" = "$prev" ]; then break; fi
-        prev=$n
-        sleep 0.4
-      done
-      # A row can sit against the bottom edge at 2.0 fonts (每日任务 measured
-      # [56,619][169,640]): its centre lands in the system bar and the tap
-      # is swallowed. Lift it above the gesture inset first.
-      if row_near_bottom "$row_zh" || row_near_bottom "$row_en"; then
-        # At 2.0 fonts the drawer's content is taller than the sheet and the
-        # last rows sit in the gesture inset; scrolling cannot move them
-        # (already at the end). Tap 8 px above the row's centre so the touch
-        # leaves the inset, and if that is still not enough use the row's
-        # own accessibility path: focus it with the keyboard and activate it
-        # (the way a TalkBack user reaches the same control).
-        row_tap_nudged "$row_zh" || row_tap_nudged "$row_en" || true
-        sleep 1.2
-        if ! dense_sheet_opened "$witness"; then
-          echo "!! $name: nudged tap did not open (witness=$witness)"
-          for _ in 1 2 3 4 5 6; do
-            adb shell input keyevent KEYCODE_DPAD_DOWN > /dev/null 2>&1 || true
-            sleep 0.15
-          done
-          adb shell input keyevent KEYCODE_DPAD_CENTER > /dev/null 2>&1 || true
-          sleep 1.2
-        fi
-        if dense_sheet_opened "$witness"; then ok=1; break; fi
-        echo "!! $name: even the keyboard path did not open the page"
-        continue
-      fi
-      # The row may sit above the viewport: earlier rounds' swipes left the
-      # list anywhere. Scroll down; if the drawer closed (bottom reached),
-      # re-tap 更多 from the top.
-      adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-      sleep 0.5
-      if ! drawer_present; then
-        tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
-        sleep 1.2
-      fi
-      continue
-    fi
-    # Report what the tap did, so a red run explains itself.
-    if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
+  # Deterministic per-page reset. The layered state machine lost every race
+  # (ring vs drawer vs page, mid-entrance dumps, sheet-owned trees); a clean
+  # relaunch costs ~15 s and cannot race anything. Twelve pages fit the
+  # smoke's budget.
+  for attempt in 1 2; do
+    adb shell am force-stop ai.duck.microduck > /dev/null 2>&1 || true
+    sleep 1
+    adb shell am start -n ai.duck.microduck/.MainActivity > /dev/null 2>&1 || true
+    for _ in $(seq 1 40); do
+      curl -sf --max-time 3 http://127.0.0.1:8765/state > /dev/null 2>&1 && break
+      sleep 1
+    done
+    sleep 2.5
+
+    # Open the drawer by tapping the board's 更多 word at its live bounds.
+    tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+    sleep 1.5
+    drawer_present || {
+      adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
       sleep 1.2
-      if dense_sheet_opened "$witness"; then
-        ok=1
+    }
+    drawer_present || continue
+
+    # Let the sheet's rows compose (the title lands before them).
+    prev=-1
+    for _ in 1 2 3 4 5 6 7 8; do
+      rm -f settle.xml
+      adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+      adb exec-out cat /sdcard/ui.xml > settle.xml 2>/dev/null || true
+      n=$(grep -o 'text="[^"]\+"' settle.xml 2>/dev/null | wc -l)
+      if [ "$n" -ge 10 ] && [ "$n" = "$prev" ]; then break; fi
+      prev=$n
+      sleep 0.4
+    done
+
+    # The row: scroll down a screen at a time (the drawer is ordered), then
+    # tap it at its live bounds.
+    for _ in $(seq 1 8); do
+      if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
+        sleep 1.5
+        if dense_sheet_opened "$witness"; then ok=1; break; fi
+        echo "!! $name: tapped but the page did not open (witness=$witness)"
         break
       fi
-      echo "!! $name: row tapped but no page (witness=$witness)"
-      adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-      sleep 1
-      continue
-    fi
-    if live_screen; then
-      # The board is the cabinet pull; tap the wood, never BACK here. The
-      # 更多 word's bounds move with the font scale and the pill above it,
-      # so every attempt reads its CURRENT bounds from a fresh dump and
-      # taps its centre (both fixed fractions landed off the wood).
-      echo "!! $name round $round: bare Live -> tapping the board"
-      # The board is a full-width pull with the 更多 word inside it; the word's
-      # own centre has been unreliable (the tap lands but the pull does not
-      # fire), so tap the word and then two points on the wood above it.
-      tap_text "更多" > /dev/null 2>&1 || true
+      adb shell input swipe 160 560 160 160 300 > /dev/null 2>&1 || true
       sleep 0.5
-      drawer_present || {
-        adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
-        sleep 0.6
-        drawer_present || adb shell input tap $((FONT_W / 4)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
-      }
-      sleep 1
-      continue
-    fi
-    # Anything else is a feature page (the dump caught the Neighbours page
-    # open after the hunt brushed its row): BACK lands on the drawer.
-    adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-    sleep 1.2
+    done
+    [ "$ok" = "1" ] && break
   done
 
   if [ "$ok" != "1" ]; then
     adb exec-out screencap -p > dense-screen.png 2>/dev/null || true
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
     adb exec-out cat /sdcard/ui.xml > dense-dump.xml 2>/dev/null || true
-    echo "::error::no $name row at font scale 2.0 (state machine exhausted; see dense-dump.xml)"
+    echo "::error::no $name row at font scale 2.0 (clean-reset attempts exhausted; see dense-dump.xml)"
     exit 1
   fi
-  sleep 1.5
+  sleep 1
   dense_sheet_check "$title_en" "$title_zh" "$name" || exit 1
   adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-  sleep 1
+  sleep 0.8
 }
 
 # The skill ring can still be up when the sweep starts (the handover left
