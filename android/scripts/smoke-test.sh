@@ -1941,9 +1941,10 @@ app_foreground() {
   rm -f fg-check.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
   adb exec-out cat /sdcard/ui.xml > fg-check.xml 2>/dev/null || return 1
-  # The drawer's 更多 title also proves the duck is foreground (the Live
-  # title sits behind an open sheet and never reaches the tree).
-  grep -qE '心情不错|in a good mood|有点饿了|散步中|MicroDuck|挂钟|读数' fg-check.xml
+  # An open sheet owns the tree: the Live title, the mood pill and the wall
+  # objects all sit behind it and never reach the dump, so the sheet's own
+  # words are the foreground proof.
+  grep -qE '心情不错|in a good mood|有点饿了|散步中|MicroDuck|挂钟|读数|更多|More|动作|Actions|关闭|Close|Drag handle' fg-check.xml
 }
 
 ring_open() {
