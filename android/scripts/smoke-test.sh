@@ -2023,12 +2023,15 @@ SH
 # A page really opened when a string only that page shows is in the tree.
 # (ModalBottomSheet keeps the drawer composed behind it, so "the drawer's
 # headers are gone" can never be true; and 更多 is also the shelf caption.)
-# The witness is argv[1]: one or two alternatives, pipe-separated.
+# The witness is argv[1]: pipe-separated alternatives. The check polls for
+# 4 s — the sheet's entrance animation and the 2.0-font composition are
+# slower than one dump.
 dense_sheet_opened() {
-  rm -f sheet-check.xml
-  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
-  adb exec-out cat /sdcard/ui.xml > sheet-check.xml 2>/dev/null || return 1
-  python3 - "$1" <<'SH'
+  for _ in $(seq 1 8); do
+    rm -f sheet-check.xml
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+    adb exec-out cat /sdcard/ui.xml > sheet-check.xml 2>/dev/null || true
+    python3 - "$1" <<'SH' && return 0
 import sys, xml.etree.ElementTree as ET
 witnesses = {w for w in sys.argv[1].split('|') if w}
 try:
@@ -2039,6 +2042,9 @@ labels = {(n.get('text') or n.get('content-desc') or '')
           for n in root.iter('node') if n.get('package') == 'ai.duck.microduck'}
 raise SystemExit(0 if witnesses & labels else 1)
 SH
+    sleep 0.5
+  done
+  return 1
 }
 
 dense_sheet_title_present() {
