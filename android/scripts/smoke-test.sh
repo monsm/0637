@@ -2160,9 +2160,10 @@ open_more_sheet() {
     fi
     if live_screen; then
       # The board is the cabinet pull; tap the wood, never BACK here. The
-      # board's 更多 word measured [139,491][163,539] at 2.0 fonts: tap its
-      # centre — both earlier fractions landed off the wood.
-      adb shell input tap $((FONT_W / 2)) 515 > /dev/null 2>&1 || true
+      # 更多 word's bounds move with the font scale and the pill above it,
+      # so every attempt reads its CURRENT bounds from a fresh dump and
+      # taps its centre (both fixed fractions landed off the wood).
+      tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
       sleep 1.2
       continue
     fi
