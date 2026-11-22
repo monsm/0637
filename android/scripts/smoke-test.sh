@@ -1957,7 +1957,10 @@ try:
 except Exception:
     raise SystemExit(1)
 texts = {(n.get('text') or '') for n in root.iter('node')}
-raise SystemExit(0 if {'动作', '关闭'} & texts else 1)
+# 动作 is the ring's own section heading; 关闭 is on every sheet, so it
+# cannot tell a ring from a page (that mistake made the hunt BACK the
+# drawer away every round).
+raise SystemExit(0 if '动作' in texts or 'Actions' in texts else 1)
 SH
 }
 
