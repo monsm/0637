@@ -2136,11 +2136,11 @@ open_more_sheet() {
         continue
       fi
       # The row may sit above the viewport: earlier rounds' swipes left the
-      # list anywhere. Closing and reopening the drawer guarantees the top
-      # (a downward drag on the sheet body dismisses it — no reverse swipes).
-      if ! tap_text "$row_zh" > /dev/null 2>&1 && ! tap_text "$row_en" > /dev/null 2>&1; then
-        adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-        sleep 0.8
+      # list anywhere. Scroll down; if the drawer closed (bottom reached),
+      # re-tap 更多 from the top.
+      adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+      sleep 0.5
+      if ! drawer_present; then
         tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
         sleep 1.2
       fi
