@@ -186,6 +186,11 @@ fun DuckShelf(
                     onClickLabel = Copy.more,
                     onClick = onMore,
                 )
+                // uiautomator only reports the tag on nodes that carry their
+                // own semantics: without the merge, Compose folds this pull
+                // into its children and the smoke taps a label with no
+                // clickable behind it.
+                .semantics(mergeDescendants = true) {}
                 .testTag("duck-more")
                 .background(
                     Brush.verticalGradient(listOf(DuckTheme.WoodHi, DuckTheme.Wood, DuckTheme.WoodDeep)),
