@@ -2179,7 +2179,8 @@ SH
       # 更多 word measured y 491-539 at 2.0 fonts (the board spans ~470-640),
       # so the tap goes at seven-eighths — three-quarters landed above it
       # on the stage, between the mood pill and the wood.
-      adb shell input tap $((FONT_W / 2)) $((FONT_H * 7 / 8)) > /dev/null 2>&1 || true
+      # The board's own 更多 word measured [139,491][163,539]: tap its centre.
+      adb shell input tap $((FONT_W / 2)) 515 > /dev/null 2>&1 || true
       sleep 1.2
       continue
     fi
