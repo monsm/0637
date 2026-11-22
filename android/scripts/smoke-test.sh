@@ -1317,7 +1317,7 @@ if stale:
 # B4 §6.1: the first screen must count seven tappable controls at most.
 clickable = sum(
     1 for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck' and node.get('clickable') == 'true'
+    if node.get('clickable') == 'true'
 )
 if clickable > 7:
     raise SystemExit(f"::error::the first screen has {clickable} clickable controls, want <= 7")
@@ -1591,8 +1591,7 @@ except Exception as exc:
 texts = [
     node.get(attr) or ''
     for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
+        for attr in ('text', 'content-desc')
 ]
 raw = [t for t in texts if '_' in t]
 if raw:
@@ -1633,8 +1632,7 @@ except Exception as exc:
 texts = [
     node.get(attr) or ''
     for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
+        for attr in ('text', 'content-desc')
 ]
 ensemble = {'Dance together', '家庭舞团'}
 chorus = {'Chorus', '合唱'}
@@ -1659,8 +1657,7 @@ except Exception as exc:
 texts = [
     node.get(attr) or ''
     for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
+        for attr in ('text', 'content-desc')
 ]
 if not any(t for t in texts if t in ('喂食', 'Feed')):
     raise SystemExit(f"::error::back from the peers sheet left the app, not the sheet: {texts[:20]}")
@@ -1686,8 +1683,7 @@ except Exception:
 texts = [
     node.get(attr) or ''
     for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
+        for attr in ('text', 'content-desc')
 ]
 ring = {'动作', 'Actions'}
 if not ring.intersection(texts):
@@ -1708,8 +1704,7 @@ except Exception as exc:
 texts = [
     node.get(attr) or ''
     for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
+        for attr in ('text', 'content-desc')
 ]
 ring = {'动作', 'Actions'}
 alive = {'喂食', 'Feed'}
@@ -1765,8 +1760,7 @@ except Exception as exc:
 texts = [
     node.get(attr) or ''
     for node in root.iter('node')
-    if node.get('package') == 'ai.duck.microduck'
-    for attr in ('text', 'content-desc')
+        for attr in ('text', 'content-desc')
 ]
 duck = {'这只鸭子', 'This duck'}
 shelf = {'明信片', 'Postcards'}
@@ -1818,8 +1812,7 @@ groups = [
     ('quack', ('叫一声', 'Quack')), ('grab', ('拎起', 'Hold')),
     ('more', ('更多', 'More')), ('clock', ('挂钟', 'Wall clock')),
 ]
-nodes = [node for node in root.iter('node')
-         if node.get('package') == 'ai.duck.microduck']
+nodes = [node for node in root.iter('node')]
 found = {}
 for key, names in groups:
     for node in nodes:
@@ -1872,7 +1865,7 @@ try:
     root = ET.parse('ui.xml').getroot()
 except Exception as exc:
     raise SystemExit(f"::error::cannot read the {name} dump: {exc}")
-nodes = [n for n in root.iter('node') if n.get('package') == 'ai.duck.microduck']
+nodes = [n for n in root.iter('node') ]
 titles = [n for n in nodes if (n.get('text') or '') in {en, zh}]
 if not titles:
     seen = sorted({(n.get('text') or n.get('content-desc') or '') for n in nodes})
@@ -1957,8 +1950,7 @@ try:
     root = ET.parse('ring-check.xml').getroot()
 except Exception:
     raise SystemExit(1)
-texts = {(n.get('text') or '') for n in root.iter('node')
-         if n.get('package') == 'ai.duck.microduck'}
+texts = {(n.get('text') or '') for n in root.iter('node')}
 raise SystemExit(0 if {'动作', '关闭'} & texts else 1)
 SH
 }
@@ -2036,8 +2028,10 @@ try:
     root = ET.parse('sheet-check.xml').getroot()
 except Exception:
     raise SystemExit(1)
+# uiautomator writes package= only on the top node; children carry none —
+# filtering on it dropped every label and the check always failed.
 labels = {(n.get('text') or n.get('content-desc') or '')
-          for n in root.iter('node') if n.get('package') == 'ai.duck.microduck'}
+          for n in root.iter('node')}
 raise SystemExit(0 if witnesses & labels else 1)
 SH
     sleep 0.5
@@ -2056,8 +2050,7 @@ try:
 except Exception:
     raise SystemExit(1)
 want = {sys.argv[1], sys.argv[2]}
-texts = {(n.get('text') or '') for n in root.iter('node')
-         if n.get('package') == 'ai.duck.microduck'}
+texts = {(n.get('text') or '') for n in root.iter('node')}
 raise SystemExit(0 if want & texts else 1)
 SH
 }
@@ -2076,8 +2069,7 @@ try:
     root = ET.parse('live-check.xml').getroot()
 except Exception:
     raise SystemExit(1)
-texts = {(n.get('text') or '') for n in root.iter('node')
-         if n.get('package') == 'ai.duck.microduck'}
+texts = {(n.get('text') or '') for n in root.iter('node')}
 raise SystemExit(0 if {'喂食', 'Feed'} & texts and {'技能', 'Skills'} & texts else 1)
 SH
 }
@@ -2223,7 +2215,7 @@ drawer_present || {
 dense_sheet_check "More" "更多" "More" || exit 1
 # The drawer's own order, top to bottom: a one-way scroll reaches every
 # row without having to scroll back up after a close.
-open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks" "拍手|Clap"
+open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks" "粘贴程序|Paste"
 open_more_sheet "Dance Studio" "编舞铺" "Dance Studio" "编舞铺" "Dance Studio" "录制|Record"
 open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more" "驱动|Driving"
 open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours" "配对码|Pairing code"
@@ -2276,7 +2268,7 @@ try:
     root = ET.parse('live-check.xml').getroot()
 except Exception:
     raise SystemExit(1)
-texts = {(n.get('text') or '') for n in root.iter('node') if n.get('package') == 'ai.duck.microduck'}
+texts = {(n.get('text') or '') for n in root.iter('node') }
 raise SystemExit(0 if ({'喂食', 'Feed'} & texts and {'更多', 'More'} & texts) else 1)
 SH
     then
