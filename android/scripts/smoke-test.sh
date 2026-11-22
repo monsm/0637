@@ -2163,7 +2163,8 @@ open_more_sheet() {
       # 更多 word's bounds move with the font scale and the pill above it,
       # so every attempt reads its CURRENT bounds from a fresh dump and
       # taps its centre (both fixed fractions landed off the wood).
-      tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+      echo "!! $name round $round: bare Live -> tapping 更多"
+      tap_text "更多" > /dev/null 2>&1 && echo "!! tap hit 更多" || echo "!! tap MISSED 更多"
       sleep 1.2
       continue
     fi
