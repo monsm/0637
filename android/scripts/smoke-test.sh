@@ -2091,7 +2091,7 @@ open_more_sheet() {
   # Deterministic state machine, one state per round; every step reads the
   # screen first (four previous runs each lost a race between BACK, captions
   # and the ring).
-  for round in $(seq 1 20); do
+  for round in $(seq 1 24); do
     if ! app_foreground; then
       # Relaunch and wait for the core, not for a stopwatch: at 2.0 fonts the
       # first composition plus the core load can outlast a fixed sleep, and
@@ -2135,51 +2135,33 @@ open_more_sheet() {
         if dense_sheet_opened "$witness"; then ok=1; break; fi
         continue
       fi
-      # Report what the tap did, so a red run explains itself.
-      if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
-        sleep 1.2
-        if dense_sheet_opened "$witness"; then
-          ok=1
-          break
-        fi
-        echo "!! $name: row tapped but no page (witness=$witness)"
-        adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-        adb exec-out cat /sdcard/ui.xml > tap-miss.xml 2>/dev/null || true
-        python3 - <<'SH' || true
-import xml.etree.ElementTree as ET
-try:
-    root = ET.parse('tap-miss.xml').getroot()
-except Exception:
-    raise SystemExit(0)
-labels = [(n.get('text') or n.get('content-desc') or '') for n in root.iter('node')
-          if n.get('package') == 'ai.duck.microduck']
-print('!! after tap held:', [x for x in labels if x][:24])
-SH
+      # The row may sit above the viewport: earlier rounds' swipes left the
+      # list anywhere. Closing and reopening the drawer guarantees the top
+      # (a downward drag on the sheet body dismisses it — no reverse swipes).
+      if ! tap_text "$row_zh" > /dev/null 2>&1 && ! tap_text "$row_en" > /dev/null 2>&1; then
         adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-        sleep 1
+        sleep 0.8
+        tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+        sleep 1.2
       fi
-      # Not on screen. Sweep deterministically: first back to the top (a row
-      # can be above the viewport after the previous page's return), then one
-      # screen down each round. Two full passes cover every row.
-      if [ "$drawer_pass" = "0" ]; then
-        drawer_pass=1
-        for _ in 1 2 3 4 5; do
-          adb shell input swipe 160 200 160 560 200 > /dev/null 2>&1 || true
-          sleep 0.2
-        done
-      else
-        adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-        sleep 0.4
-        if [ $((round % 5)) -eq 0 ]; then drawer_pass=0; fi
+      continue
+    fi
+    # Report what the tap did, so a red run explains itself.
+    if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
+      sleep 1.2
+      if dense_sheet_opened "$witness"; then
+        ok=1
+        break
       fi
+      echo "!! $name: row tapped but no page (witness=$witness)"
+      adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+      sleep 1
       continue
     fi
     if live_screen; then
       # The board is the cabinet pull; tap the wood, never BACK here. The
-      # 更多 word measured y 491-539 at 2.0 fonts (the board spans ~470-640),
-      # so the tap goes at seven-eighths — three-quarters landed above it
-      # on the stage, between the mood pill and the wood.
-      # The board's own 更多 word measured [139,491][163,539]: tap its centre.
+      # board's 更多 word measured [139,491][163,539] at 2.0 fonts: tap its
+      # centre — both earlier fractions landed off the wood.
       adb shell input tap $((FONT_W / 2)) 515 > /dev/null 2>&1 || true
       sleep 1.2
       continue
