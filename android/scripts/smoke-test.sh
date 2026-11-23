@@ -1451,6 +1451,12 @@ PY
 # on its clickable node, so uiautomator can read it; the two-player row is
 # the toggle (check = twoPlayerOn). A real tap must flip the trait and a
 # second tap must restore it.
+drawer_here() { # the drawer is on screen (a row only it carries)
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  grep -q 'text="每日任务"' ui.xml
+}
 comp_state_row() { # selected attr of the clickable row containing the label
   rm -f ui.xml
   adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
@@ -1476,11 +1482,11 @@ for _ in 1 2 3 4; do
   # A downward swipe at the top of the sheet IS the dismiss gesture: each
   # swipe must not outlast the drawer (run 45148760000: four blind swipes
   # closed the sheet, BACK then left the app, and 更多 vanished).
-  drawer_present || break
+  drawer_here || break
   adb shell input swipe 160 200 160 560 300 > /dev/null 2>&1 || true
   sleep 0.3
 done
-drawer_present || {
+drawer_here || {
   tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
   sleep 1.2
 }

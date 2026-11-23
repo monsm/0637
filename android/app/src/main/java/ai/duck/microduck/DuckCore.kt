@@ -1,5 +1,8 @@
 package ai.duck.microduck
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import java.io.File
 
 /**
@@ -392,8 +395,13 @@ class DuckInput {
     @Volatile var ambientLux: Float = -1.0f
     /** The observation HUD overlay is up: a few real numbers over the stage. */
     @Volatile var hudOn: Boolean = false
-    /** The second player's verb column is up on the stage's right edge. */
-    @Volatile var p2On: Boolean = false
+    /**
+     * The second player's verb column is up on the stage's right edge.
+     * Snapshot state, not @Volatile: the drawer's toggle row and the stage
+     * chip row must recompose the moment it flips (QA leftover 1 exposed it
+     * as a non-reactive plain var).
+     */
+    var p2On by mutableStateOf(false)
     /**
      * The compass: a yaw offset in radians for the camera, derived from the
      * rotation vector when the person turns the compass on. Zero when off;
