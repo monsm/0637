@@ -41,7 +41,9 @@
 - 遗留 1 — **关闭**：iOS `testComponentStatesMoveWithRealTaps`（分段选中 trait 随真实点击迁移、开关行翻转并复原）；Android 冒烟 `component state` 断言（读 checkable/checked，点击前 false → 点击后 true → 再点复原）。探路中发现并修复真缺陷：`DuckInput.p2On` 非快照状态（开关不重组）。纯视觉按下态仍无快照断言——如实保留为残余项。
 - 遗留 2 — **关闭**：Android dense 扫掠逐页断言首焦点 + 47dp 底线 + 不出屏；iOS `testDenseSheetsSurviveAccessibilityXXXL` 逐页 assertSheetFocus/assertHitTargets。本快照写于该基建落地之前。
 - 遗留 5 — **关闭（横屏截图 iOS 除外）**：矩阵补 Android 横屏（640x320）与 XXL、iOS XXL，三图进 `dist/`；iOS 横屏截图无宿主旋转 API，行为由 `testLandscapeRoundTrip` 覆盖。
-- 遗留 3/4 — 仍按「记录 + 真机 QA」关闭；遗留 6/7 随下一功能批。
+- 遗留 6 — **关闭**：日记/明信片/图鉴三处空态两端均已在用 `DuckEmptyState`（`diary-empty-state`/`postcards-empty-state-action`/`collectionEmpty` 的组件调用），本快照写于 D5 接入之前。
+- 遗留 7 — **关闭**：`docs/SOUND_EVENTS.md` 逐事件对表（生产者→标签→`/state` 字段→断言）；新增 Android「quack 物件→`last_sound=chirp`」断言，补齐物件路径（API 路径原已有）。未单钉的开机问候/peck/coo 共用同一条 `queue_sound→take_sound→PCM` 管道，按「记录 + 真机 QA」处理。
+- 遗留 3/4 — 仍按「记录 + 真机 QA」关闭。
 
 ## 四、红线复核
 

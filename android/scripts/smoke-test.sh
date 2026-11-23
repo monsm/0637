@@ -1325,6 +1325,28 @@ print(f"first screen: {clickable} clickable controls")
 print("first screen: no raw tokens, ticks, percentages or engine names; fully Chinese")
 PY
 
+# The duck's own voice (QA leftover 7, the quack row): the object's tap
+# queues the core's chirp — /state.last_sound is the honest field. The
+# earlier /sound POST proves the API path; this proves the OBJECT path.
+BEFORE_SOUND=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('last_sound') or '')
+except Exception: print('')
+" 2>/dev/null || true)
+if [ "$BEFORE_SOUND" = "chirp" ]; then
+  echo "voice: last_sound is already chirp; the object tap check is skipped"
+elif tap_text "叫一声" > /dev/null 2>&1; then
+  QUACK_OK=0
+  for _ in $(seq 1 24); do
+    if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"chirp"'; then QUACK_OK=1; break; fi
+    sleep 0.25
+  done
+  [ "$QUACK_OK" = "1" ] || { echo "::error::tapping the quack object did not queue the chirp (last_sound)"; exit 1; }
+  echo "voice: the quack object queues the chirp"
+else
+  echo "::warning::the quack object was not tappable; voice check skipped"
+fi
+
 # The idle Live screen itself, portrait, no skill line on it: the Chinese state
 # a real user sees.
 adb exec-out screencap -p > ui-b1-android-zh.png || true
