@@ -2107,11 +2107,13 @@ open_more_sheet() {
     done
     sleep 2.5
 
-    # Open the drawer by tapping the board's 更多 word at its live bounds.
+    # Open the drawer by tapping the pull strip's 更多 word at its live
+    # bounds. The wood between the objects is scenery now (two-band shelf),
+    # so a fixed board-centre tap is a dead drop — retry the word instead.
     tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
     sleep 1.5
     drawer_present || {
-      adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+      tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
       sleep 1.2
     }
     drawer_present || continue
@@ -2173,13 +2175,15 @@ for _ in $(seq 1 60); do
 done
 [ -n "$STATE_OK" ] || { echo "::error::the core did not come back for the dense-sheet sweep"; exit 1; }
 sleep 2
-# The 更多 word can be pushed off the board at 2.0 fonts; the BOARD is the
-# pull, so tap the wood itself — screen centre between the mood pill and
-# the objects, no text to miss.
-adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+# The shelf is two bands now: objects above, the pull strip below. The wood
+# between the objects is scenery — tapping the old board centre hits nothing.
+# The 更多 word sits INSIDE the clickable strip (dense-dump: word
+# [139,584][182,632] within strip [8,584][312,632]), so its live bounds are
+# the reliable handle.
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
 sleep 1.2
 drawer_present || {
-  adb shell input tap $((FONT_W / 2)) $((FONT_H * 3 / 4)) > /dev/null 2>&1 || true
+  tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
   sleep 1.5
 }
 drawer_present || {
