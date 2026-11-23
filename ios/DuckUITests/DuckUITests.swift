@@ -1144,6 +1144,17 @@ final class DuckUITests: XCTestCase {
 
     // MARK: - Component states (QA leftover 1)
 
+    /// The accessibility trait is re-read on the next frame; a single read
+    /// right after a tap is a race. Poll briefly, like the label waits.
+    private func waitForSelected(_ element: XCUIElement, _ expected: Bool, timeout: TimeInterval = 5) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.isSelected == expected { return true }
+            usleep(100_000)
+        }
+        return element.isSelected == expected
+    }
+
     /// The component contract's state matrix, asserted by real interaction:
     /// a segmented control's selected trait follows the tap, and a toggle
     /// row's selected trait flips. The matrix was a static contract; this
@@ -1176,10 +1187,10 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(drive.isSelected, "the current stick mode is not selected")
         XCTAssertFalse(look.isSelected, "two segments claim selection")
         look.tap()
-        XCTAssertTrue(look.isSelected, "tapping the look segment did not select it")
-        XCTAssertFalse(drive.isSelected, "the old segment kept selection")
+        XCTAssertTrue(waitForSelected(look, true), "tapping the look segment did not select it")
+        XCTAssertTrue(waitForSelected(drive, false), "the old segment kept selection")
         drive.tap()
-        XCTAssertTrue(drive.isSelected, "restoring the drive segment failed")
+        XCTAssertTrue(waitForSelected(drive, true), "restoring the drive segment failed")
 
         // DuckListRow as a toggle (DuckToggle's on/off value): the row's
         // selected trait flips with the tap and flips back.
@@ -1188,9 +1199,15 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(p2.waitForExistence(timeout: 10), "the two-player row is missing")
         let before = p2.isSelected
         p2.tap()
-        XCTAssertEqual(p2.isSelected, !before, "the toggle row's selected trait did not flip")
+        XCTAssertTrue(
+            waitForSelected(p2, !before),
+            "the toggle row's selected trait did not flip"
+        )
         p2.tap()
-        XCTAssertEqual(p2.isSelected, before, "the toggle row did not flip back")
+        XCTAssertTrue(
+            waitForSelected(p2, before),
+            "the toggle row did not flip back"
+        )
     }
 
 }
