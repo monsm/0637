@@ -2039,7 +2039,7 @@ dense_sheet_opened() {
   # open (run 45118504261, dense-dump vs the poll). A failed dump is now
   # retried without burning a witness round; only a real tree counts.
   local rounds=0
-  for _ in $(seq 1 20); do
+  for _ in $(seq 1 40); do
     rm -f sheet-check.xml
     # Drop the REMOTE file too: a failed dump (the heart monitor never lets
     # uiautomator idle) leaves the PREVIOUS /sdcard/ui.xml in place, and
@@ -2070,7 +2070,7 @@ raise SystemExit(0 if witnesses & labels else 1)
 SH
     fi
     sleep 0.5
-    [ "$rounds" -ge 8 ] && break
+    [ "$rounds" -ge 12 ] && break
   done
   return 1
 }
@@ -2152,17 +2152,27 @@ open_more_sheet() {
     done
 
     # The row: scroll down a screen at a time (the drawer is ordered), then
-    # tap it at its live bounds.
+    # tap it at its live bounds. The page transition at 2.0 fonts is slow:
+    # the final dump of run 45127345167 shows the page open seconds after
+    # the witness window gave up, so a failed window first re-taps the row
+    # (the tap can also be swallowed by the drawer's exit animation) and
+    # then waits again.
+    ROW_TAPPED=""
     for _ in $(seq 1 8); do
       if tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1; then
+        ROW_TAPPED=1
         sleep 1.5
         if dense_sheet_opened "$witness"; then ok=1; break; fi
-        echo "!! $name: tapped but the page did not open (witness=$witness)"
         break
       fi
       adb shell input swipe 160 560 160 160 300 > /dev/null 2>&1 || true
       sleep 0.5
     done
+    if [ "$ok" != "1" ] && [ -n "$ROW_TAPPED" ]; then
+      tap_text "$row_zh" > /dev/null 2>&1 || tap_text "$row_en" > /dev/null 2>&1 || true
+      sleep 1.5
+      dense_sheet_opened "$witness" && ok=1
+    fi
     [ "$ok" = "1" ] && break
   done
 
