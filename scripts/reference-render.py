@@ -1,3 +1,6 @@
+# Offline visual-comparison helper (not in CI). Needs MuJoCo 3.10 bindings —
+# run with the work venv: work/.venv/Scripts/python.exe scripts/reference-render.py
+# (the global pip mujoco/glfw desktop stack was uninstalled 2026-11-23.)
 import struct, zlib, sys
 import numpy as np
 import mujoco

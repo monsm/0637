@@ -795,7 +795,11 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 - **明确不动**：`work/mingw-binutils|ort-win|shim|mujoco-lib|tmp(包装脚本)|.venv|.cargo|.rustup` — 本机 Rust 核心测试回路（含 `--features mujoco`）依赖它们；`verify_odom_roller/`、`audit_fp/` 是被 git 跟踪的官方语义验证件。
 - 十个静态门全绿后提交 `c7430bc`。
 
-**待老板确认的卸载清单**（见当日对话）：全局 pip 的 mujoco 4.0.1 全家桶 + glfw；`work/.venv`（桌面时代整体环境）；VS 2022 空壳目录 + VS Installer。硬约束：`scripts/reference-render.py` import mujoco（离线视觉比对工具，非 CI），删 venv 前需先给它指路。
+**本机软件卸载（老板逐项确认后执行）**：
+- 全局 pip 桌面栈 `mujoco 4.0.1 / mujoco-core / mujoco-studio / mujoco-studio-wasm / glfw` — 已卸载。`scripts/reference-render.py` 改用 `work/.venv` 的 mujoco 3.10（与上游锁定版一致），头部注释已写明。
+- 全局 rustup（`~/.rustup` + `~/.cargo`，MSVC 工具链，635 MB）— 已删；本机核心测试走 `work/.cargo` 便携 GNU 工具链（记忆 local-core-test-loop），PATH/注册表卸载项都指向 work/ 那套，全局只是残留。删后便携 cargo/rustc 1.99.1 复测正常。
+- `C:\Program Files (x86)\Microsoft Visual Studio\2022` 与 `C:\Program Files\Microsoft Visual Studio\2022` 两个 0 KB 空壳 — 已删（需提权）。VS 2026 Insiders（11 月前的自有 IDE）与 VS Installer 保留。
+- `work/.venv` 保留：build.rs 兜底头文件路径 + 运行时 mujoco.dll + reference-render 的渲染后端都靠它。
 
 ---
 

@@ -20,7 +20,8 @@ M1 阶段曾用 Windows 桌面跑通完整策略回路（Python + MuJoCo + ONNX 
   （`cargo test` 在 Windows 上链接 MuJoCo/ORT；见记忆 local-core-test-loop）。
 - `work/verify_odom_roller/`、`work/audit_fp/` 等 — 官方语义验证脚本，随批使用。
 
-## 本机软件
+## 本机软件（2026-11-23 已按老板确认卸载）
 
-桌面版 Python 依赖（pip: mujoco / mujoco-studio / glfw / onnxruntime）与相关
-软件是否卸载，见 REPORT.md 当日批次记录中的卸载清单——卸载需老板逐项确认。
+全局 pip 的 mujoco/mujoco-studio/glfw 桌面栈与全局 rustup（MSVC）已删除；
+`work/.venv` 保留——它是核心测试回路与 `scripts/reference-render.py` 的
+MuJoCo 3.10 来源。详见 REPORT.md 四之三十七。
