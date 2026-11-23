@@ -1480,7 +1480,15 @@ def find_row(root):
         if (node.get("text") or "") == LABEL and parent is not None:
             b = bounds(parent)
             if b is not None:
-                hit.append((parent.get("selected") or "false", b))
+                # Compose's selected semantics reaches uiautomator as
+                # checkable/checked on this platform, not as selected
+                # (comp-dump, run 45200109994: checked flipped true while
+                # selected stayed false). Prefer checked when checkable.
+                if parent.get("checkable") == "true":
+                    state = parent.get("checked") or "false"
+                else:
+                    state = parent.get("selected") or "false"
+                hit.append((state, b))
             return
         nxt = node if node.get("clickable") == "true" else parent
         for child in node:
