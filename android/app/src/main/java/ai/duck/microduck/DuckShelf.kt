@@ -3,6 +3,7 @@
 package ai.duck.microduck
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -173,12 +175,22 @@ fun DuckShelf(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The board has the prototype's FIXED height
+    // (design-demos/A-complete.html `.shelf-board { height: 132px }`):
+    // heightIn(min) is a floor, not a ceiling, and the greedy fill let the
+    // wood swallow the duck on iOS (identical smoke frames). Same number,
+    // both ends.
+    val boardHeight = 132.dp
     Box(modifier) {
-        // The board is the cabinet pull: its label is the More verb.
+        // The wooden board is the wide pull (same verb as iOS). The word's
+        // own strip below is composed LAST, so at AX3 — where the object
+        // columns overlap the word (dense-dump: skills [93,157]×[494,608] vs
+        // 更多 [139,163]×[491,539], run 45048019232) — a tap on the word
+        // reaches the drawer instead of whichever object draws on top.
         Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 82.dp)
+                .height(boardHeight)
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -186,36 +198,16 @@ fun DuckShelf(
                     onClickLabel = Copy.more,
                     onClick = onMore,
                 )
-                // uiautomator only reports the tag on nodes that carry their
-                // own semantics: without the merge, Compose folds this pull
-                // into its children and the smoke taps a label with no
-                // clickable behind it.
-                .semantics(mergeDescendants = true) {}
-                .testTag("duck-more")
                 .background(
                     Brush.verticalGradient(listOf(DuckTheme.WoodHi, DuckTheme.Wood, DuckTheme.WoodDeep)),
                     RoundedCornerShape(DuckTheme.Radius.panel),
                 ),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
-            // The cabinet pull carries its own word: discoverable, not a bare
-            // board of dots.
-            Column(
-                Modifier.padding(bottom = DuckTheme.Space.sm),
-                verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
-            ) {
-                Text(Copy.more, color = DuckTheme.TextPrimary.copy(alpha = 0.55f), fontSize = DuckTheme.Type.Micro)
-                Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
-                    repeat(3) {
-                        Box(Modifier.size(3.dp).background(DuckTheme.TextPrimary.copy(alpha = 0.4f), CircleShape))
-                    }
-                }
-            }
-        }
+        )
         Row(
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 82.dp)
+                .height(boardHeight)
+                .align(Alignment.TopCenter)
                 .padding(horizontal = DuckTheme.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -228,6 +220,36 @@ fun DuckShelf(
                 "duck-grab",
                 onClick = onGrab,
             ) { Hand(carrying) }
+        }
+        // The cabinet pull: its own word, its own hit strip, clear of the
+        // objects' columns. LocalIndication — the press must ripple.
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = LocalIndication.current,
+                    role = Role.Button,
+                    onClickLabel = Copy.more,
+                    onClick = onMore,
+                )
+                // uiautomator only reports the tag on nodes that carry their
+                // own semantics: without the merge, Compose folds this pull
+                // into its children and the smoke taps a label with no
+                // clickable behind it.
+                .semantics(mergeDescendants = true) {}
+                .testTag("duck-more")
+                .padding(bottom = DuckTheme.Space.xs),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs, Alignment.CenterVertically),
+        ) {
+            Text(Copy.more, color = DuckTheme.TextPrimary.copy(alpha = 0.55f), fontSize = DuckTheme.Type.Micro)
+            Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+                repeat(3) {
+                    Box(Modifier.size(3.dp).background(DuckTheme.TextPrimary.copy(alpha = 0.4f), CircleShape))
+                }
+            }
         }
     }
 }

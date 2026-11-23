@@ -801,6 +801,20 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 - `C:\Program Files (x86)\Microsoft Visual Studio\2022` 与 `C:\Program Files\Microsoft Visual Studio\2022` 两个 0 KB 空壳 — 已删（需提权）。VS 2026 Insiders（11 月前的自有 IDE）与 VS Installer 保留。
 - `work/.venv` 保留：build.rs 兜底头文件路径 + 运行时 mujoco.dll + reference-render 的渲染后端都靠它。
 
+### 四之三十八、A1 冒烟三红定位与修复（2026-11-23）
+
+拉两端 CI 产物按证据定位，不甩抖动。三处红同源于 Direction-A 架子的两处布局病，各端表现不同：
+
+**病根一：板子贪心撑满全屏（iOS 实锤）**。`DuckShelf` 的板用 `frame(maxWidth:.infinity, minHeight:82)` + 内嵌 `Spacer`——`minHeight` 是地板不是天花板，chrome VStack 把剩余高度全给了最后一个元素，木板铺满整屏盖住鸭子。证据：`work/ci-ios-a1/smoke-logs/sim-drive/frame-1.png` 里鸭子完全不见、四物件浮在板中央。后果：`frames 1-2/2-3 differ (scene is live)` 两红（板静止→三帧全等），但 `--expect-shell` 颜色检查仍过（碗/手是亮像素，1582 px 骗过了它）。
+
+**病根二：AX3 下物件列压住拉手文字（Android 实锤）**。旧结构先画板（可点）再画物件 Row（叠在上层）；2x 字号下技能物件列 `[93,157]×[494,608]` 与 更多 文字 `[139,163]×[491,539]` 在 x/y 都重叠，Compose 命中给后画的物件层——点 更多 开了技能环而非抽屉。证据：`dense-dump.xml` 失败瞬间是主屏（无 积木规则 行）、`dense-screen.png` 板仅 82px 而物件标签溢出到 608。11 个 dense 页里前面靠运气过，Blocks 页运气用完。
+
+**修复（两端对齐原型语义 `.shelf-board{height:132px}`）**：板改固定 132pt/dp（`DuckShelf.boardHeight`），物件坐进板内居中、上移让出底部拉手；Android 拉手文字独立成 Column、**最后组合**（叠在物件之上）并给默认水波纹（`LocalIndication`，满足 press-feedback 棘轮）。iOS 规则编程 300ms 超时：写成功、读回 PASS，仅应答超时——A1 是 UI-only 提交不碰 core/intent 路径，判为板盖鸭引发的前序时序连带，板修好后随冒烟重跑验证（若仍红按真缺陷单查，不预设）。
+
+**验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过（修了 sizeIn import + combinedClickable 需显式 indication）。推 CI 双端复跑。
+
+---
+
 ---
 
 ## 八、仓库与复现
