@@ -1344,6 +1344,30 @@ print(f"Chinese portrait screenshot: {width}x{height}")
 PY
 cp ui-b1-android-zh.png ui-b4-android.png
 
+# The screenshot matrix's landscape cell (竖/横/三态/XXL): rotate, let the
+# shell recompose, shoot, and rotate back so every later section sees
+# portrait again. The manifest handles orientation itself.
+adb shell settings put system accelerometer_rotation 0 > /dev/null 2>&1 || true
+adb shell settings put system user_rotation 1 > /dev/null 2>&1 || true
+sleep 3
+adb exec-out screencap -p > ui-b1-android-land.png || true
+python3 - <<'PY' || exit 1
+import struct
+try:
+    with open('ui-b1-android-land.png', 'rb') as handle:
+        header = handle.read(24)
+except Exception as exc:
+    raise SystemExit(f"::error::no landscape screenshot: {exc}")
+if header[:8] != b'\x89PNG\r\n\x1a\n':
+    raise SystemExit("::error::the landscape screenshot is not a PNG")
+width, height = struct.unpack('>II', header[16:24])
+if width <= height:
+    raise SystemExit(f"::error::the landscape screenshot is not landscape: {width}x{height}")
+print(f"landscape screenshot: {width}x{height}")
+PY
+adb shell settings put system user_rotation 0 > /dev/null 2>&1 || true
+sleep 2
+
 # The B4 drawer, opened from the thumb deck's More button, in Chinese. The
 # drawer scrolls: on the 640 px emulator only its first rows are on screen,
 # so poll and swipe up between dumps, keeping every text seen, until the
@@ -1421,6 +1445,54 @@ if missing:
     raise SystemExit(f"::error::the drawer is missing {missing}: {seen[:24]}")
 print("drawer: four groups, all rows, Chinese")
 PY
+
+# Component-state behaviour (QA leftover 1): the contract's selected state,
+# asserted against the running app. DuckListRow carries semantics.selected
+# on its clickable node, so uiautomator can read it; the two-player row is
+# the toggle (check = twoPlayerOn). A real tap must flip the trait and a
+# second tap must restore it.
+comp_state_row() { # selected attr of the clickable row containing the label
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  python3 - "$1" <<'PY'
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+def walk(node, parent):
+    if (node.get('text') or '') == sys.argv[1] and parent is not None:
+        print(parent.get('selected') or 'false')
+        raise SystemExit(0)
+    nxt = node if node.get('clickable') == 'true' else parent
+    for child in node:
+        walk(child, nxt)
+walk(root, None)
+raise SystemExit(1)
+PY
+}
+for _ in 1 2 3 4; do adb shell input swipe 160 200 160 560 300 > /dev/null 2>&1 || true; sleep 0.3; done
+BEFORE_STATE=$(comp_state_row "双人接机" 2>/dev/null || true)
+if [ -z "$BEFORE_STATE" ]; then
+  echo "::warning::the two-player row was not visible; component state check skipped"
+else
+  tap_text "双人接机" > /dev/null 2>&1 || true
+  sleep 1.2
+  AFTER_STATE=$(comp_state_row "双人接机" 2>/dev/null || true)
+  if [ -z "$AFTER_STATE" ] || [ "$AFTER_STATE" = "$BEFORE_STATE" ]; then
+    echo "::error::the toggle row's selected state did not flip ($BEFORE_STATE -> $AFTER_STATE)"
+    exit 1
+  fi
+  tap_text "双人接机" > /dev/null 2>&1 || true
+  sleep 1.2
+  RESTORED_STATE=$(comp_state_row "双人接机" 2>/dev/null || true)
+  if [ "$RESTORED_STATE" != "$BEFORE_STATE" ]; then
+    echo "::error::the toggle did not flip back ($BEFORE_STATE -> $RESTORED_STATE)"
+    exit 1
+  fi
+  echo "component state: the toggle row's selected trait flips with a real tap"
+fi
 adb exec-out screencap -p > ui-b4-android-more.png || true
 python3 - <<'PY' || exit 1
 import struct
@@ -1839,6 +1911,9 @@ for i, (name_a, a) in enumerate(boxes):
             raise SystemExit(f"::error::large type overlaps {name_a} and {name_b}")
 print("large type: every verb and the time rail are on screen, no overlap")
 PY
+# The screenshot matrix's XXL cell: the Live screen at font scale 2.0 —
+# captured here, while the large-type layout is on screen for the check.
+adb exec-out screencap -p > ui-b1-android-xxl.png || true
 # ------------------------------------------------------------------ D4 dense sheets
 # Every dense sheet at the largest system font: its first title carries the
 # focus Compose requested on open, every clickable node keeps the 48 dp

@@ -830,9 +830,16 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 - **仪表 = 铜表盘**：仪器 sheet 容器同木色（iOS `.presentationBackground`、Android `containerColor`），一眼两块木面同柜。
 - **全柜一致**：原型里柜子的每一格都是木托盘（`.tray`），所以抽屉可达的每一页（规则/编舞/玩一玩/邻居/AI/任务/日记/明信片/图鉴/工具/这只鸭子/大按钮/AB/备份/别名/天数）两端统一木色容器；照片预览是 Dialog，保留暗底让照片最亮——两端同一例外。iOS 用 `CabinetTray` 修饰器（`route == .photo` 时跳过），Android 用 `CabinetTray` 令牌替换 17 处 sheet 的 containerColor。
 
-**验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过；iOS 由 CI 编译+冒烟裁决。所有 testTag（more-title、time-pause.fill、time-play.fill、rewind-play、more-group-*）与行文字保持原样。
+**验证与收口**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过。CI 全绿：iOS/Android/Contracts `78d204d`（Core 未触发——A2 全在 UI 层）。中途自查抓到一个编辑叠加出的多余 `}`（Swift 编译必挂），修复推 `08cc1a0` 后才进 CI。所有 testTag（more-title、time-pause.fill、time-play.fill、rewind-play、more-group-*）与行文字保持原样。截图验收：`dist/ui-b4-android-more.png` 木纹抽屉+铜色分组。**方向 A 批准套件（主屏/抽屉/时间机器/仪表）至此全部落地且双端全绿。**
 
 ---
+
+
+### 四之四十、发布否决遗留收尾：截图矩阵 + 组件状态行为断言（2026-11-23）
+
+- **遗留 5（截图矩阵，竖/横/XXL）**：Android 冒烟新增两格——横屏（旋转→等重排→截图→转回，PNG 宽>高断言）与 XXL（字号 2.0 时截 Live 屏）；iOS 新增 XXL 格（`simctl launch` 带 `UIPreferredContentSizeCategoryName=AccessibilityXXXL` 启动后截图）。三个新图进 workflow 的 dist 发布与 artifact 清单。iOS 横屏截图缺口如实登记：simctl 无宿主侧旋转 API；横屏行为本身由 `testLandscapeRoundTrip` 覆盖（旋转往返 + 技能投递 + 转回）。
+- **遗留 1（组件状态行为测试）**：iOS 新增 `testComponentStatesMoveWithRealTaps`——DuckSegmented 的 selected trait 随真实点击迁移、DuckListRow 开关行（双人接机）的 selected trait 点击翻转且二次点击复原；Android 冒烟新增开关行 selected 翻转断言（读 uiautomator `selected` 属性，翻转+复原）。禁用态仍靠既有端到端路径（核心未就绪时控件 disabled + 冒烟可达性断言），视觉按下态不在快照基建内——如实保留为剩余缺口。
+- **遗留 2（dense AX3 全表/44-48/焦点）**：核对后已由现有双端扫掠覆盖——Android 逐页断言首焦点+47dp 底线+不出屏；iOS `testDenseSheetsSurviveAccessibilityXXXL` 逐页 assertSheetFocus/assertHitTargets。QA 文档该条可视为关闭（文档为 3 天前快照）。
 
 ---
 
