@@ -828,6 +828,7 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 - **抽屉 = 木柜**：`ModalBottomSheet` 容器色 `WoodDeep` + 内容列木纹纵渐变（`WoodHi→Wood→WoodDeep`）；分组标题改铜色（`Brass`）。iOS 用 `.presentationBackground(LinearGradient(wood))`，Android 用 `containerColor` + `Column.background(Brush.verticalGradient)`。原型 `.drawer` 的 30px 顶圆弧与内高光由 Material3 的 sheet 形状承担。
 - **时间机器 = 木匣**：iOS 的 scrubber 包进木纹圆角匣（`.tm-case` 语言）：内描边黑影、琥珀播放头（径向渐变瓷珠+描边）、四角铜钉（`brassRivet`，径向渐变）；刻度读数改铜色。Android 的冻结/单步/倒放/倒回/分枝 chip 组进同款木匣（`Box` 渐变+黑影描边+左上两枚铜钉）。
 - **仪表 = 铜表盘**：仪器 sheet 容器同木色（iOS `.presentationBackground`、Android `containerColor`），一眼两块木面同柜。
+- **全柜一致**：原型里柜子的每一格都是木托盘（`.tray`），所以抽屉可达的每一页（规则/编舞/玩一玩/邻居/AI/任务/日记/明信片/图鉴/工具/这只鸭子/大按钮/AB/备份/别名/天数）两端统一木色容器；照片预览是 Dialog，保留暗底让照片最亮——两端同一例外。iOS 用 `CabinetTray` 修饰器（`route == .photo` 时跳过），Android 用 `CabinetTray` 令牌替换 17 处 sheet 的 containerColor。
 
 **验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过；iOS 由 CI 编译+冒烟裁决。所有 testTag（more-title、time-pause.fill、time-play.fill、rewind-play、more-group-*）与行文字保持原样。
 

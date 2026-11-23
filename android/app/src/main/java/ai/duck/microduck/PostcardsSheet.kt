@@ -44,7 +44,11 @@ fun PostcardsSheet(onClose: () -> Unit, onOpenDirector: () -> Unit) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val cards = remember { PostcardShelf.load(context) }
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = CabinetTray,
+    ) {
         Column(
             Modifier.padding(DuckTheme.Space.xl),
             verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.md),

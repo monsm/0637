@@ -127,7 +127,11 @@ fun DiarySheet(onClose: () -> Unit) {
         modelError = error
         busy = false
     }
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = CabinetTray,
+    ) {
         Column(Modifier.padding(DuckTheme.Space.xl), verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(

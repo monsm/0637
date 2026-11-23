@@ -33,7 +33,11 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun DexSheet(entries: List<DexEntryUi>, onClose: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = CabinetTray,
+    ) {
         Column(Modifier.padding(DuckTheme.Space.xl), verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
             Row(
                 Modifier.fillMaxWidth(),

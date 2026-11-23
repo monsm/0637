@@ -323,7 +323,7 @@ internal fun AliasSheet(onClose: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        containerColor = CabinetTray,
     ) {
         Column(
             Modifier

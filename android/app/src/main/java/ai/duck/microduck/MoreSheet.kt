@@ -56,6 +56,13 @@ internal val ShellSurface = DuckTheme.BgSurface
 internal val ActionAccent = DuckTheme.AccentAction
 
 /**
+ * Direction A (design-demos/A-complete.html `.tray`, `.drawer`): every
+ * cabinet page is a wooden tray. The photo preview is a Dialog and opts out
+ * on both ends.
+ */
+internal val CabinetTray = DuckTheme.WoodDeep
+
+/**
  * The one More drawer (B4 §2), mirrored from iOS's MoreSheet.swift: four
  * groups, at most four rows each, every row one tap from Live. The chorus
  * and the gifts are actions inside the neighbours page, not pages of their
@@ -229,7 +236,7 @@ internal fun QuestsSheet(board: QuestBoardUi, onClose: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        containerColor = CabinetTray,
     ) {
         Column(
             Modifier
