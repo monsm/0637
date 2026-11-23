@@ -58,6 +58,10 @@ work/scratch/
 # MuJoCo writes this beside the model
 MUJOCO_LOG.TXT
 
+# Desktop-era archive: docs are tracked (M1_REPORT.md), binaries/scratch stay local-only
+_archive/builds/
+_archive/desktop-m1/scripts/
+
 # Session drafts at the repo root (screenshots, scratch Swift/JSON dumps)
 /ddg*.html
 /gh_cv.*

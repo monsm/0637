@@ -7,8 +7,8 @@ iOS / Android 上的 MicroDuck 数字孪生。目标：官方 MJCF 身体 + 官�
 ```
 D:\AI\Duck
 ├─ FIDELITY.md          保真度定义、能做到/做不到的边界
-├─ M1_REPORT.md         M1 桌面验证报告（历史；桌面面已移除）
 ├─ M2_PLAN.md           iOS 优先 / 原生 Metal / Rust 核心 / 全技能
+├─ _archive/            桌面版时代归档（M1 报告 + 构建产物，只读留痕，不再维护）
 ├─ M2_PROGRESS.md       Rust 控制回路闭环实测
 ├─ upstream/
 │  ├─ microduck/        官方机器人运行时（Rust）

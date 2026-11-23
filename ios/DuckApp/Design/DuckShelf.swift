@@ -169,7 +169,15 @@ struct DuckHand: View {
 /// pull (tap the wood, not a fifth verb). Direction A keeps the Live screen
 /// at seven controls: four objects, the board (More), the wall clock and the
 /// brass gauge.
+///
+/// The board has the prototype's FIXED height (design-demos/A-complete.html
+/// `.shelf-board { height: 132px }`): minHeight is a floor, not a ceiling,
+/// and a Spacer inside let the last element of the chrome VStack stretch the
+/// wood over the whole screen — the duck vanished behind it and the smoke's
+/// "scene is live" frames came out identical.
 struct DuckShelf: View {
+    static let boardHeight: CGFloat = 132
+
     var hunger: Double
     var carrying: Bool
     var sheetClosed: Bool
@@ -207,7 +215,8 @@ struct DuckShelf: View {
                     }
                     .padding(.bottom, DuckSpace.sm)
                 }
-                .frame(maxWidth: .infinity, minHeight: 82)
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.boardHeight)
                 .background(
                     LinearGradient(
                         colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
@@ -232,6 +241,8 @@ struct DuckShelf: View {
             .accessibilityIdentifier("duck-more")
             .modifier(StageFocusModifier(focus: .more, active: active(.more), binding: stageFocus))
 
+            // The objects sit ON the board like the prototype's flex row:
+            // centred in its upper field, clear of the pull at the bottom.
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
                 DuckShelfObject(id: "duck-feed", label: Copy.feed, focus: .feed,
@@ -254,8 +265,13 @@ struct DuckShelf: View {
                 }
                 Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: Self.boardHeight, alignment: .center)
+            .offset(y: -DuckSpace.lg)
             .padding(.horizontal, DuckSpace.sm)
             .allowsHitTesting(true)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: Self.boardHeight)
     }
 }

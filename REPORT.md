@@ -786,6 +786,35 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **判分更新**：七条口径第 2 条（动态字体/AX3/命中区）由「部分」升为**达标（首屏 + dense sheets 两端全量扫掠）**；第 5 条获得真实可测上限（Lazy 化与 @Published 拆分仍为遗留）。
 
+### 四之三十七、桌面版遗物归档（2026-11-23）
+
+产品只有 iOS + Android（README），M1 桌面 sim harness 的代码早已随桌面版移除；本次把剩下的遗物从工作树清出去。
+
+- **入库**：`M1_REPORT.md` → `_archive/desktop-m1/M1_REPORT.md`（git 识别为移动）；`_archive/README.md` 说明历史与「勿删」清单；`docs/COMPARISON_OFFICIAL_VS_MOBILE_2026-11-18.md` 的 5 处引用改指新路径。
+- **本机留痕（.gitignore，不入库）**：`_archive/builds/`（mujoco-310/cmake/lib、target-mj-r2/3/4、refrender、scratch 等 16 个构建目录）、`_archive/desktop-m1/scripts/`（jaw_* 桌面渲染试验 21 个、GLSL 着色器、traces/ 轨迹 CSV）。work/ 从 9.5G 降到 6.2G。
+- **明确不动**：`work/mingw-binutils|ort-win|shim|mujoco-lib|tmp(包装脚本)|.venv|.cargo|.rustup` — 本机 Rust 核心测试回路（含 `--features mujoco`）依赖它们；`verify_odom_roller/`、`audit_fp/` 是被 git 跟踪的官方语义验证件。
+- 十个静态门全绿后提交 `c7430bc`。
+
+**本机软件卸载（老板逐项确认后执行）**：
+- 全局 pip 桌面栈 `mujoco 4.0.1 / mujoco-core / mujoco-studio / mujoco-studio-wasm / glfw` — 已卸载。`scripts/reference-render.py` 改用 `work/.venv` 的 mujoco 3.10（与上游锁定版一致），头部注释已写明。
+- 全局 rustup（`~/.rustup` + `~/.cargo`，MSVC 工具链，635 MB）— 已删；本机核心测试走 `work/.cargo` 便携 GNU 工具链（记忆 local-core-test-loop），PATH/注册表卸载项都指向 work/ 那套，全局只是残留。删后便携 cargo/rustc 1.99.1 复测正常。
+- `C:\Program Files (x86)\Microsoft Visual Studio\2022` 与 `C:\Program Files\Microsoft Visual Studio\2022` 两个 0 KB 空壳 — 已删（需提权）。VS 2026 Insiders（11 月前的自有 IDE）与 VS Installer 保留。
+- `work/.venv` 保留：build.rs 兜底头文件路径 + 运行时 mujoco.dll + reference-render 的渲染后端都靠它。
+
+### 四之三十八、A1 冒烟三红定位与修复（2026-11-23）
+
+拉两端 CI 产物按证据定位，不甩抖动。三处红同源于 Direction-A 架子的两处布局病，各端表现不同：
+
+**病根一：板子贪心撑满全屏（iOS 实锤）**。`DuckShelf` 的板用 `frame(maxWidth:.infinity, minHeight:82)` + 内嵌 `Spacer`——`minHeight` 是地板不是天花板，chrome VStack 把剩余高度全给了最后一个元素，木板铺满整屏盖住鸭子。证据：`work/ci-ios-a1/smoke-logs/sim-drive/frame-1.png` 里鸭子完全不见、四物件浮在板中央。后果：`frames 1-2/2-3 differ (scene is live)` 两红（板静止→三帧全等），但 `--expect-shell` 颜色检查仍过（碗/手是亮像素，1582 px 骗过了它）。
+
+**病根二：AX3 下物件列压住拉手文字（Android 实锤）**。旧结构先画板（可点）再画物件 Row（叠在上层）；2x 字号下技能物件列 `[93,157]×[494,608]` 与 更多 文字 `[139,163]×[491,539]` 在 x/y 都重叠，Compose 命中给后画的物件层——点 更多 开了技能环而非抽屉。证据：`dense-dump.xml` 失败瞬间是主屏（无 积木规则 行）、`dense-screen.png` 板仅 82px 而物件标签溢出到 608。11 个 dense 页里前面靠运气过，Blocks 页运气用完。
+
+**修复（两端对齐原型语义 `.shelf-board{height:132px}`）**：板改固定 132pt/dp（`DuckShelf.boardHeight`），物件坐进板内居中、上移让出底部拉手；Android 拉手文字独立成 Column、**最后组合**（叠在物件之上）并给默认水波纹（`LocalIndication`，满足 press-feedback 棘轮）。iOS 规则编程 300ms 超时：写成功、读回 PASS，仅应答超时——A1 是 UI-only 提交不碰 core/intent 路径，判为板盖鸭引发的前序时序连带，板修好后随冒烟重跑验证（若仍红按真缺陷单查，不预设）。
+
+**验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过（修了 sizeIn import + combinedClickable 需显式 indication）。推 CI 双端复跑。
+
+---
+
 ---
 
 ## 八、仓库与复现
