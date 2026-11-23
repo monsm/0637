@@ -786,6 +786,17 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **判分更新**：七条口径第 2 条（动态字体/AX3/命中区）由「部分」升为**达标（首屏 + dense sheets 两端全量扫掠）**；第 5 条获得真实可测上限（Lazy 化与 @Published 拆分仍为遗留）。
 
+### 四之三十七、桌面版遗物归档（2026-11-23）
+
+产品只有 iOS + Android（README），M1 桌面 sim harness 的代码早已随桌面版移除；本次把剩下的遗物从工作树清出去。
+
+- **入库**：`M1_REPORT.md` → `_archive/desktop-m1/M1_REPORT.md`（git 识别为移动）；`_archive/README.md` 说明历史与「勿删」清单；`docs/COMPARISON_OFFICIAL_VS_MOBILE_2026-11-18.md` 的 5 处引用改指新路径。
+- **本机留痕（.gitignore，不入库）**：`_archive/builds/`（mujoco-310/cmake/lib、target-mj-r2/3/4、refrender、scratch 等 16 个构建目录）、`_archive/desktop-m1/scripts/`（jaw_* 桌面渲染试验 21 个、GLSL 着色器、traces/ 轨迹 CSV）。work/ 从 9.5G 降到 6.2G。
+- **明确不动**：`work/mingw-binutils|ort-win|shim|mujoco-lib|tmp(包装脚本)|.venv|.cargo|.rustup` — 本机 Rust 核心测试回路（含 `--features mujoco`）依赖它们；`verify_odom_roller/`、`audit_fp/` 是被 git 跟踪的官方语义验证件。
+- 十个静态门全绿后提交 `c7430bc`。
+
+**待老板确认的卸载清单**（见当日对话）：全局 pip 的 mujoco 4.0.1 全家桶 + glfw；`work/.venv`（桌面时代整体环境）；VS 2022 空壳目录 + VS Installer。硬约束：`scripts/reference-render.py` import mujoco（离线视觉比对工具，非 CI），删 venv 前需先给它指路。
+
 ---
 
 ## 八、仓库与复现
