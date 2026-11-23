@@ -841,6 +841,8 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 - **遗留 1（组件状态行为测试）**：iOS 新增 `testComponentStatesMoveWithRealTaps`——DuckSegmented 的 selected trait 随真实点击迁移、DuckListRow 开关行（双人接机）的 selected trait 点击翻转且二次点击复原；Android 冒烟新增开关行 selected 翻转断言（读 uiautomator `selected` 属性，翻转+复原）。禁用态仍靠既有端到端路径（核心未就绪时控件 disabled + 冒烟可达性断言），视觉按下态不在快照基建内——如实保留为剩余缺口。
 - **遗留 2（dense AX3 全表/44-48/焦点）**：核对后已由现有双端扫掠覆盖——Android 逐页断言首焦点+47dp 底线+不出屏；iOS `testDenseSheetsSurviveAccessibilityXXXL` 逐页 assertSheetFocus/assertHitTargets。QA 文档该条可视为关闭（文档为 3 天前快照）。
 
+**收口（2026-11-23，双端全绿）**：iOS `02d4511` ✅、Android `260c6d0` ✅、Contracts ✅。截图矩阵三格已入库（`dist/ui-b1-android-land.png` 640x320、`ui-b1-android-xxl.png`、`ui-b1-ios-xxl.png`，ui-bot 提交 `fceb706`/`36714ab`）。组件状态断言探路时抓到两条真问题：① `DuckInput.p2On` 是普通 `@Volatile var`，开关行与 P2 chip **点了不重组**——改为 Compose 快照状态；② Compose 的 selected 语义在本机 uiautomator 上以 `checkable/checked` 暴露（comp-dump：checked 翻转、selected 恒 false），冒烟读取改为 checkable 时读 checked。另记一次自伤事故：一行式行尾归一化把 `smoke-test.sh` 清空并推送（`02d4511`），已从 `fd640a1` 逐字节恢复（`7396569`），教训入记忆（先读入变量再写回）。
+
 ---
 
 ## 八、仓库与复现
