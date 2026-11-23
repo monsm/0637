@@ -2066,7 +2066,12 @@ except Exception:
 # filtering on it dropped every label and the check always failed.
 labels = {(n.get('text') or n.get('content-desc') or '')
           for n in root.iter('node')}
-raise SystemExit(0 if witnesses & labels else 1)
+# Substring, not equality: a row's text node can carry its note in the
+# same label — 感受它的心——由心情推出来的读数 (run ba3cf41 chain: the
+# page was open in every failure dump, the exact-match witness never saw
+# it). The witnesses are page-only words, so a hit inside a longer label
+# still means the page is up.
+raise SystemExit(0 if any(w in label for w in witnesses for label in labels) else 1)
 SH
     fi
     sleep 0.5
