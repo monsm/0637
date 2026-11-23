@@ -813,6 +813,14 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过（修了 sizeIn import + combinedClickable 需显式 indication）。推 CI 双端复跑。
 
+**后续四轮迭代到双端全绿（每轮拉产物按证据修，不猜）**：
+1. `9a3dfe8` 后 Android 红「8 控件超预算 7」：拉手独立命中条时忘了板子还可点——板降为纯场景（`7641e99`）。同轮 iOS 揪出 `155f3c0` 的拼接事故 `playMore.tap()        openDirector()`（语法错+自我递归，UI 测试连红四轮）——补全三步门 More→玩一玩→取景（`63011b4`）。
+2. `7641e99` 后双端同病同治：AX3 下「更多」字框落进技能列框（Android overlap 门）；iOS 板级 Button 的 frame=整个架子，XXXL 门判 duck-feed overlaps duck-more。**结构定论：上下双带**——物件行内容自适应在上、拉手满宽 48 独立条在下、木纹是容器背景（Android `d06cdb7`、iOS `b33a951`）。同轮修 sweep 开局敲旧板心的死木头逻辑。
+3. `b33a951` 后 iOS 剩两项时序红（chain last=chirp、curious 读到 excited）：`wait_idle` 按 label 判空闲是假的（技能时间线期间 label 恒 walk），前一条时间线还占着鸭子——改轮询诚实字段+等 emotion 清空（`14e2a1c`，**iOS 转绿**）。Android 剩 This duck 页 witness 不中：先修「失败 dump 读远端旧树」（`2387f1b`）再放宽窗口（`ba3cf41`）——都不是主因。
+4. **真根因**（a8 dump 直接终结争论）：`dense_sheet_opened` 精确集合匹配，但该页 感受它的心 只存在于长行标签 `感受它的心——由心情推出来的读数` 的前缀里——改子串匹配（`ce15170`，**Android 转绿**）。十一页能过是因为它们的 witness 词在别处以完整标签出现过。
+
+**收口**：iOS `14e2a1c` ✅、Android `ce15170` ✅、Contracts `ce15170` ✅、Core `c5bc38c` ✅（UI 批次未碰 core/，check-ui-scope 把关）。A1 批次双端全绿。教训入记忆：Edit 工具把仓库 .sh 重写成 CRLF，改脚本后必须 normalize + `bash -n` 再提交（本轮踩两次，autocrlf 掩盖了入库 blob，只炸本机）。
+
 ---
 
 ---
