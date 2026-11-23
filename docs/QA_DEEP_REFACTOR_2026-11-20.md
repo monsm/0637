@@ -36,6 +36,13 @@
 | 6 | 空态组件在各表面的全面接入 | 组件已建，失败/加载已接；日记/明信片/图鉴的空态仍为就地文案 | D5 收尾 |
 | 7 | 声音通道的事件对表（quack/情绪/技能完成/摔倒/合唱/TTS） | D3 只做触感与动效；声音表未逐事件核对 | D3 收尾 |
 
+### 三之补（2026-11-23 复核）
+
+- 遗留 1 — **关闭**：iOS `testComponentStatesMoveWithRealTaps`（分段选中 trait 随真实点击迁移、开关行翻转并复原）；Android 冒烟 `component state` 断言（读 checkable/checked，点击前 false → 点击后 true → 再点复原）。探路中发现并修复真缺陷：`DuckInput.p2On` 非快照状态（开关不重组）。纯视觉按下态仍无快照断言——如实保留为残余项。
+- 遗留 2 — **关闭**：Android dense 扫掠逐页断言首焦点 + 47dp 底线 + 不出屏；iOS `testDenseSheetsSurviveAccessibilityXXXL` 逐页 assertSheetFocus/assertHitTargets。本快照写于该基建落地之前。
+- 遗留 5 — **关闭（横屏截图 iOS 除外）**：矩阵补 Android 横屏（640x320）与 XXL、iOS XXL，三图进 `dist/`；iOS 横屏截图无宿主旋转 API，行为由 `testLandscapeRoundTrip` 覆盖。
+- 遗留 3/4 — 仍按「记录 + 真机 QA」关闭；遗留 6/7 随下一功能批。
+
 ## 四、红线复核
 
 - 61 维观测与安全层、`core/`、`upstream/`、`patches/`：**零改动**（`check-ui-scope.py` 随每推守门）。
