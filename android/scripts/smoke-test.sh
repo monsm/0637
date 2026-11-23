@@ -1472,25 +1472,8 @@ walk(root, None)
 raise SystemExit(1)
 PY
 }
-for _ in 1 2 3 4; do
-  # A downward swipe at the top of the sheet IS the dismiss gesture: each
-  # swipe must not outlast the drawer (run 45148760000: four blind swipes
-  # closed the sheet, BACK then left the app, and 更多 vanished).
-  drawer_present || break
-  adb shell input swipe 160 200 160 560 300 > /dev/null 2>&1 || true
-  sleep 0.3
-done
-drawer_present || {
-  tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
-  sleep 1.2
-}
+for _ in 1 2 3 4; do adb shell input swipe 160 200 160 560 300 > /dev/null 2>&1 || true; sleep 0.3; done
 BEFORE_STATE=$(comp_state_row "双人接机" 2>/dev/null || true)
-for _ in 1 2 3; do
-  [ -n "$BEFORE_STATE" ] && break
-  adb shell input swipe 160 560 160 200 300 > /dev/null 2>&1 || true
-  sleep 0.4
-  BEFORE_STATE=$(comp_state_row "双人接机" 2>/dev/null || true)
-done
 if [ -z "$BEFORE_STATE" ]; then
   echo "::warning::the two-player row was not visible; component state check skipped"
 else
