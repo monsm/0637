@@ -1317,16 +1317,34 @@ print(sum(1 for k in ('roulade','kick_left','kick_right') if s.get(k,0) >= 1))
 # after the POST is a race the runner loses on load (runs 63011b4/45114023157:
 # emotion=excited at read time, curious a moment later). Poll the honest
 # field instead of snapshotting it.
-api POST /skill '{"name":"curious"}' > /dev/null
+# Wait out any running emotion timeline first: a defiant queued by a
+# previous act owned the duck and curious was dropped (run 2bc3b4a:
+# emotion empty at read time, last_emotion_sound=emotion:defiant). Then
+# two POST attempts, each with a 10 s poll: the same code passes on
+# lighter runners, so a drop is a load race, not a verdict.
+for _ in $(seq 1 60); do
+  BUSY=$(api GET /state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('emotion') or '')
+except Exception: print('busy')
+" 2>/dev/null || echo busy)
+  [ -z "$BUSY" ] && break
+  sleep 0.25
+done
 EMOTION=""
-for _ in $(seq 1 20); do
-  EMOTION=$(api GET /state | python3 -c "
+for _attempt in 1 2; do
+  api POST /skill '{"name":"curious"}' > /dev/null
+  for _ in $(seq 1 40); do
+    EMOTION=$(api GET /state | python3 -c "
 import json,sys
 try: print(json.load(sys.stdin).get('emotion',{}).get('name',''))
 except Exception: print('')
 " 2>/dev/null || true)
+    [ "$EMOTION" = "curious" ] && break
+    sleep 0.25
+  done
   [ "$EMOTION" = "curious" ] && break
-  sleep 0.25
+  sleep 1
 done
 [ "$EMOTION" = "curious" ]; check $? "an emotion plays: curious" "emotion=$EMOTION"
 # The official wav must reach the platform's speaker channel. Before the
