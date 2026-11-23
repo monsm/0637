@@ -435,6 +435,7 @@ jobs:
             input-method.txt
             dense-dump.xml
             dense-screen.png
+            comp-dump.xml
             wallclock-dump.xml
             wallclock-screen.png
             ui-b1-android.png

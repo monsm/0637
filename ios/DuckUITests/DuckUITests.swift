@@ -1180,10 +1180,22 @@ final class DuckUITests: XCTestCase {
 
         // DuckSegmented: exactly one option is selected, and a tap moves the
         // trait to the new option (labels are Copy.stick's English words).
-        let drive = app.staticTexts["drive"]
-        let look = app.staticTexts["look"]
-        XCTAssertTrue(drive.waitForExistence(timeout: 10), "no drive segment")
-        XCTAssertTrue(look.waitForExistence(timeout: 10), "no look segment")
+        // The drawer stays composed behind this sheet and its 玩一玩 row
+        // note is also the current stick word, so the label matches twice:
+        // operate on the HITTABLE one (the sheet in front).
+        func hittable(_ label: String) -> XCUIElement? {
+            let query = app.staticTexts.matching(NSPredicate(format: "label == %@", label))
+            for index in 0..<query.count {
+                let element = query.element(boundBy: index)
+                if element.isHittable { return element }
+            }
+            return nil
+        }
+        let drive = hittable("drive")
+        let look = hittable("look")
+        XCTAssertNotNil(drive, "no hittable drive segment")
+        XCTAssertNotNil(look, "no hittable look segment")
+        guard let drive, let look else { return }
         XCTAssertTrue(drive.isSelected, "the current stick mode is not selected")
         XCTAssertFalse(look.isSelected, "two segments claim selection")
         look.tap()
