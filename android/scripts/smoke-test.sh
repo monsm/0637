@@ -2041,6 +2041,13 @@ dense_sheet_opened() {
   local rounds=0
   for _ in $(seq 1 20); do
     rm -f sheet-check.xml
+    # Drop the REMOTE file too: a failed dump (the heart monitor never lets
+    # uiautomator idle) leaves the PREVIOUS /sdcard/ui.xml in place, and
+    # cat then reads the stale drawer tree — non-empty, witness-free, and
+    # it burned a round (run 45122868442: the page was open, the poll still
+    # scored eight stale trees). With the remote gone, a failed dump is a
+    # genuinely empty read and costs nothing.
+    adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
     if adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
       adb exec-out cat /sdcard/ui.xml > sheet-check.xml 2>/dev/null || true
     else
