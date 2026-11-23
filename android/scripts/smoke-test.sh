@@ -2032,11 +2032,23 @@ SH
 # 4 s — the sheet's entrance animation and the 2.0-font composition are
 # slower than one dump.
 dense_sheet_opened() {
-  for _ in $(seq 1 8); do
+  # A page with a live element (the duck's face sheet watches the heart)
+  # keeps uiautomator from idling: `dump` then FAILS and writes nothing,
+  # which the old loop counted as "witness absent" — eight dead dumps and
+  # a false "page did not open" while the very next dump showed the page
+  # open (run 45118504261, dense-dump vs the poll). A failed dump is now
+  # retried without burning a witness round; only a real tree counts.
+  local rounds=0
+  for _ in $(seq 1 20); do
     rm -f sheet-check.xml
-    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-    adb exec-out cat /sdcard/ui.xml > sheet-check.xml 2>/dev/null || true
-    python3 - "$1" <<'SH' && return 0
+    if adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1; then
+      adb exec-out cat /sdcard/ui.xml > sheet-check.xml 2>/dev/null || true
+    else
+      true
+    fi
+    if [ -s sheet-check.xml ]; then
+      rounds=$((rounds + 1))
+      python3 - "$1" <<'SH' && return 0
 import sys, xml.etree.ElementTree as ET
 witnesses = {w for w in sys.argv[1].split('|') if w}
 try:
@@ -2049,7 +2061,9 @@ labels = {(n.get('text') or n.get('content-desc') or '')
           for n in root.iter('node')}
 raise SystemExit(0 if witnesses & labels else 1)
 SH
+    fi
     sleep 0.5
+    [ "$rounds" -ge 8 ] && break
   done
   return 1
 }

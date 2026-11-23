@@ -480,7 +480,23 @@ print(e.get('trigger',''), e.get('value',''))
 [ "$FIRED" = "clap roulade" ]; check $? "state publishes the block that fired" "event=$FIRED"
 # A chain: one clap -> chirp, THEN laugh. The published event is the last
 # step that really ran, and the emotion count proves the second step ran.
-wait_idle 80 > /dev/null
+# wait_idle keys on the policy label, which stays "walk" while a skill or
+# emotion timeline owns the duck: on a loaded runner the roulade from the
+# previous check was still playing when the clap arrived, its scheduler
+# swallowed the chain's second step, and last=chirp was all the window
+# ever saw (run b33a951; the same check passed at 63011b4/45114023157 —
+# load-dependent, like the 300 ms precedent at the clock section). The
+# honest idle signal is the state's emotion field going empty: wait for
+# THAT, then clap.
+for _ in $(seq 1 40); do
+  BUSY=$(api GET /state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('emotion') or '')
+except Exception: print('busy')
+" 2>/dev/null || echo busy)
+  [ -z "$BUSY" ] && break
+  sleep 0.25
+done
 LAUGHS_BEFORE=$(api GET /life | python3 -c "
 import json,sys
 print(json.load(sys.stdin).get('emotions',{}).get('laugh',0))
@@ -491,7 +507,7 @@ api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\
 sleep 0.15
 api POST /sensor "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((CHAIN_TICK + 60))}" > /dev/null || true
 CHAIN_FIRED=""
-for _ in $(seq 1 30); do
+for _ in $(seq 1 60); do
   CHAIN_FIRED=$(api GET /state | python3 -c "
 import json,sys
 e=json.load(sys.stdin).get('rule_event') or {}
@@ -1287,16 +1303,34 @@ print(sum(1 for k in ('roulade','kick_left','kick_right') if s.get(k,0) >= 1))
 # applied by the 50 Hz loop, and `/state.emotion` is the honest evidence that
 # it ran. `curious` is 2.9 s; check both that it starts and that its clock
 # advances, so a dead loader cannot pass on a cached field.
+# The intent lands on the next tick and a previous timeline (the gift's
+# excited, the whistle's curious) can still own the duck: one read right
+# after the POST is a race the runner loses on load (runs 63011b4/45114023157:
+# emotion=excited at read time, curious a moment later). Poll the honest
+# field instead of snapshotting it.
 api POST /skill '{"name":"curious"}' > /dev/null
-EMOTION=$(api GET /state | python3 -c "
+EMOTION=""
+for _ in $(seq 1 20); do
+  EMOTION=$(api GET /state | python3 -c "
 import json,sys
 try: print(json.load(sys.stdin).get('emotion',{}).get('name',''))
 except Exception: print('')
 " 2>/dev/null || true)
+  [ "$EMOTION" = "curious" ] && break
+  sleep 0.25
+done
 [ "$EMOTION" = "curious" ]; check $? "an emotion plays: curious" "emotion=$EMOTION"
 # The official wav must reach the platform's speaker channel. Before the
 # dynamic-tag fix this was silently dropped by next_sound's static match.
-SOUND=$(api GET /state | field last_emotion_sound)
+# The sound is queued by the scheduler a beat after the timeline starts,
+# so this field is polled too (run b33a951 read emotion:excited here —
+# the previous timeline's voice, still the last one queued).
+SOUND=""
+for _ in $(seq 1 20); do
+  SOUND=$(api GET /state | field last_emotion_sound)
+  [ "$SOUND" = "emotion:curious" ] && break
+  sleep 0.25
+done
 [ "$SOUND" = "emotion:curious" ]; check $? "an emotion's voice is queued" "last_emotion_sound=$SOUND"
 # The clock advances with the loop; a loaded runner can take a moment, so
 # poll for a non-zero reading rather than trusting one read half a second
