@@ -142,7 +142,7 @@ internal fun PlayMoreSheet(
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        containerColor = CabinetTray,
     ) {
         Column(
             Modifier
@@ -323,7 +323,7 @@ internal fun DuckPanelSheet(
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        containerColor = CabinetTray,
     ) {
         Column(
             Modifier
@@ -426,7 +426,7 @@ internal fun ToolsSheet(
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        containerColor = CabinetTray,
     ) {
         Column(
             Modifier

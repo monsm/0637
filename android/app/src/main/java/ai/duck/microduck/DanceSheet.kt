@@ -90,7 +90,11 @@ fun DanceSheet(
         activeStep = -1
     }
 
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = CabinetTray,
+    ) {
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())

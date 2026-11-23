@@ -1,5 +1,5 @@
-run=45138122414
-sha=8823a28481f4c0a45c0d4217b645475c50198de4
-emulator=cancelled
+run=45139381473
+sha=78d204d41cda9ea8b6d3c9a39b6ddf116a8c33b4
+emulator=success
 unittest=success
 alignment=success

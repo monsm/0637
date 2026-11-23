@@ -1384,7 +1384,11 @@ private fun AISheet(
             persona = persona,
         )
     }
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = CabinetTray,
+    ) {
         // The header rides above the scroll (D4 swipe rule): at 2x fonts an
         // IME or a focus pull can scroll the body, and a scrolled-away title
         // is no focus anchor and no close.
@@ -1545,7 +1549,11 @@ private fun PeersSheet(
             }
         }
     }
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = CabinetTray,
+    ) {
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
@@ -1771,7 +1779,11 @@ private fun RulesSheet(onClose: () -> Unit) {
         pasteRulesFromClip(context, rules, rulesLoaded, ::applyRules)
     }
 
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        containerColor = CabinetTray,
+    ) {
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())

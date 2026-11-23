@@ -245,7 +245,7 @@ internal fun DaysSheet(onClose: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        containerColor = CabinetTray,
     ) {
         Column(
             Modifier

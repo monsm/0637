@@ -1,5 +1,19 @@
 import SwiftUI
 
+/// Direction A: the cabinet's trays are wood (design-demos/A-complete.html
+/// `.tray`, `.drawer`). One modifier keeps every route page on the same
+/// material; the photo preview opts out in the body.
+private struct CabinetTray: ViewModifier {
+    func body(content: Content) -> some View {
+        content.presentationBackground(
+            LinearGradient(
+                colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
+                startPoint: .top, endPoint: .bottom
+            )
+        )
+    }
+}
+
 /// The route table's destinations in one place (B7).
 ///
 /// It lives outside ContentView so the shell file keeps shrinking instead
@@ -29,7 +43,16 @@ struct DuckRouteSheets: View {
     @State private var child: DuckRoute?
 
     var body: some View {
-        content
+        // Direction A: every cabinet page is a wooden tray
+        // (design-demos/A-complete.html `.tray`); the photo preview stays
+        // dark so the photograph is the lightest thing on screen.
+        Group {
+            if route == .photo {
+                content
+            } else {
+                content.modifier(CabinetTray())
+            }
+        }
             .sheet(item: $child) { next in
                 DuckRouteSheets(
                     route: next,
@@ -56,14 +79,6 @@ struct DuckRouteSheets: View {
             )
             .presentationDetents(portrait ? [.medium, .large] : [.large])
             .presentationDragIndicator(.visible)
-            // Direction A: the instrument is a brass gauge on the wooden
-            // cabinet — the same wood as the drawer.
-            .presentationBackground(
-                LinearGradient(
-                    colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
-                    startPoint: .top, endPoint: .bottom
-                )
-            )
         case .photo:
             if let photo {
                 PhotoPreviewSheet(
@@ -120,13 +135,8 @@ struct DuckRouteSheets: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
             // Direction A (design-demos/A-complete.html `.drawer`): the
-            // drawer is a wooden cabinet — wood gradient, brass words.
-            .presentationBackground(
-                LinearGradient(
-                    colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
-                    startPoint: .top, endPoint: .bottom
-                )
-            )
+            // drawer is a wooden cabinet — the page background comes from
+            // CabinetTray above.
         case .diary:
             DiarySheet(controller: controller)
                 .presentationDetents([.large])

@@ -492,7 +492,6 @@ struct InstrumentSheet: View {
             )
             .overlay(alignment: .topLeading) { brassRivet.padding(DuckSpace.sm) }
             .overlay(alignment: .topTrailing) { brassRivet.padding(DuckSpace.sm) }
-            }
 
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
                 timeButton(

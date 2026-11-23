@@ -193,7 +193,7 @@ fun CollectionSheet(onClose: () -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        containerColor = CabinetTray,
     ) {
         Column(
             Modifier.padding(DuckTheme.Space.xl),
