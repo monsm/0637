@@ -834,6 +834,13 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 ---
 
+
+### 四之四十、发布否决遗留收尾：截图矩阵 + 组件状态行为断言（2026-11-23）
+
+- **遗留 5（截图矩阵，竖/横/XXL）**：Android 冒烟新增两格——横屏（旋转→等重排→截图→转回，PNG 宽>高断言）与 XXL（字号 2.0 时截 Live 屏）；iOS 新增 XXL 格（`simctl launch` 带 `UIPreferredContentSizeCategoryName=AccessibilityXXXL` 启动后截图）。三个新图进 workflow 的 dist 发布与 artifact 清单。iOS 横屏截图缺口如实登记：simctl 无宿主侧旋转 API；横屏行为本身由 `testLandscapeRoundTrip` 覆盖（旋转往返 + 技能投递 + 转回）。
+- **遗留 1（组件状态行为测试）**：iOS 新增 `testComponentStatesMoveWithRealTaps`——DuckSegmented 的 selected trait 随真实点击迁移、DuckListRow 开关行（双人接机）的 selected trait 点击翻转且二次点击复原；Android 冒烟新增开关行 selected 翻转断言（读 uiautomator `selected` 属性，翻转+复原）。禁用态仍靠既有端到端路径（核心未就绪时控件 disabled + 冒烟可达性断言），视觉按下态不在快照基建内——如实保留为剩余缺口。
+- **遗留 2（dense AX3 全表/44-48/焦点）**：核对后已由现有双端扫掠覆盖——Android 逐页断言首焦点+47dp 底线+不出屏；iOS `testDenseSheetsSurviveAccessibilityXXXL` 逐页 assertSheetFocus/assertHitTargets。QA 文档该条可视为关闭（文档为 3 天前快照）。
+
 ---
 
 ## 八、仓库与复现

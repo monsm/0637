@@ -430,10 +430,28 @@ jobs:
           fi
           sleep 3
           xcrun simctl io "$SIM_UDID" screenshot ui-b4-ios-more.png
+          # The screenshot matrix's XXL cell: the Live screen at the largest
+          # accessibility text, the same launch argument the UI test uses.
+          xcrun simctl terminate "$SIM_UDID" ai.duck.microduck > /dev/null 2>&1 || true
+          xcrun simctl launch "$SIM_UDID" ai.duck.microduck \
+            -duck.language 中文 -duck.daylightHour 12 \
+            -UIPreferredContentSizeCategoryName UICTContentSizeCategoryAccessibilityXXXL > /dev/null 2>&1 || true
+          STATE=""
+          for _ in $(seq 1 120); do
+            STATE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state || true)
+            if [ -n "$STATE" ] && ! printf '%s' "$STATE" | grep -q '"label":"idle"'; then break; fi
+            sleep 2
+          done
+          if [ -z "$STATE" ]; then
+            echo "::error::the app did not come back for the XXL screenshot"
+            exit 1
+          fi
+          sleep 2
+          xcrun simctl io "$SIM_UDID" screenshot ui-b1-ios-xxl.png
           # The acceptance screenshots are portrait, or they are not the product.
           python3 - <<'PY'
           import struct
-          for path in ('ui-b4-ios.png', 'ui-b4-ios-more.png'):
+          for path in ('ui-b4-ios.png', 'ui-b4-ios-more.png', 'ui-b1-ios-xxl.png'):
               with open(path, 'rb') as handle:
                   header = handle.read(24)
               if header[:8] != b'\x89PNG\r\n\x1a\n':
@@ -616,6 +634,7 @@ jobs:
           cp ui-b4-ios.png dist/ui-b4-ios.png
           cp ui-b4-ios-more.png dist/ui-b4-ios-more.png
           cp ui-b1-ios.png dist/ui-b1-ios.png
+          cp ui-b1-ios-xxl.png dist/ui-b1-ios-xxl.png
           cp ui-b1-postcard.png dist/ui-b1-postcard.png
           cp ui-b4-postcard-zh.png dist/ui-b4-postcard-zh.png
           git config user.email "actions@github.com"
@@ -629,7 +648,8 @@ jobs:
               git reset --mixed FETCH_HEAD
             fi
             git add -f dist/ui-b4-ios.png dist/ui-b4-ios-more.png \
-              dist/ui-b1-ios.png dist/ui-b1-postcard.png dist/ui-b4-postcard-zh.png
+              dist/ui-b1-ios.png dist/ui-b1-postcard.png dist/ui-b4-postcard-zh.png \
+              dist/ui-b1-ios-xxl.png
             git commit -m "ui-b1/ui-b4: iOS portrait Live screen, More drawer and postcard [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2

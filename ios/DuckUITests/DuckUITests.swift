@@ -1142,4 +1142,55 @@ final class DuckUITests: XCTestCase {
         }
     }
 
+    // MARK: - Component states (QA leftover 1)
+
+    /// The component contract's state matrix, asserted by real interaction:
+    /// a segmented control's selected trait follows the tap, and a toggle
+    /// row's selected trait flips. The matrix was a static contract; this
+    /// pins the two behaviours it names — selected and default — to the
+    /// running app instead of the source text.
+    func testComponentStatesMoveWithRealTaps() throws {
+        app.terminate()
+        app = XCUIApplication()
+        app.launchArguments += ["-duck.language", "EN"]
+        app.launch()
+        XCTAssertTrue(
+            app.buttons["duck-more"].waitForExistence(timeout: 60),
+            "the More button is missing"
+        )
+        app.buttons["duck-more"].tap()
+        let playMore = app.buttons["more-playmore"]
+        XCTAssertTrue(playMore.waitForExistence(timeout: 10), "the Play-more row is missing")
+        playMore.tap()
+        XCTAssertTrue(
+            app.staticTexts["play-more-title"].waitForExistence(timeout: 10),
+            "the Play-more page did not open"
+        )
+
+        // DuckSegmented: exactly one option is selected, and a tap moves the
+        // trait to the new option (labels are Copy.stick's English words).
+        let drive = app.staticTexts["drive"]
+        let look = app.staticTexts["look"]
+        XCTAssertTrue(drive.waitForExistence(timeout: 10), "no drive segment")
+        XCTAssertTrue(look.waitForExistence(timeout: 10), "no look segment")
+        XCTAssertTrue(drive.isSelected, "the current stick mode is not selected")
+        XCTAssertFalse(look.isSelected, "two segments claim selection")
+        look.tap()
+        XCTAssertTrue(look.isSelected, "tapping the look segment did not select it")
+        XCTAssertFalse(drive.isSelected, "the old segment kept selection")
+        drive.tap()
+        XCTAssertTrue(drive.isSelected, "restoring the drive segment failed")
+
+        // DuckListRow as a toggle (DuckToggle's on/off value): the row's
+        // selected trait flips with the tap and flips back.
+        app.buttons["sheet-close-shared"].tap()
+        let p2 = app.buttons["more-p2"]
+        XCTAssertTrue(p2.waitForExistence(timeout: 10), "the two-player row is missing")
+        let before = p2.isSelected
+        p2.tap()
+        XCTAssertEqual(p2.isSelected, !before, "the toggle row's selected trait did not flip")
+        p2.tap()
+        XCTAssertEqual(p2.isSelected, before, "the toggle row did not flip back")
+    }
+
 }
