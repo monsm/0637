@@ -175,35 +175,30 @@ fun DuckShelf(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The board has the prototype's FIXED height
-    // (design-demos/A-complete.html `.shelf-board { height: 132px }`):
-    // heightIn(min) is a floor, not a ceiling, and the greedy fill let the
-    // wood swallow the duck on iOS (identical smoke frames). Same number,
-    // both ends.
-    val boardHeight = 132.dp
-    Box(modifier) {
-        // The wooden board is NOT clickable: the object columns overlap the
-        // pull's word at AX3 (dense-dump: skills [93,157]×[494,608] vs 更多
-        // [139,163]×[491,539], run 45048019232), so a board-wide target
-        // silently hands taps to whichever object draws on top. The pull
-        // below is the one More target — and the board budget is seven
-        // controls (four objects, the pull, clock, gauge): a clickable board
-        // would make eight (smoke gate at run 45106146710).
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(boardHeight)
-                .background(
-                    Brush.verticalGradient(listOf(DuckTheme.WoodHi, DuckTheme.Wood, DuckTheme.WoodDeep)),
-                    RoundedCornerShape(DuckTheme.Radius.panel),
-                ),
-        )
+    // The board has the prototype's fixed-height strip (design-demos/
+    // A-complete.html `.shelf-board { height: 132px }`): heightIn(min) is a
+    // floor, not a ceiling, and the greedy fill let the wood swallow the
+    // duck on iOS (identical smoke frames). Here the Column sizes itself to
+    // its content, so the board can never stretch over the stage.
+    //
+    // Two horizontal bands, stacked: the objects above, the cabinet pull
+    // below. A centre-placed pull would collide with the skills column at
+    // AX3 (font-scale-2.0 dump: 更多 [139,491][163,539] inside the skills
+    // object [93,494][157,608]) — the overlap gate fails bounds that touch.
+    // Stacking makes the two bands' text rows disjoint by construction.
+    val pullHeight = 48.dp
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(listOf(DuckTheme.WoodHi, DuckTheme.Wood, DuckTheme.WoodDeep)),
+                RoundedCornerShape(DuckTheme.Radius.panel),
+            ),
+    ) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .height(boardHeight)
-                .align(Alignment.TopCenter)
-                .padding(horizontal = DuckTheme.Space.sm),
+                .padding(top = DuckTheme.Space.sm, start = DuckTheme.Space.sm, end = DuckTheme.Space.sm),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
@@ -216,12 +211,12 @@ fun DuckShelf(
                 onClick = onGrab,
             ) { Hand(carrying) }
         }
-        // The cabinet pull: its own word, its own hit strip, clear of the
-        // objects' columns. LocalIndication — the press must ripple.
+        // The cabinet pull: the whole strip is the More target, word and
+        // dots centred in it. LocalIndication — the press must ripple.
         Column(
             Modifier
-                .align(Alignment.BottomCenter)
-                .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                .fillMaxWidth()
+                .height(pullHeight)
                 .combinedClickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = LocalIndication.current,
@@ -234,8 +229,7 @@ fun DuckShelf(
                 // into its children and the smoke taps a label with no
                 // clickable behind it.
                 .semantics(mergeDescendants = true) {}
-                .testTag("duck-more")
-                .padding(bottom = DuckTheme.Space.xs),
+                .testTag("duck-more"),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs, Alignment.CenterVertically),
         ) {
