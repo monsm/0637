@@ -182,22 +182,17 @@ fun DuckShelf(
     // both ends.
     val boardHeight = 132.dp
     Box(modifier) {
-        // The wooden board is the wide pull (same verb as iOS). The word's
-        // own strip below is composed LAST, so at AX3 — where the object
-        // columns overlap the word (dense-dump: skills [93,157]×[494,608] vs
-        // 更多 [139,163]×[491,539], run 45048019232) — a tap on the word
-        // reaches the drawer instead of whichever object draws on top.
+        // The wooden board is NOT clickable: the object columns overlap the
+        // pull's word at AX3 (dense-dump: skills [93,157]×[494,608] vs 更多
+        // [139,163]×[491,539], run 45048019232), so a board-wide target
+        // silently hands taps to whichever object draws on top. The pull
+        // below is the one More target — and the board budget is seven
+        // controls (four objects, the pull, clock, gauge): a clickable board
+        // would make eight (smoke gate at run 45106146710).
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(boardHeight)
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    role = Role.Button,
-                    onClickLabel = Copy.more,
-                    onClick = onMore,
-                )
                 .background(
                     Brush.verticalGradient(listOf(DuckTheme.WoodHi, DuckTheme.Wood, DuckTheme.WoodDeep)),
                     RoundedCornerShape(DuckTheme.Radius.panel),
