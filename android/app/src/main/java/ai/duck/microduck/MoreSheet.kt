@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -87,11 +88,18 @@ internal fun MoreSheet(
     ModalBottomSheet(
         onDismissRequest = onClose,
         sheetState = sheetState,
-        containerColor = ShellSurface,
+        // Direction A (design-demos/A-complete.html `.drawer`): the drawer is
+        // a wooden cabinet — wood gradient panel, brass group words.
+        containerColor = DuckTheme.WoodDeep,
     ) {
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
+                .background(
+                    Brush.verticalGradient(
+                        listOf(DuckTheme.WoodHi, DuckTheme.Wood, DuckTheme.WoodDeep)
+                    )
+                )
                 .padding(horizontal = DuckTheme.Space.xl)
                 // The last row must be able to scroll clear of the system
                 // gesture inset: at 2x fonts 每日任务 measured [56,619][169,640]
@@ -376,7 +384,7 @@ private fun Group(
     Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs)) {
         Text(
             title,
-            color = Color.White.copy(alpha = 0.6f),
+            color = DuckTheme.Brass,
             fontSize = DuckTheme.Type.Label,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier

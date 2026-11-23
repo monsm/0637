@@ -171,7 +171,7 @@ struct MoreSheet: View {
         VStack(alignment: .leading, spacing: DuckSpace.xs) {
             Text(title)
                 .font(.duckLabel.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.duckBrass)
                 .padding(.leading, DuckSpace.xs)
                 .padding(.bottom, DuckSpace.xxs)
             VStack(spacing: DuckSpace.xxs) { content() }

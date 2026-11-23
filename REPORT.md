@@ -813,6 +813,24 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过（修了 sizeIn import + combinedClickable 需显式 indication）。推 CI 双端复跑。
 
+**后续四轮迭代到双端全绿（每轮拉产物按证据修，不猜）**：
+1. `9a3dfe8` 后 Android 红「8 控件超预算 7」：拉手独立命中条时忘了板子还可点——板降为纯场景（`7641e99`）。同轮 iOS 揪出 `155f3c0` 的拼接事故 `playMore.tap()        openDirector()`（语法错+自我递归，UI 测试连红四轮）——补全三步门 More→玩一玩→取景（`63011b4`）。
+2. `7641e99` 后双端同病同治：AX3 下「更多」字框落进技能列框（Android overlap 门）；iOS 板级 Button 的 frame=整个架子，XXXL 门判 duck-feed overlaps duck-more。**结构定论：上下双带**——物件行内容自适应在上、拉手满宽 48 独立条在下、木纹是容器背景（Android `d06cdb7`、iOS `b33a951`）。同轮修 sweep 开局敲旧板心的死木头逻辑。
+3. `b33a951` 后 iOS 剩两项时序红（chain last=chirp、curious 读到 excited）：`wait_idle` 按 label 判空闲是假的（技能时间线期间 label 恒 walk），前一条时间线还占着鸭子——改轮询诚实字段+等 emotion 清空（`14e2a1c`，**iOS 转绿**）。Android 剩 This duck 页 witness 不中：先修「失败 dump 读远端旧树」（`2387f1b`）再放宽窗口（`ba3cf41`）——都不是主因。
+4. **真根因**（a8 dump 直接终结争论）：`dense_sheet_opened` 精确集合匹配，但该页 感受它的心 只存在于长行标签 `感受它的心——由心情推出来的读数` 的前缀里——改子串匹配（`ce15170`，**Android 转绿**）。十一页能过是因为它们的 witness 词在别处以完整标签出现过。
+
+**收口**：iOS `14e2a1c` ✅、Android `ce15170` ✅、Contracts `ce15170` ✅、Core `c5bc38c` ✅（UI 批次未碰 core/，check-ui-scope 把关）。A1 批次双端全绿。教训入记忆：Edit 工具把仓库 .sh 重写成 CRLF，改脚本后必须 normalize + `bash -n` 再提交（本轮踩两次，autocrlf 掩盖了入库 blob，只炸本机）。
+
+### 四之三十九、A2 批次：柜子、时间机器与仪表的木/铜语言（2026-11-23）
+
+按 `design-demos/A-complete.html` 的材质语言，三块表面换装，标识/IA/动词零改动：
+
+- **抽屉 = 木柜**：`ModalBottomSheet` 容器色 `WoodDeep` + 内容列木纹纵渐变（`WoodHi→Wood→WoodDeep`）；分组标题改铜色（`Brass`）。iOS 用 `.presentationBackground(LinearGradient(wood))`，Android 用 `containerColor` + `Column.background(Brush.verticalGradient)`。原型 `.drawer` 的 30px 顶圆弧与内高光由 Material3 的 sheet 形状承担。
+- **时间机器 = 木匣**：iOS 的 scrubber 包进木纹圆角匣（`.tm-case` 语言）：内描边黑影、琥珀播放头（径向渐变瓷珠+描边）、四角铜钉（`brassRivet`，径向渐变）；刻度读数改铜色。Android 的冻结/单步/倒放/倒回/分枝 chip 组进同款木匣（`Box` 渐变+黑影描边+左上两枚铜钉）。
+- **仪表 = 铜表盘**：仪器 sheet 容器同木色（iOS `.presentationBackground`、Android `containerColor`），一眼两块木面同柜。
+
+**验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过；iOS 由 CI 编译+冒烟裁决。所有 testTag（more-title、time-pause.fill、time-play.fill、rewind-play、more-group-*）与行文字保持原样。
+
 ---
 
 ---

@@ -56,6 +56,14 @@ struct DuckRouteSheets: View {
             )
             .presentationDetents(portrait ? [.medium, .large] : [.large])
             .presentationDragIndicator(.visible)
+            // Direction A: the instrument is a brass gauge on the wooden
+            // cabinet — the same wood as the drawer.
+            .presentationBackground(
+                LinearGradient(
+                    colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
         case .photo:
             if let photo {
                 PhotoPreviewSheet(
@@ -111,6 +119,14 @@ struct DuckRouteSheets: View {
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+            // Direction A (design-demos/A-complete.html `.drawer`): the
+            // drawer is a wooden cabinet — wood gradient, brass words.
+            .presentationBackground(
+                LinearGradient(
+                    colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
         case .diary:
             DiarySheet(controller: controller)
                 .presentationDetents([.large])
