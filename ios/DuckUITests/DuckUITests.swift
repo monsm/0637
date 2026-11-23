@@ -75,7 +75,14 @@ final class DuckUITests: XCTestCase {
         more.tap()
         let playMore = app.buttons["more-playmore"]
         XCTAssertTrue(playMore.waitForExistence(timeout: 10), "the Play-more row is missing")
-        playMore.tap()        openDirector()
+        playMore.tap()
+        // The third door: the Director row on the Play-more page. It is a
+        // list row, so match by identifier whatever element type SwiftUI
+        // gave it (anyElement), then the page closes itself into the
+        // viewfinder.
+        let director = anyElement("surface-toggle")
+        XCTAssertTrue(director.waitForExistence(timeout: 10), "no Director switch on Play more")
+        director.tap()
     }
 
     /// Open the More drawer: one tap from the stage (B4 §2).
