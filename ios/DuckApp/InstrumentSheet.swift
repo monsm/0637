@@ -433,7 +433,10 @@ struct InstrumentSheet: View {
         VStack(alignment: .leading, spacing: DuckSpace.sm) {
             sectionTitle(Copy.timeMachine, detail: "tick \(controller.simTick)")
 
-            // The scrubber spans the checkpoints the core actually kept.
+            // Direction A (design-demos/A-complete.html `.tm-case`): the
+            // wooden case with brass rivets; the scrubber is the dial's
+            // window, the amber cap is the playhead. Chips below keep every
+            // identifier and verb exactly as the tests pin them.
             VStack(spacing: DuckSpace.xs) {
                 GeometryReader { geometry in
                     let width = geometry.size.width
@@ -449,8 +452,21 @@ struct InstrumentSheet: View {
                             .fill(Color.white.opacity(0.08))
                             .frame(height: 6)
                         Capsule()
-                            .fill(Color.accentColor.opacity(0.6))
+                            .fill(Color.duckBrass.opacity(0.75))
                             .frame(width: width * fraction, height: 6)
+                        // The playhead: amber, like the dial's handle.
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [Color.duckCeramic, Color.duckBrassDeep],
+                                    center: .topLeading,
+                                    startRadius: 0,
+                                    endRadius: 10
+                                )
+                            )
+                            .overlay(Circle().stroke(Color.black.opacity(0.55), lineWidth: 1))
+                            .frame(width: 14, height: 14)
+                            .offset(x: max(0, width * fraction - 7), y: -4)
                     }
                 }
                 .frame(height: 10)
@@ -460,7 +476,22 @@ struct InstrumentSheet: View {
                     Text("\(controller.simTick)")
                 }
                 .font(.duckMicro)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.duckBrass.opacity(0.7))
+            }
+            .padding(DuckSpace.md)
+            .background(
+                LinearGradient(
+                    colors: [Color.duckWoodHi, Color.duckWood],
+                    startPoint: .top, endPoint: .bottom
+                ),
+                in: RoundedRectangle(cornerRadius: DuckRadius.card)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: DuckRadius.card)
+                    .stroke(Color.black.opacity(0.5), lineWidth: 1)
+            )
+            .overlay(alignment: .topLeading) { brassRivet.padding(DuckSpace.sm) }
+            .overlay(alignment: .topTrailing) { brassRivet.padding(DuckSpace.sm) }
             }
 
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
@@ -503,6 +534,21 @@ struct InstrumentSheet: View {
         }
         .padding(DuckSpace.md)
         .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: DuckRadius.control))
+    }
+
+    /// The case's brass rivet (design-demos/A-complete.html `.tm-case::before`).
+    private var brassRivet: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [Color.duckBrass, Color.duckBrassDeep],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: 6
+                )
+            )
+            .frame(width: 7, height: 7)
+            .shadow(color: .black.opacity(0.6), radius: 1, y: 1)
     }
 
     private func timeButton(_ icon: String, _ title: String, action: @escaping () -> Void) -> some View {

@@ -821,6 +821,16 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **收口**：iOS `14e2a1c` ✅、Android `ce15170` ✅、Contracts `ce15170` ✅、Core `c5bc38c` ✅（UI 批次未碰 core/，check-ui-scope 把关）。A1 批次双端全绿。教训入记忆：Edit 工具把仓库 .sh 重写成 CRLF，改脚本后必须 normalize + `bash -n` 再提交（本轮踩两次，autocrlf 掩盖了入库 blob，只炸本机）。
 
+### 四之三十九、A2 批次：柜子、时间机器与仪表的木/铜语言（2026-11-23）
+
+按 `design-demos/A-complete.html` 的材质语言，三块表面换装，标识/IA/动词零改动：
+
+- **抽屉 = 木柜**：`ModalBottomSheet` 容器色 `WoodDeep` + 内容列木纹纵渐变（`WoodHi→Wood→WoodDeep`）；分组标题改铜色（`Brass`）。iOS 用 `.presentationBackground(LinearGradient(wood))`，Android 用 `containerColor` + `Column.background(Brush.verticalGradient)`。原型 `.drawer` 的 30px 顶圆弧与内高光由 Material3 的 sheet 形状承担。
+- **时间机器 = 木匣**：iOS 的 scrubber 包进木纹圆角匣（`.tm-case` 语言）：内描边黑影、琥珀播放头（径向渐变瓷珠+描边）、四角铜钉（`brassRivet`，径向渐变）；刻度读数改铜色。Android 的冻结/单步/倒放/倒回/分枝 chip 组进同款木匣（`Box` 渐变+黑影描边+左上两枚铜钉）。
+- **仪表 = 铜表盘**：仪器 sheet 容器同木色（iOS `.presentationBackground`、Android `containerColor`），一眼两块木面同柜。
+
+**验证**：十静态门全绿；Android 本机 `assembleDebug testDebugUnitTest` 通过；iOS 由 CI 编译+冒烟裁决。所有 testTag（more-title、time-pause.fill、time-play.fill、rewind-play、more-group-*）与行文字保持原样。
+
 ---
 
 ---

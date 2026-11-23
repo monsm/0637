@@ -15,6 +15,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -74,6 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Path
@@ -3111,7 +3113,13 @@ private fun InstrumentSheet(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onClose, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = sheetState,
+        // Direction A: the instrument reads as a brass gauge on a wooden
+        // cabinet door — same wood tone as the drawer.
+        containerColor = DuckTheme.WoodDeep,
+    ) {
         // The sheet outgrew a phone screen, so its column scrolls and the
         // dense status text collapses behind one chip.
         Column(
@@ -3371,28 +3379,61 @@ private fun InstrumentSheet(
                     )
                 }
             }
-            DuckChipWrap {
-                ButtonChip(
-                    if (paused) Copy.resume else Copy.freeze,
-                    testTag = if (paused) "time-play.fill" else "time-pause.fill",
-                ) {
-                    paused = !paused
-                    core.setPaused(paused)
+            // Direction A (design-demos/A-complete.html `.tm-case`): the time
+            // controls live in the wooden case, rivets on the top corners;
+            // the amber playhead lives on the iOS dial. Every chip keeps its
+            // verb and testTag exactly as the tests pin them.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(listOf(DuckTheme.WoodHi, DuckTheme.Wood)),
+                        RoundedCornerShape(DuckTheme.Radius.card),
+                    )
+                    .border(
+                        1.dp,
+                        Color.Black.copy(alpha = 0.5f),
+                        RoundedCornerShape(DuckTheme.Radius.card),
+                    )
+                    .padding(DuckTheme.Space.sm),
+            ) {
+                DuckChipWrap {
+                    ButtonChip(
+                        if (paused) Copy.resume else Copy.freeze,
+                        testTag = if (paused) "time-play.fill" else "time-pause.fill",
+                    ) {
+                        paused = !paused
+                        core.setPaused(paused)
+                    }
+                    ButtonChip(Copy.step) { core.step() }
+                    // Rewind-play: while on, the duck walks its own history
+                    // backwards, 200 ticks a pop - the same /seek the rewind
+                    // chip uses, just continuously.
+                    ButtonChip(
+                        if (rewinding) Copy.stateOn else Copy.rewindPlay,
+                        "rewind-play",
+                    ) { rewinding = !rewinding }
+                    ButtonChip(Copy.rewind) { core.seek(200) }
+                    ButtonChip(Copy.fork) {
+                        core.fork()
+                        // The JNI call gives no verdict; the count is the truth.
+                        scope.launch {
+                            branches = withContext(Dispatchers.IO) { fetchBranchCount() }
+                        }
+                    }
                 }
-                ButtonChip(Copy.step) { core.step() }
-                // Rewind-play: while on, the duck walks its own history
-                // backwards, 200 ticks a pop - the same /seek the rewind
-                // chip uses, just continuously.
-                ButtonChip(
-                    if (rewinding) Copy.stateOn else Copy.rewindPlay,
-                    "rewind-play",
-                ) { rewinding = !rewinding }
-                ButtonChip(Copy.rewind) { core.seek(200) }
-                ButtonChip(Copy.fork) {
-                    core.fork()
-                    // The JNI call gives no verdict; the count is the truth.
-                    scope.launch {
-                        branches = withContext(Dispatchers.IO) { fetchBranchCount() }
+                Row(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(DuckTheme.Space.xs),
+                    horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
+                ) {
+                    repeat(2) {
+                        Box(
+                            Modifier
+                                .size(6.dp)
+                                .background(DuckTheme.Brass, CircleShape),
+                        )
                     }
                 }
             }
