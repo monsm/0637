@@ -165,18 +165,19 @@ struct DuckHand: View {
     }
 }
 
-/// The wooden shelf with the four objects; the board itself is the cabinet's
-/// pull (tap the wood, not a fifth verb). Direction A keeps the Live screen
-/// at seven controls: four objects, the board (More), the wall clock and the
-/// brass gauge.
+/// The wooden shelf with the four objects; the cabinet's pull below them is
+/// the More verb. Direction A keeps the Live screen at seven controls: four
+/// objects, the pull, the wall clock and the brass gauge.
 ///
-/// The board has the prototype's FIXED height (design-demos/A-complete.html
-/// `.shelf-board { height: 132px }`): minHeight is a floor, not a ceiling,
-/// and a Spacer inside let the last element of the chrome VStack stretch the
-/// wood over the whole screen — the duck vanished behind it and the smoke's
-/// "scene is live" frames came out identical.
+/// Two stacked bands, not a board with objects floating over it: the pull's
+/// Button frame must not intersect the objects' frames — the XXXL UI test
+/// and the Android overlap gate both fail bounds that touch, and a
+/// board-wide button made its frame the whole shelf (run 45114023157:
+/// duck-feed overlaps duck-more). The wood is the container's background;
+/// the height follows the content, so the board can never stretch over the
+/// duck the way the greedy minHeight fill did (frame-1.png, run 8ab84b7).
 struct DuckShelf: View {
-    static let boardHeight: CGFloat = 132
+    static let pullHeight: CGFloat = 48
 
     var hunger: Double
     var carrying: Bool
@@ -195,54 +196,7 @@ struct DuckShelf: View {
     }
 
     var body: some View {
-        ZStack {
-            Button(action: onMore) {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    // The cabinet pull carries its own word: the drawer has to
-                    // be discoverable, not just a bare board of dots.
-                    VStack(spacing: DuckSpace.xxs) {
-                        Text(Copy.more)
-                            .font(.duckMicro)
-                            .foregroundStyle(Color.duckTextPrimary.opacity(0.55))
-                        HStack(spacing: DuckSpace.sm) {
-                            ForEach(0..<3, id: \.self) { _ in
-                                Circle()
-                                    .fill(Color.duckTextPrimary.opacity(0.4))
-                                    .frame(width: 3, height: 3)
-                            }
-                        }
-                    }
-                    .padding(.bottom, DuckSpace.sm)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: Self.boardHeight)
-                .background(
-                    LinearGradient(
-                        colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
-                        startPoint: .top, endPoint: .bottom
-                    ),
-                    in: RoundedRectangle(cornerRadius: DuckRadius.panel)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: DuckRadius.panel)
-                        .stroke(Color.black.opacity(0.45), lineWidth: 1)
-                )
-                .overlay(alignment: .top) {
-                    Capsule()
-                        .fill(Color.duckTextPrimary.opacity(0.12))
-                        .frame(height: 1)
-                        .padding(.horizontal, DuckSpace.lg)
-                        .padding(.top, DuckSpace.sm)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Copy.more)
-            .accessibilityIdentifier("duck-more")
-            .modifier(StageFocusModifier(focus: .more, active: active(.more), binding: stageFocus))
-
-            // The objects sit ON the board like the prototype's flex row:
-            // centred in its upper field, clear of the pull at the bottom.
+        VStack(spacing: 0) {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
                 DuckShelfObject(id: "duck-feed", label: Copy.feed, focus: .feed,
@@ -265,13 +219,50 @@ struct DuckShelf: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: Self.boardHeight, alignment: .center)
-            .offset(y: -DuckSpace.lg)
+            .padding(.top, DuckSpace.sm)
             .padding(.horizontal, DuckSpace.sm)
-            .allowsHitTesting(true)
+
+            // The cabinet pull: one full-width strip, its own word and dots.
+            Button(action: onMore) {
+                VStack(spacing: DuckSpace.xxs) {
+                    Text(Copy.more)
+                        .font(.duckMicro)
+                        .foregroundStyle(Color.duckTextPrimary.opacity(0.55))
+                    HStack(spacing: DuckSpace.sm) {
+                        ForEach(0..<3, id: \.self) { _ in
+                            Circle()
+                                .fill(Color.duckTextPrimary.opacity(0.4))
+                                .frame(width: 3, height: 3)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.pullHeight)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(Copy.more)
+            .accessibilityIdentifier("duck-more")
+            .modifier(StageFocusModifier(focus: .more, active: active(.more), binding: stageFocus))
         }
         .frame(maxWidth: .infinity)
-        .frame(height: Self.boardHeight)
+        .background(
+            LinearGradient(
+                colors: [Color.duckWoodHi, Color.duckWood, Color.duckWoodDeep],
+                startPoint: .top, endPoint: .bottom
+            ),
+            in: RoundedRectangle(cornerRadius: DuckRadius.panel)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DuckRadius.panel)
+                .stroke(Color.black.opacity(0.45), lineWidth: 1)
+        )
+        .overlay(alignment: .top) {
+            Capsule()
+                .fill(Color.duckTextPrimary.opacity(0.12))
+                .frame(height: 1)
+                .padding(.horizontal, DuckSpace.lg)
+                .padding(.top, DuckSpace.sm)
+        }
     }
 }
