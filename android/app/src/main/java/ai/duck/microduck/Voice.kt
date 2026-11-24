@@ -4,6 +4,9 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -26,6 +29,11 @@ class Voice(private val core: DuckCore) {
 
     @Volatile private var track: AudioTrack? = null
     @Volatile private var playing = false
+
+    /// Whether the duck is sounding right now. Driven from the voice
+    /// scheduler's own thread, so the UI reads it via compose state.
+    private val _isSpeaking = mutableStateOf(false)
+    val isSpeaking: Boolean get() = _isSpeaking.value
 
     private val rate: Int by lazy { DuckCore.voiceRate() }
 
@@ -69,10 +77,12 @@ class Voice(private val core: DuckCore) {
         }
         val audio = track ?: open(pcm.size * 2).also { track = it }
         playing = true
+        _isSpeaking.value = true
         try {
             audio.write(samples, 0, samples.size)
         } finally {
             playing = false
+            _isSpeaking.value = false
         }
     }
 
