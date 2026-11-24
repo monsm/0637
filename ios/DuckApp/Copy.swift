@@ -379,6 +379,21 @@ enum Copy {
     static func echoRound(_ n: Int) -> String { String(format: pick("Round %d", "第 %d 关"), n) }
     static var echoWon: String { pick("You learned it!", "你学会啦！") }
     /// The four pads are the duck's own synth voices, named as onomatopoeia.
+    // RPS: the duck answers with its body — sit is the rock, stand the
+    // paper, a kick the scissors.
+    static var rpsTitle: String { pick("Rock paper scissors", "猜拳") }
+    static var rpsDuckThrew: String { pick("The duck threw", "鸭子出了") }
+    static var rpsRock: String { pick("rock", "石头") }
+    static var rpsPaper: String { pick("paper", "布") }
+    static var rpsScissors: String { pick("scissors", "剪刀") }
+    static func rpsResult(_ outcome: String) -> String {
+        switch outcome {
+        case "win": return pick("You win!", "你赢了！")
+        case "lose": return pick("The duck wins!", "鸭子赢了！")
+        default: return pick("Again!", "再来！")
+        }
+    }
+
     static func echoSound(_ tag: String) -> String {
         switch tag {
         case "chirp": return pick("chirp", "叽")

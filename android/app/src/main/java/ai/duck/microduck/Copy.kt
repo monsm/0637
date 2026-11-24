@@ -130,6 +130,19 @@ val quack get() = pick("Quack", "叫一声")
     val echoAgain get() = pick("Again", "再来")
     fun echoRound(n: Int) = String.format(pick("Round %d", "第 %d 关"), n)
     val echoWon get() = pick("You learned it!", "你学会啦！")
+    // RPS: the duck answers with its body — sit is the rock, stand the
+    // paper, a kick the scissors.
+    val rpsTitle get() = pick("Rock paper scissors", "猜拳")
+    val rpsDuckThrew get() = pick("The duck threw", "鸭子出了")
+    val rpsRock get() = pick("rock", "石头")
+    val rpsPaper get() = pick("paper", "布")
+    val rpsScissors get() = pick("scissors", "剪刀")
+    fun rpsResult(outcome: String): String = when (outcome) {
+        "win" -> pick("You win!", "你赢了！")
+        "lose" -> pick("The duck wins!", "鸭子赢了！")
+        else -> pick("Again!", "再来！")
+    }
+
     /** The four pads are the duck's own synth voices, named as onomatopoeia. */
     fun echoSound(tag: String): String = when (tag) {
         "chirp" -> pick("chirp", "叽")

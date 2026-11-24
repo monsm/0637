@@ -899,7 +899,19 @@ struct ContentView: View {
                         let withinDuck = (gesture.location.y - size.height * 0.33)
                             / (size.height * 0.35)
                         if withinDuck < 0.35 {
-                            controller.trigger("curious")
+                            // The head has two answers: the crown earns a
+                            // curious look-up, the side turns it toward the
+                            // finger. Same joint the head stick drives —
+                            // released a beat later so it stays a glance.
+                            let dx = gesture.location.x / size.width - 0.5
+                            if abs(dx) < 0.1 {
+                                controller.trigger("curious")
+                            } else {
+                                controller.setHead(yaw: dx > 0 ? 0.7 : -0.7, pitch: 0)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                    controller.setHead(yaw: 0, pitch: 0)
+                                }
+                            }
                             DuckHaptics.selection()
                         } else if withinDuck > 0.7 {
                             controller.trigger("kick_left")

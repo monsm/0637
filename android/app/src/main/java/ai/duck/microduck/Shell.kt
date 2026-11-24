@@ -163,6 +163,9 @@ fun Shell(
     // The window is the shell's own; every touch is still a real pet.
     var petBurst by remember { mutableStateOf(0) }
     var petBurstAt by remember { mutableStateOf(0L) }
+    // A head-glance (touch on the side of the head) holds the turn until
+    // this moment passes; the state poll below releases it.
+    var headGlanceUntil by remember { mutableStateOf(0L) }
     // D7: debug-only recomposition counter (recorded by the smoke). The
     // debuggable flag stands in for BuildConfig, which AGP 8 no longer
     // generates for this module.
@@ -536,6 +539,10 @@ fun Shell(
             }
             // The path runner: the same publish carries whether a walk is on,
             // the progress through it and the waypoints as accepted.
+            if (headGlanceUntil != 0L && System.currentTimeMillis() > headGlanceUntil) {
+                headGlanceUntil = 0L
+                if (!carrying && stick != "head") duck.setHead(0.0, 0.0, 0.0, 0.0)
+            }
             val pathNow = stateText?.let(::parsePathFromState) ?: PathUi()
             // The duck's own excited mood is the real celebration; the pill
             // names it when a walk ended without the child's Stop. The end
@@ -974,7 +981,21 @@ fun Shell(
                             val within = (y - 0.33f) / 0.35f
                             when {
                                 within < 0.35f -> {
-                                    duck.skill("curious")
+                                    // The head has two answers: the crown
+                                    // earns a curious look-up, the side turns
+                                    // it toward the finger — the same joint
+                                    // the head stick drives, released a beat
+                                    // later so it stays a glance.
+                                    val dx = x - 0.5f
+                                    if (kotlin.math.abs(dx) < 0.1f) {
+                                        duck.skill("curious")
+                                    } else {
+                                        duck.setHead(0.0, 0.0, if (dx > 0) 0.7 else -0.7, 0.0)
+                                        // Release through the state poll's own
+                                        // clock: the glance holds until the beat
+                                        // after it is due.
+                                        headGlanceUntil = System.currentTimeMillis() + 1200
+                                    }
                                     DuckHaptics.selection(hapticView)
                                 }
                                 within > 0.7f -> {
