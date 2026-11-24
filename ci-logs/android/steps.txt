@@ -1,8 +1,8 @@
-run=45331266115
-sha=e75837bb1d3f8d6842a88126d14f6813b12d574e
+run=45331701516
+sha=18d25f60ab2c74beda4f2c3f4b490c8815433fe2
 checkout=success
-rusttoolchain=skipped
-upstream=skipped
+rusttoolchain=success
+upstream=success
 mujoco=skipped
 ort=skipped
 stage=skipped
