@@ -877,6 +877,64 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// The two games live inline on the Play-more page (no route of their
+    /// own), so a dead button there would pass every static gate: starting
+    /// the echo game must reach round 1 once the duck has sung its sequence,
+    /// and a rock throw must draw the duck's own answer. The score is only
+    /// asserted as a readable tally — a draw leaves it at zero legitimately.
+    func testThePlayPagesGamesAnswer() throws {
+        let more = app.buttons["duck-more"]
+        XCTAssertTrue(more.waitForExistence(timeout: 15), "the More button is missing")
+        more.tap()
+        let playMore = app.buttons["more-playmore"]
+        XCTAssertTrue(playMore.waitForExistence(timeout: 10), "the Play-more row is missing")
+        playMore.tap()
+
+        // The games sit at the foot of the page; scroll the sheet until the
+        // Start button is reachable. Swiping up inside a sheet scrolls it.
+        let start = anyElement("echo-start")
+        var swipes = 0
+        while !(start.exists && start.isHittable) && swipes < 12 {
+            app.swipeUp()
+            swipes += 1
+        }
+        XCTAssertTrue(start.exists && start.isHittable, "the echo game is not on the Play-more page")
+        start.tap()
+
+        let echoStatus = anyElement("echo-status")
+        var echoLabel = ""
+        let echoDeadline = Date().addingTimeInterval(20)
+        repeat {
+            echoLabel = echoStatus.exists ? echoStatus.label : ""
+            if echoLabel == "Round 1" { break }
+            usleep(200_000)
+        } while Date() < echoDeadline
+        XCTAssertEqual(echoLabel, "Round 1", "the echo game never began a round after Start")
+
+        let rock = anyElement("rps-rock")
+        var moreSwipes = 0
+        while !(rock.exists && rock.isHittable) && moreSwipes < 12 {
+            app.swipeUp()
+            moreSwipes += 1
+        }
+        XCTAssertTrue(rock.exists && rock.isHittable, "no rock hand on the Play-more page")
+        rock.tap()
+
+        let answer = anyElement("rps-duck")
+        XCTAssertTrue(answer.waitForExistence(timeout: 10), "the duck never answered the throw")
+        XCTAssertTrue(
+            answer.label.hasPrefix("The duck threw"),
+            "the duck's answer names no hand: \(answer.label)"
+        )
+        let status = anyElement("rps-status")
+        XCTAssertNotEqual(status.label, "Start", "the round produced no outcome")
+        let score = anyElement("rps-score").label
+        XCTAssertTrue(
+            score.hasPrefix("You ") && score.contains(" · Duck "),
+            "the tally row is unreadable: \(score)"
+        )
+    }
+
     /// D1: the first screen at the largest accessibility text size. The deck
     /// labels grow (two lines allowed), their containers grow with them, and
     /// nothing leaves the screen or overlaps a neighbour.

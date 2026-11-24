@@ -886,6 +886,15 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 **遗留**：A24 声纹 / E48 识人跟随 / K98 真机回流 / K100 保真对拍需模型或核心工程，按红线单独立批。
 **工具注记**：本机 `gh` 已不在旧路径（目录被新版本替换），CI 查询改用 git 凭据 token + GitHub 官方 API，轮询照旧。
 
+### 四之四十五、新玩法补脚本化验收（2026-11-25）
+
+QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（回声、猜拳）只有静态门与截图，没有行为断言——内联在「玩一玩」页的控件坏了，十门全绿也照样过。本批补上：
+
+1. **Android 冒烟**：dense 扫掠在 AX3 字号下打开「玩一玩」后，新增 `playmore_games_check`——点「开始」必须到达「第 1 关」（鸭子真的把合成音排进队列、协程 550 ms 后才开拍键，状态文本是真实相位的证据）；点「石头」必须出现「鸭子出了 <手势>」，且场次比分行可读（正则读 `你 N · 鸭 M`）。失败时留 `games-dump.xml`/`games-screen.png`。顺带截 `ui-b4-android-games.png` 进 dist 与产物。`open_more_sheet` 加可选第 7 参（页面自己的行为检查），其余 12 张页零改动。
+2. **iOS UI 测试**：`testThePlayPagesGamesAnswer`——滚动到回声块点 `echo-start`，`echo-status` 在 20 s 内变 `Round 1`；再滚到 `rps-rock` 点击，`rps-duck` 出现且以「The duck threw」开头，`rps-status` 不再停在 `Start`，比分行匹配 `You N · Duck M`。平局不改比分是合法结果，故只断言「可读」不断言「非零」。
+
+**验证**：十门绿；冒烟语法 `bash -n` 过、新断言用合成 dump 单测过；Android 仅脚本/工作流改动，iOS 编译由 CI 判。
+
 ---
 
 ## 八、仓库与复现
