@@ -1016,7 +1016,46 @@ PY
   adb shell input tap $coords > /dev/null 2>&1
 }
 
-# Tap a control by its testTag (Compose puts it in resource-id). The
+# Tap the CLICKABLE control that wraps the label, not the first label with
+# that text. On the Play more page 开始 appears three times — the echo
+# status, the echo start chip and the RPS status — and tap_text picked the
+# dead status text every round (run b0d4c44: eight taps, score still
+# 你 0 · 鸭 0). Compose exposes the chip as an anonymous clickable View
+# around its Text, so the tap must go to that wrapper's centre.
+tap_text_in_control() {
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || return 1
+  coords=$(python3 - "$1" <<'PY'
+import sys, xml.etree.ElementTree as ET
+want = sys.argv[1]
+try:
+    root = ET.parse('ui.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+
+def box(node):
+    parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
+    return tuple(map(int, parts)) if len(parts) == 4 else None
+
+nodes = list(root.iter('node'))
+texts = [(n, box(n)) for n in nodes
+         if (n.get('text') or n.get('content-desc') or '') == want]
+texts = [(n, b) for n, b in texts if b]
+clickables = [(n, box(n)) for n in nodes if n.get('clickable') == 'true']
+clickables = [(n, b) for n, b in clickables if b]
+for _, tbox in texts:
+    for _, cbox in clickables:
+        if (cbox[0] <= tbox[0] and cbox[1] <= tbox[1]
+                and cbox[2] >= tbox[2] and cbox[3] >= tbox[3]):
+            print((cbox[0] + cbox[2]) // 2, (cbox[1] + cbox[3]) // 2)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+)
+  [ -n "$coords" ] || return 1
+  adb shell input tap $coords > /dev/null 2>&1
+}
+
 # Live verbs became shelf objects, so their words live on the objects and
 # the reliable handle is the tag.
 tap_tag() {
@@ -2154,7 +2193,7 @@ playmore_games_check() {
   local ok=0
 
   for _ in $(seq 1 8); do
-    if tap_text "开始" > /dev/null 2>&1 || tap_text "Start" > /dev/null 2>&1; then
+    if tap_text_in_control "开始" > /dev/null 2>&1 || tap_text_in_control "Start" > /dev/null 2>&1; then
       sleep 1
       for _ in 1 2 3 4; do
         screen_has_text "第 1 关|Round 1" && { ok=1; break; }
@@ -2175,7 +2214,7 @@ playmore_games_check() {
 
   ok=0
   for _ in $(seq 1 8); do
-    if tap_text "石头" > /dev/null 2>&1 || tap_text "rock" > /dev/null 2>&1; then
+    if tap_text_in_control "石头" > /dev/null 2>&1 || tap_text_in_control "rock" > /dev/null 2>&1; then
       sleep 1
       for _ in 1 2 3 4; do
         screen_has_text "鸭子出了|The duck threw" && { ok=1; break; }
