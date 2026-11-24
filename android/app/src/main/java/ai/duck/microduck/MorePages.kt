@@ -227,6 +227,107 @@ private fun EchoGame(core: DuckCore?) {
     }
 }
 
+/**
+ * Rock-paper-scissors with the duck's body: sit is the rock, stand the
+ * paper, a kick the scissors. The duck's answer is mixed from its own
+ * provenance fingerprint (the bytes its voice seed comes from) and the
+ * round, so the same duck plays the same way on the same round and two
+ * ducks differ — a personality, not a coin. Nothing is scored or stored.
+ */
+private enum class RpsMove(val word: () -> String, val skill: String) {
+    Rock({ Copy.rpsRock }, "sit"),
+    Paper({ Copy.rpsPaper }, "stand"),
+    Scissors({ Copy.rpsScissors }, "kick_left"),
+    ;
+
+    /** The move this one beats — entries cannot reference each other in
+     * the constructor, so the table lives here. */
+    val beats: RpsMove
+        get() = when (this) {
+            Rock -> Scissors
+            Paper -> Rock
+            Scissors -> Paper
+        }
+}
+
+@Composable
+private fun RpsGame(core: DuckCore?, fingerprint: () -> String) {
+    val hapticView = LocalView.current
+    var round by remember { mutableStateOf(0) }
+    var outcome by remember { mutableStateOf("") }
+    var duckWord by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+
+    fun throwMove(mine: RpsMove) {
+        if (busy) return
+        busy = true
+        round += 1
+        // FNV-1a over the fingerprint, mixed with the round.
+        var hash = -3750763034362895579L // 0xcbf29ce484222325
+        val bytes = fingerprint().toByteArray(Charsets.UTF_8)
+        for (b in bytes) {
+            hash = hash xor b.toLong()
+            hash *= 0x100000001b3L
+        }
+        hash = hash xor (round.toLong() * 2_654_435_761L)
+        val theirs = RpsMove.entries[(hash.mod(3)).toInt()]
+        duckWord = "${Copy.rpsDuckThrew} ${theirs.word()}"
+        core?.skill(theirs.skill)
+        outcome = when {
+            theirs == mine -> {
+                DuckHaptics.selection(hapticView)
+                Copy.rpsResult("draw")
+            }
+            mine.beats == theirs -> {
+                DuckHaptics.success(hapticView)
+                core?.skill("laugh")
+                Copy.rpsResult("win")
+            }
+            else -> {
+                DuckHaptics.medium(hapticView)
+                Copy.rpsResult("lose")
+            }
+        }
+        busy = false
+    }
+
+    val status = if (outcome.isEmpty()) Copy.echoStart else outcome
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                Copy.rpsTitle,
+                color = Color.White,
+                fontSize = DuckTheme.Type.Label,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                status,
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier
+                    .testTag("rps-status")
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            RpsMove.entries.forEach { move ->
+                PathChip(move.word(), enabled = !busy, testTag = "rps-${move.name.lowercase()}") {
+                    throwMove(move)
+                }
+            }
+        }
+        if (duckWord.isNotEmpty()) {
+            Text(
+                duckWord,
+                color = DuckTheme.Brass,
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("rps-duck"),
+            )
+        }
+    }
+}
+
 /** 玩一玩: stick mode, A/B, push-and-compare, HUD - four controls. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -350,6 +451,9 @@ internal fun PlayMoreSheet(
             // Play: the duck sings a short sequence of its own voices and the
             // child answers in the same order — inline, no route case.
             EchoGame(core)
+            // Play: rock-paper-scissors with the duck's body — its own
+            // sit/stand/kick answers, chosen by its own fingerprint.
+            RpsGame(core) { core?.fingerprint().orEmpty() ?: "" }
         }
     }
 }

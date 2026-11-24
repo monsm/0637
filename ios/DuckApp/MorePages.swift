@@ -112,6 +112,10 @@ struct PlayMoreSheet: View {
             // child answers in the same order. Inline on this page so the
             // route table (pinned by check-routes) does not grow a case.
             EchoGame(controller: controller)
+            Divider()
+            // Play: rock-paper-scissors with the duck's body — its own
+            // sit/stand/kick answers, chosen by its own fingerprint.
+            RPSGame(controller: controller)
         }
     }
 }
