@@ -480,7 +480,21 @@ val quack get() = pick("Quack", "叫一声")
         "skill" -> pick("move", "动作")
         "emotion" -> pick("mood", "心情")
         "sound" -> pick("sound", "声音")
+        "light" -> pick("light", "灯")
         else -> action
+    }
+
+    /** The duck's own lamp, at the seven official colours (leds::COLORS). */
+    fun lightColour(value: String): String = when (value) {
+        "red" -> pick("red", "红")
+        "green" -> pick("green", "绿")
+        "blue" -> pick("blue", "蓝")
+        "yellow" -> pick("yellow", "黄")
+        "cyan" -> pick("cyan", "青")
+        "magenta" -> pick("magenta", "紫")
+        "white" -> pick("white", "白")
+        "off" -> pick("off", "关灯")
+        else -> value
     }
     // Other ducks on the same Wi-Fi.
     val peers get() = pick("Neighbours", "邻居")

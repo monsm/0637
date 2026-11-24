@@ -1764,9 +1764,10 @@ private fun RulesSheet(onClose: () -> Unit) {
     }
     val triggers = listOf("clap", "whistle", "pet", "timer")
     var timerPeriod by remember { mutableStateOf(60) }
-    val kinds = listOf("skill", "emotion", "sound")
+    val kinds = listOf("skill", "emotion", "sound", "light")
     val values = when (action) {
         "skill" -> listOf("roulade", "kick_left", "kick_right", "sit", "ground_pick")
+        "light" -> listOf("red", "green", "blue", "yellow", "cyan", "magenta", "white", "off")
         "emotion" -> listOf(
             "excited", "laugh", "curious", "yes", "no", "sad", "angry",
             "defiant", "impatient", "mock", "mmh", "yes_fast", "devastated",
@@ -1843,7 +1844,11 @@ private fun RulesSheet(onClose: () -> Unit) {
                 ) {
                     Text(
                         "${Copy.ruleWhen} ${Copy.ruleTrigger(rule.trigger)} → " +
-                            if (rule.action == "sound") rule.value else skillLabel(rule.value),
+                            when (rule.action) {
+                                "sound" -> rule.value
+                                "light" -> Copy.lightColour(rule.value)
+                                else -> skillLabel(rule.value)
+                            },
                         color = Color.White,
                         fontSize = DuckTheme.Type.Label,
                         modifier = Modifier
@@ -1903,7 +1908,11 @@ private fun RulesSheet(onClose: () -> Unit) {
             ) {
                 values.forEach { option ->
                     RuleChip(
-                        if (action == "sound") option else skillLabel(option),
+                        when (action) {
+                            "sound" -> option
+                            "light" -> Copy.lightColour(option)
+                            else -> skillLabel(option)
+                        },
                         "rule-value-$option",
                         value == option,
                     ) { value = option }

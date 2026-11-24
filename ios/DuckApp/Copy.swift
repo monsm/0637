@@ -655,7 +655,23 @@ enum Copy {
         case "skill": return pick("move", "动作")
         case "emotion": return pick("mood", "心情")
         case "sound": return pick("sound", "声音")
+        case "light": return pick("light", "灯")
         default: return action
+        }
+    }
+
+    /// The duck's own lamp, at the seven official colours (leds::COLORS).
+    static func lightColour(_ value: String) -> String {
+        switch value {
+        case "red": return pick("red", "红")
+        case "green": return pick("green", "绿")
+        case "blue": return pick("blue", "蓝")
+        case "yellow": return pick("yellow", "黄")
+        case "cyan": return pick("cyan", "青")
+        case "magenta": return pick("magenta", "紫")
+        case "white": return pick("white", "白")
+        case "off": return pick("off", "关灯")
+        default: return value
         }
     }
     // Other ducks on the same Wi-Fi.
