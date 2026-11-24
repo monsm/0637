@@ -443,7 +443,27 @@ fun Shell(
             // snapshot it persists.
             val stateText = withContext(Dispatchers.IO) { fetchRawState() }
             val careNow = stateText?.let(::parseCare)
-            if (careNow != null) careUi = careNow
+            if (careNow != null) {
+                // A bond milestone, named once: care.bond is the core's own
+                // number, and a crossing is a real moment. The pref remembers
+                // it was said so a reconnect cannot repeat it.
+                val previousBond = careUi?.bond
+                careUi = careNow
+                if (previousBond != null) {
+                    val prefs = context.getSharedPreferences("duck", android.content.Context.MODE_PRIVATE)
+                    for (threshold in listOf(0.5, 0.8)) {
+                        val key = "bond_milestone_" + (threshold * 100).toInt()
+                        if (previousBond < threshold && careNow.bond >= threshold &&
+                            !prefs.getBoolean(key, false)
+                        ) {
+                            prefs.edit().putBoolean(key, true).apply()
+                            soundLine = Copy.bondMilestone((threshold * 100).toInt())
+                            duck.skill("excited")
+                            DuckHaptics.success(hapticView)
+                        }
+                    }
+                }
+            }
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
             val nightNow = stateText?.let(::parseNight)
