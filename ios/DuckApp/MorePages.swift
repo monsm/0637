@@ -108,6 +108,10 @@ struct PlayMoreSheet: View {
                 selected: controller.hudOn,
                 id: "play-more-hud"
             ) { controller.hudOn.toggle() }
+            // Play: the duck sings a short sequence of its own voices and the
+            // child answers in the same order. Inline on this page so the
+            // route table (pinned by check-routes) does not grow a case.
+            EchoGame(controller: controller)
         }
     }
 }

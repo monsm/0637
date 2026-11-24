@@ -371,6 +371,22 @@ enum Copy {
     }
     static var pathDone: String { pick("Walked the whole path", "走完全程啦") }
     static var pathPostcard: String { pick("Keep it", "存成明信片") }
+
+    // Echo game (玩法: the duck sings, the child answers in the same order).
+    static var echoTitle: String { pick("Echo game", "回声游戏") }
+    static var echoStart: String { pick("Start", "开始") }
+    static var echoAgain: String { pick("Again", "再来") }
+    static func echoRound(_ n: Int) -> String { String(format: pick("Round %d", "第 %d 关"), n) }
+    static var echoWon: String { pick("You learned it!", "你学会啦！") }
+    /// The four pads are the duck's own synth voices, named as onomatopoeia.
+    static func echoSound(_ tag: String) -> String {
+        switch tag {
+        case "chirp": return pick("chirp", "叽")
+        case "coo": return pick("coo", "咕咕")
+        case "peck": return pick("tock", "嗒")
+        default: return pick("huh?", "嗯?")
+        }
+    }
     // Morning postcard.
     static var postcardKeep: String { pick("Keep", "收藏") }
     static var postcardQuiet: String { pick("A quiet night.", "安静的一夜。") }

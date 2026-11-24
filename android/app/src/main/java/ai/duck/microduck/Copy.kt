@@ -123,6 +123,20 @@ val quack get() = pick("Quack", "叫一声")
     fun pathStep(step: Int, total: Int) = pick("Step $step of $total", "第 $step 步，共 $total 步")
     val pathDone get() = pick("Walked the whole path", "走完全程啦")
     val pathPostcard get() = pick("Keep it", "存成明信片")
+
+    // Echo game (玩法: the duck sings, the child answers in the same order).
+    val echoTitle get() = pick("Echo game", "回声游戏")
+    val echoStart get() = pick("Start", "开始")
+    val echoAgain get() = pick("Again", "再来")
+    fun echoRound(n: Int) = String.format(pick("Round %d", "第 %d 关"), n)
+    val echoWon get() = pick("You learned it!", "你学会啦！")
+    /** The four pads are the duck's own synth voices, named as onomatopoeia. */
+    fun echoSound(tag: String): String = when (tag) {
+        "chirp" -> pick("chirp", "叽")
+        "coo" -> pick("coo", "咕咕")
+        "peck" -> pick("tock", "嗒")
+        else -> pick("huh?", "嗯?")
+    }
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
     /** Startup failure in words a person can act on. The raw text is a log line. */
