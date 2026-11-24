@@ -370,6 +370,7 @@ enum Copy {
         String(format: pick("Step %d of %d", "第 %d 步，共 %d 步"), step, total)
     }
     static var pathDone: String { pick("Walked the whole path", "走完全程啦") }
+    static var pathPostcard: String { pick("Keep it", "存成明信片") }
     // Morning postcard.
     static var postcardKeep: String { pick("Keep", "收藏") }
     static var postcardQuiet: String { pick("A quiet night.", "安静的一夜。") }

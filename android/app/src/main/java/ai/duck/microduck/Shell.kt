@@ -312,6 +312,10 @@ fun Shell(
     // "path" object of /state: active, the reached/total counts and the
     // accepted body-frame waypoints as posted.
     var pathActive by remember { mutableStateOf(false) }
+    // A route just ran its whole course: offer to keep the moment as a
+    // postcard for a few seconds (the shutter is the same capture Director
+    // uses; the core has already fired its excited celebration).
+    var pathPostcardReady by remember { mutableStateOf(false) }
     var pathProgress by remember { mutableStateOf(0 to 0) }
     var pathActivePoints by remember { mutableStateOf(emptyList<List<Double>>()) }
     // The draw-time mapping, remembered when the stroke is posted so the walk
@@ -535,6 +539,7 @@ fun Shell(
             // not the final count — is what says "finished".
             if (!pathNow.active && pathActive && !pathCancelRequested) {
                 soundLine = Copy.pathDone
+                pathPostcardReady = true
                 DuckHaptics.success(hapticView)
             }
             if (!pathNow.active) pathCancelRequested = false
@@ -552,6 +557,12 @@ fun Shell(
         }
     }
 
+    LaunchedEffect(pathPostcardReady) {
+        if (pathPostcardReady) {
+            kotlinx.coroutines.delay(15_000)
+            pathPostcardReady = false
+        }
+    }
     // A clap or a whistle stays on screen for a moment, then the care line
     // has the slot back.
     LaunchedEffect(soundLine) {
@@ -767,6 +778,14 @@ fun Shell(
                         onCancel = {
                             pathCancelRequested = true
                             postPathCancel()
+                        },
+                        onPostcard = if (pathPostcardReady && onPhoto != null) {
+                            {
+                                pathPostcardReady = false
+                                onPhoto()
+                            }
+                        } else {
+                            null
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -3568,6 +3587,7 @@ private fun PathBar(
     onGo: () -> Unit,
     onClear: () -> Unit,
     onCancel: () -> Unit,
+    onPostcard: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (!drawing && !active) return
@@ -3591,6 +3611,9 @@ private fun PathBar(
             PathChip(Copy.pathCancel, testTag = "path-cancel", onClick = onCancel)
         } else {
             Spacer(Modifier.weight(1f))
+            if (onPostcard != null) {
+                PathChip(Copy.pathPostcard, testTag = "path-postcard", onClick = onPostcard)
+            }
             PathChip(Copy.pathGo, enabled = canGo, testTag = "path-go", onClick = onGo)
             PathChip(Copy.pathClear, testTag = "path-clear", onClick = onClear)
         }

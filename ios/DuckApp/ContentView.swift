@@ -70,6 +70,10 @@ struct ContentView: View {
     /// The progress store's unlock signal (a real fact, never invented):
     /// a fresh achievement makes the duck celebrate once.
     @ObservedObject private var progress = ProgressStore.shared
+    /// A route just ran its whole course: offer to keep the moment as a
+    /// postcard for a few seconds. Real event, real frame — the shutter is
+    /// the same one Director uses.
+    @State private var pathPostcardReady = false
     /// D4 sheet focus: the stage control a sheet must return focus to when it
     /// closes. The route reducer does not know who opened the sheet, so every
     /// entry point names its own anchor here.
@@ -260,9 +264,13 @@ struct ContentView: View {
             guard tick > 0 else { return }
             let notice = Copy.pathDone
             withDuckMotion(DuckMotion.base) { moodText = notice }
+            withDuckMotion(DuckMotion.base) { pathPostcardReady = true }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard moodText == notice else { return }
                 withDuckMotion(DuckMotion.slow) { moodText = nil }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
+                if pathPostcardReady { withDuckMotion(DuckMotion.slow) { pathPostcardReady = false } }
             }
         }
         // The morning after a chosen night: the same one-line pill, saying
@@ -983,6 +991,12 @@ struct ContentView: View {
             }
             pathChip("path-clear", Copy.pathClear, "trash", enabled: !pathDraft.isEmpty) {
                 pathDraft.removeAll()
+            }
+            if pathPostcardReady {
+                pathChip("path-postcard", Copy.pathPostcard, "camera", enabled: true) {
+                    pathPostcardReady = false
+                    controller.captureDirectorPhoto()
+                }
             }
             Spacer(minLength: 0)
             if controller.pathActive {
