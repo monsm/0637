@@ -2,7 +2,7 @@
 PASS  bundle has Shaders.metal  (ios/build/Build/Products/Debug-iphonesimulator/Duck.app/DuckResources)
 --- install and launch ---
 PASS  simctl install  (installed)
-app container: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/FBCA2AB3-2FC5-4031-9D5A-DAA7CE0BABE3/Duck.app
+app container: /Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/63D1A8D1-E360-4356-A836-3B9E65ADD22D/Duck.app
 PASS  intent API answers on :8765  (walk)
 PASS  the 50 Hz control loop is ticking  (label=walk)
 PASS  policy reached ready (bringup=2)  (bringup=2)
@@ -33,12 +33,12 @@ PASS  state publishes the duck's proprioception
 PASS  measured joint positions are published
 PASS  commanded joint targets are published
 PASS  state publishes the platform's own performance
-PASS  the control loop reports 41.97993236437069 ticks/s
+PASS  the control loop reports 41.26456068672919 ticks/s
 PASS  the IMU reports warm once the loop is driving
 PASS  the beak is published
 PASS  build fingerprint is served  ("fingerprint":"69b4e43b681bead51f5736ff810c269316d5cb19903db6db3794b88c36bfe5c1")
 --- idle look-around ---
-PASS  a still duck looks around  (takeover=1.0 head=0.2826911283043795)
+PASS  a still duck looks around  (takeover=1.0 head=0.18119183797315552)
 --- idle ritual ---
 PASS  a duck left alone does something by itself  (emotions 1 -> 2)
 --- face ---
@@ -77,14 +77,14 @@ PASS  an unknown chorus move is refused  ({"error":"no such emotion","ok":false}
 PASS  the duck queues its own chorus  ({"moves":["laugh"],"ok":true,"queued":true})
 PASS  the lead chorus is published  (role=lead)
 --- feed ---
-PASS  a treat starts the peck  ({"care":{"asleep":false,"bond":0.14950509259258937,"budget_s":null,"heart_bpm":77.7,"hunger":0.0,"idle_s":0.0,"last_touc)
+PASS  a treat starts the peck  ({"care":{"asleep":false,"bond":0.14957245370370092,"budget_s":null,"heart_bpm":77.7,"hunger":0.0,"idle_s":0.0,"last_touc)
 --- life ---
 PASS  life publishes the record  ({"boots":2,"claps":3,"day_started":{"claps":0,"day":"2026-11-24","falls":0,"fed":0,"ground_picks":0,"metres":0.0,"pets":)
 PASS  life counts the skills and emotions the duck ran
 PASS  life does not count a refused skill
 PASS  state carries the same record  (walking_s=0.0)
 --- care ---
-PASS  care publishes hunger, mood and bond  ({"care":{"asleep":false,"bond":0.14949166666666336,"budget_s":null,"heart_bpm":77.7,"hunger":0.00042962962962962996,"idle_s":1.16,"last_touc)
+PASS  care publishes hunger, mood and bond  ({"care":{"asleep":false,"bond":0.14956296296296012,"budget_s":null,"heart_bpm":77.7,"hunger":0.00030370370370370387,"idle_s":0.8200000000000)
 PASS  a treat fills the tummy and a stroke warms the bond
 PASS  care publishes the palm's heart reading
 PASS  a long neglect puts the duck to sleep  (asleep=yes)
@@ -99,8 +99,8 @@ PASS  a low mood plays the official sad timeline  (emotion=sad)
 --- night ---
 PASS  a good night is accepted  ({"ok":true,"queued":true})
 PASS  the night puts the duck to sleep on purpose  (active/asleep=yes)
-PASS  the morning is accepted  ({"ok":true,"queued":true,"quiet_s":0.96})
-PASS  the morning reports how quiet the night was  (quiet_s=0.96)
+PASS  the morning is accepted  ({"ok":true,"queued":true,"quiet_s":0.84})
+PASS  the morning reports how quiet the night was  (quiet_s=0.84)
 PASS  the morning clears the night  (active=yes)
 PASS  the vet book names the morning  (morning=yes)
 PASS  a stroke ends the night  (active=yes)
@@ -122,19 +122,19 @@ PASS  the ride ends on release  (wheee:end:0)
 --- heard ---
 PASS  Chinese speech maps to a skill  ({"chained":false,"heard":"翻滚","ok":true,"phrase":"翻滚","skill":"roulade"})
 PASS  English speech maps to the same table  ({"chained":false,"heard":"excited","ok":true,"phrase":"excited","skill":"excited"})
-PASS  the heard words are published for an outside model  ({"last_heard":{"text":"excited","tick":3473}})
+PASS  the heard words are published for an outside model  ({"last_heard":{"text":"excited","tick":2843}})
 PASS  站起来 on a standing duck is a no-op  ({"did":false,"heard":"站起来","ok":true,"phrase":"站起来","skill":"stand"})
 PASS  a greeting answers with the duck's voice  ({"heard":"你好","ok":true,"phrase":"你好","sound":"greet"})
 PASS  unrecognized speech is refused, not guessed  ({"heard":"qwertyuiop","ok":false,"reason":"no verb matched"})
 --- odometry ---
-PASS  the duck publishes its own pose  (pose=0.296 0.236 0.116 0.670)
+PASS  the duck publishes its own pose  (pose=0.282 0.251 0.116 0.749)
 --- walk ---
-trunk while walking: 0.8575 0.9241 0.1155 -> 1.1482 1.0894 0.1132
-PASS  twist moves the duck  (0.8575 0.9241 0.1155 -> 1.1482 1.0894 0.1132)
-PASS  the vet book counts the metres walked  (metres=2.304618670453283)
+trunk while walking: 0.8160 0.9557 0.1152 -> 1.1478 1.1590 0.1178
+PASS  twist moves the duck  (0.8160 0.9557 0.1152 -> 1.1478 1.1590 0.1178)
+PASS  the vet book counts the metres walked  (metres=2.400253952713353)
 --- sit and stand ---
 PASS  sit command seats the duck  (label=sit)
-PASS  sit toggle stands it back up  (label=rise)
+PASS  sit toggle stands it back up  (label=walk)
 --- posture ---
 PASS  posture seats the duck  (label=sit)
 PASS  asking to sit twice does not stand it up  (label=sit)
@@ -148,7 +148,7 @@ PASS  skill runs: kick_right  (label=kick_right)
 PASS  life counts the skills that ran  (counted=3/3)
 PASS  an emotion plays: curious  (emotion=curious)
 PASS  an emotion's voice is queued  (last_emotion_sound=emotion:curious)
-PASS  the emotion clock advances  (0.4000000000000001 curious)
+PASS  the emotion clock advances  (0.46000000000000013 curious)
 --- ground pick ---
 PASS  ground pick runs  (label=ground_pick)
 PASS  the book counts the peck  (ground_picks=7)
@@ -156,11 +156,11 @@ PASS  the book counts the peck  (ground_picks=7)
 PASS  head command accepted
 PASS  body command accepted
 PASS  body pose released
-PASS  the duck walks again after releasing the pose  (1.4804 0.8422 0.0942 -> 1.9120 0.7490 0.1152)
+PASS  the duck walks again after releasing the pose  (1.4642 0.8533 0.0969 -> 1.8424 0.7545 0.1124)
 --- voice ---
 PASS  the duck can be asked to chirp  ({"ok":true,"tag":"chirp"})
-PASS  the chirp reaches the audio engine  (scheduled chirps 1 -> 3)
-PASS  the audio session is playable (playback, not ambient)  (2026-11-24 02:05:20.581 Duck[13239:44039] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker)
+PASS  the chirp reaches the audio engine  (scheduled chirps 1 -> 2)
+PASS  the audio session is playable (playback, not ambient)  (2026-11-24 02:44:31.193 Duck[11219:36184] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker)
 PASS  an unknown sound is refused  ({"error":"no such sound: bark","ok":false})
 PASS  MCP duck_sound plays the voice  ({"id":9,"jsonrpc":"2.0","result":{"content":[{"text":"{\"ok\":true,\"tag\":\"greet\"}","type":"text"}]}})
 --- beak ---
@@ -175,7 +175,7 @@ PASS  roller keeps the skill: kick_left
 PASS  roller keeps the skill: sit
 PASS  the duck can switch back to walk  ({"mode":"walk","ok":true})
 PASS  the state reports walk again  (mode=walk)
-PASS  a mode switch keeps the companion  (bond 0.34924259259258766 -> 0.3492078703703652)
+PASS  a mode switch keeps the companion  (bond 0.3495120370370339 -> 0.3494763888888855)
 PASS  a mode switch keeps the child's rules
 PASS  an unknown mode is refused  ({"error":"mode refused: no such mode: hover","ok":false})
 --- shutdown ---
@@ -185,11 +185,11 @@ PASS  the state reports powered off  (powered_off=True)
 PASS  the vet book counts the power-off  (power_offs=1)
 PASS  power-on accepted
 PASS  the duck powers back on  (bringup=2)
-after power-on: label=walk trunk=-0.1289 0.0569 0.1162
+after power-on: label=walk trunk=-0.1012 -0.0389 0.0529
 PASS  the walking networks have the duck after power-on  (label=walk)
 --- carry ---
 PASS  the duck can be picked up  ({"carrying":true,"ok":true})
-PASS  picking it up lifts the body  (z 0.1163 -> 0.3545)
+PASS  picking it up lifts the body  (z 0.0821 -> 0.3497)
 PASS  the duck can be set down
 --- external push ---
 PASS  push (external disturbance) accepted
@@ -198,15 +198,15 @@ PASS  duck survives the push  (bringup=2)
 PASS  reload the bundled policy set  ({"ok":true})
 PASS  skills still available after reload  ({"skills":["sit","stand","ground_pick","roulade","kick_left","kick_right","angry","curious","defiant","devastated","excited","impatient","laugh","mmh","mock","no","sad","yes","yes_fast"]})
 --- time machine ---
-PASS  pause freezes the simulation clock  (1207 -> 1207)
+PASS  pause freezes the simulation clock  (1164 -> 1164)
 PASS  state reports the duck is paused  (paused=true)
-PASS  step advances exactly the ticks asked for  (1207 -> 1217 (want +10))
+PASS  step advances exactly the ticks asked for  (1164 -> 1174 (want +10))
 PASS  the clock takes the half-speed setting  (speed=0.5000 paused=false)
-PASS  half speed advances about half as fast  (47 ticks in 2 s)
+PASS  half speed advances about half as fast  (55 ticks in 2 s)
 PASS  the timeline lists checkpoints  ({"checkpoints":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,)
-PASS  seek rewinds the duck  (1318 -> 1163)
+PASS  seek rewinds the duck  (1279 -> 1123)
 PASS  the rewound duck is still driving  (label=homing)
-PASS  the rewound duck is still ready or walking home  (bringup=2)
+PASS  the rewound duck is still ready or walking home  (bringup=1)
 --- mcp ---
 PASS  MCP initialize answers  ({"id":1,"jsonrpc":"2.0","result":{"capabilities":{"tools":{}},"protocolVersion":"2025-06-18","server)
 PASS  MCP tool listed: duck_state
@@ -229,32 +229,32 @@ PASS  sensor reading is published: camera
 PASS  sensor reading is published: microphone
 PASS  sensor reading is published: depth
 PASS  phone sensors stay out of the 61-D observation
-PASS  an IMU shake pushes the duck  (0.5368 0.0690 0.1159 -> 0.8384 0.0480 0.0528)
+PASS  an IMU shake pushes the duck  (-0.1616 -0.1230 0.1159 -> 0.1149 -0.1590 0.0420)
 --- fork ---
-PASS  fork creates a branch  ({"branches":[{"gravity":[0.4418866341981618,0.4096357262506829,-0.7980819345757028],"label":"a","label_state":"ready","paused":false,"tick":)
+PASS  fork creates a branch  ({"branches":[{"gravity":[-0.28150119782525795,-0.9558159336192462,0.08469342750483505],"label":"a","label_state":"ready","paused":false,"tic)
 PASS  the branch reports its own tick
 PASS  a branch can be selected  (selected=a)
-PASS  a selected branch keeps recording checkpoints  (newest=1477)
-PASS  the branch's newest checkpoint is rewindable  ({"ok":true,"pending":true,"tick":1477})
+PASS  a selected branch keeps recording checkpoints  (newest=1380)
+PASS  the branch's newest checkpoint is rewindable  ({"ok":true,"pending":true,"tick":1380})
 PASS  the ninth branch is refused (cap 8)  ({"error":"fork refused: at most 8 branches","ok":false})
 PASS  a branch can be dropped
 --- frames ---
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: 97520FC3-26B7-40FB-A4F7-C876F2F0B1D2 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: E8F3F811-1D4B-4647-966C-EEF538295007 (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-1.png
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: 97520FC3-26B7-40FB-A4F7-C876F2F0B1D2 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: E8F3F811-1D4B-4647-966C-EEF538295007 (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-2.png
 Detected file type from extension: PNG
-Note: No display specified. Defaulting to display: 97520FC3-26B7-40FB-A4F7-C876F2F0B1D2 (screenID: 1, name: LCD)
+Note: No display specified. Defaulting to display: E8F3F811-1D4B-4647-966C-EEF538295007 (screenID: 1, name: LCD)
 Wrote screenshot to: /Users/runner/work/0637/0637/sim-drive/frame-3.png
-PASS  frame 1: lit viewport with the duck's materials  (sim-drive/frame-1.png: bright neutral shell (>= 120) -> 123349 px (want >= 1200))
-PASS  frame 2: lit viewport with the duck's materials  (sim-drive/frame-2.png: bright neutral shell (>= 120) -> 124815 px (want >= 1200))
-PASS  frame 3: lit viewport with the duck's materials  (sim-drive/frame-3.png: bright neutral shell (>= 120) -> 125869 px (want >= 1200))
+PASS  frame 1: lit viewport with the duck's materials  (sim-drive/frame-1.png: bright neutral shell (>= 120) -> 125111 px (want >= 1200))
+PASS  frame 2: lit viewport with the duck's materials  (sim-drive/frame-2.png: bright neutral shell (>= 120) -> 119531 px (want >= 1200))
+PASS  frame 3: lit viewport with the duck's materials  (sim-drive/frame-3.png: bright neutral shell (>= 120) -> 124318 px (want >= 1200))
 PASS  frames 1-2 differ (scene is live)
 PASS  frames 2-3 differ (scene is live)
 --- companion survives a restart ---
-PASS  the duck wakes up with its tummy and bond  (hunger/bond=0.425 0.330)
+PASS  the duck wakes up with its tummy and bond  (hunger/bond=0.424 0.330)
 --- renderer log ---
 ios/scripts/sim-drive.sh: line 1915: printf: write error: Broken pipe
 note  log: the startup trail was not in the captured stream (not a failure)
