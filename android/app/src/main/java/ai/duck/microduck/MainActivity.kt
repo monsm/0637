@@ -212,6 +212,7 @@ class MainActivity : ComponentActivity() {
                         }.start()
                     },
                     input = input,
+                    isSpeaking = { voice?.isSpeaking == true },
                     onQuack = { voice?.play("chirp") },
                     onWheee = { held -> core?.wheee(held) },
                     onFeed = {
@@ -352,6 +353,7 @@ private fun DuckScreen(
     coreProvider: () -> DuckCore?,
     onCoreCreated: (DuckCore) -> Unit,
     input: DuckInput,
+    isSpeaking: () -> Boolean,
     onQuack: () -> Unit,
     onWheee: (Boolean) -> Unit,
     onFeed: () -> Unit,
@@ -482,6 +484,11 @@ private fun DuckScreen(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+            // Direction-A play: the ripple of every sound the duck makes.
+            // Above the scene, below the shell's controls — the wave reaches
+            // the duck without covering the shelf, the wall and the sheets.
+            // Read in composition so the voice's state drives recomposition.
+            VoiceRipple(isSpeaking = isSpeaking())
             // The fused shell owns the chrome: live duck, instrument sheet,
             // viewfinder.
             Shell(
