@@ -257,6 +257,9 @@ private fun RpsGame(core: DuckCore?, fingerprint: () -> String) {
     var outcome by remember { mutableStateOf("") }
     var duckWord by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    // This page's own tally: session only, nothing stored.
+    var youScore by remember { mutableStateOf(0) }
+    var duckScore by remember { mutableStateOf(0) }
 
     fun throwMove(mine: RpsMove) {
         if (busy) return
@@ -281,10 +284,12 @@ private fun RpsGame(core: DuckCore?, fingerprint: () -> String) {
             mine.beats == theirs -> {
                 DuckHaptics.success(hapticView)
                 core?.skill("laugh")
+                youScore += 1
                 Copy.rpsResult("win")
             }
             else -> {
                 DuckHaptics.medium(hapticView)
+                duckScore += 1
                 Copy.rpsResult("lose")
             }
         }
@@ -308,6 +313,12 @@ private fun RpsGame(core: DuckCore?, fingerprint: () -> String) {
                 modifier = Modifier
                     .testTag("rps-status")
                     .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            Text(
+                "${Copy.rpsYou} $youScore · ${Copy.rpsDuck} $duckScore",
+                color = DuckTheme.Brass,
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("rps-score"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
