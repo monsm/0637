@@ -132,6 +132,12 @@ val quack get() = pick("Quack", "叫一声")
     val echoWon get() = pick("You learned it!", "你学会啦！")
     // RPS: the duck answers with its body — sit is the rock, stand the
     // paper, a kick the scissors.
+    /** A bond milestone, said once when it first crosses (real care.bond). */
+    fun bondMilestone(percent: Int): String = if (percent >= 80) {
+        pick("It treats you as family", "它把你当自己人了")
+    } else {
+        pick("It trusts you more", "它更信任你了")
+    }
     val autoPostcard get() = pick("Auto postcard", "自动存明信片")
     val autoPostcardNote get() = pick("When a walk ends", "走完路自动存一张")
     val rpsTitle get() = pick("Rock paper scissors", "猜拳")

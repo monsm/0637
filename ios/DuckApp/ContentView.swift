@@ -221,6 +221,24 @@ struct ContentView: View {
             controller.trigger("excited")
             DuckHaptics.success()
         }
+        // A bond milestone, named once: care.bond is the core's own number,
+        // and a crossing is a real moment. The flag remembers it was said so
+        // a reconnect cannot repeat it.
+        .onChange(of: controller.careBond) { oldBond, newBond in
+            for threshold in [0.5, 0.8] where oldBond < threshold && newBond >= threshold {
+                let key = "duck_bond_milestone_\(Int(threshold * 100))"
+                guard !UserDefaults.standard.bool(forKey: key) else { continue }
+                UserDefaults.standard.set(true, forKey: key)
+                let notice = Copy.bondMilestone(Int(threshold * 100))
+                withDuckMotion(DuckMotion.base) { moodText = notice }
+                controller.trigger("excited")
+                DuckHaptics.success()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    guard moodText == notice else { return }
+                    withDuckMotion(DuckMotion.slow) { moodText = nil }
+                }
+            }
+        }
         // A greeting from the room next door, or the answer to ours.
         .onChange(of: controller.peerNotice) { _, notice in
             guard let notice, !notice.isEmpty else { return }
