@@ -3543,7 +3543,7 @@ internal fun ButtonChip(
  * TalkBack never loses the control.
  */
 @Composable
-private fun PathChip(
+internal fun PathChip(
     label: String,
     enabled: Boolean = true,
     testTag: String? = null,

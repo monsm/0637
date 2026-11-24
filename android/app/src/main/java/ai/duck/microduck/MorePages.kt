@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -120,6 +122,101 @@ private fun loadBranchB(folder: String, core: DuckCore?, context: Context, scope
             if (verdict == null) android.widget.Toast.LENGTH_SHORT
             else android.widget.Toast.LENGTH_LONG,
         ).show()
+    }
+}
+
+/**
+ * A turn-taking memory game with the duck's own voice: the duck sings a
+ * short sequence of its synth sounds (queueSound), the child answers on the
+ * same pads in the same order. Each cleared round adds one sound, up to five;
+ * a win lets the duck celebrate with its own excited mood. No score, no timer
+ * — play, not a test.
+ */
+private enum class EchoPhase { Idle, Singing, Listening, Won, Lost }
+
+@Composable
+private fun EchoGame(core: DuckCore?) {
+    val scope = rememberCoroutineScope()
+    val hapticView = LocalView.current
+    var phase by remember { mutableStateOf(EchoPhase.Idle) }
+    var sequence by remember { mutableStateOf(emptyList<String>()) }
+    var answer by remember { mutableStateOf(0) }
+    val pads = listOf("chirp", "coo", "peck", "inquire")
+
+    fun play(tag: String) {
+        core?.queueSound(tag)
+    }
+    fun sing(seq: List<String>) {
+        phase = EchoPhase.Singing
+        scope.launch {
+            for (tag in seq) {
+                play(tag)
+                delay(550)
+            }
+            answer = 0
+            phase = EchoPhase.Listening
+        }
+    }
+    fun tap(tag: String) {
+        if (phase != EchoPhase.Listening || answer >= sequence.size) return
+        play(tag)
+        if (tag != sequence[answer]) {
+            phase = EchoPhase.Lost
+            DuckHaptics.error(hapticView)
+            play("alarm")
+            return
+        }
+        answer += 1
+        if (answer < sequence.size) return
+        if (sequence.size >= 5) {
+            phase = EchoPhase.Won
+            DuckHaptics.success(hapticView)
+            core?.skill("excited")
+        } else {
+            sequence = sequence + pads.random()
+            sing(sequence)
+        }
+    }
+    val status = when (phase) {
+        EchoPhase.Idle -> Copy.echoStart
+        EchoPhase.Singing -> "…"
+        EchoPhase.Listening -> Copy.echoRound(sequence.size)
+        EchoPhase.Won -> Copy.echoWon
+        EchoPhase.Lost -> Copy.echoAgain
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                Copy.echoTitle,
+                color = Color.White,
+                fontSize = DuckTheme.Type.Label,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                status,
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("echo-status"),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            pads.forEach { tag ->
+                PathChip(
+                    Copy.echoSound(tag),
+                    enabled = phase == EchoPhase.Listening,
+                    testTag = "echo-pad-$tag",
+                ) { tap(tag) }
+            }
+        }
+        PathChip(
+            if (sequence.isEmpty()) Copy.echoStart else Copy.echoAgain,
+            testTag = "echo-start",
+        ) {
+            sequence = listOf(pads.random())
+            answer = 0
+            sing(sequence)
+        }
     }
 }
 
@@ -243,6 +340,9 @@ internal fun PlayMoreSheet(
                     fontSize = DuckTheme.Type.Micro,
                 )
             }
+            // Play: the duck sings a short sequence of its own voices and the
+            // child answers in the same order — inline, no route case.
+            EchoGame(core)
         }
     }
 }
