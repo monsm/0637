@@ -67,6 +67,9 @@ struct ContentView: View {
     /// One transient line above the time rail: what happened while the app
     /// was away. It hides itself and takes no space when empty.
     @State private var moodText: String?
+    /// The progress store's unlock signal (a real fact, never invented):
+    /// a fresh achievement makes the duck celebrate once.
+    @ObservedObject private var progress = ProgressStore.shared
     /// D4 sheet focus: the stage control a sheet must return focus to when it
     /// closes. The route reducer does not know who opened the sheet, so every
     /// entry point names its own anchor here.
@@ -200,6 +203,15 @@ struct ContentView: View {
                 guard moodText == notice else { return }
                 withDuckMotion(DuckMotion.slow) { moodText = nil }
             }
+        }
+        // A badge just unlocked (ProgressStore only sets latestUnlock on a
+        // fresh unlock during a real record — never at launch): let the duck
+        // celebrate. excited is its own celebration; the ripple follows the
+        // voice, and the badge is named in the growth book.
+        .onChange(of: progress.latestUnlock?.id ?? "") { _, id in
+            guard !id.isEmpty else { return }
+            controller.trigger("excited")
+            DuckHaptics.success()
         }
         // A greeting from the room next door, or the answer to ours.
         .onChange(of: controller.peerNotice) { _, notice in

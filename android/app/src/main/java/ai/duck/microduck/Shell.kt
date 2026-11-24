@@ -65,6 +65,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
@@ -147,6 +148,17 @@ fun Shell(
 ) {
     val context = LocalContext.current
     val hapticView = LocalView.current
+    // A badge just unlocked (ProgressStore sets latestUnlock only on a fresh
+    // unlock during a real record, never at launch): the duck celebrates with
+    // its own excited emotion, and the ripple follows the voice.
+    val growth by DuckProgress.snapshot.collectAsState()
+    LaunchedEffect(growth.latestUnlock) {
+        val id = growth.latestUnlock
+        if (!id.isNullOrEmpty()) {
+            core?.skill("excited")
+            DuckHaptics.success(hapticView)
+        }
+    }
     // D7: debug-only recomposition counter (recorded by the smoke). The
     // debuggable flag stands in for BuildConfig, which AGP 8 no longer
     // generates for this module.
