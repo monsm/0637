@@ -480,6 +480,9 @@ final class DuckController: ObservableObject {
     private let voiceAliases = VoiceAliasStore()
     private let motion = CMMotionManager()
     private var lastPush = Date.distantPast
+    /// The duck is sounding right now (its own voice or the diary's TTS).
+    /// Published from the 50 Hz tick; the stage ripples on the sound.
+    @Published var isSpeaking = false
     /// The duck's own voice: the core decides when, this owns the speaker.
     let voice = Voice()
     /// The system voice speaking for the duck (diary reads): possession-mode,
@@ -3135,7 +3138,12 @@ final class DuckController: ObservableObject {
         // tick; a receiver-owned deadzone means raw values travel.
         padSender.stickX = joystick.x
         padSender.stickY = joystick.y
-        let mouthTarget = (voice.isSpeaking || speaker.isSpeaking) ? 1.0 : 0.0
+        let speaking = voice.isSpeaking || speaker.isSpeaking
+        // Direction-A play: the stage shows a ripple whenever the duck is
+        // sounding, so a quack or an emotion's voice is visible before the
+        // room hears it. Published from the same 50 Hz tick the mouth uses.
+        if isSpeaking != speaking { isSpeaking = speaking }
+        let mouthTarget = speaking ? 1.0 : 0.0
         visualMouth += (mouthTarget - visualMouth) * (1 - exp(-0.02 / 0.09))
         // The palm's beat: one tick checks whether the next beat of the
         // polled bpm is due. A disabled heart is one branch and no engine.
