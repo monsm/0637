@@ -2570,4 +2570,30 @@ if [ "$RECOMP" -gt 50 ]; then
   exit 1
 fi
 
+echo "--- frame pacing (recorded, ceiling set from real runs) ---"
+# dumpsys gfxinfo is the platform's own frame ledger. Reset it, drive the
+# three heaviest surfaces for a few seconds each — the walking stage, the
+# drawer, an instrument sheet — then read the janky-share and percentiles.
+# Recording first: a ceiling is only honest once a real run names the band.
+adb shell dumpsys gfxinfo ai.duck.microduck reset > /dev/null 2>&1 || true
+tap_text "叫一声" > /dev/null 2>&1 || true
+for _ in 1 2 3; do
+  adb shell input swipe 200 420 200 300 500 > /dev/null 2>&1 || true
+  sleep 0.4
+done
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+sleep 2.5
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 1
+GFX=$(adb shell dumpsys gfxinfo ai.duck.microduck 2>/dev/null || true)
+JANK=$(printf '%s' "$GFX" | grep -oE "Janky frames: [0-9]+ \([0-9.]+%\)" | head -1)
+P90=$(printf '%s' "$GFX" | grep -oE "90th percentile: [0-9]+ms" | head -1)
+P95=$(printf '%s' "$GFX" | grep -oE "95th percentile: [0-9]+ms" | head -1)
+P99=$(printf '%s' "$GFX" | grep -oE "99th percentile: [0-9]+ms" | head -1)
+if [ -z "$JANK" ]; then
+  echo "::error::dumpsys gfxinfo produced no frame ledger for the app"
+  exit 1
+fi
+echo "frame pacing: $JANK | $P90 | $P95 | $P99"
+
 echo "smoke test passed"
