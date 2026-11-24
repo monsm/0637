@@ -2120,6 +2120,104 @@ PY
   return "$rc"
 }
 
+# Is any of the pipe-separated substrings in the tree right now? The games
+# are Text nodes, so their captions are the stable handle (the dense-sheet
+# comment above explains why testTags are not relied on here).
+screen_has_text() {
+  local want="$1"
+  rm -f games-check.xml
+  # Drop the remote file first: a failed dump would otherwise read the
+  # previous tree (the heart monitor can block uiautomator's idle wait).
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || return 1
+  adb exec-out cat /sdcard/ui.xml > games-check.xml 2>/dev/null || return 1
+  python3 - "$want" <<'SH'
+import sys, xml.etree.ElementTree as ET
+witnesses = [w for w in sys.argv[1].split('|') if w]
+try:
+    root = ET.parse('games-check.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+labels = [(n.get('text') or n.get('content-desc') or '')
+          for n in root.iter('node')]
+raise SystemExit(0 if any(w in l for w in witnesses for l in labels) else 1)
+SH
+}
+
+# Scriptable acceptance for the two play pages added 2026-11-24 (criterion
+# 7). Both are inline on Play more, so a dead control would pass every
+# static gate. The checks are behavioural: the echo game must really start
+# a round (its coroutine queues the duck's synth sound and only then enables
+# the pads), and rock-paper-scissors must really answer (the duck's own
+# throw appears, with the session tally beside it).
+playmore_games_check() {
+  local ok=0
+
+  for _ in $(seq 1 8); do
+    if tap_text "开始" > /dev/null 2>&1 || tap_text "Start" > /dev/null 2>&1; then
+      sleep 1
+      for _ in 1 2 3 4; do
+        screen_has_text "第 1 关|Round 1" && { ok=1; break; }
+        sleep 0.6
+      done
+      [ "$ok" = "1" ] && break
+    fi
+    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+    sleep 0.4
+  done
+  if [ "$ok" != "1" ]; then
+    cp games-check.xml games-dump.xml 2>/dev/null || true
+    adb exec-out screencap -p > games-screen.png 2>/dev/null || true
+    echo "::error::the echo game never began round 1 after Start"
+    return 1
+  fi
+  echo "echo game: Start began round 1 (the duck sang its sequence)"
+
+  ok=0
+  for _ in $(seq 1 8); do
+    if tap_text "石头" > /dev/null 2>&1 || tap_text "rock" > /dev/null 2>&1; then
+      sleep 1
+      for _ in 1 2 3 4; do
+        screen_has_text "鸭子出了|The duck threw" && { ok=1; break; }
+        sleep 0.6
+      done
+      [ "$ok" = "1" ] && break
+    fi
+    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+    sleep 0.4
+  done
+  if [ "$ok" != "1" ]; then
+    cp games-check.xml games-dump.xml 2>/dev/null || true
+    adb exec-out screencap -p > games-screen.png 2>/dev/null || true
+    echo "::error::rock paper scissors never answered the throw"
+    return 1
+  fi
+  # The answer names one of the three hands and the tally row is readable.
+  python3 - <<'SH'
+import re, xml.etree.ElementTree as ET
+try:
+    root = ET.parse('games-check.xml').getroot()
+except Exception as exc:
+    raise SystemExit(f"cannot read the games dump: {exc}")
+labels = [(n.get('text') or '') for n in root.iter('node')]
+hands = ('石头', '布', '剪刀', 'rock', 'paper', 'scissors')
+answer = [l for l in labels if ('鸭子出了' in l or 'The duck threw' in l)]
+if not answer or not any(h in answer[0] for h in hands):
+    raise SystemExit(f"the duck's answer names no hand: {answer[:3]}")
+if not any(re.search(r'(你|You) \d+ · (鸭|Duck) \d+', l) for l in labels):
+    raise SystemExit("the session tally row is missing")
+SH
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then
+    cp games-check.xml games-dump.xml 2>/dev/null || true
+    adb exec-out screencap -p > games-screen.png 2>/dev/null || true
+    echo "::error::the rock-paper-scissors answer or tally is malformed"
+    return 1
+  fi
+  adb exec-out screencap -p > ui-b4-android-games.png || true
+  echo "rock paper scissors: the duck answered the throw and the tally row is readable"
+}
+
 # True when the More drawer is the surface in front (its title plus one
 # group header; every sheet has a drag handle, so that alone would lie).
 drawer_present() {
@@ -2329,6 +2427,7 @@ SH
 
 open_more_sheet() {
   local row_en="$1" row_zh="$2" title_en="$3" title_zh="$4" name="$5" witness="$6"
+  local extra="${7:-}"
   local ok=0 attempt=0
 
   # Deterministic per-page reset. The layered state machine lost every race
@@ -2402,6 +2501,10 @@ open_more_sheet() {
   fi
   sleep 1
   dense_sheet_check "$title_en" "$title_zh" "$name" || exit 1
+  # A page's own behavioural acceptance (the inline games on Play more).
+  if [ -n "$extra" ]; then
+    "$extra" || exit 1
+  fi
   adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
   sleep 0.8
 }
@@ -2446,7 +2549,7 @@ dense_sheet_check "More" "更多" "More" || exit 1
 # row without having to scroll back up after a close.
 open_more_sheet "Blocks" "积木规则" "Blocks" "积木规则" "Blocks" "粘贴程序|Paste"
 open_more_sheet "Dance Studio" "编舞铺" "Dance Studio" "编舞铺" "Dance Studio" "录制|Record"
-open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more" "驱动|Driving"
+open_more_sheet "Play more" "玩一玩" "Play more" "玩一玩" "Play more" "驱动|Driving" playmore_games_check
 open_more_sheet "Neighbours" "邻居" "Neighbours" "邻居" "Neighbours" "配对码|Pairing code"
 # The sheet title is Copy.dailyQuests (the row's own words); "Today's
 # quests" is the card heading inside, and it is not the focus anchor.

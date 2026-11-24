@@ -307,6 +307,7 @@ jobs:
           cp ui-b4-android-more.png dist/ui-b4-android-more.png
           cp ui-b1-android-land.png dist/ui-b1-android-land.png
           cp ui-b1-android-xxl.png dist/ui-b1-android-xxl.png
+          cp ui-b4-android-games.png dist/ui-b4-android-games.png
           git config user.email "actions@github.com"
           git config user.name "ui-bot"
           pushed=0
@@ -319,7 +320,8 @@ jobs:
             fi
             git add -f dist/ui-b1-android.png dist/ui-b1-android-zh.png \
               dist/ui-b4-android.png dist/ui-b4-android-more.png \
-              dist/ui-b1-android-land.png dist/ui-b1-android-xxl.png
+              dist/ui-b1-android-land.png dist/ui-b1-android-xxl.png \
+              dist/ui-b4-android-games.png
             git commit -m "ui-b1: Android portrait Live screenshot [skip ci]" || true
             if git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"; then pushed=1; break; fi
             sleep 2
@@ -444,6 +446,9 @@ jobs:
             ui-b4-android-more.png
             ui-b1-android-land.png
             ui-b1-android-xxl.png
+            ui-b4-android-games.png
+            games-screen.png
+            games-dump.xml
             unstripped/
 
       - uses: actions/upload-artifact@v4
