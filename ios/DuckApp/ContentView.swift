@@ -74,6 +74,10 @@ struct ContentView: View {
     /// postcard for a few seconds. Real event, real frame — the shutter is
     /// the same one Director uses.
     @State private var pathPostcardReady = false
+    /// Tickle: four belly touches inside three seconds earn a laugh. The
+    /// window is this view's own; each touch is still a real pet.
+    @State private var petBurst = 0
+    @State private var petBurstAt = Date.distantPast
     /// D4 sheet focus: the stage control a sheet must return focus to when it
     /// closes. The route reducer does not know who opened the sheet, so every
     /// entry point names its own anchor here.
@@ -903,6 +907,19 @@ struct ContentView: View {
                         } else {
                             controller.pet()
                             DuckHaptics.pet()
+                            // Tickle play: four quick belly touches make it
+                            // laugh — the laugh is the duck's own emotion.
+                            let now = Date()
+                            if now.timeIntervalSince(petBurstAt) > 3 {
+                                petBurst = 0
+                            }
+                            petBurstAt = now
+                            petBurst += 1
+                            if petBurst >= 4 {
+                                petBurst = 0
+                                controller.trigger("laugh")
+                                DuckHaptics.success()
+                            }
                         }
                     } else if stickMode == .drive {
                         let dx = gesture.location.x - size.width * 0.5
