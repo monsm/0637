@@ -391,6 +391,8 @@ enum Copy {
     static var autoPostcardNote: String { pick("When a walk ends", "走完路自动存一张") }
     static var rpsTitle: String { pick("Rock paper scissors", "猜拳") }
     static var rpsDuckThrew: String { pick("The duck threw", "鸭子出了") }
+    static var rpsYou: String { pick("You", "你") }
+    static var rpsDuck: String { pick("Duck", "鸭") }
     static var rpsRock: String { pick("rock", "石头") }
     static var rpsPaper: String { pick("paper", "布") }
     static var rpsScissors: String { pick("scissors", "剪刀") }

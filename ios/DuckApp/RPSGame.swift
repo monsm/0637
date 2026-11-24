@@ -41,6 +41,10 @@ struct RPSGame: View {
     @State private var round = 0
     @State private var outcome = ""
     @State private var duckWord = ""
+    // This page's own tally: the child's wins against the duck's. Session
+    // only — nothing is stored, so a reopened page starts honest at zero.
+    @State private var youScore = 0
+    @State private var duckScore = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: DuckSpace.sm) {
@@ -53,6 +57,10 @@ struct RPSGame: View {
                     .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.6))
                     .accessibilityIdentifier("rps-status")
+                Text("\(Copy.rpsYou) \(youScore) · \(Copy.rpsDuck) \(duckScore)")
+                    .font(.duckCaption.weight(.semibold))
+                    .foregroundStyle(Color.duckBrass)
+                    .accessibilityIdentifier("rps-score")
             }
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
                 ForEach(Move.allCases, id: \.self) { move in
@@ -95,10 +103,12 @@ struct RPSGame: View {
             DuckHaptics.selection()
         } else if mine.beats == theirs {
             outcome = Copy.rpsResult("win")
+            youScore += 1
             DuckHaptics.success()
             controller.trigger("laugh")
         } else {
             outcome = Copy.rpsResult("lose")
+            duckScore += 1
             DuckHaptics.medium()
         }
         UIAccessibility.post(notification: .announcement, argument: outcome)
