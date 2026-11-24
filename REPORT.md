@@ -853,6 +853,15 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **验证**：十静态门全绿（含有意重定的 `controller_published 108`）；Android 本机 `assembleDebug + testDebugUnitTest` 过。iOS 冒烟绿；`testTheDuckVoiceIsHeard`（音频会话分类测试，与本改动无关）在负载高的 runner 上偶发红，同测试在涟漪轮次刚绿过——dispatch 复跑 45313689419 **成功**，按负载敏感归档。三玩法双端全绿：灯 `4350832`、涟漪 iOS `159f6f9`/Android `da5fa92`、庆祝 iOS `414b198`/Android 同批。
 
+### 四之四十二、玩法续：路线明信片与回声游戏（2026-11-24）
+
+4. **路线完成明信片**（`5b8ef1c`，随 `917b822` 一并双端绿）：走完全程后 15 秒内，画路条上出现「存成明信片」；点一下走 Director 同款快门（真实帧 + 房间），存成普通明信片。iOS 由 `pathDoneTick` 触发，Android 由 `/state.path` 的 active→false 转换触发（与已有的“走完全程啦”同源）。
+5. **回声游戏**（`917b822`，双端绿）：内联在「玩一玩」页，免新路由。鸭子按顺序唱自己的四个合成音（chirp/coo/peck/inquire，`queue_sound` 真声），孩子依序拍回；每过一关加一声，5 关通关，错一声响 alarm（失败态），通关让鸭子用真实 excited 庆祝。iOS `EchoGame.swift`；Android `MorePages.kt` 内 `EchoGame`（`PathChip` 提为 internal 复用）。
+
+**玩法池全部状态**（`docs/PLAY_IDEAS_2026-11-24.md`）：1 灯编程 ✅、2 声音涟漪 ✅、3 成就庆祝 ✅、4 路线明信片 ✅、6 昼夜（Daylight 既有）✅、7 回声游戏 ✅、9 定时（编辑器既有）✅；5/10（灯联动、情绪灯色）因灯只在仪表虚拟脸可见，标为收益低、暂缓；8（分枝社交）需双实例，留大版本。
+
+**验证**：十静态门全绿；Android 本机 `assembleDebug + testDebugUnitTest` 过；`917b822` iOS/Android/Contracts 全绿。
+
 ---
 
 ## 八、仓库与复现
