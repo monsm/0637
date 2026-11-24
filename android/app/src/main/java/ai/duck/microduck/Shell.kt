@@ -949,6 +949,41 @@ fun Shell(
                             },
                         )
                     }
+                    // A tap on the duck is a touch on its body, by part:
+                    // head = a curious look, belly = a coo (pet), feet = a
+                    // kick — the same zones and the same real reactions as
+                    // iOS. Taps outside the duck do nothing (drive is a drag),
+                    // and path mode / carrying / the ring own their gestures.
+                    .pointerInput(core, stick, pathActive, ringOpen, carrying) {
+                        val duck = core ?: return@pointerInput
+                        detectTapGestures { offset ->
+                            if (ringOpen || carrying || (stick == "path" && !pathActive)) {
+                                return@detectTapGestures
+                            }
+                            val w = size.width.toFloat().coerceAtLeast(1f)
+                            val h = size.height.toFloat().coerceAtLeast(1f)
+                            val x = offset.x / w
+                            val y = offset.y / h
+                            if (x < 0.25f || x > 0.75f || y < 0.33f || y > 0.68f) {
+                                return@detectTapGestures
+                            }
+                            val within = (y - 0.33f) / 0.35f
+                            when {
+                                within < 0.35f -> {
+                                    duck.skill("curious")
+                                    DuckHaptics.selection(hapticView)
+                                }
+                                within > 0.7f -> {
+                                    duck.skill("kick_left")
+                                    DuckHaptics.medium(hapticView)
+                                }
+                                else -> {
+                                    postDuckCommand("/pet")
+                                    DuckHaptics.pet(hapticView)
+                                }
+                            }
+                        }
+                    }
                     // The same 0.35 s hold as portrait: hold still on the scene
                     // and the ring comes up. A drag cancels it (the drag
                     // detector consumes movement), so driving never opens it.

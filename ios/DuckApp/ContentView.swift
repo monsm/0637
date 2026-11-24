@@ -888,8 +888,22 @@ struct ContentView: View {
                         && gesture.location.y > size.height * 0.33
                         && gesture.location.y < size.height * 0.68
                     if insideDuck {
-                        controller.pet()
-                        DuckHaptics.pet()
+                        // The body is touchable by part: the head earns a
+                        // curious look, the belly a coo, the feet a kick.
+                        // Each reaction is the duck's own (emotion, pet,
+                        // skill) — the touch just names where you stroked.
+                        let withinDuck = (gesture.location.y - size.height * 0.33)
+                            / (size.height * 0.35)
+                        if withinDuck < 0.35 {
+                            controller.trigger("curious")
+                            DuckHaptics.selection()
+                        } else if withinDuck > 0.7 {
+                            controller.trigger("kick_left")
+                            DuckHaptics.medium()
+                        } else {
+                            controller.pet()
+                            DuckHaptics.pet()
+                        }
                     } else if stickMode == .drive {
                         let dx = gesture.location.x - size.width * 0.5
                         let dy = gesture.location.y - size.height * 0.5
