@@ -122,6 +122,7 @@ val quack get() = pick("Quack", "叫一声")
     val pathCancel get() = pick("Stop", "不走了")
     fun pathStep(step: Int, total: Int) = pick("Step $step of $total", "第 $step 步，共 $total 步")
     val pathDone get() = pick("Walked the whole path", "走完全程啦")
+    val pathPostcard get() = pick("Keep it", "存成明信片")
     val viewfinder get() = pick("VIEWFINDER", "取景器")
     val couldNotStart get() = pick("MicroDuck could not start", "MicroDuck 无法启动")
     /** Startup failure in words a person can act on. The raw text is a log line. */
