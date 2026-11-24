@@ -218,6 +218,15 @@ class MainActivity : ComponentActivity() {
                     onFeed = {
                         DuckProgress.record(ProgressEvent.Feed)
                         postDuckCommand("/feed")
+                        // The catch: the beak opens to take the treat, then
+                        // closes unless a sound owns it. /mouth is the same
+                        // local intent the TTS uses.
+                        postDuckCommand("/mouth", """{"open":1.0}""")
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (voice?.isSpeaking != true) {
+                                postDuckCommand("/mouth", """{"open":0.0}""")
+                            }
+                        }, 600)
                     },
                 )
             }

@@ -2513,6 +2513,15 @@ final class DuckController: ObservableObject {
     func feed() {
         dance.record("feed", label: Copy.feed)
         ProgressStore.shared.record(.feed)
+        // The catch: the beak opens to take the treat, then closes. /mouth is
+        // the same local intent the TTS uses; the core clamps it while the
+        // duck sleeps, and a sounding voice keeps the beak (isSpeaking is the
+        // 50 Hz tick's own signal).
+        postJSON("/mouth", ["open": 1.0])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            guard let self, !self.isSpeaking else { return }
+            self.postJSON("/mouth", ["open": 0.0])
+        }
         guard let url = URL(string: "http://127.0.0.1:8765/feed") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
