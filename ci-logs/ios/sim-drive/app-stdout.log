@@ -1,63 +1,65 @@
-2026-11-24 03:53:10.316 Duck[9388:33994] duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/F8813EBA-9377-48D9-B281-6C5E7E99475A/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
-2026-11-24 03:53:10.316 Duck[9388:33994] duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/F8813EBA-9377-48D9-B281-6C5E7E99475A/Duck.app/DuckResources/policies
-2026-11-24 03:53:11.784 Duck[9388:33908] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-24 03:53:11.839 Duck[9388:33908] duck: voice resumed category=AVAudioSessionCategoryPlayback
-2026-11-24 03:53:14.200 Duck[9388:33994] duck: built 38 meshes off the main thread
-2026-11-24 03:53:14.205 Duck[9388:33908] duck: core created
-2026-11-24 03:53:14.215 Duck[9388:33908] duck: pickup detector -> 0
-2026-11-24 03:53:14.246 Duck[9388:33908] duck: emotions -> 13
-2026-11-24 03:53:14.248 Duck[9388:33908] duck: intent server -> 0
-2026-11-24 03:53:14.257 Duck[9388:33908] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
-2026-11-24 03:53:14.258 Duck[9388:33908] duck: voice ready at 48000 Hz
-2026-11-24 03:53:17.331 Duck[9388:33908] duck: renderer: 70 visual geoms
-2026-11-24 03:53:17.454 Duck[9388:33908] duck: voice scheduled tag=greet frames=19251 total=1
-2026-11-24 03:53:19.443 Duck[9388:33908] duck: voice scheduled tag=alarm frames=8827 total=2
-2026-11-24 03:53:24.822 Duck[9388:33908] duck: voice scheduled tag=emotion:angry frames=112790 total=3
-2026-11-24 03:53:37.554 Duck[9388:33908] duck: voice scheduled tag=emotion:impatient frames=110399 total=4
-2026-11-24 03:53:39.864 Duck[9388:33908] duck: voice scheduled tag=coo frames=36764 total=5
-2026-11-24 03:53:43.341 Duck[9388:33908] duck: voice scheduled tag=alarm frames=9760 total=6
-2026-11-24 03:53:44.003 Duck[9388:33908] duck: voice scheduled tag=emotion:laugh frames=116254 total=7
-2026-11-24 03:53:46.445 Duck[9388:33908] duck: voice scheduled tag=inquire frames=17124 total=8
-2026-11-24 03:53:54.407 Duck[9388:33908] duck: voice scheduled tag=alarm frames=9524 total=9
-2026-11-24 03:53:57.301 Duck[9388:33908] duck: voice scheduled tag=emotion:laugh frames=116254 total=10
-2026-11-24 03:54:02.202 Duck[9388:33908] duck: voice scheduled tag=emotion:excited frames=136319 total=11
-2026-11-24 03:54:11.021 Duck[9388:33908] duck: voice scheduled tag=emotion:yes frames=38399 total=12
-2026-11-24 03:54:17.148 Duck[9388:33908] duck: voice scheduled tag=emotion:laugh frames=116254 total=13
-2026-11-24 03:54:19.860 Duck[9388:33908] duck: voice scheduled tag=emotion:yes frames=38399 total=14
-2026-11-24 03:54:21.825 Duck[9388:33908] duck: voice scheduled tag=coo frames=49379 total=15
-2026-11-24 03:54:27.965 Duck[9388:33908] duck: voice scheduled tag=coo frames=49379 total=16
-2026-11-24 03:54:36.920 Duck[9388:33908] duck: voice scheduled tag=emotion:sad frames=146047 total=17
-2026-11-24 03:54:39.997 Duck[9388:33908] duck: voice scheduled tag=coo frames=43954 total=18
-2026-11-24 03:54:43.088 Duck[9388:33908] duck: voice scheduled tag=wheee:start:0 frames=32627 total=19
-2026-11-24 03:54:43.795 Duck[9388:33908] duck: voice scheduled tag=wheee:end:0 frames=25061 total=20
-2026-11-24 03:54:46.124 Duck[9388:33908] duck: voice scheduled tag=alarm frames=10767 total=21
-2026-11-24 03:54:47.394 Duck[9388:33908] duck: voice scheduled tag=greet frames=38682 total=22
-2026-11-24 03:55:04.664 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11533 total=23
-2026-11-24 03:55:08.021 Duck[9388:33908] duck: voice scheduled tag=emotion:curious frames=68331 total=24
-2026-11-24 03:55:15.522 Duck[9388:33908] duck: voice scheduled tag=chirp frames=4665 total=25
-2026-11-24 03:55:15.781 Duck[9388:33908] duck: voice scheduled tag=chirp frames=4665 total=26
-2026-11-24 03:55:16.129 Duck[9388:33908] duck: voice scheduled tag=greet frames=29638 total=27
-2026-11-24 03:55:18.553 Duck[9388:33908] duck: voice scheduled tag=chirp frames=7710 total=28
-2026-11-24 03:55:18.988 Duck[9388:33908] duck: renderer: 76 visual geoms
-2026-11-24 03:55:20.763 Duck[9388:33908] duck: voice scheduled tag=alarm frames=9716 total=29
-2026-11-24 03:55:23.608 Duck[9388:33908] duck: renderer: 70 visual geoms
-2026-11-24 03:55:23.678 Duck[9388:33908] duck: voice scheduled tag=chirp frames=13199 total=30
-2026-11-24 03:55:25.125 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11830 total=31
-2026-11-24 03:55:27.286 Duck[9388:33908] duck: voice scheduled tag=peck frames=7491 total=32
-2026-11-24 03:55:33.042 Duck[9388:33908] duck: voice scheduled tag=greet frames=18493 total=33
-2026-11-24 03:55:35.957 Duck[9388:33908] duck: voice scheduled tag=alarm frames=12272 total=34
-2026-11-24 03:55:43.982 Duck[9388:33908] duck: voice scheduled tag=emotion:angry frames=112790 total=35
-2026-11-24 03:55:58.394 Duck[9388:33908] duck: voice scheduled tag=coo frames=48388 total=36
-2026-11-24 03:55:59.422 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11817 total=37
-2026-11-24 03:56:00.561 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11817 total=38
-2026-11-24 03:56:01.561 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11817 total=39
-2026-11-24 03:56:03.044 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11817 total=40
-2026-11-24 03:56:09.480 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11817 total=41
-2026-11-24 03:56:19.122 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11817 total=42
-2026-11-24 03:56:23.001 Duck[9388:33908] duck: voice scheduled tag=alarm frames=11817 total=43
-2026-11-24 03:56:32.002 Duck[9388:33908] duck: voice scheduled tag=emotion:curious frames=68331 total=44
-2026-11-24 03:56:42.466 Duck[9388:33908] duck: voice scheduled tag=inquire frames=24478 total=45
-2026-11-24 03:57:06.620 Duck[9388:33908] duck: voice scheduled tag=emotion:defiant frames=67198 total=46
-2026-11-24 03:57:38.232 Duck[9388:33908] duck: voice scheduled tag=emotion:excited frames=136319 total=47
-2026-11-24 03:58:08.805 Duck[9388:33908] duck: voice scheduled tag=emotion:impatient frames=110399 total=48
-ai.duck.microduck: 9388
+2026-11-24 05:29:21.098 Duck[9624:34853] duck: scene=/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/160F5446-98FB-4AAE-8FC5-B25627CF8123/Duck.app/DuckResources/robot/microduck/scene_backlash.xml
+2026-11-24 05:29:21.098 Duck[9624:34853] duck: policies=/Users/runner/Library/Developer/CoreSimulator/Devices/EED6FB0A-E273-43C6-B5DE-3DF739543042/data/Containers/Bundle/Application/160F5446-98FB-4AAE-8FC5-B25627CF8123/Duck.app/DuckResources/policies
+2026-11-24 05:29:22.480 Duck[9624:34825] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
+2026-11-24 05:29:22.499 Duck[9624:34825] duck: voice resumed category=AVAudioSessionCategoryPlayback
+2026-11-24 05:29:24.019 Duck[9624:34853] duck: built 38 meshes off the main thread
+2026-11-24 05:29:24.020 Duck[9624:34825] duck: core created
+2026-11-24 05:29:24.023 Duck[9624:34825] duck: pickup detector -> 0
+2026-11-24 05:29:24.043 Duck[9624:34825] duck: emotions -> 13
+2026-11-24 05:29:24.044 Duck[9624:34825] duck: intent server -> 0
+2026-11-24 05:29:24.046 Duck[9624:34825] duck: audio session category=AVAudioSessionCategoryPlayback options=1 mic=0 forced=0 route=Speaker
+2026-11-24 05:29:24.046 Duck[9624:34825] duck: voice ready at 48000 Hz
+2026-11-24 05:29:26.398 Duck[9624:34825] duck: renderer: 70 visual geoms
+2026-11-24 05:29:27.256 Duck[9624:34825] duck: voice scheduled tag=greet frames=19251 total=1
+2026-11-24 05:29:29.194 Duck[9624:34825] duck: voice scheduled tag=alarm frames=8827 total=2
+2026-11-24 05:29:33.317 Duck[9624:34825] duck: voice scheduled tag=emotion:angry frames=112790 total=3
+2026-11-24 05:29:42.497 Duck[9624:34825] duck: voice scheduled tag=emotion:impatient frames=110399 total=4
+2026-11-24 05:29:44.801 Duck[9624:34825] duck: voice scheduled tag=coo frames=36764 total=5
+2026-11-24 05:29:48.622 Duck[9624:34825] duck: voice scheduled tag=alarm frames=9760 total=6
+2026-11-24 05:29:49.642 Duck[9624:34825] duck: voice scheduled tag=emotion:laugh frames=116254 total=7
+2026-11-24 05:29:53.584 Duck[9624:34825] duck: voice scheduled tag=inquire frames=17124 total=8
+2026-11-24 05:30:00.006 Duck[9624:34825] duck: voice scheduled tag=alarm frames=9524 total=9
+2026-11-24 05:30:00.348 Duck[9624:34825] duck: voice scheduled tag=chirp frames=4665 total=10
+2026-11-24 05:30:14.154 Duck[9624:34825] duck: voice scheduled tag=emotion:curious frames=68331 total=11
+2026-11-24 05:30:35.885 Duck[9624:34825] duck: voice scheduled tag=emotion:laugh frames=116254 total=12
+2026-11-24 05:30:38.324 Duck[9624:34825] duck: voice scheduled tag=emotion:yes frames=38399 total=13
+2026-11-24 05:30:40.807 Duck[9624:34825] duck: voice scheduled tag=emotion:laugh frames=116254 total=14
+2026-11-24 05:30:43.252 Duck[9624:34825] duck: voice scheduled tag=coo frames=49379 total=15
+2026-11-24 05:30:46.770 Duck[9624:34825] duck: voice scheduled tag=coo frames=49379 total=16
+2026-11-24 05:30:52.133 Duck[9624:34825] duck: voice scheduled tag=emotion:sad frames=146047 total=17
+2026-11-24 05:30:55.195 Duck[9624:34825] duck: voice scheduled tag=emotion:yes frames=38399 total=18
+2026-11-24 05:30:55.996 Duck[9624:34825] duck: voice scheduled tag=coo frames=43954 total=19
+2026-11-24 05:30:59.510 Duck[9624:34825] duck: voice scheduled tag=wheee:start:0 frames=32627 total=20
+2026-11-24 05:31:00.211 Duck[9624:34825] duck: voice scheduled tag=wheee:end:0 frames=25061 total=21
+2026-11-24 05:31:02.439 Duck[9624:34825] duck: voice scheduled tag=alarm frames=10767 total=22
+2026-11-24 05:31:03.559 Duck[9624:34825] duck: voice scheduled tag=emotion:excited frames=136319 total=23
+2026-11-24 05:31:06.422 Duck[9624:34825] duck: voice scheduled tag=greet frames=38682 total=24
+2026-11-24 05:31:19.029 Duck[9624:34825] duck: voice scheduled tag=alarm frames=11533 total=25
+2026-11-24 05:31:19.346 Duck[9624:34825] duck: voice scheduled tag=emotion:excited frames=136319 total=26
+2026-11-24 05:31:28.051 Duck[9624:34825] duck: voice scheduled tag=emotion:excited frames=136319 total=27
+2026-11-24 05:31:35.775 Duck[9624:34825] duck: voice scheduled tag=emotion:curious frames=68331 total=28
+2026-11-24 05:31:42.439 Duck[9624:34825] duck: voice scheduled tag=chirp frames=7710 total=29
+2026-11-24 05:31:42.616 Duck[9624:34825] duck: voice scheduled tag=chirp frames=7710 total=30
+2026-11-24 05:31:42.996 Duck[9624:34825] duck: voice scheduled tag=chirp frames=7710 total=31
+2026-11-24 05:31:43.259 Duck[9624:34825] duck: voice scheduled tag=greet frames=29638 total=32
+2026-11-24 05:31:45.716 Duck[9624:34825] duck: renderer: 76 visual geoms
+2026-11-24 05:31:45.730 Duck[9624:34825] duck: voice scheduled tag=chirp frames=13199 total=33
+2026-11-24 05:31:47.079 Duck[9624:34825] duck: voice scheduled tag=alarm frames=9716 total=34
+2026-11-24 05:31:51.018 Duck[9624:34825] duck: renderer: 70 visual geoms
+2026-11-24 05:31:51.052 Duck[9624:34825] duck: voice scheduled tag=chirp frames=8451 total=35
+2026-11-24 05:31:52.324 Duck[9624:34825] duck: voice scheduled tag=alarm frames=11830 total=36
+2026-11-24 05:31:54.806 Duck[9624:34825] duck: voice scheduled tag=peck frames=7491 total=37
+2026-11-24 05:32:01.109 Duck[9624:34825] duck: voice scheduled tag=greet frames=18493 total=38
+2026-11-24 05:32:03.909 Duck[9624:34825] duck: voice scheduled tag=alarm frames=12272 total=39
+2026-11-24 05:32:06.892 Duck[9624:34825] duck: voice scheduled tag=coo frames=48388 total=40
+2026-11-24 05:32:08.052 Duck[9624:34825] duck: voice scheduled tag=alarm frames=11817 total=41
+2026-11-24 05:32:09.029 Duck[9624:34825] duck: voice scheduled tag=alarm frames=11817 total=42
+2026-11-24 05:32:12.932 Duck[9624:34825] duck: voice scheduled tag=emotion:angry frames=112790 total=43
+2026-11-24 05:32:15.295 Duck[9624:34825] duck: voice scheduled tag=alarm frames=9298 total=44
+2026-11-24 05:32:22.258 Duck[9624:34825] duck: voice scheduled tag=alarm frames=9298 total=45
+2026-11-24 05:32:25.098 Duck[9624:34825] duck: voice scheduled tag=alarm frames=9298 total=46
+2026-11-24 05:32:35.948 Duck[9624:34825] duck: voice scheduled tag=inquire frames=24478 total=47
+2026-11-24 05:32:50.472 Duck[9624:34825] duck: voice scheduled tag=inquire frames=24478 total=48
+2026-11-24 05:32:57.376 Duck[9624:34825] duck: voice scheduled tag=emotion:curious frames=68331 total=49
+2026-11-24 05:33:28.495 Duck[9624:34825] duck: voice scheduled tag=emotion:defiant frames=67198 total=50
+ai.duck.microduck: 9624
