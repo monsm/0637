@@ -25,6 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -197,7 +200,11 @@ private fun EchoGame(core: DuckCore?) {
                 status,
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = DuckTheme.Type.Caption,
-                modifier = Modifier.testTag("echo-status"),
+                // TalkBack says whose turn it is: the status text is a live
+                // region, so every phase change is spoken without a focus move.
+                modifier = Modifier
+                    .testTag("echo-status")
+                    .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {

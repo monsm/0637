@@ -83,6 +83,9 @@ struct EchoGame: View {
             }
             answer = 0
             phase = .listening
+            // A screen reader must know whose turn it is: the same word the
+            // pill shows, posted as an announcement.
+            UIAccessibility.post(notification: .announcement, argument: Copy.echoRound(sequence.count))
         }
     }
 
@@ -95,6 +98,7 @@ struct EchoGame: View {
             if sequence.count >= Self.topRounds {
                 phase = .won
                 DuckHaptics.success()
+                UIAccessibility.post(notification: .announcement, argument: Copy.echoWon)
                 controller.trigger("excited")
             } else {
                 sequence.append(Self.pads.randomElement() ?? "chirp")
@@ -103,6 +107,7 @@ struct EchoGame: View {
         } else {
             phase = .lost
             DuckHaptics.error()
+            UIAccessibility.post(notification: .announcement, argument: Copy.echoAgain)
             play("alarm")
         }
     }
