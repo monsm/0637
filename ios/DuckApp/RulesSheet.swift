@@ -19,7 +19,7 @@ struct RulesSheet: View {
     @State private var importNote = ""
 
     private let triggers = ["clap", "whistle", "pet", "timer"]
-    private let kinds = ["skill", "emotion", "sound"]
+    private let kinds = ["skill", "emotion", "sound", "light"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: DuckSpace.md) {
@@ -340,6 +340,8 @@ struct RulesSheet: View {
         switch action {
         case "skill":
             return ["roulade", "kick_left", "kick_right", "sit", "ground_pick"]
+        case "light":
+            return ["red", "green", "blue", "yellow", "cyan", "magenta", "white", "off"]
         case "emotion":
             return [
                 "excited", "laugh", "curious", "yes", "no", "sad", "angry",
@@ -354,6 +356,8 @@ struct RulesSheet: View {
         switch kind ?? action {
         case "skill", "emotion":
             return SkillLabel.of(value)
+        case "light":
+            return Copy.lightColour(value)
         default:
             return value
         }

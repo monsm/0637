@@ -465,6 +465,42 @@ curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"rules":[
   http://127.0.0.1:8765/rules > /dev/null || true
 echo "block rules: clap -> roulade ok ($ROLLS_BEFORE -> $ROLLS_AFTER)"
 
+# The light action (the editor's fourth kind): a clap lights the duck's own
+# lamp in blue. /state.leds publishes the colour name — the honest field.
+if ! curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d '{"rules":[{"trigger":"clap","action":"light","value":"blue"}]}' \
+  http://127.0.0.1:8765/rules | grep -q '"ok":true'; then
+  echo "::error::the core refused a light rule"
+  exit 1
+fi
+LIGHT_OK=0
+for attempt in 1 2 3; do
+  RT=$(sound_tick)
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$RT}" \
+    http://127.0.0.1:8765/sensor > /dev/null || true
+  sleep 0.15
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((RT + 60))}" \
+    http://127.0.0.1:8765/sensor > /dev/null || true
+  for _ in $(seq 1 16); do
+    if curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+leds=json.load(sys.stdin).get('leds',{})
+raise SystemExit(0 if leds.get('color')=='blue' else 1)
+" 2>/dev/null; then LIGHT_OK=1; break; fi
+    sleep 0.25
+  done
+  [ "$LIGHT_OK" = "1" ] && break
+  sleep 1.5
+done
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"rules":[]}' \
+  http://127.0.0.1:8765/rules > /dev/null || true
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' \
+  http://127.0.0.1:8765/flashlight > /dev/null || true
+[ "$LIGHT_OK" = "1" ] || { echo "::error::a clap did not light the programmed blue lamp"; exit 1; }
+echo "block rules: clap -> blue lamp ok"
+
 # The LAN social layer starts on demand and publishes its own identity and
 # peer list. Two emulators are not available here, so the host plays the
 # second duck: its datagrams reach the app through the emulator's UDP
