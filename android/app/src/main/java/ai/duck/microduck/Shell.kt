@@ -550,7 +550,15 @@ fun Shell(
             // not the final count — is what says "finished".
             if (!pathNow.active && pathActive && !pathCancelRequested) {
                 soundLine = Copy.pathDone
-                pathPostcardReady = true
+                // The child's own remembered choice: keep the moment without
+                // asking. Off by default — a photo nobody requested is noise.
+                if (context.getSharedPreferences("duck", android.content.Context.MODE_PRIVATE)
+                        .getBoolean("auto_postcard", false) && onPhoto != null
+                ) {
+                    onPhoto()
+                } else {
+                    pathPostcardReady = true
+                }
                 DuckHaptics.success(hapticView)
             }
             if (!pathNow.active) pathCancelRequested = false

@@ -381,6 +381,8 @@ enum Copy {
     /// The four pads are the duck's own synth voices, named as onomatopoeia.
     // RPS: the duck answers with its body — sit is the rock, stand the
     // paper, a kick the scissors.
+    static var autoPostcard: String { pick("Auto postcard", "自动存明信片") }
+    static var autoPostcardNote: String { pick("When a walk ends", "走完路自动存一张") }
     static var rpsTitle: String { pick("Rock paper scissors", "猜拳") }
     static var rpsDuckThrew: String { pick("The duck threw", "鸭子出了") }
     static var rpsRock: String { pick("rock", "石头") }

@@ -268,7 +268,13 @@ struct ContentView: View {
             guard tick > 0 else { return }
             let notice = Copy.pathDone
             withDuckMotion(DuckMotion.base) { moodText = notice }
-            withDuckMotion(DuckMotion.base) { pathPostcardReady = true }
+            if controller.autoPostcard {
+                // The switch is the child's own choice, remembered: keep the
+                // moment without asking. Same shutter as the chip.
+                controller.captureDirectorPhoto()
+            } else {
+                withDuckMotion(DuckMotion.base) { pathPostcardReady = true }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 guard moodText == notice else { return }
                 withDuckMotion(DuckMotion.slow) { moodText = nil }

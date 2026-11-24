@@ -440,6 +440,19 @@ internal fun PlayMoreSheet(
                     ) { input.hudOn = !input.hudOn }
                 }
             }
+            // Auto postcard: the child's own switch, remembered in the app's
+            // prefs; the path-completion branch reads it on both ends.
+            val autoPrefs = remember(context) {
+                context.getSharedPreferences("duck", android.content.Context.MODE_PRIVATE)
+            }
+            var autoPostcard by remember { mutableStateOf(autoPrefs.getBoolean("auto_postcard", false)) }
+            PathChip(
+                if (autoPostcard) Copy.stateOn else Copy.autoPostcard,
+                testTag = "play-more-auto-postcard",
+            ) {
+                autoPostcard = !autoPostcard
+                autoPrefs.edit().putBoolean("auto_postcard", autoPostcard).apply()
+            }
             Text(Copy.abNote, color = Color.White.copy(alpha = 0.55f), fontSize = DuckTheme.Type.Micro)
             if (stick.isNotBlank()) {
                 Text(

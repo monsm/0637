@@ -1867,6 +1867,9 @@ final class DuckController: ObservableObject {
     }
 
     /// The observation HUD's toggles, persisted like the mic.
+    /// Keep a postcard automatically when a painted route finishes its whole
+    /// course. Off by default: a photo the child did not ask for is noise.
+    @AppStorage("duck_auto_postcard") var autoPostcard = false
     @Published var hudOn = UserDefaults.standard.bool(forKey: "duck_hud_on") {
         didSet {
             if hudOn != oldValue { UserDefaults.standard.set(hudOn, forKey: "duck_hud_on") }
