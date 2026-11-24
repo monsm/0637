@@ -739,6 +739,13 @@ fun Shell(
                                     )
                                 },
                         )
+                        // The duck's real pulse, visible: one soft amber ring
+                        // thumping at care.heart_bpm, drawn over the scene and
+                        // never taking a touch.
+                        HeartRipple(
+                            bpm = careUi?.heartBpm ?: 0.0,
+                            modifier = Modifier.matchParentSize(),
+                        )
                         // The stroke is scene, not chrome: it draws over the
                         // stage and never takes a touch from the gesture.
                         if (stick == "path" || pathActive) {

@@ -549,6 +549,9 @@ struct ContentView: View {
                 // makes. Above the scene, below the chrome, so the wave
                 // reaches the duck without covering the controls.
                 VoiceRipple(isSpeaking: controller.isSpeaking).zIndex(1)
+                // The duck's real pulse, visible: one amber flash per beat at
+                // care.heart_bpm, centred on the body.
+                HeartRipple(bpm: controller.heartBpm).zIndex(1)
                 if portrait {
                     portraitChrome(in: geometry.size)
                         .zIndex(2)
