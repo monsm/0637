@@ -132,6 +132,8 @@ val quack get() = pick("Quack", "叫一声")
     val echoWon get() = pick("You learned it!", "你学会啦！")
     // RPS: the duck answers with its body — sit is the rock, stand the
     // paper, a kick the scissors.
+    val autoPostcard get() = pick("Auto postcard", "自动存明信片")
+    val autoPostcardNote get() = pick("When a walk ends", "走完路自动存一张")
     val rpsTitle get() = pick("Rock paper scissors", "猜拳")
     val rpsDuckThrew get() = pick("The duck threw", "鸭子出了")
     val rpsRock get() = pick("rock", "石头")
