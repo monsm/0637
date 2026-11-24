@@ -616,6 +616,18 @@ fun Shell(
     // thread because SpeechRecognizer and its callbacks must live on the main
     // Looper; the sheet reads its Compose state directly.
     val speechFeed = remember(context) { SpeechFeed(context) }
+    // A spoken word reaches the same pill the room sounds use: without it,
+    // a transcript that no verb matched vanished — the ear worked and the
+    // screen said nothing, which reads as a deaf duck. The instrument sheet
+    // keeps the longer transcript; this is the glance.
+    var lastSpoken by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(speechFeed.lastHeard) {
+        val heard = speechFeed.lastHeard
+        if (!heard.isNullOrBlank() && heard != lastSpoken) {
+            lastSpoken = heard
+            soundLine = heard
+        }
+    }
     // A fresh transcript asks the model for one decision immediately: a
     // conversation cannot wait out the periodic think. Same 10 s floor.
     LaunchedEffect(Unit) {
