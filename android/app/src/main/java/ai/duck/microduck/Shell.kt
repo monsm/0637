@@ -159,6 +159,10 @@ fun Shell(
             DuckHaptics.success(hapticView)
         }
     }
+    // Tickle: four quick belly touches inside three seconds earn a laugh.
+    // The window is the shell's own; every touch is still a real pet.
+    var petBurst by remember { mutableStateOf(0) }
+    var petBurstAt by remember { mutableStateOf(0L) }
     // D7: debug-only recomposition counter (recorded by the smoke). The
     // debuggable flag stands in for BuildConfig, which AGP 8 no longer
     // generates for this module.
@@ -980,6 +984,15 @@ fun Shell(
                                 else -> {
                                     postDuckCommand("/pet")
                                     DuckHaptics.pet(hapticView)
+                                    val now = System.currentTimeMillis()
+                                    if (now - petBurstAt > 3_000) petBurst = 0
+                                    petBurstAt = now
+                                    petBurst += 1
+                                    if (petBurst >= 4) {
+                                        petBurst = 0
+                                        duck.skill("laugh")
+                                        DuckHaptics.success(hapticView)
+                                    }
                                 }
                             }
                         }
