@@ -2595,5 +2595,24 @@ if [ -z "$JANK" ]; then
   exit 1
 fi
 echo "frame pacing: $JANK | $P90 | $P95 | $P99"
+# The ceiling, set from real runs (rule: record first, gate second). Two
+# green runs named the band on this software-GL emulator: Janky 56.7-86.5%,
+# 99th 121-350 ms. The gate only fires on a collapse — a frozen or thrashing
+# renderer — not on the normal spread of a CPU-emulating-GPU runner.
+JANK_PCT=$(printf '%s' "$JANK" | grep -oE '[0-9.]+%' | tr -d '%')
+P99_MS=$(printf '%s' "$P99" | grep -oE '[0-9]+ms' | tr -d 'ms')
+if [ -z "$JANK_PCT" ] || [ -z "$P99_MS" ]; then
+  echo "::error::the frame pacing line could not be parsed"
+  exit 1
+fi
+python3 - "$JANK_PCT" "$P99_MS" <<'PY' || exit 1
+import sys
+jank, p99 = float(sys.argv[1]), int(sys.argv[2])
+if jank > 95.0:
+    raise SystemExit(f"::error::Janky frames {jank}% — the renderer is thrashing (ceiling 95%)")
+if p99 > 500:
+    raise SystemExit(f"::error::99th percentile {p99} ms — frames are stalling (ceiling 500 ms)")
+print(f"frame pacing within the collapse ceiling (jank {jank}% <= 95, p99 {p99} ms <= 500)")
+PY
 
 echo "smoke test passed"
