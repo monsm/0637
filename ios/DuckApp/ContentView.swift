@@ -515,6 +515,10 @@ struct ContentView: View {
                 if stickMode == .path && !pathDraft.isEmpty {
                     PathDraftOverlay(points: pathDraft)
                 }
+                // Direction-A play: the ripple of every sound the duck
+                // makes. Above the scene, below the chrome, so the wave
+                // reaches the duck without covering the controls.
+                VoiceRipple(isSpeaking: controller.isSpeaking).zIndex(1)
                 if portrait {
                     portraitChrome(in: geometry.size)
                         .zIndex(2)
