@@ -7,7 +7,7 @@
 | 指标 | 采集点 | 现状 |
 |---|---|---|
 | Android 壳层重组次数 | debug 构建每 5 s 打 `duck-perf: recompose=N`；冒烟读末值 | **门禁已设**：整轮 2–3 次属正常，>50 判整树重组回归（`smoke-test.sh` D7 段） |
-| Android 掉帧率 / 帧耗时分位 | 冒烟末段 `dumpsys gfxinfo` 重置后驱动「叫一声→拖动→开抽屉→返回」，读 `Janky frames` 与 90/95/99th percentile | **本轮起记录**，日志行 `frame pacing: …`；跑两轮绿后据此设上限 |
+| Android 掉帧率 / 帧耗时分位 | 冒烟末段 `dumpsys gfxinfo` 重置后驱动「叫一声→拖动→开抽屉→返回」，读 `Janky frames` 与 90/95/99th percentile | **本轮起记录**，日志行 `frame pacing: …`。首轮实测（模拟器软件 GL）：Janky 86.46%、90th 57ms、95th 150ms、99th 350ms——模拟器基线极高，上限需按真机或多次运行 band 另定 |
 | Android 首帧内容 | `check-frame.py`：非空白、两帧有差异（场景活着） | 门禁（既有） |
 | Android 大字号布局 | 首屏 + 12 个 dense 页在 font scale 2.0 下：首焦点、47 dp 底线、不出屏、无叠压 | 门禁（既有） |
 | iOS 帧抖动 | 无宿主侧稳定测量（模拟器数字不可信） | **记录型缺口**：按 QA 文档走真机 QA |

@@ -862,6 +862,15 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **验证**：十静态门全绿；Android 本机 `assembleDebug + testDebugUnitTest` 过；`917b822` iOS/Android/Contracts 全绿。
 
+### 四之四十三、鸭子本体的互动 + 性能记录 + 读屏播报（2026-11-24，双端全绿 `c0dfe4e`）
+
+1. **身体分区可摸**（`d94e40b`）：此前 iOS 点鸭子一律“摸”，Android 主屏**点鸭子没有任何反应**。两端统一按身体分区回答：头→curious（抬头）、肚子→pet（咕咕）、脚→kick_left（踢）。画路/拎起/技能环/长按开环的手势让位不变（长按先置 ringOpen，抬手时 tap 分支自动让路）。
+2. **挠痒痒**（`c0dfe4e`）：3 秒内连挠肚子 4 下→laugh（音效/情绪/触感都真）。窗口在壳层本地，每次触摸仍是真实 pet。
+3. **读屏播报**（`18d25f6`）：回声游戏每阶段对 TalkBack/VoiceOver 播报（iOS announcement / Android polite live region），通关与错音同报。
+4. **掉帧记录进门记录**（`e75837b`）：冒烟末段驱动“叫一声→拖动→开抽屉→返回”，`dumpsys gfxinfo` 记录 Janky 与 90/95/99 分位。首轮实测（模拟器软件 GL）：**Janky 83 帧 86.46%｜90th 57ms｜95th 150ms｜99th 350ms**——基线极高，上限按“先记录、再设限”另定；文档 `docs/PERF_BUDGET_2026-11-24.md`。
+
+**验证**：`c0dfe4e` iOS/Android/Contracts 全绿；十门绿；Android 本机 `assembleDebug + testDebugUnitTest` 过。
+
 ---
 
 ## 八、仓库与复现
