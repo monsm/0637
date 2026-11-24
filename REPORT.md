@@ -843,6 +843,16 @@ D4 遗留的「dense sheet 全表」由老板起头、本轮收口。两端 CI �
 
 **收口（2026-11-23，双端全绿）**：iOS `02d4511` ✅、Android `260c6d0` ✅、Contracts ✅。截图矩阵三格已入库（`dist/ui-b1-android-land.png` 640x320、`ui-b1-android-xxl.png`、`ui-b1-ios-xxl.png`，ui-bot 提交 `fceb706`/`36714ab`）。组件状态断言探路时抓到两条真问题：① `DuckInput.p2On` 是普通 `@Volatile var`，开关行与 P2 chip **点了不重组**——改为 Compose 快照状态；② Compose 的 selected 语义在本机 uiautomator 上以 `checkable/checked` 暴露（comp-dump：checked 翻转、selected 恒 false），冒烟读取改为 checkable 时读 checked。另记一次自伤事故：一行式行尾归一化把 `smoke-test.sh` 清空并推送（`02d4511`），已从 `fd640a1` 逐字节恢复（`7396569`），教训入记忆（先读入变量再写回）。
 
+### 四之四十一、官方之外的玩法三连（2026-11-24）
+
+头脑风暴与排期见 `docs/PLAY_IDEAS_2026-11-24.md`。原则：不碰 `core/` 的 61 维观测与安全层，只用既有动词与 `/state` 真实字段。
+
+1. **灯的编程**（`4350832`，双端绿）：核心 `rules` 早支持 `light` 动作（`runtime.rs:2735`，7 色+关灯）但两端编辑器都没暴露。两端补「灯」动作与颜色标签；Android 冒烟编程“拍手→蓝灯”，断言 `/state.leds.color` 翻蓝后清灯。
+2. **声音涟漪**（iOS `159f6f9`、Android `da5fa92`，双端绿）：叫一声/情绪/问候时舞台扩散一圈琥珀涟漪。iOS 由 50 Hz tick 发布 `isSpeaking`（`controller_published` 棘轮**有意重定** +1，附注）；Android 由 Voice 的播放状态暴露 compose 状态。减动效折叠、走 `DuckMotion` 令牌、不抢触摸。
+3. **成就庆祝**（iOS `414b198`，Android 同批绿）：`latestUnlock` 自 D5 发布却无人消费；首次解锁（启动时为 null，不会误触）触发鸭子真实 excited + 成功触感。涟漪随声音自动出现。
+
+**验证**：十静态门全绿（含有意重定的 `controller_published 108`）；Android 本机 `assembleDebug + testDebugUnitTest` 过。iOS 冒烟绿；`testTheDuckVoiceIsHeard`（音频会话分类测试，与本改动无关）在负载高的 runner 上偶发红，同测试在涟漪轮次刚绿过——dispatch 复跑 45313689419 **成功**，按负载敏感归档。三玩法双端全绿：灯 `4350832`、涟漪 iOS `159f6f9`/Android `da5fa92`、庆祝 iOS `414b198`/Android 同批。
+
 ---
 
 ## 八、仓库与复现
