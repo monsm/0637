@@ -897,6 +897,8 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **首跑翻车与修复（run 45502701329）**：iOS 绿（新测试通过）；Android 冒烟红在「回声游戏没到第 1 关」。产物 `games-dump.xml` 说明真相：页面上有**三个「开始」**——回声状态文字、回声开始按钮、猜拳状态文字；`tap_text` 取第一个匹配，八轮全点在不可点的状态文字上（dump 里比分仍是 `你 0 · 鸭 0`）。修复：新增 `tap_text_in_control`，点「包住该文字的 clickable 容器」中心，用这次真实失败 dump 回测：开始→(55,452)、石头→(55,584)，都是芯片本体。`games-dump.xml`/`games-screen.png` 同时进 ci-logs 与产物，下次失败不用再下载 artifact。
 
+**修复后全绿（run 45507605941，`836932a`）**：Android + Contracts 绿，iOS 在 `b0d4c44` 已绿且本批未动 iOS 代码。冒烟日志实证：`echo game: Start began round 1 (the duck sang its sequence)`、`rock paper scissors: the duck answered the throw and the tally row is readable`；截图 `dist/ui-b4-android-games.png` 同屏可见「回声游戏 第 1 关」与「猜拳 你赢了！你 1 · 鸭 0」。掉帧 `jank 58.53% / p99 150 ms`，门内。
+
 ---
 
 ## 八、仓库与复现
