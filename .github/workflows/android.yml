@@ -360,6 +360,8 @@ jobs:
           cp dense-screen.png ci-logs/android/ 2>/dev/null || true
           cp games-dump.xml ci-logs/android/ 2>/dev/null || true
           cp games-screen.png ci-logs/android/ 2>/dev/null || true
+          cp games-open.xml ci-logs/android/ 2>/dev/null || true
+          cp games-open.png ci-logs/android/ 2>/dev/null || true
           cp wallclock-dump.xml ci-logs/android/ 2>/dev/null || true
           cp wallclock-screen.png ci-logs/android/ 2>/dev/null || true
           echo "run=${{ github.run_id }}" > ci-logs/android/smoke.txt
@@ -451,6 +453,8 @@ jobs:
             ui-b4-android-games.png
             games-screen.png
             games-dump.xml
+            games-open.xml
+            games-open.png
             unstripped/
 
       - uses: actions/upload-artifact@v4
