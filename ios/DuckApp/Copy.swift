@@ -62,6 +62,11 @@ enum Copy {
     static var turnLeft: String { pick("Turn left", "左转") }
     static var turnRight: String { pick("Turn right", "右转") }
     static var petIt: String { pick("Pet the duck", "摸摸它") }
+    // The floor props, for a screen reader: the stage is one element, so
+    // these are its named actions, not separate controls.
+    static var propPlayBall: String { pick("Kick the ball", "踢球") }
+    static var propPlayBlocks: String { pick("Pick up the blocks", "捡积木") }
+    static var propPlayCushion: String { pick("Sit on the cushion", "坐垫子") }
     static var couldNotStart: String { pick("MicroDuck could not start", "MicroDuck 无法启动") }
     /// The failure card's one action. Android's core loader can retry; the
     /// key lives on both sides so the dictionaries stay aligned.

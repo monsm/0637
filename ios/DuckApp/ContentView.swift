@@ -78,6 +78,10 @@ struct ContentView: View {
     /// window is this view's own; each touch is still a real pet.
     @State private var petBurst = 0
     @State private var petBurstAt = Date.distantPast
+    /// The floor props' animation state. Their cues come from the duck's own
+    /// counters (StagePropsModel.apply), so every move the props show is a
+    /// move the core accepted.
+    @StateObject private var props = StagePropsModel()
     /// D4 sheet focus: the stage control a sheet must return focus to when it
     /// closes. The route reducer does not know who opened the sheet, so every
     /// entry point names its own anchor here.
@@ -148,6 +152,10 @@ struct ContentView: View {
                 }
             }
             .duckFocusProbe(stageFocus)
+        }
+        // The floor props answer the duck's own counters and idle glance.
+        .onChange(of: controller.propCues) { _, cues in
+            props.apply(cues, asleep: controller.careAsleep)
         }
         // The hint teaches gestures, so it must wait until gestures work:
         // the core takes seconds to load, and a hint spent over a dead screen
@@ -541,6 +549,17 @@ struct ContentView: View {
                         controller.pet()
                         DuckHaptics.pet()
                     }
+                    // The floor props are scene, so a screen reader reaches
+                    // them through the same stage element's named actions.
+                    .accessibilityAction(named: Text(Copy.propPlayBall)) {
+                        propagate(.ball, controller: controller)
+                    }
+                    .accessibilityAction(named: Text(Copy.propPlayBlocks)) {
+                        propagate(.block, controller: controller)
+                    }
+                    .accessibilityAction(named: Text(Copy.propPlayCushion)) {
+                        propagate(.cushion, controller: controller)
+                    }
                     // Both gestures stay installed; the mask picks the one
                     // for this composition. A ternary of AnyGesture erased
                     // two different `some Gesture` types and failed to infer.
@@ -570,6 +589,13 @@ struct ContentView: View {
                 // The duck's real pulse, visible: one amber flash per beat at
                 // care.heart_bpm, centred on the body.
                 HeartRipple(bpm: controller.heartBpm).zIndex(1)
+                // The floor props: scene, not chrome. They take no touches
+                // (the portrait gesture reads taps against the same zones),
+                // and they answer only the duck's own real moves.
+                if portrait {
+                    StageProps(model: props, asleep: controller.careAsleep)
+                        .zIndex(1)
+                }
                 if portrait {
                     portraitChrome(in: geometry.size)
                         .zIndex(2)
@@ -912,6 +938,15 @@ struct ContentView: View {
                 let distance = hypot(gesture.translation.width, gesture.translation.height)
                 let wasTap = distance < 8
                 if wasTap && routeState.overlay != .ring {
+                    // The floor props keep the floor: a tap there asks the
+                    // duck to play, and it answers with its own real verb.
+                    if let prop = StagePropsLayout.hit(
+                        x: gesture.location.x / size.width,
+                        y: gesture.location.y / size.height
+                    ) {
+                        propagate(prop, controller: controller)
+                        return
+                    }
                     // A touch on the duck strokes it; a touch on the floor
                     // ahead sends a short step or turn, not a dead no-op.
                     let insideDuck = gesture.location.x > size.width * 0.25

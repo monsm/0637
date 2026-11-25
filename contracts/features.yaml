@@ -546,6 +546,20 @@ features:
     android: implemented
     data_chain: none
 
+  # —— 舞台道具（无入口行：舞台本身就是入口，2026-11-25）——
+  # 道具是场景元素，不是抽屉行也不是目的页里的控件：它们画在竖屏舞台
+  # 地面，触摸判定在舞台手势里按坐标命中，所以七控件预算一分未动。
+  - id: stage-props
+    zh: 舞台道具
+    group: play
+    page: null
+    hops: 1
+    conform_b4: extension
+    note: 球/积木/坐垫画在舞台地面；点道具→鸭子真踢（官方 ball_kick 策略）/真捡（ground_pick）/真坐（sit）；鸭子自己的闲逛视线（/state.idle.head）点亮相看的道具，真实计数（life.skills / ground_picks / sit_downs）驱动道具响应；睡着不动
+    ios: implemented
+    android: implemented
+    data_chain: none
+
   # —— 自动能力（无 UI 入口，2026-11-19 S1 SENSORS 线）——
   - id: depth-obstacles
     zh: 深度障碍

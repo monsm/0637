@@ -44,7 +44,7 @@ IOS_MORE = "ios/DuckApp/MoreSheet.swift"
 DRAWER_BUDGET = 16
 PAGE_CAP = 6
 GROUP_COUNT = 4
-LEDGER_TOTAL = 46  # 22 + extensions + 2 no-ui（2026-11-19 H2 增「教它说话」、K2 增「日子」、S1 增「深度障碍」「声音摸摸」）
+LEDGER_TOTAL = 47  # 22 + extensions + 2 no-ui（2026-11-19 H2 增「教它说话」、K2 增「日子」、S1 增「深度障碍」「声音摸摸」；2026-11-25 增「舞台道具」）
 TIME_BAR_ID = "rewind-play"
 NEIGHBOUR_GATED = {"ensemble", "chorus", "gifts"}
 

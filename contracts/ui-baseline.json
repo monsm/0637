@@ -44,13 +44,14 @@
   "direction": "min"
  },
  "content_view_lines": {
-  "count": 1813,
-  "direction": "max"
+  "count": 1844,
+  "direction": "max",
+  "note": "2026-11-25: +35 for the floor props (model state, stage layer, tap routing, three stage accessibility actions)."
  },
  "controller_published": {
-  "count": 108,
+  "count": 109,
   "direction": "max",
-  "note": "2026-11-24: deliberately +1 for the voice-ripple feature's isSpeaking signal (published from the 50 Hz tick). No other @Published added."
+  "note": "2026-11-25: deliberately +1 for the floor props' propCues (the idle glance plus the vet counters the props answer to). Earlier: 2026-11-24 +1 for the voice ripple's isSpeaking."
  },
  "haptics_sites": {
   "count": 12,
@@ -93,7 +94,8 @@
   "direction": "min"
  },
  "shell_kt_lines": {
-  "count": 3836,
-  "direction": "max"
+  "count": 3844,
+  "direction": "max",
+  "note": "2026-11-25: +37 for the floor props (state, poll cue, stage layer call, tap routing, three stage a11y actions)."
  }
 }

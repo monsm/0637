@@ -391,6 +391,9 @@ fun Shell(
     // The last skill the ring sent to the core. A skill's own label is brief;
     // this verdict outlives it, so the top bar can say what just ran.
     var lastSkill by remember { mutableStateOf("") }
+    // The floor props' real cues: the idle glance and the vet counters.
+    // Every move they show is a move the core accepted (StageProps.kt).
+    var propCues by remember { mutableStateOf(PropCues()) }
     // The core's own state word from /state.label. The raw string is the
     // protocol's; the top bar maps it through Copy.behaviourOf before it is
     // shown, and the instrument keeps the raw one.
@@ -466,6 +469,7 @@ fun Shell(
             }
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
+            stateText?.let(::parsePropCues)?.let { if (it != propCues) propCues = it }
             val nightNow = stateText?.let(::parseNight)
             if (nightNow != null) nightActive = nightNow.active
             val event = stateText?.let(::parseSoundEvent)
@@ -746,6 +750,7 @@ fun Shell(
                                     onPathDraw = onPathDraw,
                                     ringOpen = { ringOpen },
                                     onLongPress = { setRing(true) },
+                                    onSkillAccepted = { lastSkill = it },
                                 )
                                 // D4: the stage is one accessible element with
                                 // the four actions a TalkBack user needs.
@@ -768,6 +773,21 @@ fun Shell(
                                             postDuckCommand("/pet")
                                             true
                                         },
+                                        // The floor props are scene, so a
+                                        // screen reader reaches them through
+                                        // the same stage element's actions.
+                                        CustomAccessibilityAction(Copy.propPlayBall) {
+                                            reactProp(StageProp.Ball, duck)
+                                            true
+                                        },
+                                        CustomAccessibilityAction(Copy.propPlayBlocks) {
+                                            reactProp(StageProp.Block, duck)
+                                            true
+                                        },
+                                        CustomAccessibilityAction(Copy.propPlayCushion) {
+                                            reactProp(StageProp.Cushion, duck)
+                                            true
+                                        },
                                     )
                                 },
                         )
@@ -776,6 +796,14 @@ fun Shell(
                         // never taking a touch.
                         HeartRipple(
                             bpm = careUi?.heartBpm ?: 0.0,
+                            modifier = Modifier.matchParentSize(),
+                        )
+                        // The floor props: scene, not chrome. They take no
+                        // touches (the stage gesture reads taps against the
+                        // same zones) and answer only the duck's own moves.
+                        StagePropsStage(
+                            cues = propCues,
+                            asleep = careUi?.asleep == true,
                             modifier = Modifier.matchParentSize(),
                         )
                         // The stroke is scene, not chrome: it draws over the
@@ -2367,6 +2395,7 @@ private fun Modifier.portraitStageGesture(
     onPathDraw: (Offset) -> Unit,
     ringOpen: () -> Boolean,
     onLongPress: () -> Unit,
+    onSkillAccepted: (String) -> Unit,
 ): Modifier = pointerInput(core, carrying, stick, pathActive) {
     val deadzone = 8.dp.toPx()
     val fullScale = 90.dp.toPx()
@@ -2475,8 +2504,16 @@ private fun Modifier.portraitStageGesture(
                     val height = size.height.toFloat().coerceAtLeast(1f)
                     val x = last.position.x
                     val y = last.position.y
+                    // The floor props keep the floor: a tap there asks the
+                    // duck to play, and it answers with its own real verb.
+                    val prop = StagePropsLayout.hit(x / width, y / height)
                     val insideDuck = x > width * 0.25f && x < width * 0.75f &&
                         y > height * 0.33f && y < height * 0.68f
+                    if (prop != null) {
+                        reactProp(prop, core).takeIf { it.isNotEmpty() }?.let(onSkillAccepted)
+                        finished = true
+                        return@awaitEachGesture
+                    }
                     if (insideDuck) {
                         DuckProgress.record(ProgressEvent.Pet)
                         postDuckCommand("/pet")
