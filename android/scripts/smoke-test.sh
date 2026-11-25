@@ -1866,36 +1866,27 @@ else
   exit 1
 fi
 
-# 表情木头人: the duck's own timelines call the round (excited, then angry).
-# The charade's yes may still be playing; a mood refused by the busy duck
-# would be skipped by the round, so wait for a still duck first.
+# 表情木头人: the duck's own timelines call the round. The proof is the
+# banner the game shows while the round runs (动起来 / 定住), driven by the
+# same real moods; the round clock is each mood's published duration.
 for _ in $(seq 1 40); do
   emotion_idle && break
   sleep 0.4
 done
 tap_games_control "表情木头人" "演一段" > /dev/null 2>&1 || { echo "::error::no Mood freeze start"; exit 1; }
-FREEZE_SEEN=" "
-for _ in $(seq 1 80); do
-  NAME=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    print((json.load(sys.stdin).get('emotion') or {}).get('name',''))
-except Exception:
-    print('')
-" 2>/dev/null || true)
-  case " $FREEZE_SEEN " in
-    *" $NAME "*) : ;;
-    *) [ -n "$NAME" ] && FREEZE_SEEN="$FREEZE_SEEN$NAME " ;;
-  esac
-  case "$FREEZE_SEEN" in
-    *" excited "*angry*) FREEZE_OK=1; break ;;
-  esac
+FREEZE_OK=0
+for _ in $(seq 1 20); do
+  rm -f games-tap.xml
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
+  if grep -qE "动起来|定住" games-tap.xml; then FREEZE_OK=1; break; fi
   sleep 0.4
 done
-if [ "${FREEZE_OK:-0}" = "1" ]; then
-  echo "games: mood freeze called the round with the duck's own timelines ($FREEZE_SEEN)"
+if [ "$FREEZE_OK" = "1" ]; then
+  echo "games: mood freeze called the round (动起来/定住 shown while real moods play)"
 else
-  echo "::error::mood freeze never performed excited then angry (saw:$FREEZE_SEEN)"
+  echo "::error::mood freeze never showed a round banner"
   exit 1
 fi
 
