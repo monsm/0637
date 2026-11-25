@@ -375,20 +375,34 @@ check $? "the duck accepts a stroke" "$(printf '%s' "$PET" | head -c 120)"
 
 # A sudden bang in the room is an external event: the duck startles with
 # the official alarm voice. Nothing about it enters the 61-D observation.
-# This runs before the pet: a stroke's coo and a bang's alarm share the
-# 100-tick reaction cooldown, and 0.4 s later the alarm is still blocked.
+# This runs after the pet: a stroke's coo and a bang's alarm share the
+# 100-tick reaction cooldown, so the bang must wait for the cooldown to
+# lapse — on the duck's own tick, not wall clock. Under CI load the 50 Hz
+# loop sags (a wall-clock sleep covered far fewer than 100 ticks and the
+# alarm was swallowed: runs 45544050765 and 45558849118). Tick 130 is the
+# cooldown plus a margin; a bang that still finds another reaction running
+# is retried after the next lapse rather than read as a failure.
 echo "--- startle ---"
-# The pet's coo and the alarm share the 100-tick reaction cooldown; give
-# it time to lapse before the bang. The margin is wall-clock against a
-# 50 Hz loop that sags under CI load: four seconds covers 100 ticks down
-# to 25 Hz, or the alarm is silently swallowed by the cooldown.
-sleep 4
-api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.9,"peak_hz":440},"tick_ms":0}' > /dev/null || true
 STARTLED=""
-for _ in $(seq 1 40); do
-  STARTLED=$(api GET /state | field last_sound)
+for attempt in 1 2 3; do
+  BASE_TICK=$(api GET /state | field tick || true)
+  [ -n "$BASE_TICK" ] || BASE_TICK=0
+  WAITED=0
+  for _ in $(seq 1 150); do
+    NOW_TICK=$(api GET /state | field tick || true)
+    [ -n "$NOW_TICK" ] || NOW_TICK=$BASE_TICK
+    if [ "$NOW_TICK" -ge $((BASE_TICK + 130)) ] 2>/dev/null; then WAITED=1; break; fi
+    sleep 0.2
+  done
+  [ "$WAITED" = "1" ] || echo "note  startle: the tick did not advance 130 in 30 s; banging anyway"
+  api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.9,"peak_hz":440},"tick_ms":0}' > /dev/null || true
+  for _ in $(seq 1 40); do
+    STARTLED=$(api GET /state | field last_sound)
+    [ "$STARTLED" = "alarm" ] && break
+    sleep 0.1
+  done
   [ "$STARTLED" = "alarm" ] && break
-  sleep 0.1
+  echo "note  startle: attempt $attempt was swallowed by a running reaction (last_sound=$STARTLED); waiting out the cooldown"
 done
 [ "$STARTLED" = "alarm" ]; check $? "a loud room startles the duck" "last_sound=$STARTLED"
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
