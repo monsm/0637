@@ -2011,20 +2011,36 @@ except Exception:
 # the proof.
 for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 SAD0=$(emotion_count sad); LAUGH0=$(emotion_count laugh)
-tap_games_control "反向指令" "难过" > /dev/null 2>&1 || { echo "::error::no reverse sad chip"; exit 1; }
 REV_OK=0
-for _ in $(seq 1 25); do
-  if [ "$(emotion_count sad)" -gt "$SAD0" ] 2>/dev/null; then REV_OK=1; break; fi
-  sleep 0.3
+# The tap can land while the duck is still busy; ask again after each refusal
+# (the game's prompt only advances on an accepted mood).
+for _attempt in 1 2 3; do
+  for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+  tap_games_control "反向指令" "难过" > /dev/null 2>&1 || break
+  for _ in $(seq 1 20); do
+    if [ "$(emotion_count sad)" -gt "$SAD0" ] 2>/dev/null; then REV_OK=1; break 2; fi
+    sleep 0.3
+  done
 done
-[ "$REV_OK" = "1" ] || { echo "::error::reverse command did not make the duck sad"; exit 1; }
+if [ "$REV_OK" != "1" ]; then
+  adb exec-out screencap -p > games-screen.png 2>/dev/null || true
+  echo "::error::reverse command did not make the duck sad"
+  exit 1
+fi
 for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
-tap_games_control "反向指令" "大笑" > /dev/null 2>&1 || true
-for _ in $(seq 1 25); do
-  if [ "$(emotion_count laugh)" -gt "$LAUGH0" ] 2>/dev/null; then REV_OK=2; break; fi
-  sleep 0.3
+for _attempt in 1 2 3; do
+  for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+  tap_games_control "反向指令" "大笑" > /dev/null 2>&1 || break
+  for _ in $(seq 1 20); do
+    if [ "$(emotion_count laugh)" -gt "$LAUGH0" ] 2>/dev/null; then REV_OK=2; break 2; fi
+    sleep 0.3
+  done
 done
-[ "$REV_OK" = "2" ] || { echo "::error::reverse command did not make the duck laugh"; exit 1; }
+if [ "$REV_OK" != "2" ]; then
+  adb exec-out screencap -p > games-screen.png 2>/dev/null || true
+  echo "::error::reverse command did not make the duck laugh"
+  exit 1
+fi
 echo "games: reverse command made the duck sad (against laugh) and laugh (against sad)"
 for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 
