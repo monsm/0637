@@ -1667,10 +1667,18 @@ tap_games_control() {
   # Tap a control by its label, choosing the one nearest its section title
   # (the page repeats 开始 once per game; Compose testTags do not reach
   # uiautomator's resource-id here, so the title anchors the section).
+  #
+  # The Play more sheet is a tall verticalScroll inside a ModalBottomSheet.
+  # A failed dump leaves the PREVIOUS /sdcard/ui.xml in place, so delete the
+  # remote first (a stale Live-screen tree never moves). The drag is slow and
+  # mid-screen: a fast bottom-to-top flick can be eaten by the sheet itself.
+  # If three dumps in a row show the same first title, the page is not moving
+  # and the swipe is retried from a lower start point.
   local title="$1" label="$2" w="$PROP_STAGE_W" h="$PROP_STAGE_H" coords
-  local _i
-  for _i in $(seq 1 30); do
+  local _i first="" prev="" still=0
+  for _i in $(seq 1 40); do
     rm -f games-tap.xml
+    adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
     adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
     coords=$(python3 - "$title" "$label" "$w" "$h" <<'PYX'
@@ -1711,7 +1719,35 @@ PYX
       adb shell input tap $coords > /dev/null 2>&1
       return 0
     fi
-    adb shell input swipe 160 560 160 100 300 > /dev/null 2>&1 || true
+    # Progress probe: the topmost short label in the tree tells whether the
+    # scroll actually moved between iterations.
+    first=$(python3 - <<'PYX' 2>/dev/null || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('games-tap.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+nodes = [(n.get('bounds'), n.get('text')) for n in root.iter('node')
+         if (n.get('text') or '')]
+nodes = [(b, t) for b, t in nodes if b]
+if nodes:
+    b, t = min(nodes, key=lambda x: int(x[0].split('][')[0].strip('[').split(',')[1]))
+    print(t)
+PYX
+)
+    if [ -n "$first" ] && [ "$first" = "$prev" ]; then
+      still=$((still + 1))
+    else
+      still=0
+    fi
+    prev="$first"
+    if [ "$still" -ge 3 ]; then
+      # The sheet is not scrolling from here; start the drag lower.
+      adb shell input swipe 160 610 160 220 500 > /dev/null 2>&1 || true
+      still=0
+    else
+      adb shell input swipe 160 540 160 220 500 > /dev/null 2>&1 || true
+    fi
     sleep 0.6
   done
   # The page is long; a failure means the section never scrolled in. Report
