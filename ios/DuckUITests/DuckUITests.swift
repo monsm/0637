@@ -648,6 +648,34 @@ final class DuckUITests: XCTestCase {
             usleep(200_000)
         }
         XCTAssertTrue(rolled, "tapping the hoop never started a real roll")
+
+        // The mirror's faces: each accepted tap makes a different official
+        // emotion (curious, then laugh). One at a time — the core drops a
+        // request while another plays — so wait out the first timeline.
+        usleep(1_000_000)
+        let mirror = stage.exists
+            ? stage.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.76))
+            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.76))
+        mirror.tap()
+        var curious = false
+        let curiousDeadline = Date().addingTimeInterval(20)
+        while Date() < curiousDeadline {
+            let label = verdict.exists ? verdict.label.lowercased() : ""
+            if label.contains("curious") { curious = true; break }
+            usleep(200_000)
+        }
+        XCTAssertTrue(curious, "the mirror never made the duck curious")
+
+        usleep(4_000_000) // curious is a 2.9 s timeline
+        mirror.tap()
+        var laughed = false
+        let laughDeadline = Date().addingTimeInterval(20)
+        while Date() < laughDeadline {
+            let label = verdict.exists ? verdict.label.lowercased() : ""
+            if label.contains("laugh") { laughed = true; break }
+            usleep(200_000)
+        }
+        XCTAssertTrue(laughed, "the second mirror tap never made the duck laugh")
     }
 
     /// The self-play switch (2026-11-25): turned on, an idle duck walks to a

@@ -127,4 +127,20 @@ class StagePropsTest {
         // Two ducks are not forced to the same prop.
         assertNotEquals(selfPlayProp("duck-a", 1250), selfPlayProp("duck-b", 1250))
     }
+
+    @Test
+    fun theMirrorMakesADifferentOfficialFaceEachTap() {
+        // Whatever the session counter is, the next five faces are distinct
+        // official emotions and advancing moves to the next one.
+        val faces = mutableSetOf<String>()
+        repeat(5) {
+            val face = mirrorFace()
+            assertTrue("not an official emotion: $face", face in setOf(
+                "curious", "laugh", "excited", "sad", "yes"
+            ))
+            faces.add(face)
+            mirrorFaceDone()
+        }
+        assertEquals(5, faces.size)
+    }
 }

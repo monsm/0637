@@ -3382,6 +3382,14 @@ final class DuckController: ObservableObject {
         return duck_core_ground_pick(core) == 0
     }
 
+    /// The duck's own synth voice: one official tag (chirp/coo/greet/inquire/
+    /// peck/alarm), played through the same engine the echo game uses. The
+    /// core's tags are the only accepted words; the engine drops the rest.
+    func queueSound(_ tag: String) {
+        guard let core else { return }
+        voice.play(core: core, tag: tag)
+    }
+
     /// One verb from the skill ring. `sit`, `stand` and `ground_pick` are the
     /// loop's own; the rest are manifest skills, and the core refuses an
     /// unknown name rather than pretending it started.

@@ -184,6 +184,19 @@ fun StageProp.side(): Int = when (this) {
     StageProp.Cushion -> 0
 }
 
+/** The faces the duck makes at the mirror, in the order a child meets them.
+ * Official emotions only; the timeline plays its own voice. Session-only. */
+private val mirrorFaces = listOf("curious", "laugh", "excited", "sad", "yes")
+private var mirrorTaps = 0
+
+/** The face the next accepted mirror tap will make. */
+fun mirrorFace(): String = mirrorFaces[mirrorTaps % mirrorFaces.size]
+
+/** The duck finished a face; the next tap meets the next one. */
+fun mirrorFaceDone() {
+    mirrorTaps += 1
+}
+
 /**
  * A prop was tapped: the duck does its real verb toward it. The prop's
  * response comes from the vet book's counter (or the emotion timeline) a
@@ -191,13 +204,34 @@ fun StageProp.side(): Int = when (this) {
  * skill name only when the core accepted it — a refusal leaves the top bar
  * unchanged. (The C entries answer differently: `skill` is 1 started / 0
  * refused, while `ground_pick` is 0 done / -1 refused.)
+ *
+ * Each prop also gives the duck its real synth voice (the core's own tags);
+ * the mirror needs none — an emotion timeline carries its own voice.
  */
-fun reactProp(prop: StageProp, core: DuckCore): String = when (prop) {
-    StageProp.Ball -> if (core.skill("kick_left") != 0) "kick_left" else ""
-    StageProp.Hoop -> if (core.skill("roulade") != 0) "roulade" else ""
-    StageProp.Block -> if (core.groundPick() == 0) "ground_pick" else ""
-    StageProp.Mirror -> if (core.skill("curious") != 0) "curious" else ""
-    StageProp.Cushion -> if (core.skill("sit") != 0) "sit" else ""
+fun reactProp(prop: StageProp, core: DuckCore): String {
+    val face = if (prop == StageProp.Mirror) mirrorFace() else ""
+    val accepted = when (prop) {
+        StageProp.Ball -> if (core.skill("kick_left") != 0) "kick_left" else ""
+        StageProp.Hoop -> if (core.skill("roulade") != 0) "roulade" else ""
+        StageProp.Block -> if (core.groundPick() == 0) "ground_pick" else ""
+        StageProp.Mirror -> if (core.skill(face) != 0) {
+            mirrorFaceDone()
+            face
+        } else {
+            ""
+        }
+        StageProp.Cushion -> if (core.skill("sit") != 0) "sit" else ""
+    }
+    if (accepted.isNotEmpty()) {
+        when (prop) {
+            StageProp.Ball -> core.queueSound("peck")
+            StageProp.Hoop -> core.queueSound("chirp")
+            StageProp.Block -> core.queueSound("greet")
+            StageProp.Cushion -> core.queueSound("coo")
+            StageProp.Mirror -> Unit
+        }
+    }
+    return accepted
 }
 
 @Composable
