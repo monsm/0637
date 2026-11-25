@@ -342,23 +342,33 @@ struct SoundSimon: View {
     }
 }
 
-/// 反向指令: the prompt says one thing; the child must do the opposite.
+/// 反向指令: the prompt names a mood; the child must perform its opposite.
+/// Emotions always start fresh (no idempotent already-in-state answer like
+/// sit/stand), so every correct press is a real mood with a real counter.
 struct ReverseCommand: View {
     @ObservedObject var controller: DuckController
-    @State private var promptSit = true
+    private let pairs: [(String, String)] = [
+        ("laugh", "sad"), ("sad", "laugh"), ("excited", "curious"), ("curious", "excited"),
+    ]
+    private let faces = ["laugh", "sad", "excited", "curious"]
+    @State private var round = 0
     @State private var notice = ""
 
-    private func press(sit: Bool) {
-        guard sit != promptSit else {
+    private var answer: String { pairs[round % pairs.count].1 }
+    private var prompt: String { pairs[round % pairs.count].0 }
+
+    private func press(_ mood: String) {
+        guard round < 4 else { return }
+        guard mood == answer else {
             notice = Copy.reverseWrong
             return
         }
-        guard controller.trigger(sit ? "sit" : "stand") else {
+        guard controller.trigger(mood) else {
             notice = Copy.reverseWrong
             return
         }
         notice = ""
-        promptSit.toggle()
+        round += 1
     }
 
     var body: some View {
@@ -366,14 +376,24 @@ struct ReverseCommand: View {
             HStack {
                 Text(Copy.reverseTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
                 Spacer(minLength: DuckSpace.sm)
-                Text(notice.isEmpty ? SkillLabel.of(promptSit ? "sit" : "stand") : notice)
+                Text(notice.isEmpty ? (round >= 4 ? Copy.rallyDone : SkillLabel.of(prompt)) : notice)
                     .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.6))
                     .accessibilityIdentifier("reverse-status")
             }
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
-                GameChip(title: SkillLabel.of("sit"), identifier: "reverse-sit") { press(sit: true) }
-                GameChip(title: SkillLabel.of("stand"), identifier: "reverse-stand") { press(sit: false) }
+                ForEach(Array(faces.prefix(2)), id: \.self) { mood in
+                    GameChip(title: SkillLabel.of(mood), identifier: "reverse-\(mood)") { press(mood) }
+                }
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                ForEach(Array(faces.dropFirst(2)), id: \.self) { mood in
+                    GameChip(title: SkillLabel.of(mood), identifier: "reverse-\(mood)") { press(mood) }
+                }
+                GameChip(title: Copy.echoStart, identifier: "reverse-start") {
+                    round = 0
+                    notice = ""
+                }
             }
         }
     }
