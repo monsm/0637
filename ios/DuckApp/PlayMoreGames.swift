@@ -14,6 +14,26 @@ private let officialMoods = [
     "laugh", "mmh", "mock", "no", "sad", "yes", "yes_fast",
 ]
 
+/// Each mood's official timeline length, from upstream's keyframes.
+private func moodDurationMs(_ name: String) -> Int {
+    switch name {
+    case "angry": return 2500
+    case "curious": return 2900
+    case "defiant": return 2100
+    case "devastated": return 8500
+    case "excited": return 3300
+    case "impatient": return 2500
+    case "laugh": return 2900
+    case "mmh": return 1900
+    case "mock": return 2500
+    case "no": return 1700
+    case "sad": return 7500
+    case "yes": return 1400
+    case "yes_fast": return 1400
+    default: return 2500
+    }
+}
+
 private func duckState() async -> [String: Any]? {
     guard let url = URL(string: "http://127.0.0.1:8765/state") else { return nil }
     var request = URLRequest(url: url)
@@ -137,10 +157,11 @@ struct MoodCharade: View {
             return
         }
         phase = 1
+        // The guess opens when the mood's own timeline ends; the published
+        // durations are the honest clock (polling /state can lag under load
+        // and leave the chips disabled after the player already saw idle).
         Task { @MainActor in
-            while await duckEmotionPlaying() {
-                try? await Task.sleep(nanoseconds: 300_000_000)
-            }
+            try? await Task.sleep(nanoseconds: UInt64(moodDurationMs(answer) + 300) * 1_000_000)
             phase = 2
         }
     }

@@ -1851,6 +1851,8 @@ for _ in $(seq 1 40); do
   emotion_idle && break
   sleep 0.4
 done
+# The game opens its chips from the same published duration, a beat later.
+sleep 0.6
 YES0=$(emotion_count yes)
 tap_games_control "情绪哑剧" "$MOOD_ZH" > /dev/null 2>&1 || { echo "::error::no charade chip for $MOOD"; exit 1; }
 YES_OK=0
