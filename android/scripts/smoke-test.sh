@@ -1995,6 +1995,16 @@ try: print(json.load(sys.stdin).get('care_time_scale',1.0))
 except Exception: print(-1)
 " 2>/dev/null || echo -1
 }
+body_idle() {
+  [ "$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    l = json.load(sys.stdin).get('label', '')
+    print('idle' if l in ('walk', 'stand') else l)
+except Exception:
+    print('err')
+" 2>/dev/null || echo err)" = "idle" ]
+}
 
 # 反向指令: the prompt names a mood; the child must do the opposite emotion
 # (laugh->sad, then sad->laugh). Emotions always start, so the counters are
@@ -2033,11 +2043,13 @@ for _ in $(seq 1 30); do
   if [ "$(life_int stand_ups)" -gt "$PM_STAND0" ] 2>/dev/null; then break; fi
   sleep 0.4
 done
+for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
 tap_games_control "照我做" "贴地抓取" > /dev/null 2>&1 || true
 for _ in $(seq 1 30); do
   if [ "$(life_int ground_picks)" -gt "$PM_PICK0" ] 2>/dev/null; then break; fi
   sleep 0.4
 done
+for _ in $(seq 1 40); do body_idle && break; sleep 0.4; done
 tap_games_control "照我做" "翻滚" > /dev/null 2>&1 || true
 PM_OK=0
 for _ in $(seq 1 25); do
@@ -2972,8 +2984,11 @@ SH
 playmore_games_check() {
   local ok=0
 
-  for _ in $(seq 1 8); do
-    if tap_text_in_control "开始" > /dev/null 2>&1 || tap_text_in_control "Start" > /dev/null 2>&1; then
+  # The Play more sheet is long now; use the same title-anchored, on-screen
+  # tap helper as the main games section (a bare "first 开始" tap landed on
+  # whatever was on screen once the page grew).
+  for _ in $(seq 1 3); do
+    if tap_games_control "回声游戏" "开始" > /dev/null 2>&1; then
       sleep 1
       for _ in 1 2 3 4; do
         screen_has_text "第 1 关|Round 1" && { ok=1; break; }
@@ -2981,8 +2996,7 @@ playmore_games_check() {
       done
       [ "$ok" = "1" ] && break
     fi
-    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-    sleep 0.4
+    sleep 0.5
   done
   if [ "$ok" != "1" ]; then
     cp games-check.xml games-dump.xml 2>/dev/null || true
@@ -2993,8 +3007,8 @@ playmore_games_check() {
   echo "echo game: Start began round 1 (the duck sang its sequence)"
 
   ok=0
-  for _ in $(seq 1 8); do
-    if tap_text_in_control "石头" > /dev/null 2>&1 || tap_text_in_control "rock" > /dev/null 2>&1; then
+  for _ in $(seq 1 3); do
+    if tap_games_control "猜拳" "石头" > /dev/null 2>&1; then
       sleep 1
       for _ in 1 2 3 4; do
         screen_has_text "鸭子出了|The duck threw" && { ok=1; break; }
@@ -3002,8 +3016,7 @@ playmore_games_check() {
       done
       [ "$ok" = "1" ] && break
     fi
-    adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
-    sleep 0.4
+    sleep 0.5
   done
   if [ "$ok" != "1" ]; then
     cp games-check.xml games-dump.xml 2>/dev/null || true
