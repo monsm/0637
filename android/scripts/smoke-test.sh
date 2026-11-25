@@ -1822,21 +1822,26 @@ else
 fi
 
 # 情绪哑剧: the duck performs a mood; the right chip earns its real yes.
-tap_games_control "情绪哑剧" "开始猜" > /dev/null 2>&1 || { echo "::error::no Mood charade start"; exit 1; }
-MOOD=""
-for _ in $(seq 1 30); do
-  MOOD=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+# A round can be lost to a busy duck or a swallowed tap; each attempt starts
+# a fresh round and reads its own mood, so a retry cannot answer the old one.
+CHAR_OK=0
+for _attempt in 1 2 3; do
+  for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+  tap_games_control "情绪哑剧" "开始猜" > /dev/null 2>&1 || break
+  MOOD=""
+  for _ in $(seq 1 30); do
+    MOOD=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
 import json,sys
 try:
     print((json.load(sys.stdin).get('emotion') or {}).get('name',''))
 except Exception:
     print('')
 " 2>/dev/null || true)
-  [ -n "$MOOD" ] && break
-  sleep 0.3
-done
-[ -n "$MOOD" ] || { echo "::error::the charade never started a mood"; exit 1; }
-MOOD_ZH=$(python3 - "$MOOD" <<'PYX'
+    [ -n "$MOOD" ] && break
+    sleep 0.3
+  done
+  [ -n "$MOOD" ] || continue
+  MOOD_ZH=$(python3 - "$MOOD" <<'PYX'
 import sys
 names = {
     "angry": "生气", "curious": "好奇", "defiant": "不服", "devastated": "崩溃",
@@ -1847,24 +1852,20 @@ names = {
 print(names.get(sys.argv[1], sys.argv[1]))
 PYX
 )
-for _ in $(seq 1 40); do
-  emotion_idle && break
-  sleep 0.4
+  for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+  sleep 0.6
+  YES0=$(emotion_count yes)
+  tap_games_control "情绪哑剧" "$MOOD_ZH" > /dev/null 2>&1 || continue
+  for _ in $(seq 1 20); do
+    if [ "$(emotion_count yes)" -gt "$YES0" ] 2>/dev/null; then CHAR_OK=1; break 2; fi
+    sleep 0.3
+  done
 done
-# The game opens its chips from the same published duration, a beat later.
-sleep 0.6
-YES0=$(emotion_count yes)
-tap_games_control "情绪哑剧" "$MOOD_ZH" > /dev/null 2>&1 || { echo "::error::no charade chip for $MOOD"; exit 1; }
-YES_OK=0
-for _ in $(seq 1 20); do
-  YES=$(emotion_count yes)
-  if [ "$YES" -gt "$YES0" ] 2>/dev/null; then YES_OK=1; break; fi
-  sleep 0.3
-done
-if [ "$YES_OK" = "1" ]; then
+if [ "$CHAR_OK" = "1" ]; then
   echo "games: mood charade performed $MOOD and the right answer earned a real yes"
 else
-  echo "::error::the right charade answer did not earn the duck's yes"
+  adb exec-out screencap -p > games-screen.png 2>/dev/null || true
+  echo "::error::the right charade answer never earned the duck's yes"
   exit 1
 fi
 
