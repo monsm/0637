@@ -943,6 +943,22 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 9 例（新增：一轮五张脸互不重复、全是官方情绪）；冒烟先断言点球后 `last_sound=peck`，再站起鸭子、点镜子两次，断言 `life.emotions.curious`、`life.emotions.laugh` 各真增长（拒绝重试、演完再点）；iOS 测试在点球、点圈之后点镜子两次，断言顶栏判词先 `curious` 后 `laugh`。
 
+**验证（`e092b74`）**：Android + Contracts 绿（iOS 在 `e29bfbe` 已绿：镜子/嗓音 UI 测试与首屏七控件都过）。冒烟实证五行：踢计数 `0 -> 1`、`last_sound=peck`、翻滚 `2 -> 3`、`mirror: two taps made two different real emotions (curious, then laugh)`、自娱计数 `7 -> 8`。两处 CI 教训：① `last_sound` 是单值字段，peck 的断言必须紧跟踢球，否则被呼啦圈的 chirp 覆盖（首跑红）；② `accessibilityAddTraits(.isButton)` 会让开关成为首屏第 8 个按钮、踩七控件预算——开关是场景元素，不带 button trait，语音辅助走舞台的「自己玩开关」命名动作（与 Android 同构）。
+
+### 四之四十九、五张小游戏一次落地（2026-11-25）
+
+出处：全维度脑暴（`docs/PLAY_IDEAS_FULL_2026-11-25.md`，四维 56 条审计后保留 12 条）里五条小成本高分项，一次做完，全部内联在「玩一玩」页（与回声/猜拳同款，不新增路由）：
+
+1. **左右开弓**：节拍上交替左/右踢，每一下都是官方 `kick_left/right`；接受/拒绝以 vetbook `life.skills` 为准，六步完成鸭子 excited。
+2. **情绪哑剧**：鸭子演 13 个官方情绪之一（答案由指纹+回合决定），演完开猜；猜中鸭子点头（`yes`）、猜错摇头（`no`）。
+3. **表情木头人**：用鸭子自己的情绪时间线当回合钟——excited 段「动起来」、angry/yes 段「定住」，状态跟随 `/state.emotion`。
+4. **它今天有没有**：用 `life` 与 `life.day_started` 的真实差值回答「今天走过吗/被摸过吗/摔过吗/吃过吗」，并展示真实数字；答案就是鸭子的 `yes`/`no` 情绪。
+5. **声音指挥官**：出题「拍手让它笑 / 吹口哨让它好奇」，核心自己的房间声分类器听见后用官方默认反应回答；回合按 `sound_event.tick` 判定。
+
+两端：`ios/DuckApp/PlayMoreGames.swift`、`android/.../PlayMoreGames.kt`；28 个文案键两端同键同值；Play more 页追加五段。
+
+**验收**：Android 冒烟在真实 UI 上按「标题锚定的文字点击」驱动五个游戏（Compose 的 testTag 不进 uiautomator 的 resource-id，实测 dump 只有 `android:id/content`，所以不能用 tag）：节拍四次交替踢断言左右各 +2；读 `/state.emotion.name` 后点对应中文情绪 chip，断言 `life.emotions.yes` +1；木头人断言先后看到 excited 与 angry；今天卡断言情绪与真实 pets 差值一致；声音指挥官注入合成拍手后断言界面出现「听到了」。iOS `testTheFiveSmallGamesAreWired` 自上而下滚过五段：踢出判词、哑剧到「它在演什么？」、木头人横幅、今天卡给出 `Today:` 事实、声音指挥官进入聆听。
+
 ---
 
 ## 八、仓库与复现

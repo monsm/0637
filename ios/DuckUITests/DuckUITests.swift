@@ -678,6 +678,117 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(laughed, "the second mirror tap never made the duck laugh")
     }
 
+    /// The five small games (2026-11-25) are inline on Play more. This walks
+    /// the sheet top to bottom and proves each one is wired to a real verb or
+    /// a real state field: the rally taps kick, the charade performs a mood
+    /// and opens the guess, the freeze banner follows the duck's timeline,
+    /// the today card answers from the day facts, and Sound Simon starts
+    /// listening. The deeper core proofs live in the Android smoke.
+    func testTheFiveSmallGamesAreWired() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+        app.buttons["duck-more"].tap()
+        let playMore = app.buttons["more-playmore"]
+        XCTAssertTrue(playMore.waitForExistence(timeout: 10), "the Play-more row is missing")
+        playMore.tap()
+
+        func scrollTo(_ id: String, swipes: Int = 24) -> XCUIElement {
+            let element = anyElement(id)
+            var n = 0
+            while !(element.exists && element.isHittable) && n < swipes {
+                app.swipeUp()
+                n += 1
+            }
+            return element
+        }
+
+        // 左右开弓: the first correct-foot tap starts a real kick.
+        let rallyStart = scrollTo("rally-start")
+        XCTAssertTrue(rallyStart.exists && rallyStart.isHittable, "no Kick rally start")
+        rallyStart.tap()
+        let rallyLeft = anyElement("rally-left")
+        XCTAssertTrue(rallyLeft.exists && rallyLeft.isHittable, "no Kick rally left chip")
+        rallyLeft.tap()
+        let verdict = app.staticTexts["duck-last-skill"]
+        var kicked = false
+        let kickDeadline = Date().addingTimeInterval(15)
+        while Date() < kickDeadline {
+            if verdict.exists, verdict.label.lowercased().contains("kick") {
+                kicked = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(kicked, "the kick rally chip never started a real kick")
+
+        // 情绪哑剧: starting performs a mood and then opens the guess.
+        let charadeStart = scrollTo("charade-start")
+        XCTAssertTrue(charadeStart.exists && charadeStart.isHittable, "no Mood charade start")
+        charadeStart.tap()
+        let charadeStatus = anyElement("charade-status")
+        var guessing = false
+        let charadeDeadline = Date().addingTimeInterval(20)
+        while Date() < charadeDeadline {
+            if charadeStatus.exists, charadeStatus.label == "Which mood is it?" {
+                guessing = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(guessing, "the mood charade never reached the guess (status: \(charadeStatus.label))")
+
+        // 表情木头人: the banner follows the duck's own timeline.
+        let freezeStart = scrollTo("freeze-start")
+        XCTAssertTrue(freezeStart.exists && freezeStart.isHittable, "no Mood freeze start")
+        freezeStart.tap()
+        let banner = anyElement("freeze-banner")
+        var called = false
+        let freezeDeadline = Date().addingTimeInterval(15)
+        while Date() < freezeDeadline {
+            if banner.exists, banner.label == "Dance!" || banner.label == "Freeze!" {
+                called = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(called, "the mood freeze never called a round (banner: \(banner.label))")
+
+        // 它今天有没有: the card answers with a real day fact.
+        let todayWalk = scrollTo("today-walk")
+        XCTAssertTrue(todayWalk.exists && todayWalk.isHittable, "no today-walk chip")
+        todayWalk.tap()
+        let fact = anyElement("today-fact")
+        var answered = false
+        let todayDeadline = Date().addingTimeInterval(10)
+        while Date() < todayDeadline {
+            if fact.exists, fact.label.contains("Today:") {
+                answered = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(answered, "the today card never answered with a fact")
+
+        // 声音指挥官: the clap round starts listening.
+        let soundClap = scrollTo("sound-clap")
+        XCTAssertTrue(soundClap.exists && soundClap.isHittable, "no sound-clap chip")
+        soundClap.tap()
+        let soundStatus = anyElement("soundgame-status")
+        var listening = false
+        let soundDeadline = Date().addingTimeInterval(5)
+        while Date() < soundDeadline {
+            if soundStatus.exists, soundStatus.label == "Clap to make it laugh" {
+                listening = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(listening, "Sound Simon never started listening")
+    }
+
     /// The self-play switch (2026-11-25): turned on, an idle duck walks to a
     /// prop and plays with it on its own. The verdict line is the proof the
     /// core accepted the verb; it is empty at launch and no other tap

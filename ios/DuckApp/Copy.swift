@@ -417,6 +417,43 @@ enum Copy {
         }
     }
 
+    // The five small games (2026-11-25). Every word below is a prompt for a
+    // real verb; nothing here is a score the duck did not earn.
+    static var rallyTitle: String { pick("Kick rally", "左右开弓") }
+    static func rallyStep(_ n: Int) -> String {
+        String(format: pick("Step %d of 6", "第 %d 步，共 6 步"), n)
+    }
+    static var rallyLeftTurn: String { pick("Left foot", "轮到左踢") }
+    static var rallyRightTurn: String { pick("Right foot", "轮到右踢") }
+    static var rallyWrong: String { pick("Not that foot", "换一只脚") }
+    static var rallyDone: String { pick("Rally done!", "开弓完成！") }
+    static var charadesTitle: String { pick("Mood charade", "情绪哑剧") }
+    static var charadesPrompt: String { pick("Which mood is it?", "它在演什么？") }
+    static var charadesRight: String { pick("Right!", "猜对了！") }
+    static var charadesWrong: String { pick("Not that one", "猜错了") }
+    static var freezeTitle: String { pick("Mood freeze", "表情木头人") }
+    static var freezeMove: String { pick("Dance!", "动起来！") }
+    static var freezeStop: String { pick("Freeze!", "定住！") }
+    static var freezeDone: String { pick("That's the round", "演完了") }
+    static var todayTitle: String { pick("Did it happen today?", "它今天有没有") }
+    static var todayWalk: String { pick("Did we walk today?", "今天走过吗") }
+    static var todayPets: String { pick("Was it petted today?", "今天被摸过吗") }
+    static var todayFalls: String { pick("Did it fall today?", "今天摔过吗") }
+    static var todayFed: String { pick("Did it eat today?", "今天吃过吗") }
+    static var todayYes: String { pick("Yes", "是") }
+    static var todayNo: String { pick("No", "不是") }
+    static func todayMetres(_ m: Double) -> String {
+        String(format: pick("Today: %.1f m", "今天走了 %.1f 米"), m)
+    }
+    static func todayCount(_ n: Int) -> String {
+        String(format: pick("Today: %d times", "今天 %d 次"), n)
+    }
+    static var soundTitle: String { pick("Sound Simon", "声音指挥官") }
+    static var soundPromptLaugh: String { pick("Clap to make it laugh", "拍手让它笑") }
+    static var soundPromptCurious: String { pick("Whistle to make it curious", "吹口哨让它好奇") }
+    static var soundHeard: String { pick("Heard it!", "听到了！") }
+    static var soundMissed: String { pick("Nothing heard", "没听到") }
+
     static func echoSound(_ tag: String) -> String {
         switch tag {
         case "chirp": return pick("chirp", "叽")

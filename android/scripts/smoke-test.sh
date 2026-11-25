@@ -1657,6 +1657,221 @@ else
   exit 1
 fi
 
+# The five small games (2026-11-25): inline on Play more like Echo and RPS.
+# Every prompt asks a real verb and every score is the vet book's counter, so
+# the proof is /state moving. The sheet is long; the helper below taps a
+# control by testTag only when its live bounds are on screen, scrolling the
+# sheet until they are (off-screen nodes carry real bounds; a tap outside the
+# display lands nowhere — the games' first failure mode).
+tap_games_control() {
+  # Tap a control by its label, choosing the one nearest its section title
+  # (the page repeats 开始 once per game; Compose testTags do not reach
+  # uiautomator's resource-id here, so the title anchors the section).
+  local title="$1" label="$2" w="$PROP_STAGE_W" h="$PROP_STAGE_H" coords
+  local _i
+  for _i in $(seq 1 16); do
+    rm -f games-tap.xml
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+    adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
+    coords=$(python3 - "$title" "$label" "$w" "$h" <<'PYX'
+import sys, xml.etree.ElementTree as ET
+title, label, w, h = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+try:
+    root = ET.parse('games-tap.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+
+def box(node):
+    parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
+    return tuple(map(int, parts)) if len(parts) == 4 else None
+
+titles = [box(n) for n in root.iter('node') if (n.get('text') or '') == title]
+titles = [b for b in titles if b]
+if not titles:
+    raise SystemExit(1)
+tb = titles[0]
+targets = [box(n) for n in root.iter('node') if (n.get('text') or '') == label]
+targets = [b for b in targets if b]
+if not targets:
+    raise SystemExit(1)
+
+def score(b):
+    cx, cy = (b[0] + b[2]) // 2, (b[1] + b[3]) // 2
+    tx, ty = (tb[0] + tb[2]) // 2, tb[3]
+    return (0 if cy >= ty else 100000) + abs(cy - ty) + abs(cx - tx) // 4
+
+b = min(targets, key=score)
+if b[0] >= 0 and b[1] >= 0 and b[2] <= w and b[3] <= h and b[2] > b[0] and b[3] > b[1]:
+    print((b[0] + b[2]) // 2, (b[1] + b[3]) // 2)
+    raise SystemExit(0)
+raise SystemExit(1)
+PYX
+)
+    if [ -n "$coords" ]; then
+      adb shell input tap $coords > /dev/null 2>&1
+      return 0
+    fi
+    adb shell input swipe 160 560 160 200 300 > /dev/null 2>&1 || true
+    sleep 0.5
+  done
+  return 1
+}
+
+# 左右开弓: four correct-foot taps must start two real kicks per foot.
+KL0=$(skill_count kick_left); KR0=$(skill_count kick_right)
+tap_games_control "左右开弓" "开始" > /dev/null 2>&1 || { echo "::error::no Kick rally start"; exit 1; }
+sleep 0.5
+tap_games_control "左右开弓" "轮到左踢" > /dev/null 2>&1 || true
+sleep 0.8
+tap_games_control "左右开弓" "轮到右踢" > /dev/null 2>&1 || true
+sleep 0.8
+tap_games_control "左右开弓" "轮到左踢" > /dev/null 2>&1 || true
+sleep 0.8
+tap_games_control "左右开弓" "轮到右踢" > /dev/null 2>&1 || true
+RALLY_OK=0
+for _ in $(seq 1 20); do
+  KL=$(skill_count kick_left); KR=$(skill_count kick_right)
+  if [ "$KL" -ge $((KL0 + 2)) ] 2>/dev/null && [ "$KR" -ge $((KR0 + 2)) ] 2>/dev/null; then RALLY_OK=1; break; fi
+  sleep 0.3
+done
+if [ "$RALLY_OK" = "1" ]; then
+  echo "games: kick rally landed $((KL - KL0)) left and $((KR - KR0)) right real kicks"
+else
+  echo "::error::kick rally did not land two real kicks per foot (left $KL0->$KL, right $KR0->$KR)"
+  exit 1
+fi
+
+# 情绪哑剧: the duck performs a mood; the right chip earns its real yes.
+tap_games_control "情绪哑剧" "开始" > /dev/null 2>&1 || { echo "::error::no Mood charade start"; exit 1; }
+MOOD=""
+for _ in $(seq 1 30); do
+  MOOD=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print((json.load(sys.stdin).get('emotion') or {}).get('name',''))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+  [ -n "$MOOD" ] && break
+  sleep 0.3
+done
+[ -n "$MOOD" ] || { echo "::error::the charade never started a mood"; exit 1; }
+MOOD_ZH=$(python3 - "$MOOD" <<'PYX'
+import sys
+names = {
+    "angry": "生气", "curious": "好奇", "defiant": "不服", "devastated": "崩溃",
+    "excited": "兴奋", "impatient": "不耐烦", "laugh": "大笑", "mmh": "嗯哼",
+    "mock": "嘲弄", "no": "摇头", "sad": "难过", "yes": "点头",
+    "yes_fast": "快速点头",
+}
+print(names.get(sys.argv[1], sys.argv[1]))
+PYX
+)
+for _ in $(seq 1 40); do
+  emotion_idle && break
+  sleep 0.4
+done
+YES0=$(emotion_count yes)
+tap_games_control "情绪哑剧" "$MOOD_ZH" > /dev/null 2>&1 || { echo "::error::no charade chip for $MOOD"; exit 1; }
+YES_OK=0
+for _ in $(seq 1 20); do
+  YES=$(emotion_count yes)
+  if [ "$YES" -gt "$YES0" ] 2>/dev/null; then YES_OK=1; break; fi
+  sleep 0.3
+done
+if [ "$YES_OK" = "1" ]; then
+  echo "games: mood charade performed $MOOD and the right answer earned a real yes"
+else
+  echo "::error::the right charade answer did not earn the duck's yes"
+  exit 1
+fi
+
+# 表情木头人: the duck's own timelines call the round (excited, then angry).
+tap_games_control "表情木头人" "开始" > /dev/null 2>&1 || { echo "::error::no Mood freeze start"; exit 1; }
+FREEZE_SEEN=" "
+for _ in $(seq 1 80); do
+  NAME=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print((json.load(sys.stdin).get('emotion') or {}).get('name',''))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+  case " $FREEZE_SEEN " in
+    *" $NAME "*) : ;;
+    *) [ -n "$NAME" ] && FREEZE_SEEN="$FREEZE_SEEN$NAME " ;;
+  esac
+  case "$FREEZE_SEEN" in
+    *" excited "*angry*) FREEZE_OK=1; break ;;
+  esac
+  sleep 0.4
+done
+if [ "${FREEZE_OK:-0}" = "1" ]; then
+  echo "games: mood freeze called the round with the duck's own timelines ($FREEZE_SEEN)"
+else
+  echo "::error::mood freeze never performed excited then angry (saw:$FREEZE_SEEN)"
+  exit 1
+fi
+
+# 它今天有没有: the answer matches the real today-vs-day_started delta.
+PETS_DELTA=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    life = json.load(sys.stdin).get('life', {})
+    day = life.get('day_started') or {}
+    print(int(life.get('pets', 0) - day.get('pets', 0)))
+except Exception:
+    print(0)
+" 2>/dev/null || echo 0)
+if [ "$PETS_DELTA" -gt 0 ] 2>/dev/null; then EXPECT=yes; else EXPECT=no; fi
+EXPECT_BEFORE=$(emotion_count $EXPECT)
+tap_games_control "它今天有没有" "今天被摸过吗" > /dev/null 2>&1 || { echo "::error::no today-pets chip"; exit 1; }
+TODAY_OK=0
+for _ in $(seq 1 20); do
+  EXPECT_NOW=$(emotion_count $EXPECT)
+  if [ "$EXPECT_NOW" -gt "$EXPECT_BEFORE" ] 2>/dev/null; then TODAY_OK=1; break; fi
+  sleep 0.3
+done
+if [ "$TODAY_OK" = "1" ]; then
+  echo "games: did-it-happen answered the real pets delta with a real $EXPECT"
+else
+  echo "::error::did-it-happen did not answer the real delta (pets delta $PETS_DELTA, wanted $EXPECT)"
+  exit 1
+fi
+
+# 声音指挥官: a synthetic clap must be heard by the duck's own classifier and
+# the game must say so. The duck's default reaction (laugh) is the core's.
+tap_games_control "声音指挥官" "拍手让它笑" > /dev/null 2>&1 || { echo "::error::no sound-clap chip"; exit 1; }
+sleep 0.5
+SOUND_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.02,\"peak_hz\":300},\"tick_ms\":$((SOUND_TICK))}" \
+  http://127.0.0.1:8765/sensor > /dev/null 2>&1 || true
+sleep 0.15
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"sensor\":\"microphone\",\"mode\":\"twin\",\"value\":{\"rms\":0.7,\"peak_hz\":2800},\"tick_ms\":$((SOUND_TICK + 60))}" \
+  http://127.0.0.1:8765/sensor > /dev/null 2>&1 || true
+SOUNDGAME_OK=0
+for _ in $(seq 1 30); do
+  rm -f games-tap.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
+  if grep -q "听到了" games-tap.xml; then SOUNDGAME_OK=1; break; fi
+  sleep 0.4
+done
+if [ "$SOUNDGAME_OK" = "1" ]; then
+  echo "games: sound Simon heard the synthetic clap and said so"
+else
+  echo "::error::sound Simon never heard the synthetic clap"
+  exit 1
+fi
+
+# Back to the Live screen for the rest of the smoke: page, then drawer.
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 0.8
+adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+sleep 0.8
+
 # The idle Live screen itself, portrait, no skill line on it: the Chinese state
 # a real user sees.
 adb exec-out screencap -p > ui-b1-android-zh.png || true

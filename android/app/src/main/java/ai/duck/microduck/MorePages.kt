@@ -478,6 +478,11 @@ internal fun PlayMoreSheet(
             // Play: rock-paper-scissors with the duck's body — its own
             // sit/stand/kick answers, chosen by its own fingerprint.
             RpsGame(core) { core?.fingerprint().orEmpty() ?: "" }
+            KickRally(core)
+            MoodCharade(core)
+            MoodFreeze(core)
+            DidItHappenToday(core)
+            SoundSimon(core)
         }
     }
 }

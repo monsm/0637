@@ -991,6 +991,26 @@
           "StagePropsLayout"
         ]
       }
+    },
+    {
+      "id": "play-mini-games",
+      "zh": "玩一玩小游戏",
+      "conform_b4": "extension",
+      "note": "2026-11-25：Play more 页内联五张：左右开弓/情绪哑剧/表情木头人/它今天有没有/声音指挥官；每个提示都对应真实动词或 /state 字段，分数是 vetbook 真计数",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/PlayMoreGames.swift",
+          "KickRally"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/PlayMoreGames.kt",
+          "KickRally"
+        ]
+      }
     }
   ]
 }
