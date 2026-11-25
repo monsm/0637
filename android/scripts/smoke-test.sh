@@ -1512,6 +1512,22 @@ else
   fi
 fi
 
+# The props give the duck its own voice (2026-11-25): the ball's kick carries
+# the official "peck" synth tag through the core's queue. /state.last_sound
+# is the same honest field the quack object check reads. Checked here, right
+# after the kick: the hoop's own "chirp" lands on the same field a beat later.
+SOUND_OK=0
+for _ in $(seq 1 20); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"peck"'; then SOUND_OK=1; break; fi
+  sleep 0.25
+done
+if [ "$SOUND_OK" = "1" ]; then
+  echo "props: the kick carries the duck's own peck voice (last_sound)"
+else
+  echo "::error::the ball tap did not give the duck its voice (no last_sound=peck)"
+  exit 1
+fi
+
 # The hoop (same batch): a tap asks for a roll, and the official roulade
 # policy really runs — the vet book's counter is the proof.
 sleep 1
@@ -1528,21 +1544,6 @@ if [ "$ROLL_OK" = "1" ]; then
   echo "props: a hoop tap really started a roll (life.skills.roulade $ROLLS_BEFORE -> $ROLLS_NOW)"
 else
   echo "::error::tapping the hoop did not start a real roll"
-  exit 1
-fi
-
-# The props give the duck its own voice (2026-11-25): the ball's kick carries
-# the official "peck" synth tag through the core's queue. /state.last_sound
-# is the same honest field the quack object check reads.
-SOUND_OK=0
-for _ in $(seq 1 20); do
-  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"peck"'; then SOUND_OK=1; break; fi
-  sleep 0.25
-done
-if [ "$SOUND_OK" = "1" ]; then
-  echo "props: the kick carries the duck's own peck voice (last_sound)"
-else
-  echo "::error::the ball tap did not give the duck its voice (no last_sound=peck)"
   exit 1
 fi
 
@@ -1593,6 +1594,7 @@ for face in curious laugh; do
       emotion_idle && break
       sleep 0.4
     done
+    sleep 1
   done
   if [ "$FACE_OK" != "1" ]; then
     echo "::error::the mirror did not make the duck $face"
