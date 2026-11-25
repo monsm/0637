@@ -943,6 +943,8 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 9 例（新增：一轮五张脸互不重复、全是官方情绪）；冒烟先断言点球后 `last_sound=peck`，再站起鸭子、点镜子两次，断言 `life.emotions.curious`、`life.emotions.laugh` 各真增长（拒绝重试、演完再点）；iOS 测试在点球、点圈之后点镜子两次，断言顶栏判词先 `curious` 后 `laugh`。
 
+**验证（`e092b74`）**：Android + Contracts 绿（iOS 在 `e29bfbe` 已绿：镜子/嗓音 UI 测试与首屏七控件都过）。冒烟实证五行：踢计数 `0 -> 1`、`last_sound=peck`、翻滚 `2 -> 3`、`mirror: two taps made two different real emotions (curious, then laugh)`、自娱计数 `7 -> 8`。两处 CI 教训：① `last_sound` 是单值字段，peck 的断言必须紧跟踢球，否则被呼啦圈的 chirp 覆盖（首跑红）；② `accessibilityAddTraits(.isButton)` 会让开关成为首屏第 8 个按钮、踩七控件预算——开关是场景元素，不带 button trait，语音辅助走舞台的「自己玩开关」命名动作（与 Android 同构）。
+
 ---
 
 ## 八、仓库与复现
