@@ -453,6 +453,11 @@ enum Copy {
     static var soundPromptCurious: String { pick("Whistle to make it curious", "吹口哨让它好奇") }
     static var soundHeard: String { pick("Heard it!", "听到了！") }
     static var soundMissed: String { pick("Nothing heard", "没听到") }
+    // Each game's start key says its own words: Play more stacks several
+    // games, and a repeated 开始 made a tap land on the neighbour's start.
+    static var rallyGo: String { pick("Start the rally", "开弓") }
+    static var charadeGo: String { pick("Start guessing", "开始猜") }
+    static var freezeGo: String { pick("Play a round", "演一段") }
 
     static func echoSound(_ tag: String) -> String {
         switch tag {
