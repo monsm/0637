@@ -959,6 +959,10 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 冒烟在真实 UI 上按「标题锚定的文字点击」驱动五个游戏（Compose 的 testTag 不进 uiautomator 的 resource-id，实测 dump 只有 `android:id/content`，所以不能用 tag）：节拍四次交替踢断言左右各 +2；读 `/state.emotion.name` 后点对应中文情绪 chip，断言 `life.emotions.yes` +1；木头人断言先后看到 excited 与 angry；今天卡断言情绪与真实 pets 差值一致；声音指挥官注入合成拍手后断言界面出现「听到了」。iOS `testTheFiveSmallGamesAreWired` 自上而下滚过五段：踢出判词、哑剧到「它在演什么？」、木头人横幅、今天卡给出 `Today:` 事实、声音指挥官进入聆听。
 
+**验证（`0c2e7d2` Android+Contracts / `f8e6a78` iOS，2026-11-26）**：冒烟五行实证——`kick rally landed 2 left and 2 right real kicks`、`mood charade performed mock and the right answer earned a real yes`、`mood freeze called the round (动起来/定住 shown while real moods play)`、`did-it-happen answered the real pets delta with a real no`、`sound Simon heard the synthetic clap and said so`；`smoke test passed`，横屏 `640x320`，掉帧 `60.39% / p99 200 ms`。iOS 的 `testTheFiveSmallGamesAreWired` 在同一代码上绿。
+
+**这一批的六次 CI 教训**（全部按真因修，不归抖动）：① 游戏段根本没有先打开 Play more（早前脚本拼接把「更多→玩一玩」整段替换掉了）——补回开页并加开页 dump；② Compose testTag 不进 uiautomator 的 resource-id（实测只有 `android:id/content`）——改为「标题锚定的文字点击」；③ 三个游戏共用「开始」导致点串台（日志里哑剧在木头人回合里演了 impatient）——开始键改为各说各话（开弓/开始猜/演一段）；④ 情绪游戏靠轮询 `/state` 翻页会被慢请求跳段并被别家情绪污染——改为按情绪官方时长排程（生气 2.5s、好奇 2.9s、崩溃 8.5s…取自上游关键帧）；⑤ 长面板需要 ~60 次慢速中屏拖动 + 先删远端 dump + 停滞探测；⑥ 横屏截图要轮询旋转（最多 16 秒）且先证明回到 Live 屏，否则拍到的是残留面板。
+
 ---
 
 ## 八、仓库与复现
