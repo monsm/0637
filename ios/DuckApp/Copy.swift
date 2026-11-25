@@ -65,7 +65,9 @@ enum Copy {
     // The floor props, for a screen reader: the stage is one element, so
     // these are its named actions, not separate controls.
     static var propPlayBall: String { pick("Kick the ball", "踢球") }
+    static var propPlayHoop: String { pick("Roll through the hoop", "钻呼啦圈") }
     static var propPlayBlocks: String { pick("Pick up the blocks", "捡积木") }
+    static var propPlayMirror: String { pick("Look in the mirror", "照镜子") }
     static var propPlayCushion: String { pick("Sit on the cushion", "坐垫子") }
     static var couldNotStart: String { pick("MicroDuck could not start", "MicroDuck 无法启动") }
     /// The failure card's one action. Android's core loader can retry; the

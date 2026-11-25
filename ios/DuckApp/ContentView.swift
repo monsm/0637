@@ -554,8 +554,14 @@ struct ContentView: View {
                     .accessibilityAction(named: Text(Copy.propPlayBall)) {
                         propagate(.ball, controller: controller)
                     }
+                    .accessibilityAction(named: Text(Copy.propPlayHoop)) {
+                        propagate(.hoop, controller: controller)
+                    }
                     .accessibilityAction(named: Text(Copy.propPlayBlocks)) {
                         propagate(.block, controller: controller)
+                    }
+                    .accessibilityAction(named: Text(Copy.propPlayMirror)) {
+                        propagate(.mirror, controller: controller)
                     }
                     .accessibilityAction(named: Text(Copy.propPlayCushion)) {
                         propagate(.cushion, controller: controller)
@@ -593,8 +599,12 @@ struct ContentView: View {
                 // (the portrait gesture reads taps against the same zones),
                 // and they answer only the duck's own real moves.
                 if portrait {
-                    StageProps(model: props, asleep: controller.careAsleep)
-                        .zIndex(1)
+                    StageProps(
+                        model: props,
+                        emotion: controller.propCues.emotion,
+                        asleep: controller.careAsleep
+                    )
+                    .zIndex(1)
                 }
                 if portrait {
                     portraitChrome(in: geometry.size)

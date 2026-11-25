@@ -281,7 +281,9 @@ val quack get() = pick("Quack", "叫一声")
     // The floor props, for a screen reader: the stage is one element, so
     // these are its named actions, not separate controls.
     val propPlayBall get() = pick("Kick the ball", "踢球")
+    val propPlayHoop get() = pick("Roll through the hoop", "钻呼啦圈")
     val propPlayBlocks get() = pick("Pick up the blocks", "捡积木")
+    val propPlayMirror get() = pick("Look in the mirror", "照镜子")
     val propPlayCushion get() = pick("Sit on the cushion", "坐垫子")
     val timeMachine get() = pick("Time machine", "时间机器")
     // Direction A: the wall clock and the brass barometer.

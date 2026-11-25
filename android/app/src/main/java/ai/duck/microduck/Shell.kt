@@ -780,8 +780,16 @@ fun Shell(
                                             reactProp(StageProp.Ball, duck)
                                             true
                                         },
+                                        CustomAccessibilityAction(Copy.propPlayHoop) {
+                                            reactProp(StageProp.Hoop, duck)
+                                            true
+                                        },
                                         CustomAccessibilityAction(Copy.propPlayBlocks) {
                                             reactProp(StageProp.Block, duck)
+                                            true
+                                        },
+                                        CustomAccessibilityAction(Copy.propPlayMirror) {
+                                            reactProp(StageProp.Mirror, duck)
                                             true
                                         },
                                         CustomAccessibilityAction(Copy.propPlayCushion) {

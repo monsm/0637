@@ -918,6 +918,14 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **修复后全绿（run 45537353792，`69eb18f`）**：Android + iOS + Contracts 绿（Core 在前一提交 `d99e799` 已绿）。冒烟实证：`props: a ball tap really started a kick (life.skills.kick_left 0 -> 1)`；掉帧 `jank 57.02% / p99 250 ms`，门内。文档随后补进 COMPANION 第 18 条（`a22d9b9`，仅文档不触发 CI）。
 
+**追加（2026-11-25 第二道具批）**：脑暴池与审计见 `docs/PROPS_IDEAS_2026-11-25.md`（13 个候选；明确不做会自己滚的球、没有真实动词的纸飞机、需要双实例的跷跷板、以及会重置 idle 破坏打盹的"鸭子定时自己发起技能"）。本批新增两个道具与一层自主互动：
+
+- **呼啦圈**：点→官方 `roulade`；鸭子真实的翻滚计数（`life.skills.roulade`，环/规则/邻居/AI/手指同路）增量让圈转，它自己 `excited` 时圈也转；
+- **镜子**：点→`curious` 情绪；鸭子自己的情绪时间线（`/state.emotion`）是唯一来源——好奇时镜面反光；
+- **情绪到道具**（自主）：`laugh`/`sad` 让坐垫发暖，`excited` 转圈、球发亮，`curious` 照镜子；全部来自 `/state.emotion.name`，睡着时全静。
+
+布局改为每侧两行（上：球/积木，下：呼啦圈/镜子，中间坐垫），`PropCues` 增 `rolls/emotion`（不加 @Published，控制器仍 109）。验收：Android 单测覆盖五个分区与 `emotion`/`rolls` 解析；冒烟点球断言踢计数、点呼啦圈断言 `life.skills.roulade` 增长（舞台坐标仍从 dump 的「鸭子舞台」bounds 算）；iOS 测试先点球验 `kick left`、隔 1.5 秒点呼啦圈验 `roulade`。a11y 命名动作从 3 个增到 5 个。
+
 ---
 
 ## 八、仓库与复现

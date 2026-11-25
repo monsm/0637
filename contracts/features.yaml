@@ -555,7 +555,7 @@ features:
     page: null
     hops: 1
     conform_b4: extension
-    note: 球/积木/坐垫画在舞台地面；点道具→鸭子真踢（官方 ball_kick 策略）/真捡（ground_pick）/真坐（sit）；鸭子自己的闲逛视线（/state.idle.head）点亮相看的道具，真实计数（life.skills / ground_picks / sit_downs）驱动道具响应；睡着不动
+    note: 球/积木/坐垫/呼啦圈/镜子画在舞台地面；点道具→鸭子真踢（官方 ball_kick）/真捡（ground_pick）/真坐（sit）/真滚（roulade）/真好奇（curious）；鸭子自己的闲逛视线（/state.idle.head）点亮相看的道具，真实计数（life.skills / ground_picks / sit_downs）增量与自己的情绪时间线（/state.emotion）驱动道具响应；睡着不动
     ios: implemented
     android: implemented
     data_chain: none

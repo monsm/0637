@@ -7,8 +7,8 @@ import org.junit.Test
 /**
  * The floor props' pure half: the zones a tap is read against and the cues
  * the props answer to. The animation itself is a UI concern; the contract
- * worth testing is that a body tap never becomes a prop tap, and that a
- * counter is only ever read as an increment.
+ * worth testing is that a body tap never becomes a prop tap, that every prop
+ * zone is reachable, and that the cues are read from the duck's real fields.
  */
 class StagePropsTest {
     @Test
@@ -23,8 +23,10 @@ class StagePropsTest {
 
     @Test
     fun floorZonesHitTheirProps() {
-        assertEquals(StageProp.Ball, StagePropsLayout.hit(0.10f, 0.70f))
-        assertEquals(StageProp.Block, StagePropsLayout.hit(0.90f, 0.70f))
+        assertEquals(StageProp.Ball, StagePropsLayout.hit(0.10f, 0.60f))
+        assertEquals(StageProp.Hoop, StagePropsLayout.hit(0.10f, 0.80f))
+        assertEquals(StageProp.Block, StagePropsLayout.hit(0.90f, 0.60f))
+        assertEquals(StageProp.Mirror, StagePropsLayout.hit(0.90f, 0.80f))
         assertEquals(StageProp.Cushion, StagePropsLayout.hit(0.50f, 0.80f))
         // Above the floor line on the same sides is still the duck's stage,
         // not a prop.
@@ -37,8 +39,9 @@ class StagePropsTest {
         val state = """
             {
               "idle": {"takeover": 0.42, "head": [0.0, 0.0, 0.31, 0.0]},
+              "emotion": {"name": "curious", "elapsed_s": 0.4, "duration_s": 2.0},
               "life": {
-                "skills": {"kick_left": 3, "kick_right": 1},
+                "skills": {"kick_left": 3, "kick_right": 1, "roulade": 2},
                 "ground_picks": 2,
                 "sit_downs": 4
               }
@@ -48,8 +51,10 @@ class StagePropsTest {
         assertEquals(0.31, cues.idleYaw, 1e-9)
         assertEquals(3, cues.kickLeft)
         assertEquals(1, cues.kickRight)
+        assertEquals(2, cues.rolls)
         assertEquals(2, cues.groundPicks)
         assertEquals(4, cues.sitDowns)
+        assertEquals("curious", cues.emotion)
     }
 
     @Test
@@ -66,6 +71,8 @@ class StagePropsTest {
         assertEquals(0, cues.kickLeft)
         assertEquals(0, cues.groundPicks)
         assertEquals(0, cues.sitDowns)
+        assertEquals(0, cues.rolls)
+        assertEquals("", cues.emotion)
         assertNull(parsePropCues("not json"))
     }
 }
