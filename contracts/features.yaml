@@ -65,7 +65,7 @@ pages:
     group: play
     zh: 玩一玩
     controls: 4
-    entries: [stick-modes, ab-try, push-compare, hud]
+    entries: [stick-modes, ab-try, push-compare, hud, play-mini-games]
   - id: neighbours
     group: together
     zh: 邻居
@@ -542,6 +542,18 @@ features:
     hops: 2
     conform_b4: extension
     note: 编舞铺灯光步内，无独立首层行
+    ios: implemented
+    android: implemented
+    data_chain: none
+
+  # —— 玩一玩里的五张小游戏（2026-11-25，内联在 Play more，不占抽屉行）——
+  - id: play-mini-games
+    zh: 玩一玩小游戏
+    group: play
+    page: play-more
+    hops: 2
+    conform_b4: extension
+    note: 左右开弓（节拍交替真踢）/情绪哑剧（演官方情绪、猜中点头）/表情木头人（用情绪时间线当回合钟）/它今天有没有（按 life.day_started 真实差值回答 yes/no）/声音指挥官（房间拍手或口哨，核心自己的分类器听见）；每条的分数都是 vetbook 真计数
     ios: implemented
     android: implemented
     data_chain: none

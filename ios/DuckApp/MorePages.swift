@@ -122,6 +122,18 @@ struct PlayMoreSheet: View {
             // Play: rock-paper-scissors with the duck's body — its own
             // sit/stand/kick answers, chosen by its own fingerprint.
             RPSGame(controller: controller)
+            Divider()
+            // The five small games (2026-11-25): every prompt asks for a real
+            // verb and every score is the vet book's own counter.
+            KickRally(controller: controller)
+            Divider()
+            MoodCharade(controller: controller)
+            Divider()
+            MoodFreeze(controller: controller)
+            Divider()
+            DidItHappenToday(controller: controller)
+            Divider()
+            SoundSimon(controller: controller)
         }
     }
 }
