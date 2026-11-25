@@ -1676,7 +1676,7 @@ tap_games_control() {
   # and the swipe is retried from a lower start point.
   local title="$1" label="$2" w="$PROP_STAGE_W" h="$PROP_STAGE_H" coords
   local _i first="" prev="" still=0
-  for _i in $(seq 1 40); do
+  for _i in $(seq 1 60); do
     rm -f games-tap.xml
     adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
@@ -1743,10 +1743,10 @@ PYX
     prev="$first"
     if [ "$still" -ge 3 ]; then
       # The sheet is not scrolling from here; start the drag lower.
-      adb shell input swipe 160 610 160 220 500 > /dev/null 2>&1 || true
+      adb shell input swipe 160 300 160 60 300 > /dev/null 2>&1 || true
       still=0
     else
-      adb shell input swipe 160 540 160 220 500 > /dev/null 2>&1 || true
+      adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
     fi
     sleep 0.6
   done
@@ -1763,12 +1763,43 @@ seen = sorted({(n.get('text') or '') for n in root.iter('node')
                if (n.get('text') or '') and len((n.get('text') or '')) <= 8})
 print(f"::warning::'{title}' never reached the screen; on-screen titles: {seen[:24]}")
 PYX
+  adb exec-out screencap -p > games-screen.png 2>/dev/null || true
+  cp games-tap.xml games-dump.xml 2>/dev/null || true
   return 1
 }
 
+# Open the Play more page: the drawer's 玩一玩 row, then let the sheet settle.
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+sleep 1.5
+PLAYMORE_OK=0
+for _ in $(seq 1 10); do
+  if tap_text "玩一玩" > /dev/null 2>&1 || tap_text "Play more" > /dev/null 2>&1; then
+    PLAYMORE_OK=1
+    break
+  fi
+  adb shell input swipe 160 560 160 160 300 > /dev/null 2>&1 || true
+  sleep 0.4
+done
+[ "$PLAYMORE_OK" = "1" ] || { echo "::error::the drawer has no Play more row for the games section"; exit 1; }
+sleep 1.5
+# What the sheet looks like the moment it opens, for the uploaded log.
+rm -f games-open.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > games-open.xml 2>/dev/null || true
+adb exec-out screencap -p > games-open.png 2>/dev/null || true
+python3 - <<'PYX' || true
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('games-open.xml').getroot()
+except Exception:
+    raise SystemExit(0)
+seen = [n.get('text') for n in root.iter('node') if (n.get('text') or '')]
+print("games sheet opened with:", seen[:18])
+PYX
+
 # 左右开弓: four correct-foot taps must start two real kicks per foot.
 KL0=$(skill_count kick_left); KR0=$(skill_count kick_right)
-tap_games_control "左右开弓" "开始" > /dev/null 2>&1 || { echo "::error::no Kick rally start"; exit 1; }
+tap_games_control "左右开弓" "开始" || { echo "::error::no Kick rally start"; exit 1; }
 sleep 0.5
 tap_games_control "左右开弓" "轮到左踢" > /dev/null 2>&1 || true
 sleep 0.8
