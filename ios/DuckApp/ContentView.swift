@@ -571,6 +571,14 @@ struct ContentView: View {
                     .accessibilityAction(named: Text(Copy.propPlayCushion)) {
                         propagate(.cushion, controller: controller)
                     }
+                    // The self-play switch is scene, so it reaches a screen
+                    // reader through the stage element's named action (the
+                    // chip itself carries no button trait, keeping the first
+                    // screen's seven-control budget).
+                    .accessibilityAction(named: Text(Copy.selfPlayAction)) {
+                        let on = UserDefaults.standard.bool(forKey: "duck_self_play")
+                        UserDefaults.standard.set(!on, forKey: "duck_self_play")
+                    }
                     // Both gestures stay installed; the mask picks the one
                     // for this composition. A ternary of AnyGesture erased
                     // two different `some Gesture` types and failed to infer.

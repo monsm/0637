@@ -440,7 +440,10 @@ struct SelfPlayChip: View {
         .accessibilityIdentifier("stage-self-play")
         .accessibilityLabel(Copy.selfPlay)
         .accessibilityValue(on ? "on" : "off")
-        .accessibilityAddTraits(.isButton)
+        // Deliberately NOT a button trait: the first screen's seven-control
+        // budget is the shelf/wall set, and the switch is scene like the
+        // props. A screen reader toggles it through the stage's named action
+        // (the same split Android uses).
     }
 }
 

@@ -44,7 +44,7 @@
   "direction": "min"
  },
  "content_view_lines": {
-  "count": 1867,
+  "count": 1875,
   "direction": "max",
   "note": "2026-11-25: +10 for the self-play chip and the maybeSelfPlay call in the props poll."
  },
