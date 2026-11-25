@@ -601,11 +601,15 @@ final class DuckUITests: XCTestCase {
         )
         _ = waitForLabel(["walk", "stand"], timeout: 180)
 
-        // The prop zone in fractions: x 0.16, y 0.68 of the window (the
-        // stage spans the window in portrait).
-        let ball = app.coordinate(
-            withNormalizedOffset: CGVector(dx: 0.16, dy: 0.68)
-        )
+        // The prop zone is a fraction of the STAGE, not of the window: the
+        // scene carries the "Duck stage" label, so tap through its own
+        // coordinate space. (A window fraction would land on the rail.)
+        let stage = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Duck stage"))
+            .firstMatch
+        let ball = stage.exists
+            ? stage.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.68))
+            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.68))
         ball.tap()
 
         let verdict = app.staticTexts["duck-last-skill"]

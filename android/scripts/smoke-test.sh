@@ -1431,16 +1431,43 @@ fi
 # but is refused never moves it.
 #
 # The stage occupies the middle of the portrait screen (title bar above,
-# shelf below), so a stage fraction maps to a screen fraction with a small
-# offset. The ball zone is generous (stage x < 0.25, y > 0.58); screen
-# (16%, 72%) lands inside it on any layout, so the tap is not a fixed
-# stage fraction read as a screen one.
+# pill/rail/shelf below), so a stage fraction is not a screen fraction. Read
+# the stage's own bounds from the dump (the scene carries the 鸭子舞台
+# content description) and map the ball zone through them.
 PROP_STAGE_W=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d'x' -f1)
 PROP_STAGE_H=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d'x' -f2)
 [ -n "$PROP_STAGE_W" ] || PROP_STAGE_W=320
 [ -n "$PROP_STAGE_H" ] || PROP_STAGE_H=640
-BALL_X=$((PROP_STAGE_W * 16 / 100))
-BALL_Y=$((PROP_STAGE_H * 72 / 100))
+rm -f prop-stage.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > prop-stage.xml 2>/dev/null || true
+STAGE_XY=$(python3 - <<'PY'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('prop-stage.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+for node in root.iter('node'):
+    label = (node.get('content-desc') or '') + '|' + (node.get('text') or '')
+    if '鸭子舞台' in label or 'Duck stage' in label:
+        parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
+        if len(parts) == 4:
+            left, top, right, bottom = map(int, parts)
+            print(left + (right - left) * 16 // 100, top + (bottom - top) * 68 // 100)
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+)
+if [ -n "$STAGE_XY" ]; then
+  BALL_X=${STAGE_XY%% *}
+  BALL_Y=${STAGE_XY##* }
+else
+  # Fallback measured from the portrait CI screenshot (320x640): the stage
+  # spans ~85..445 px, so stage y 0.68 lands near 330.
+  BALL_X=$((PROP_STAGE_W * 16 / 100))
+  BALL_Y=$((PROP_STAGE_H * 52 / 100))
+  echo "::warning::the stage node was not in the dump; tapping the screenshot-measured ball point"
+fi
 KICKS_BEFORE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
 import json,sys
 try:
