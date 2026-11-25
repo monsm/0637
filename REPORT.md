@@ -926,6 +926,8 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 布局改为每侧两行（上：球/积木，下：呼啦圈/镜子，中间坐垫），`PropCues` 增 `rolls/emotion`（不加 @Published，控制器仍 109）。验收：Android 单测覆盖五个分区与 `emotion`/`rolls` 解析；冒烟点球断言踢计数、点呼啦圈断言 `life.skills.roulade` 增长（舞台坐标仍从 dump 的「鸭子舞台」bounds 算）；iOS 测试先点球验 `kick left`、隔 1.5 秒点呼啦圈验 `roulade`。a11y 命名动作从 3 个增到 5 个。
 
+**验证（`3ffc15e`）**：Android + Contracts 绿；iOS 首跑红在已知负载敏感用例「大声惊吓」（`last_sound=coo`——pet 的 coo 与 bang 的 alarm 共享 100 tick 冷却，见四之四十四同族），同代码 dispatch 复跑（run 45548539490，`7e73f43`=代码 + 机器人截图提交）**205/205 全过**、该用例 `last_sound=alarm`，按负载敏感归档。
+
 ---
 
 ## 八、仓库与复现
