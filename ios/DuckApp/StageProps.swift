@@ -16,7 +16,19 @@ struct PropCues: Equatable {
     /// is playing. The props answer it: a curious duck makes the mirror
     /// glint, a laughing or sad one warms the cushion.
     var emotion = ""
+    // The guards the self-play scheduler reads, from the same /state.
+    var idleTakeover: Double = 0
+    var paused = false
+    var carrying = false
+    var idleS: Double = 0
+    var tick: Int = 0
 }
+
+/// A self-play beat no sooner than this many simulated ticks (25 s at 50 Hz).
+let selfPlayCooldownTicks = 1250
+
+/// The duck must have been left alone this long before it goes to play.
+let selfPlayIdleSeconds = 10.0
 
 /// Props on the duck's floor: a ball it can kick, blocks it can pick, a
 /// cushion it can sit on, a hoop it can roll through, and a mirror it can
@@ -330,16 +342,80 @@ enum StagePropsLayout {
 
 /// A prop was tapped: the duck does its real verb toward it. The prop's
 /// response comes from the vet book's counter (or the emotion timeline) a
-/// beat later, so the screen cannot claim a move the core refused.
-func propagate(_ prop: StagePropHit, controller: DuckController) {
+/// beat later, so the screen cannot claim a move the core refused. Returns
+/// whether the core accepted the verb — a refusal changes nothing.
+@discardableResult
+func propagate(_ prop: StagePropHit, controller: DuckController) -> Bool {
+    let accepted: Bool
     switch prop {
-    case .ball: controller.trigger("kick_left")
-    case .hoop: controller.trigger("roulade")
-    case .block: controller.groundPick()
-    case .mirror: controller.trigger("curious")
-    case .cushion: controller.trigger("sit")
+    case .ball: accepted = controller.trigger("kick_left")
+    case .hoop: accepted = controller.trigger("roulade")
+    case .block: accepted = controller.groundPick()
+    case .mirror: accepted = controller.trigger("curious")
+    case .cushion: accepted = controller.trigger("sit")
     }
     DuckHaptics.selection()
+    return accepted
+}
+
+/// Whether the duck may go off to play now. Every input is a real /state
+/// field: awake, unfrozen, not carried, not in an emotion, genuinely idle
+/// (the core's own look-around owns the head), left alone long enough, and
+/// past the cooldown. The caller adds its own window guard (no sheet).
+func selfPlayDue(_ cues: PropCues, asleep: Bool, enabled: Bool, lastTick: Int) -> Bool {
+    guard enabled, !asleep, !cues.paused, !cues.carrying, cues.emotion.isEmpty
+    else { return false }
+    guard cues.idleTakeover > 0.1, cues.idleS >= selfPlayIdleSeconds
+    else { return false }
+    return lastTick <= 0 || cues.tick - lastTick >= selfPlayCooldownTicks
+}
+
+/// The prop the duck chooses this beat: a pure function of its own
+/// fingerprint and the simulated tick, so two ducks differ and the same duck
+/// is stable within a beat — a personality, not a coin.
+func selfPlayProp(fingerprint: String, tick: Int) -> StagePropHit {
+    var hash: UInt64 = 0xcbf29ce484222325
+    for byte in fingerprint.utf8 {
+        hash ^= UInt64(byte)
+        hash = hash &* 0x100000001b3
+    }
+    hash ^= UInt64(bitPattern: Int64(tick / selfPlayCooldownTicks))
+    let list: [StagePropHit] = [.ball, .hoop, .block, .mirror, .cushion]
+    return list[Int(hash % UInt64(list.count))]
+}
+
+/// The chip that asks for self-play. Off by default; the choice persists so
+/// a child's duck keeps its habit across launches.
+struct SelfPlayChip: View {
+    @AppStorage("duck_self_play") private var on = false
+
+    var body: some View {
+        VStack(spacing: DuckSpace.xxs) {
+            Circle()
+                .fill(on ? Color.duckAction : Color.duckBrass)
+                .frame(width: 20, height: 20)
+                .overlay(
+                    Circle()
+                        .fill(Color.black.opacity(0.35))
+                        .frame(width: 7, height: 7)
+                )
+            Text(on ? Copy.selfPlayOn : Copy.selfPlay)
+                .font(.duckCaption)
+                .foregroundStyle(.white.opacity(0.7))
+                .lineLimit(1)
+        }
+        .padding(DuckSpace.xs)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            on.toggle()
+            DuckHaptics.selection()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("stage-self-play")
+        .accessibilityLabel(Copy.selfPlay)
+        .accessibilityValue(on ? "on" : "off")
+        .accessibilityAddTraits(.isButton)
+    }
 }
 
 enum PropKind {

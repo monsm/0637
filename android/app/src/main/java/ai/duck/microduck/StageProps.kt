@@ -3,12 +3,23 @@ package ai.duck.microduck
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -44,8 +55,9 @@ import org.json.JSONObject
  * budget is untouched and TalkBack still hears one stage element.
  */
 
-/** The props' real cues, from /state: the idle glance, the counters, and
- * the emotion timeline the duck is in right now. */
+/** The props' real cues, from /state: the idle glance, the counters, the
+ * emotion timeline the duck is in right now, and the guards the self-play
+ * scheduler reads (same document, one parse). */
 data class PropCues(
     val idleYaw: Double = 0.0,
     val kickLeft: Int = 0,
@@ -54,6 +66,11 @@ data class PropCues(
     val sitDowns: Int = 0,
     val rolls: Int = 0,
     val emotion: String = "",
+    val idleTakeover: Double = 0.0,
+    val paused: Boolean = false,
+    val carrying: Boolean = false,
+    val idleS: Double = 0.0,
+    val tick: Long = 0L,
 )
 
 /**
@@ -83,6 +100,11 @@ fun parsePropCues(text: String): PropCues? = try {
         sitDowns = life?.optInt("sit_downs", 0) ?: 0,
         rolls = skills?.optInt("roulade", 0) ?: 0,
         emotion = root.optJSONObject("emotion")?.optString("name", "") ?: "",
+        idleTakeover = takeover,
+        paused = root.optBoolean("paused", false),
+        carrying = root.optBoolean("carrying", false),
+        idleS = root.optJSONObject("care")?.optDouble("idle_s", 0.0) ?: 0.0,
+        tick = root.optLong("tick", 0L),
     )
 } catch (_: Throwable) {
     null
@@ -105,6 +127,61 @@ object StagePropsLayout {
         x > 0.34f && x < 0.66f && y >= 0.70f -> StageProp.Cushion
         else -> null
     }
+
+    /**
+     * The self-play chip's zone, above the ball on the left. Kept clear of
+     * the prop rows (y >= 0.50) and of the duck's body (x >= 0.25).
+     */
+    fun hitToggle(x: Float, y: Float): Boolean = x < 0.25f && y >= 0.30f && y < 0.48f
+}
+
+/** A self-play beat no sooner than this many simulated ticks (25 s at 50 Hz). */
+const val SELF_PLAY_COOLDOWN_TICKS = 1250L
+
+/** The duck must have been left alone this long before it goes to play. */
+const val SELF_PLAY_IDLE_S = 10.0
+
+/**
+ * The prop the duck chooses this beat: a pure function of its own
+ * fingerprint and the simulated tick, so two ducks differ and the same duck
+ * is stable within a beat — a personality, not a coin.
+ */
+fun selfPlayProp(fingerprint: String, tick: Long): StageProp {
+    var hash = -3750763034362895579L // 0xcbf29ce484222325
+    for (byte in fingerprint.toByteArray(Charsets.UTF_8)) {
+        hash = hash xor byte.toLong()
+        hash *= 0x100000001b3L
+    }
+    hash = hash xor (tick / SELF_PLAY_COOLDOWN_TICKS)
+    return StageProp.entries[hash.mod(StageProp.entries.size).toInt()]
+}
+
+/**
+ * Whether the duck may go off to play now. Every input is a real /state
+ * field: it must be awake, unfrozen, not carried, not in an emotion,
+ * genuinely idle (the core's own look-around owns the head), left alone for
+ * [SELF_PLAY_IDLE_S], and past the cooldown. The caller adds its own window
+ * guard (no sheet, no ring).
+ */
+fun selfPlayDue(
+    cues: PropCues,
+    asleep: Boolean,
+    enabled: Boolean,
+    lastTick: Long,
+): Boolean =
+    enabled && !asleep &&
+        !cues.paused && !cues.carrying && cues.emotion.isEmpty() &&
+        cues.idleTakeover > 0.1 && cues.idleS >= SELF_PLAY_IDLE_S &&
+        (lastTick <= 0L || cues.tick - lastTick >= SELF_PLAY_COOLDOWN_TICKS)
+
+/**
+ * The walk pulse's side: -1 left, +1 right, 0 straight ahead. The duck takes
+ * a real step toward the prop's side before playing with it.
+ */
+fun StageProp.side(): Int = when (this) {
+    StageProp.Ball, StageProp.Hoop -> -1
+    StageProp.Block, StageProp.Mirror -> 1
+    StageProp.Cushion -> 0
 }
 
 /**
@@ -127,6 +204,7 @@ fun reactProp(prop: StageProp, core: DuckCore): String = when (prop) {
 fun StagePropsStage(
     cues: PropCues,
     asleep: Boolean,
+    selfPlay: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val reduce = readReduceMotion(LocalView.current)
@@ -192,7 +270,8 @@ fun StagePropsStage(
     val emotion = if (asleep) "" else cues.emotion
     val cushionWarm = warmScale > 0.01f || emotion == "laugh" || emotion == "sad"
 
-    Canvas(modifier) {
+    BoxWithConstraints(modifier) {
+    Canvas(Modifier.matchParentSize()) {
         val w = size.width
         val h = size.height
         val unit = 1.dp.toPx()
@@ -330,5 +409,38 @@ fun StagePropsStage(
                 cornerRadius = CornerRadius(8 * unit),
             )
         }
+    }
+    // The self-play switch: scene, not chrome. A real label so the toggle is
+    // findable; the stage gesture routes its taps by zone (hitToggle), so it
+    // costs the first screen no clickable node.
+    Column(
+        Modifier
+            .offset(x = maxWidth * 0.14f - 34.dp, y = maxHeight * 0.38f - 22.dp)
+            .width(68.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.xxs),
+    ) {
+        Box(
+            Modifier
+                .size(20.dp)
+                .background(
+                    if (selfPlay) DuckTheme.AccentAction else DuckTheme.Brass,
+                    CircleShape,
+                ),
+        ) {
+            Box(
+                Modifier
+                    .align(Alignment.Center)
+                    .size(7.dp)
+                    .background(Color.Black.copy(alpha = 0.35f), CircleShape),
+            )
+        }
+        Text(
+            if (selfPlay) Copy.selfPlayOn else Copy.selfPlay,
+            color = DuckTheme.TextPrimary.copy(alpha = 0.7f),
+            fontSize = DuckTheme.Type.Micro,
+            maxLines = 1,
+        )
+    }
     }
 }

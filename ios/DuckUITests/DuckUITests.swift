@@ -650,6 +650,52 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(rolled, "tapping the hoop never started a real roll")
     }
 
+    /// The self-play switch (2026-11-25): turned on, an idle duck walks to a
+    /// prop and plays with it on its own. The verdict line is the proof the
+    /// core accepted the verb; it is empty at launch and no other tap
+    /// happens here, so any skill appearing is the duck's own move.
+    func testTheDuckPlaysOnItsOwnWhenAsked() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+        let chip = anyElement("stage-self-play")
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "the self-play chip is missing")
+        XCTAssertEqual(chip.value as? String, "off", "the switch must start off")
+        chip.tap()
+
+        func waitForValue(_ want: String, timeout: TimeInterval) -> Bool {
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline {
+                if (chip.value as? String) == want { return true }
+                usleep(100_000)
+            }
+            return false
+        }
+        XCTAssertTrue(waitForValue("on", timeout: 5), "the switch did not turn on")
+
+        // Left alone for ten seconds, then a walk and a real verb; the
+        // verdict appears only when the core accepted it. (A leftover switch
+        // from a previous test run keeps its state — assert the play, not the
+        // initial value.)
+        let verdict = app.staticTexts["duck-last-skill"]
+        var played = false
+        let deadline = Date().addingTimeInterval(90)
+        while Date() < deadline {
+            if verdict.exists, !verdict.label.isEmpty { played = true; break }
+            usleep(200_000)
+        }
+
+        // Leave the switch off: the choice persists, and the rest of the
+        // suite must see a still duck.
+        if (chip.value as? String) == "on" {
+            chip.tap()
+            XCTAssertTrue(waitForValue("off", timeout: 5), "the switch did not turn off")
+        }
+        XCTAssertTrue(played, "the duck never played on its own after the switch was on")
+    }
+
     /// A composed postcard in Chinese, for B4 §6.5. It sorts last (Z) so the
     /// newest card in the app container is this one; CI publishes it as the
     /// Chinese sample.

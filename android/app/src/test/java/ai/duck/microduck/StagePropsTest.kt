@@ -1,7 +1,10 @@
 package ai.duck.microduck
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -73,6 +76,55 @@ class StagePropsTest {
         assertEquals(0, cues.sitDowns)
         assertEquals(0, cues.rolls)
         assertEquals("", cues.emotion)
+        assertEquals(false, cues.paused)
+        assertEquals(0.0, cues.idleS, 1e-9)
         assertNull(parsePropCues("not json"))
+    }
+
+    @Test
+    fun theSelfPlaySwitchHasItsOwnZoneAboveTheProps() {
+        assertTrue(StagePropsLayout.hitToggle(0.14f, 0.38f))
+        // The prop rows and the duck's body never toggle the switch.
+        assertFalse(StagePropsLayout.hitToggle(0.14f, 0.60f))
+        assertFalse(StagePropsLayout.hitToggle(0.50f, 0.40f))
+        // The zones do not overlap: a tap resolves to exactly one target.
+        assertNull(StagePropsLayout.hit(0.14f, 0.38f))
+    }
+
+    @Test
+    fun selfPlayNeedsEveryRealGuard() {
+        val idle = PropCues(idleTakeover = 0.4, idleS = 20.0, tick = 5000)
+        assertTrue(selfPlayDue(idle, asleep = false, enabled = true, lastTick = 0))
+        // The switch off is the first guard.
+        assertFalse(selfPlayDue(idle, asleep = false, enabled = false, lastTick = 0))
+        // Sleeping, frozen, carried, in an emotion: none may move.
+        assertFalse(selfPlayDue(idle, asleep = true, enabled = true, lastTick = 0))
+        assertFalse(selfPlayDue(idle.copy(paused = true), false, true, 0))
+        assertFalse(selfPlayDue(idle.copy(carrying = true), false, true, 0))
+        assertFalse(selfPlayDue(idle.copy(emotion = "laugh"), false, true, 0))
+        // Not looking around on its own / not left alone long enough.
+        assertFalse(selfPlayDue(idle.copy(idleTakeover = 0.0), false, true, 0))
+        assertFalse(selfPlayDue(idle.copy(idleS = 5.0), false, true, 0))
+        // The cooldown: a beat cannot repeat inside 1250 ticks.
+        assertFalse(
+            selfPlayDue(idle, false, true, lastTick = idle.tick - 1249)
+        )
+        assertTrue(
+            selfPlayDue(idle, false, true, lastTick = idle.tick - 1250)
+        )
+    }
+
+    @Test
+    fun selfPlayPicksAreStablePerBeatAndDuck() {
+        // The same duck in the same beat keeps its choice; the next beat can
+        // differ; each choice lands on a real prop.
+        val a = selfPlayProp("duck-a", 3000)
+        assertEquals(a, selfPlayProp("duck-a", 3000))
+        assertEquals(a, selfPlayProp("duck-a", 3499))
+        val picks = (0..20).map { selfPlayProp("duck-a", 1250L * it) }.toSet()
+        assertTrue(picks.size > 1)
+        assertTrue(picks.all { it in StageProp.entries })
+        // Two ducks are not forced to the same prop.
+        assertNotEquals(selfPlayProp("duck-a", 1250), selfPlayProp("duck-b", 1250))
     }
 }

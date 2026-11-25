@@ -285,6 +285,12 @@ val quack get() = pick("Quack", "叫一声")
     val propPlayBlocks get() = pick("Pick up the blocks", "捡积木")
     val propPlayMirror get() = pick("Look in the mirror", "照镜子")
     val propPlayCushion get() = pick("Sit on the cushion", "坐垫子")
+    // The self-play switch: the duck chooses a prop and walks to it when it
+    // has been left alone. Off by default — a duck that moves on its own
+    // must be asked for.
+    val selfPlay get() = pick("Plays on its own", "自己玩")
+    val selfPlayOn get() = pick("Plays on its own · On", "自己玩 · 开")
+    val selfPlayAction get() = pick("Toggle playing on its own", "自己玩开关")
     val timeMachine get() = pick("Time machine", "时间机器")
     // Direction A: the wall clock and the brass barometer.
     val wallClock get() = pick("Wall clock", "挂钟")

@@ -420,6 +420,14 @@ fun Shell(
             hintDismiss = false
         }
     }
+    // The self-play switch: off by default — a duck that walks off on its own
+    // must be asked for. When on, an idle duck takes a real step toward a
+    // prop and plays with it (see StageProps.selfPlayDue).
+    var selfPlay by remember { mutableStateOf(hintPrefs.getBoolean("self_play", false)) }
+    val toggleSelfPlay: () -> Unit = {
+        selfPlay = !selfPlay
+        hintPrefs.edit().putBoolean("self_play", selfPlay).apply()
+    }
 
     // The companion layer: the pill reads the core's own numbers once a
     // second. The state is kept as numbers; the words are computed at
@@ -441,6 +449,7 @@ fun Shell(
         var walkBaseline: Double? = null
         var walkSession = 0.0
         var lastRolls: Int? = null
+        var lastSelfTick = 0L
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.
@@ -470,6 +479,30 @@ fun Shell(
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
             stateText?.let(::parsePropCues)?.let { if (it != propCues) propCues = it }
+            // Self-play: with the switch on, an idle duck walks to a prop and
+            // plays with it. Every guard is a real /state field; the walk is
+            // the real velocity policy and the verb is the core's own. The
+            // sheet/ring gate keeps it from moving under an open panel.
+            if (selfPlay && routeState.sheet == null &&
+                routeState.overlay != ShellOverlay.Ring &&
+                selfPlayDue(propCues, careUi?.asleep == true, true, lastSelfTick)
+            ) {
+                val prop = selfPlayProp(duck.fingerprint(), propCues.tick)
+                val side = prop.side()
+                input.vx = 0.35
+                input.wz = -side * 0.5
+                launch {
+                    delay(1200)
+                    input.vx = 0.0
+                    input.wz = 0.0
+                    delay(150)
+                    val accepted = reactProp(prop, duck)
+                    if (accepted.isNotEmpty()) {
+                        lastSelfTick = propCues.tick
+                        lastSkill = accepted
+                    }
+                }
+            }
             val nightNow = stateText?.let(::parseNight)
             if (nightNow != null) nightActive = nightNow.active
             val event = stateText?.let(::parseSoundEvent)
@@ -751,6 +784,7 @@ fun Shell(
                                     ringOpen = { ringOpen },
                                     onLongPress = { setRing(true) },
                                     onSkillAccepted = { lastSkill = it },
+                                    onToggleSelfPlay = toggleSelfPlay,
                                 )
                                 // D4: the stage is one accessible element with
                                 // the four actions a TalkBack user needs.
@@ -796,6 +830,10 @@ fun Shell(
                                             reactProp(StageProp.Cushion, duck)
                                             true
                                         },
+                                        CustomAccessibilityAction(Copy.selfPlayAction) {
+                                            toggleSelfPlay()
+                                            true
+                                        },
                                     )
                                 },
                         )
@@ -812,6 +850,7 @@ fun Shell(
                         StagePropsStage(
                             cues = propCues,
                             asleep = careUi?.asleep == true,
+                            selfPlay = selfPlay,
                             modifier = Modifier.matchParentSize(),
                         )
                         // The stroke is scene, not chrome: it draws over the
@@ -2404,6 +2443,7 @@ private fun Modifier.portraitStageGesture(
     ringOpen: () -> Boolean,
     onLongPress: () -> Unit,
     onSkillAccepted: (String) -> Unit,
+    onToggleSelfPlay: () -> Unit,
 ): Modifier = pointerInput(core, carrying, stick, pathActive) {
     val deadzone = 8.dp.toPx()
     val fullScale = 90.dp.toPx()
@@ -2517,6 +2557,11 @@ private fun Modifier.portraitStageGesture(
                     val prop = StagePropsLayout.hit(x / width, y / height)
                     val insideDuck = x > width * 0.25f && x < width * 0.75f &&
                         y > height * 0.33f && y < height * 0.68f
+                    if (StagePropsLayout.hitToggle(x / width, y / height)) {
+                        onToggleSelfPlay()
+                        finished = true
+                        return@awaitEachGesture
+                    }
                     if (prop != null) {
                         reactProp(prop, core).takeIf { it.isNotEmpty() }?.let(onSkillAccepted)
                         finished = true
