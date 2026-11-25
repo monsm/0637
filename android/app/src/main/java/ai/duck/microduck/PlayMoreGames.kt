@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -393,6 +394,272 @@ fun SoundSimon(core: DuckCore?) {
             PathChip(Copy.soundPromptCurious, enabled = !listening, testTag = "sound-whistle") {
                 listen("whistle")
             }
+        }
+    }
+}
+
+/** 反向指令: the prompt says one thing; the child must do the opposite. */
+@Composable
+fun ReverseCommand(core: DuckCore?) {
+    var promptSit by remember { mutableStateOf(true) }
+    var notice by remember { mutableStateOf("") }
+    fun press(sit: Boolean) {
+        if (sit == promptSit) {
+            notice = Copy.reverseWrong
+            return
+        }
+        val started = core?.skill(if (sit) "sit" else "stand") ?: 0
+        if (started == 0) {
+            notice = Copy.reverseWrong
+            return
+        }
+        notice = ""
+        promptSit = !promptSit
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(Copy.reverseTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (notice.isNotEmpty()) notice else skillLabel(if (promptSit) "sit" else "stand"),
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("reverse-status").semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            PathChip(skillLabel("sit"), testTag = "reverse-sit") { press(true) }
+            PathChip(skillLabel("stand"), testTag = "reverse-stand") { press(false) }
+        }
+    }
+}
+
+/** 照我做: show one real pose at a time; the child makes the duck do it. */
+@Composable
+fun PostureMirror(core: DuckCore?) {
+    val poses = listOf("sit", "stand", "ground_pick", "roulade")
+    var round by remember { mutableStateOf(0) }
+    var notice by remember { mutableStateOf("") }
+    fun press(name: String) {
+        if (round >= poses.size) return
+        if (name != poses[round]) {
+            notice = Copy.reverseWrong
+            return
+        }
+        val started = if (name == "ground_pick") {
+            if (core?.groundPick() == 0) 1 else 0
+        } else {
+            core?.skill(name) ?: 0
+        }
+        if (started == 0) {
+            notice = Copy.reverseWrong
+            return
+        }
+        notice = ""
+        round += 1
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(Copy.postureTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (notice.isNotEmpty()) notice
+                else if (round >= poses.size) Copy.rallyDone else Copy.posturePrompt + " · " + skillLabel(poses[round]),
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("posture-status").semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            PathChip(skillLabel("sit"), testTag = "posture-sit") { press("sit") }
+            PathChip(skillLabel("stand"), testTag = "posture-stand") { press("stand") }
+            PathChip(skillLabel("ground_pick"), testTag = "posture-pick") { press("ground_pick") }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            PathChip(skillLabel("roulade"), testTag = "posture-roll") { press("roulade") }
+            PathChip(Copy.echoStart, testTag = "posture-start") { round = 0; notice = "" }
+        }
+    }
+}
+
+/** 红灯停绿灯行: green keeps a real forward command going; red stops dead. */
+@Composable
+fun RedLightGreenLight(core: DuckCore?, input: DuckInput) {
+    var green by remember { mutableStateOf(false) }
+    LaunchedEffect(green) {
+        while (green) {
+            input.vx = 0.4
+            input.wz = 0.0
+            delay(100)
+        }
+        input.vx = 0.0
+        input.wz = 0.0
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(Copy.lightTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (green) Copy.lightGreen else Copy.lightRed,
+                color = if (green) DuckTheme.StateGood else Color.White.copy(alpha = 0.7f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("light-status").semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            PathChip(Copy.lightGreen, testTag = "light-green") { green = true }
+            PathChip(Copy.lightRed, testTag = "light-red") { green = false }
+        }
+    }
+}
+
+/** 快进一天: the duck's own care clock at 60x for a minute of real life. */
+@Composable
+fun FastForwardDay() {
+    var fast by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(Copy.fastTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (fast) Copy.fastOn else Copy.fastNote,
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("fast-status").semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        PathChip(if (fast) Copy.fastOff else Copy.fastOn, testTag = "fast-toggle") {
+            fast = !fast
+            postDuckCommand("/config", if (fast) "{\"care_time_scale\":60}" else "{\"care_time_scale\":1}")
+        }
+    }
+}
+
+/** 找一找: the prompt names a body part; the touch is the real reaction. */
+@Composable
+fun FindIt(core: DuckCore?) {
+    val parts = listOf("head", "belly", "feet")
+    var round by remember { mutableStateOf(0) }
+    var notice by remember { mutableStateOf("") }
+    val prompts = mapOf("head" to Copy.findHead, "belly" to Copy.findBelly, "feet" to Copy.findFeet)
+    fun press(part: String) {
+        if (round >= parts.size || part != parts[round]) {
+            notice = Copy.reverseWrong
+            return
+        }
+        when (part) {
+            "head" -> core?.skill("curious")
+            "belly" -> postDuckCommand("/pet")
+            else -> core?.skill("kick_left")
+        }
+        notice = ""
+        round += 1
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(Copy.findTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (notice.isNotEmpty()) notice
+                else if (round >= parts.size) Copy.rallyDone else Copy.findPrompt + " · " + prompts[parts[round]],
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("find-status").semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            parts.forEach { part ->
+                PathChip(prompts.getValue(part), testTag = "find-$part") { press(part) }
+            }
+        }
+        PathChip(Copy.echoStart, testTag = "find-start") { round = 0; notice = "" }
+    }
+}
+
+/** 小账本: today's real deltas, read straight from the duck's own book. */
+@Composable
+fun LittleLedger(core: DuckCore?) {
+    var lines by remember { mutableStateOf(listOf<String>()) }
+    val scope = rememberCoroutineScope()
+    fun read() {
+        scope.launch {
+            val state = withContext(Dispatchers.IO) { fetchRawState() } ?: return@launch
+            val life = try { JSONObject(state).optJSONObject("life") } catch (_: Throwable) { null } ?: return@launch
+            val day = life.optJSONObject("day_started")
+            fun delta(name: String) = (life.optDouble(name, 0.0) - (day?.optDouble(name, 0.0) ?: 0.0)).coerceAtLeast(0.0)
+            val skills = life.optJSONObject("skills")
+            var tricks = 0
+            if (skills != null) {
+                for (key in skills.keys()) tricks += skills.optInt(key, 0)
+            }
+            lines = listOf(
+                Copy.ledgerWalk + " " + Copy.todayMetres(delta("metres")),
+                Copy.ledgerPets + " " + Copy.todayCount(delta("pets").toInt()),
+                Copy.ledgerFalls + " " + Copy.todayCount(delta("falls").toInt()),
+                Copy.ledgerFed + " " + Copy.todayCount(delta("fed").toInt()),
+                Copy.ledgerSkills + " " + Copy.todayCount(tricks),
+            )
+            core?.skill("yes")
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(Copy.ledgerTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            PathChip(Copy.ledgerRefresh, testTag = "ledger-read") { read() }
+        }
+        lines.forEach { line ->
+            Text(line, color = DuckTheme.Brass, fontSize = DuckTheme.Type.Caption, modifier = Modifier.testTag("ledger-line"))
+        }
+    }
+}
+
+/** 传悄悄话: the duck whispers one of its voices; the child names it. */
+@Composable
+fun WhisperGame(core: DuckCore?) {
+    val tags = listOf("chirp", "coo", "inquire", "peck")
+    var target by remember { mutableStateOf("") }
+    var phase by remember { mutableStateOf(0) } // 0 idle, 1 guessing, 2 answered
+    var notice by remember { mutableStateOf("") }
+    fun listen() {
+        val tick = System.currentTimeMillis() / 1000
+        target = tags[(tick % tags.size).toInt()]
+        notice = ""
+        phase = 1
+        core?.queueSound(target)
+    }
+    fun guess(tag: String) {
+        if (phase != 1) return
+        val right = tag == target
+        core?.skill(if (right) "yes" else "no")
+        notice = if (right) Copy.charadesRight else Copy.charadesWrong
+        phase = 2
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(Copy.whisperTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.weight(1f))
+            Text(
+                when (phase) {
+                    1 -> Copy.whisperPrompt
+                    2 -> notice
+                    else -> ""
+                },
+                color = Color.White.copy(alpha = 0.6f),
+                fontSize = DuckTheme.Type.Caption,
+                modifier = Modifier.testTag("whisper-status").semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            tags.take(2).forEach { tag ->
+                PathChip(Copy.echoSound(tag), enabled = phase == 1, testTag = "whisper-$tag") { guess(tag) }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            tags.drop(2).forEach { tag ->
+                PathChip(Copy.echoSound(tag), enabled = phase == 1, testTag = "whisper-$tag") { guess(tag) }
+            }
+            PathChip(if (phase == 0) Copy.whisperListen else Copy.whisperAgain, testTag = "whisper-start") { listen() }
         }
     }
 }

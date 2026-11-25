@@ -453,6 +453,37 @@ enum Copy {
     static var soundPromptCurious: String { pick("Whistle to make it curious", "吹口哨让它好奇") }
     static var soundHeard: String { pick("Heard it!", "听到了！") }
     static var soundMissed: String { pick("Nothing heard", "没听到") }
+    // The seven remaining games (2026-11-26): reverse command / follow the
+    // pose / red light / fast-forward day / find it / little ledger / whisper.
+    // Pose and mood words come from SkillLabel, so only prompts are here.
+    static var reverseTitle: String { pick("Do the opposite", "反向指令") }
+    static var reverseWrong: String { pick("The other way", "要反过来") }
+    static var postureTitle: String { pick("Follow the pose", "照我做") }
+    static var posturePrompt: String { pick("Do the same one", "做同一个") }
+    static var lightTitle: String { pick("Red light, green light", "红灯停绿灯行") }
+    static var lightGreen: String { pick("Green!", "绿灯！") }
+    static var lightRed: String { pick("Red!", "红灯！") }
+    static var fastTitle: String { pick("Fast-forward a day", "快进一天") }
+    static var fastOn: String { pick("Fast-forward on", "快进 · 开") }
+    static var fastOff: String { pick("Fast-forward off", "快进 · 关") }
+    static var fastNote: String { pick("A real day, faster", "一天压缩成一分钟") }
+    static var findTitle: String { pick("Find it", "找一找") }
+    static var findPrompt: String { pick("Touch where it says", "摸它说的那里") }
+    static var findHead: String { pick("Head", "摸头") }
+    static var findBelly: String { pick("Belly", "摸肚子") }
+    static var findFeet: String { pick("Feet", "摸脚") }
+    static var ledgerTitle: String { pick("Little ledger", "小账本") }
+    static var ledgerRefresh: String { pick("Read it", "读一读") }
+    static var ledgerWalk: String { pick("Walked", "走了") }
+    static var ledgerPets: String { pick("Petted", "被摸") }
+    static var ledgerFalls: String { pick("Fell", "摔倒") }
+    static var ledgerFed: String { pick("Ate", "吃饭") }
+    static var ledgerSkills: String { pick("Tricks", "把戏") }
+    static var whisperTitle: String { pick("Pass a whisper", "传悄悄话") }
+    static var whisperListen: String { pick("Whisper to me", "悄悄说给我听") }
+    static var whisperPrompt: String { pick("What did it say?", "它刚才说了什么？") }
+    static var whisperAgain: String { pick("Again", "再听一次") }
+
     // Each game's start key says its own words: Play more stacks several
     // games, and a repeated 开始 made a tap land on the neighbour's start.
     static var rallyGo: String { pick("Start the rally", "开弓") }

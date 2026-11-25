@@ -341,3 +341,311 @@ struct SoundSimon: View {
         }
     }
 }
+
+/// 反向指令: the prompt says one thing; the child must do the opposite.
+struct ReverseCommand: View {
+    @ObservedObject var controller: DuckController
+    @State private var promptSit = true
+    @State private var notice = ""
+
+    private func press(sit: Bool) {
+        guard sit != promptSit else {
+            notice = Copy.reverseWrong
+            return
+        }
+        guard controller.trigger(sit ? "sit" : "stand") else {
+            notice = Copy.reverseWrong
+            return
+        }
+        notice = ""
+        promptSit.toggle()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
+            HStack {
+                Text(Copy.reverseTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: DuckSpace.sm)
+                Text(notice.isEmpty ? SkillLabel.of(promptSit ? "sit" : "stand") : notice)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityIdentifier("reverse-status")
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                GameChip(title: SkillLabel.of("sit"), identifier: "reverse-sit") { press(sit: true) }
+                GameChip(title: SkillLabel.of("stand"), identifier: "reverse-stand") { press(sit: false) }
+            }
+        }
+    }
+}
+
+/// 照我做: show one real pose at a time; the child makes the duck do it.
+struct PostureMirror: View {
+    @ObservedObject var controller: DuckController
+    private let poses = ["sit", "stand", "ground_pick", "roulade"]
+    @State private var round = 0
+    @State private var notice = ""
+
+    private func press(_ name: String) {
+        guard round < poses.count else { return }
+        guard name == poses[round] else {
+            notice = Copy.reverseWrong
+            return
+        }
+        let started = name == "ground_pick" ? controller.groundPick() : controller.trigger(name)
+        guard started else {
+            notice = Copy.reverseWrong
+            return
+        }
+        notice = ""
+        round += 1
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
+            HStack {
+                Text(Copy.postureTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: DuckSpace.sm)
+                Text(notice.isEmpty
+                     ? (round >= poses.count ? Copy.rallyDone
+                        : Copy.posturePrompt + " · " + SkillLabel.of(poses[round]))
+                     : notice)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityIdentifier("posture-status")
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                GameChip(title: SkillLabel.of("sit"), identifier: "posture-sit") { press("sit") }
+                GameChip(title: SkillLabel.of("stand"), identifier: "posture-stand") { press("stand") }
+                GameChip(title: SkillLabel.of("ground_pick"), identifier: "posture-pick") {
+                    press("ground_pick")
+                }
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                GameChip(title: SkillLabel.of("roulade"), identifier: "posture-roll") { press("roulade") }
+                GameChip(title: Copy.echoStart, identifier: "posture-start") {
+                    round = 0
+                    notice = ""
+                }
+            }
+        }
+    }
+}
+
+/// 红灯停绿灯行: green keeps a real forward command going; red stops dead.
+struct RedLightGreenLight: View {
+    @ObservedObject var controller: DuckController
+    @State private var green = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
+            HStack {
+                Text(Copy.lightTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: DuckSpace.sm)
+                Text(green ? Copy.lightGreen : Copy.lightRed)
+                    .font(.duckCaption)
+                    .foregroundStyle(green ? Color.duckGood : .white.opacity(0.7))
+                    .accessibilityIdentifier("light-status")
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                GameChip(title: Copy.lightGreen, identifier: "light-green") {
+                    green = true
+                    drive()
+                }
+                GameChip(title: Copy.lightRed, identifier: "light-red") {
+                    green = false
+                    controller.joystick = .zero
+                }
+            }
+        }
+        .onChange(of: green) { _, on in
+            if on { drive() } else { controller.joystick = .zero }
+        }
+    }
+
+    /// The real velocity channel, one tick at a time, while the light is green.
+    private func drive() {
+        Task { @MainActor in
+            while green {
+                controller.joystick = CGPoint(x: 0, y: 0.4)
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            controller.joystick = .zero
+        }
+    }
+}
+
+/// 快进一天: the duck's own care clock at 60x for a minute of real life.
+struct FastForwardDay: View {
+    @ObservedObject var controller: DuckController
+    @State private var fast = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
+            HStack {
+                Text(Copy.fastTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: DuckSpace.sm)
+                Text(fast ? Copy.fastOn : Copy.fastNote)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityIdentifier("fast-status")
+            }
+            GameChip(title: fast ? Copy.fastOff : Copy.fastOn, identifier: "fast-toggle") {
+                fast.toggle()
+                controller.setCareTimeScale(fast ? 60 : 1)
+            }
+        }
+    }
+}
+
+/// 找一找: the prompt names a body part; the touch is the real reaction.
+struct FindIt: View {
+    @ObservedObject var controller: DuckController
+    private let parts = ["head", "belly", "feet"]
+    @State private var round = 0
+    @State private var notice = ""
+
+    private func title(_ part: String) -> String {
+        switch part {
+        case "head": return Copy.findHead
+        case "belly": return Copy.findBelly
+        default: return Copy.findFeet
+        }
+    }
+
+    private func press(_ part: String) {
+        guard round < parts.count, part == parts[round] else {
+            notice = Copy.reverseWrong
+            return
+        }
+        switch part {
+        case "head": controller.trigger("curious")
+        case "belly": controller.pet()
+        default: controller.trigger("kick_left")
+        }
+        notice = ""
+        round += 1
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
+            HStack {
+                Text(Copy.findTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: DuckSpace.sm)
+                Text(notice.isEmpty
+                     ? (round >= parts.count ? Copy.rallyDone
+                        : Copy.findPrompt + " · " + title(parts[round]))
+                     : notice)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityIdentifier("find-status")
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                ForEach(parts, id: \.self) { part in
+                    GameChip(title: title(part), identifier: "find-\(part)") { press(part) }
+                }
+            }
+            GameChip(title: Copy.echoStart, identifier: "find-start") {
+                round = 0
+                notice = ""
+            }
+        }
+    }
+}
+
+/// 小账本: today's real deltas, read straight from the duck's own book.
+struct LittleLedger: View {
+    @ObservedObject var controller: DuckController
+    @State private var lines: [String] = []
+
+    private func read() {
+        Task { @MainActor in
+            guard let json = await duckState(),
+                  let life = json["life"] as? [String: Any] else { return }
+            let day = life["day_started"] as? [String: Any]
+            func delta(_ name: String) -> Double {
+                max((life[name] as? Double ?? 0) - (day?[name] as? Double ?? 0), 0)
+            }
+            var tricks = 0
+            if let skills = life["skills"] as? [String: Any] {
+                for key in skills.keys { tricks += skills[key] as? Int ?? 0 }
+            }
+            lines = [
+                Copy.ledgerWalk + " " + Copy.todayMetres(delta("metres")),
+                Copy.ledgerPets + " " + Copy.todayCount(Int(delta("pets"))),
+                Copy.ledgerFalls + " " + Copy.todayCount(Int(delta("falls"))),
+                Copy.ledgerFed + " " + Copy.todayCount(Int(delta("fed"))),
+                Copy.ledgerSkills + " " + Copy.todayCount(tricks),
+            ]
+            controller.trigger("yes")
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
+            HStack {
+                Text(Copy.ledgerTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: DuckSpace.sm)
+                GameChip(title: Copy.ledgerRefresh, identifier: "ledger-read") { read() }
+            }
+            ForEach(lines, id: \.self) { line in
+                Text(line)
+                    .font(.duckCaption)
+                    .foregroundStyle(Color.duckBrass)
+                    .accessibilityIdentifier("ledger-line")
+            }
+        }
+    }
+}
+
+/// 传悄悄话: the duck whispers one of its voices; the child names it.
+struct WhisperGame: View {
+    @ObservedObject var controller: DuckController
+    private let tags = ["chirp", "coo", "inquire", "peck"]
+    @State private var target = ""
+    @State private var phase = 0 // 0 idle, 1 guessing, 2 answered
+    @State private var notice = ""
+
+    private func listen() {
+        let second = Int(Date().timeIntervalSince1970)
+        target = tags[second % tags.count]
+        notice = ""
+        phase = 1
+        controller.queueSound(target)
+    }
+
+    private func guess(_ tag: String) {
+        guard phase == 1 else { return }
+        let right = tag == target
+        controller.trigger(right ? "yes" : "no")
+        notice = right ? Copy.charadesRight : Copy.charadesWrong
+        phase = 2
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DuckSpace.sm) {
+            HStack {
+                Text(Copy.whisperTitle).font(.duckLabel.weight(.semibold)).foregroundStyle(.white)
+                Spacer(minLength: DuckSpace.sm)
+                Text(phase == 1 ? Copy.whisperPrompt : (phase == 2 ? notice : ""))
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .accessibilityIdentifier("whisper-status")
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                ForEach(Array(tags.prefix(2)), id: \.self) { tag in
+                    GameChip(title: Copy.echoSound(tag), identifier: "whisper-\(tag)",
+                             enabled: phase == 1) { guess(tag) }
+                }
+            }
+            DuckAdaptiveRow(spacing: DuckSpace.sm) {
+                ForEach(Array(tags.dropFirst(2)), id: \.self) { tag in
+                    GameChip(title: Copy.echoSound(tag), identifier: "whisper-\(tag)",
+                             enabled: phase == 1) { guess(tag) }
+                }
+                GameChip(title: phase == 0 ? Copy.whisperListen : Copy.whisperAgain,
+                         identifier: "whisper-start") { listen() }
+            }
+        }
+    }
+}

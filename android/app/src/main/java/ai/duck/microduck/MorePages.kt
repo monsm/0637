@@ -483,6 +483,13 @@ internal fun PlayMoreSheet(
             MoodFreeze(core)
             DidItHappenToday(core)
             SoundSimon(core)
+            ReverseCommand(core)
+            PostureMirror(core)
+            RedLightGreenLight(core, input)
+            FastForwardDay()
+            FindIt(core)
+            LittleLedger(core)
+            WhisperGame(core)
         }
     }
 }

@@ -1960,6 +1960,184 @@ else
   exit 1
 fi
 
+# The seven more games (2026-11-26), in sheet order after the first five.
+life_int() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print(int(json.load(sys.stdin).get('life',{}).get('$1',0)))
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1
+}
+life_float() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print(json.load(sys.stdin).get('life',{}).get('$1',0.0))
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1
+}
+pose_xy() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    p=json.load(sys.stdin).get('pose',{}).get('position',[0,0,0]); print(p[0],p[1])
+except Exception:
+    print(0,0)
+" 2>/dev/null || echo "0 0"
+}
+care_scale() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('care_time_scale',1.0))
+except Exception: print(-1)
+" 2>/dev/null || echo -1
+}
+
+# 反向指令: the prompt says 坐下, so the child must press 站起 (and then back).
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+SU0=$(life_int stand_ups)
+tap_games_control "反向指令" "站起" > /dev/null 2>&1 || { echo "::error::no reverse stand chip"; exit 1; }
+REV_OK=0
+for _ in $(seq 1 25); do
+  if [ "$(life_int stand_ups)" -gt "$SU0" ] 2>/dev/null; then REV_OK=1; break; fi
+  sleep 0.3
+done
+[ "$REV_OK" = "1" ] || { echo "::error::reverse command did not make the duck stand"; exit 1; }
+SD0=$(life_int sit_downs)
+tap_games_control "反向指令" "坐下" > /dev/null 2>&1 || true
+for _ in $(seq 1 25); do
+  if [ "$(life_int sit_downs)" -gt "$SD0" ] 2>/dev/null; then REV_OK=2; break; fi
+  sleep 0.3
+done
+[ "$REV_OK" = "2" ] || { echo "::error::reverse command did not make the duck sit"; exit 1; }
+echo "games: reverse command made the duck stand and sit against the prompt"
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+
+# 照我做: sit, stand, ground_pick, roulade in order, each a real verb.
+PM_SIT0=$(life_int sit_downs); PM_STAND0=$(life_int stand_ups)
+PM_PICK0=$(life_int ground_picks); PM_ROLL0=$(skill_count roulade)
+tap_games_control "照我做" "坐下" > /dev/null 2>&1 || true
+sleep 2
+tap_games_control "照我做" "站起" > /dev/null 2>&1 || true
+sleep 2
+tap_games_control "照我做" "贴地抓取" > /dev/null 2>&1 || true
+sleep 3
+tap_games_control "照我做" "翻滚" > /dev/null 2>&1 || true
+PM_OK=0
+for _ in $(seq 1 25); do
+  if [ "$(life_int sit_downs)" -gt "$PM_SIT0" ] 2>/dev/null &&
+     [ "$(life_int stand_ups)" -gt "$PM_STAND0" ] 2>/dev/null &&
+     [ "$(life_int ground_picks)" -gt "$PM_PICK0" ] 2>/dev/null &&
+     [ "$(skill_count roulade)" -gt "$PM_ROLL0" ] 2>/dev/null; then PM_OK=1; break; fi
+  sleep 0.3
+done
+[ "$PM_OK" = "1" ] || { echo "::error::posture mirror did not perform all four poses"; exit 1; }
+echo "games: posture mirror performed sit, stand, ground_pick and roulade"
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+
+# 红灯停绿灯行: green really walks, red really stops.
+M0=$(life_float metres)
+tap_games_control "红灯停绿灯行" "绿灯！" > /dev/null 2>&1 || { echo "::error::no green chip"; exit 1; }
+sleep 3
+M1=$(life_float metres)
+tap_games_control "红灯停绿灯行" "红灯！" > /dev/null 2>&1 || true
+sleep 0.8
+set -- $(pose_xy); PX1=$1; PY1=$2
+sleep 0.6
+set -- $(pose_xy); PX2=$1; PY2=$2
+STOP=$(python3 -c "print('yes' if ((($PX2)-($PX1))**2 + (($PY2)-($PY1))**2) ** 0.5 <= 0.15 else 'no')")
+WALKED=$(python3 -c "print('yes' if ($M1 - $M0) >= 0.3 else 'no')")
+[ "$WALKED" = "yes" ] || { echo "::error::green light did not walk (metres $M0 -> $M1)"; exit 1; }
+[ "$STOP" = "yes" ] || { echo "::error::red light did not stop the duck (moved > 0.15 m)"; exit 1; }
+echo "games: red light stopped the duck; green walked $(python3 -c "print(f'{$M1-$M0:.2f}')") m"
+
+# 快进一天: the real care knob goes to 60x and back to 1x.
+tap_games_control "快进一天" "快进 · 开" > /dev/null 2>&1 || { echo "::error::no fast-forward toggle"; exit 1; }
+FF_OK=0
+for _ in $(seq 1 20); do
+  if [ "$(care_scale)" = "60.0" ] || [ "$(care_scale)" = "60" ]; then FF_OK=1; break; fi
+  sleep 0.3
+done
+[ "$FF_OK" = "1" ] || { echo "::error::fast-forward did not set care_time_scale=60"; exit 1; }
+tap_games_control "快进一天" "快进 · 关" > /dev/null 2>&1 || true
+for _ in $(seq 1 20); do
+  if [ "$(care_scale)" = "1.0" ] || [ "$(care_scale)" = "1" ]; then FF_OK=2; break; fi
+  sleep 0.3
+done
+[ "$FF_OK" = "2" ] || { echo "::error::fast-forward did not return care_time_scale to 1"; exit 1; }
+echo "games: fast-forward set the real care clock to 60x and back to 1x"
+
+# 找一找: head, belly, feet — each touch is the real reaction.
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+FI_C0=$(emotion_count curious); FI_P0=$(life_int pets); FI_K0=$(skill_count kick_left)
+tap_games_control "找一找" "摸头" > /dev/null 2>&1 || true
+sleep 2
+tap_games_control "找一找" "摸肚子" > /dev/null 2>&1 || true
+sleep 2
+tap_games_control "找一找" "摸脚" > /dev/null 2>&1 || true
+FI_OK=0
+for _ in $(seq 1 25); do
+  if [ "$(emotion_count curious)" -gt "$FI_C0" ] 2>/dev/null &&
+     [ "$(life_int pets)" -gt "$FI_P0" ] 2>/dev/null &&
+     [ "$(skill_count kick_left)" -gt "$FI_K0" ] 2>/dev/null; then FI_OK=1; break; fi
+  sleep 0.3
+done
+[ "$FI_OK" = "1" ] || { echo "::error::find-it did not deliver head, belly and feet reactions"; exit 1; }
+echo "games: find-it delivered curious, a real pet and a real kick"
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+
+# 小账本: the numbers are today's real deltas; the duck nods.
+LEDGER_YES0=$(emotion_count yes)
+tap_games_control "小账本" "读一读" > /dev/null 2>&1 || { echo "::error::no ledger read chip"; exit 1; }
+LED_OK=0
+for _ in $(seq 1 25); do
+  rm -f games-tap.xml
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
+  if grep -q "走了" games-tap.xml && grep -q "被摸" games-tap.xml; then
+    if [ "$(emotion_count yes)" -gt "$LEDGER_YES0" ] 2>/dev/null; then LED_OK=1; break; fi
+  fi
+  sleep 0.4
+done
+[ "$LED_OK" = "1" ] || { echo "::error::little ledger did not read today's facts"; exit 1; }
+echo "games: little ledger showed today's real facts and the duck nodded"
+
+# 传悄悄话: the duck queues one real tag; the child names it from last_sound.
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+W_YES0=$(emotion_count yes)
+tap_games_control "传悄悄话" "悄悄说给我听" > /dev/null 2>&1 || { echo "::error::no whisper start"; exit 1; }
+WTAG=""
+for _ in $(seq 1 20); do
+  WTAG=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('last_sound') or '')
+except Exception: print('')
+" 2>/dev/null || true)
+  case "$WTAG" in chirp|coo|inquire|peck) break ;; esac
+  sleep 0.3
+done
+case "$WTAG" in
+  chirp|coo|inquire|peck) : ;;
+  *) echo "::error::whisper game did not queue a real tag (last_sound=$WTAG)"; exit 1 ;;
+esac
+WTAG_ZH=$(python3 - "$WTAG" <<'PYX'
+import sys
+print({"chirp":"叽","coo":"咕咕","inquire":"嗯?","peck":"嗒"}[sys.argv[1]])
+PYX
+)
+tap_games_control "传悄悄话" "$WTAG_ZH" > /dev/null 2>&1 || { echo "::error::no whisper pad for $WTAG"; exit 1; }
+W_OK=0
+for _ in $(seq 1 25); do
+  if [ "$(emotion_count yes)" -gt "$W_YES0" ] 2>/dev/null; then W_OK=1; break; fi
+  sleep 0.3
+done
+[ "$W_OK" = "1" ] || { echo "::error::the right whisper answer did not earn a yes"; exit 1; }
+echo "games: whisper game queued $WTAG and the right pad earned a real yes"
+
 # Back to the Live screen for the rest of the smoke: the Play more sheet and
 # the drawer both have to be gone before the screenshot/rotation sections —
 # a sheet still up would be the thing the next screenshot captures, and it
