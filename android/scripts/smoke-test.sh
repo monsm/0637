@@ -1463,12 +1463,14 @@ if [ -n "$STAGE_XY" ]; then
   S_L=$1; S_T=$2; S_W=$3; S_H=$4
   BALL_X=$((S_L + S_W * 14 / 100)); BALL_Y=$((S_T + S_H * 62 / 100))
   HOOP_X=$((S_L + S_W * 14 / 100)); HOOP_Y=$((S_T + S_H * 76 / 100))
+  CHIP_X=$((S_L + S_W * 14 / 100)); CHIP_Y=$((S_T + S_H * 38 / 100))
 else
   # Fallback measured from the portrait CI screenshot (320x640): the stage
-  # spans ~85..445 px, so the upper floor row sits near y 310 and the lower
-  # row near y 360.
+  # spans ~85..445 px, so the upper floor row sits near y 310, the lower row
+  # near y 360, and the self-play chip near y 225.
   BALL_X=$((PROP_STAGE_W * 14 / 100)); BALL_Y=$((PROP_STAGE_H * 48 / 100))
   HOOP_X=$((PROP_STAGE_W * 14 / 100)); HOOP_Y=$((PROP_STAGE_H * 56 / 100))
+  CHIP_X=$((PROP_STAGE_W * 14 / 100)); CHIP_Y=$((PROP_STAGE_H * 35 / 100))
   echo "::warning::the stage node was not in the dump; tapping the screenshot-measured prop points"
 fi
 
@@ -1524,6 +1526,56 @@ if [ "$ROLL_OK" = "1" ]; then
   echo "props: a hoop tap really started a roll (life.skills.roulade $ROLLS_BEFORE -> $ROLLS_NOW)"
 else
   echo "::error::tapping the hoop did not start a real roll"
+  exit 1
+fi
+
+# The self-play switch (2026-11-25): turned on, an idle duck walks to a prop
+# and plays with it on its own. The proof is the vet book's own counters
+# moving with no tap on any prop — the walk is the real velocity policy and
+# the verb is the core's own. Every guard is a real /state field (awake,
+# unfrozen, not carried, no path, no emotion, the idle look-around owns the
+# head, left alone 10 s, 25 s cooldown). The chip is scene, not chrome: it is
+# tapped at its stage coordinates and the gesture routes it by zone.
+play_count() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    s = json.load(sys.stdin)
+    life = s.get('life', {})
+    skills = life.get('skills', {})
+    total = (int(skills.get('kick_left', 0)) + int(skills.get('kick_right', 0))
+             + int(skills.get('roulade', 0)) + int(life.get('ground_picks', 0))
+             + int(life.get('sit_downs', 0))
+             + int(life.get('emotions', {}).get('curious', 0)))
+    print(total)
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1
+}
+
+adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
+sleep 1
+rm -f self-ui.xml
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > self-ui.xml 2>/dev/null || true
+if ! grep -q "自己玩 · 开" self-ui.xml; then
+  echo "::error::the self-play switch did not turn on (the chip still reads 自己玩)"
+  exit 1
+fi
+PLAY_BEFORE=$(play_count)
+SELF_OK=0
+for _ in $(seq 1 90); do
+  sleep 0.5
+  PLAY_NOW=$(play_count)
+  if [ "$PLAY_NOW" -gt "$PLAY_BEFORE" ] 2>/dev/null; then SELF_OK=1; break; fi
+done
+# Turn it back off so the rest of the smoke sees a still duck.
+adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
+sleep 1
+if [ "$SELF_OK" = "1" ]; then
+  echo "self-play: an idle duck walked to a prop and played on its own (counters $PLAY_BEFORE -> $PLAY_NOW)"
+else
+  echo "::error::the self-play switch never produced a real move"
   exit 1
 fi
 

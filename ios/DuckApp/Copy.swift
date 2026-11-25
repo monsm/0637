@@ -69,6 +69,12 @@ enum Copy {
     static var propPlayBlocks: String { pick("Pick up the blocks", "捡积木") }
     static var propPlayMirror: String { pick("Look in the mirror", "照镜子") }
     static var propPlayCushion: String { pick("Sit on the cushion", "坐垫子") }
+    // The self-play switch: the duck chooses a prop and walks to it when it
+    // has been left alone. Off by default — a duck that moves on its own
+    // must be asked for.
+    static var selfPlay: String { pick("Plays on its own", "自己玩") }
+    static var selfPlayOn: String { pick("Plays on its own · On", "自己玩 · 开") }
+    static var selfPlayAction: String { pick("Toggle playing on its own", "自己玩开关") }
     static var couldNotStart: String { pick("MicroDuck could not start", "MicroDuck 无法启动") }
     /// The failure card's one action. Android's core loader can retry; the
     /// key lives on both sides so the dictionaries stay aligned.

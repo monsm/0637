@@ -2844,9 +2844,11 @@ final class DuckController: ObservableObject {
     /// really moved — the props are the consequence, never the claim.
     private func parsePropCues(_ json: [String: Any]) {
         var cues = propCues
-        if let idle = json["idle"] as? [String: Any],
-           let takeover = idle["takeover"] as? Double, takeover > 0.1,
-           let head = idle["head"] as? [Any], head.count >= 3,
+        let idle = json["idle"] as? [String: Any]
+        let takeover = idle?["takeover"] as? Double ?? 0
+        cues.idleTakeover = takeover
+        if takeover > 0.1,
+           let head = idle?["head"] as? [Any], head.count >= 3,
            let yaw = head[2] as? Double {
             cues.idleYaw = yaw
         } else {
@@ -2863,7 +2865,40 @@ final class DuckController: ObservableObject {
         }
         // The duck's own emotion timeline, not a guess: the props answer it.
         cues.emotion = (json["emotion"] as? [String: Any])?["name"] as? String ?? ""
+        // The self-play guards, from the same document.
+        cues.paused = json["paused"] as? Bool ?? false
+        cues.carrying = json["carrying"] as? Bool ?? false
+        cues.idleS = (json["care"] as? [String: Any])?["idle_s"] as? Double ?? 0
+        cues.tick = json["tick"] as? Int ?? cues.tick
         if cues != propCues { propCues = cues }
+    }
+
+    /// With the switch on, an idle duck walks to a prop and plays with it.
+    /// Called from the 1 Hz poll while the Live stage is unobstructed; every
+    /// guard is a real /state field and the walk is the real velocity policy.
+    private var lastSelfPlayTick = 0
+
+    func maybeSelfPlay() {
+        guard ready, !pathActive,
+              UserDefaults.standard.bool(forKey: "duck_self_play") else { return }
+        let cues = propCues
+        guard selfPlayDue(cues, asleep: careAsleep, enabled: true, lastTick: lastSelfPlayTick)
+        else { return }
+        let prop = selfPlayProp(fingerprint: fingerprint, tick: cues.tick)
+        let side: Double
+        switch prop {
+        case .ball, .hoop: side = -1
+        case .block, .mirror: side = 1
+        case .cushion: side = 0
+        }
+        joystick = CGPoint(x: side * 0.5, y: 0.35)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self else { return }
+            self.joystick = .zero
+            if propagate(prop, controller: self) {
+                self.lastSelfPlayTick = self.propCues.tick
+            }
+        }
     }
 
     /// The virtual face, from the `leds` object the /state fetch already
@@ -3340,19 +3375,23 @@ final class DuckController: ObservableObject {
         duck_core_carry(core, dx, dy, dz, 1)
     }
 
-    func groundPick() {
-        guard let core else { return }
-        _ = duck_core_ground_pick(core)
+    @discardableResult
+    func groundPick() -> Bool {
+        guard let core else { return false }
+        // The C entry answers 0 on success, -1 on refusal.
+        return duck_core_ground_pick(core) == 0
     }
 
     /// One verb from the skill ring. `sit`, `stand` and `ground_pick` are the
     /// loop's own; the rest are manifest skills, and the core refuses an
     /// unknown name rather than pretending it started.
-    func trigger(_ name: String) {
+    @discardableResult
+    func trigger(_ name: String) -> Bool {
         dance.record("skill", value: name, label: SkillLabel.of(name))
-        guard let core else { return }
+        guard let core else { return false }
         let started = name.withCString { duck_core_trigger_skill(core, $0) }
         if started != 0 { lastSkill = name }
+        return started != 0
     }
 
     /// Remember the walk slot and hand it to the core now. No screen calls

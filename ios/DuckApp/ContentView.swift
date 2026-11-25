@@ -156,6 +156,11 @@ struct ContentView: View {
         // The floor props answer the duck's own counters and idle glance.
         .onChange(of: controller.propCues) { _, cues in
             props.apply(cues, asleep: controller.careAsleep)
+            // Self-play only while the Live stage is unobstructed: a sheet
+            // or the ring means the child is doing something else.
+            if routeState.sheet == nil && routeState.overlay != .ring {
+                controller.maybeSelfPlay()
+            }
         }
         // The hint teaches gestures, so it must wait until gestures work:
         // the core takes seconds to load, and a hint spent over a dead screen
@@ -604,6 +609,14 @@ struct ContentView: View {
                         emotion: controller.propCues.emotion,
                         asleep: controller.careAsleep
                     )
+                    .zIndex(1)
+                    // The self-play switch, on the stage's empty left wall.
+                    // A real button (unlike the props), so VoiceOver reaches
+                    // it like any control.
+                    GeometryReader { g in
+                        SelfPlayChip()
+                            .position(x: g.size.width * 0.14, y: g.size.height * 0.38)
+                    }
                     .zIndex(1)
                 }
                 if portrait {

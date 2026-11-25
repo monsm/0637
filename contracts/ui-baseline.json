@@ -44,14 +44,14 @@
   "direction": "min"
  },
  "content_view_lines": {
-  "count": 1854,
+  "count": 1867,
   "direction": "max",
-  "note": "2026-11-25: +35 for the floor props (model state, stage layer, tap routing, three stage accessibility actions)."
+  "note": "2026-11-25: +10 for the self-play chip and the maybeSelfPlay call in the props poll."
  },
  "controller_published": {
   "count": 109,
   "direction": "max",
-  "note": "2026-11-25: deliberately +1 for the floor props' propCues (the idle glance plus the vet counters the props answer to). Earlier: 2026-11-24 +1 for the voice ripple's isSpeaking."
+  "note": "2026-11-25: +1 for the floor props' propCues (idle glance, vet counters, emotion, self-play guards). Earlier: 2026-11-24 +1 for isSpeaking."
  },
  "haptics_sites": {
   "count": 12,
@@ -94,8 +94,8 @@
   "direction": "min"
  },
  "shell_kt_lines": {
-  "count": 3852,
+  "count": 3897,
   "direction": "max",
-  "note": "2026-11-25: +37 for the floor props (state, poll cue, stage layer call, tap routing, three stage a11y actions)."
+  "note": "2026-11-25: +8 for the self-play switch state and its poll scheduler (the walk pulse and the guarded verb)."
  }
 }
