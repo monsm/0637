@@ -634,16 +634,20 @@ fun LittleLedger(core: DuckCore?) {
     }
 }
 
+/** The four voices the whisper can use, and the chooser by wall-clock second
+ * (a pure function so the pads and the test agree). */
+internal val whisperTags = listOf("chirp", "coo", "inquire", "peck")
+internal fun whisperTarget(second: Long): String = whisperTags[(second % whisperTags.size).toInt()]
+
 /** 传悄悄话: the duck whispers one of its voices; the child names it. */
 @Composable
 fun WhisperGame(core: DuckCore?) {
-    val tags = listOf("chirp", "coo", "inquire", "peck")
+    val tags = whisperTags
     var target by remember { mutableStateOf("") }
     var phase by remember { mutableStateOf(0) } // 0 idle, 1 guessing, 2 answered
     var notice by remember { mutableStateOf("") }
     fun listen() {
-        val tick = System.currentTimeMillis() / 1000
-        target = tags[(tick % tags.size).toInt()]
+        target = whisperTarget(System.currentTimeMillis() / 1000)
         notice = ""
         phase = 1
         core?.queueSound(target)
