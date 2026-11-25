@@ -340,19 +340,45 @@ enum StagePropsLayout {
     }
 }
 
+/// The faces the duck makes at the mirror, in the order a child meets them.
+/// Official emotions only; the timeline plays its own voice. Session-only.
+private let mirrorFaces = ["curious", "laugh", "excited", "sad", "yes"]
+private var mirrorTaps = 0
+
+/// The face the next accepted mirror tap will make.
+func mirrorFace() -> String { mirrorFaces[mirrorTaps % mirrorFaces.count] }
+
+/// The duck finished a face; the next tap meets the next one.
+func mirrorFaceDone() { mirrorTaps += 1 }
+
 /// A prop was tapped: the duck does its real verb toward it. The prop's
 /// response comes from the vet book's counter (or the emotion timeline) a
 /// beat later, so the screen cannot claim a move the core refused. Returns
 /// whether the core accepted the verb — a refusal changes nothing.
+///
+/// Each prop also gives the duck its real synth voice (the core's own tags);
+/// the mirror needs none — an emotion timeline carries its own voice.
 @discardableResult
 func propagate(_ prop: StagePropHit, controller: DuckController) -> Bool {
+    let face = prop == .mirror ? mirrorFace() : ""
     let accepted: Bool
     switch prop {
     case .ball: accepted = controller.trigger("kick_left")
     case .hoop: accepted = controller.trigger("roulade")
     case .block: accepted = controller.groundPick()
-    case .mirror: accepted = controller.trigger("curious")
+    case .mirror:
+        accepted = controller.trigger(face)
+        if accepted { mirrorFaceDone() }
     case .cushion: accepted = controller.trigger("sit")
+    }
+    if accepted {
+        switch prop {
+        case .ball: controller.queueSound("peck")
+        case .hoop: controller.queueSound("chirp")
+        case .block: controller.queueSound("greet")
+        case .cushion: controller.queueSound("coo")
+        case .mirror: break
+        }
     }
     DuckHaptics.selection()
     return accepted

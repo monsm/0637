@@ -1463,6 +1463,7 @@ if [ -n "$STAGE_XY" ]; then
   S_L=$1; S_T=$2; S_W=$3; S_H=$4
   BALL_X=$((S_L + S_W * 14 / 100)); BALL_Y=$((S_T + S_H * 62 / 100))
   HOOP_X=$((S_L + S_W * 14 / 100)); HOOP_Y=$((S_T + S_H * 76 / 100))
+  MIRROR_X=$((S_L + S_W * 86 / 100)); MIRROR_Y=$((S_T + S_H * 76 / 100))
   CHIP_X=$((S_L + S_W * 14 / 100)); CHIP_Y=$((S_T + S_H * 38 / 100))
 else
   # Fallback measured from the portrait CI screenshot (320x640): the stage
@@ -1470,6 +1471,7 @@ else
   # near y 360, and the self-play chip near y 225.
   BALL_X=$((PROP_STAGE_W * 14 / 100)); BALL_Y=$((PROP_STAGE_H * 48 / 100))
   HOOP_X=$((PROP_STAGE_W * 14 / 100)); HOOP_Y=$((PROP_STAGE_H * 56 / 100))
+  MIRROR_X=$((PROP_STAGE_W * 86 / 100)); MIRROR_Y=$((PROP_STAGE_H * 56 / 100))
   CHIP_X=$((PROP_STAGE_W * 14 / 100)); CHIP_Y=$((PROP_STAGE_H * 35 / 100))
   echo "::warning::the stage node was not in the dump; tapping the screenshot-measured prop points"
 fi
@@ -1528,6 +1530,80 @@ else
   echo "::error::tapping the hoop did not start a real roll"
   exit 1
 fi
+
+# The props give the duck its own voice (2026-11-25): the ball's kick carries
+# the official "peck" synth tag through the core's queue. /state.last_sound
+# is the same honest field the quack object check reads.
+SOUND_OK=0
+for _ in $(seq 1 20); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"peck"'; then SOUND_OK=1; break; fi
+  sleep 0.25
+done
+if [ "$SOUND_OK" = "1" ]; then
+  echo "props: the kick carries the duck's own peck voice (last_sound)"
+else
+  echo "::error::the ball tap did not give the duck its voice (no last_sound=peck)"
+  exit 1
+fi
+
+# The mirror's faces (2026-11-25): each accepted tap makes a different
+# official emotion, in a fixed order (curious, laugh, excited, sad, yes).
+# An emotion timeline plays its own voice, so the mirror needs no extra synth
+# tag. The core drops a request while another emotion plays, so wait for the
+# duck to finish between taps; a refused tap does not advance the order.
+emotion_count() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print(int(json.load(sys.stdin).get('life',{}).get('emotions',{}).get('$1',0)))
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1
+}
+emotion_idle() {
+  [ "$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print('idle' if json.load(sys.stdin).get('emotion') is None else 'busy')
+except Exception:
+    print('error')
+" 2>/dev/null || echo error)" = "idle" ]
+}
+# Emotions need a standing, still duck: stand first if an earlier step sat it.
+curl -sf --max-time 3 -X POST -H 'Content-Type: application/json' \
+  -d '{"sit":false}' http://127.0.0.1:8765/posture > /dev/null 2>&1 || true
+sleep 2
+for _ in $(seq 1 20); do
+  emotion_idle && break
+  sleep 0.5
+done
+for face in curious laugh; do
+  FACE_BEFORE=$(emotion_count "$face")
+  FACE_OK=0
+  for _ in $(seq 1 3); do
+    adb shell input tap $MIRROR_X $MIRROR_Y > /dev/null 2>&1 || true
+    for _ in $(seq 1 20); do
+      FACE_NOW=$(emotion_count "$face")
+      if [ "$FACE_NOW" -gt "$FACE_BEFORE" ] 2>/dev/null; then FACE_OK=1; break 2; fi
+      sleep 0.3
+    done
+    # The tap was refused (another emotion or the sit was still running):
+    # wait for a still duck, then tap again — the face order has not moved.
+    for _ in $(seq 1 20); do
+      emotion_idle && break
+      sleep 0.4
+    done
+  done
+  if [ "$FACE_OK" != "1" ]; then
+    echo "::error::the mirror did not make the duck $face"
+    exit 1
+  fi
+  for _ in $(seq 1 30); do
+    emotion_idle && break
+    sleep 0.4
+  done
+done
+echo "mirror: two taps made two different real emotions (curious, then laugh)"
 
 # The self-play switch (2026-11-25): turned on, an idle duck walks to a prop
 # and plays with it on its own. The proof is the vet book's own counters
