@@ -1746,9 +1746,9 @@ PYX
       adb shell input swipe 160 300 160 60 300 > /dev/null 2>&1 || true
       still=0
     else
-      adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+      adb shell input swipe 160 520 160 320 300 > /dev/null 2>&1 || true
     fi
-    sleep 0.6
+    sleep 0.5
   done
   # The page is long; a failure means the section never scrolled in. Report
   # what IS on screen so the next run is told the truth rather than guessed.
@@ -2056,9 +2056,9 @@ sleep 3
 M1=$(life_float metres)
 tap_games_control "红灯停绿灯行" "红灯！" > /dev/null 2>&1 || true
 sleep 0.8
-set -- $(pose_xy); PX1=$1; PY1=$2
+POS1=$(pose_xy); PX1=${POS1%% *}; PY1=${POS1##* }
 sleep 0.6
-set -- $(pose_xy); PX2=$1; PY2=$2
+POS2=$(pose_xy); PX2=${POS2%% *}; PY2=${POS2##* }
 STOP=$(python3 -c "print('yes' if ((($PX2)-($PX1))**2 + (($PY2)-($PY1))**2) ** 0.5 <= 0.15 else 'no')")
 WALKED=$(python3 -c "print('yes' if ($M1 - $M0) >= 0.3 else 'no')")
 [ "$WALKED" = "yes" ] || { echo "::error::green light did not walk (metres $M0 -> $M1)"; exit 1; }
