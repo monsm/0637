@@ -398,38 +398,58 @@ fun SoundSimon(core: DuckCore?) {
     }
 }
 
-/** 反向指令: the prompt says one thing; the child must do the opposite. */
+/** 反向指令: the prompt names a mood; the child must perform its opposite.
+ * Emotions always start fresh (no idempotent already-in-state answer like
+ * sit/stand), so every correct press is a real mood with a real counter. */
 @Composable
 fun ReverseCommand(core: DuckCore?) {
-    var promptSit by remember { mutableStateOf(true) }
+    // prompt -> the opposite the child must press.
+    val pairs = listOf(
+        "laugh" to "sad",
+        "sad" to "laugh",
+        "excited" to "curious",
+        "curious" to "excited",
+    )
+    var round by remember { mutableStateOf(0) }
     var notice by remember { mutableStateOf("") }
-    fun press(sit: Boolean) {
-        if (sit == promptSit) {
+    val prompt = pairs[round % pairs.size].first
+    val answer = pairs[round % pairs.size].second
+    val faces = listOf("laugh", "sad", "excited", "curious")
+    fun press(mood: String) {
+        if (round >= 4) return
+        if (mood != answer) {
             notice = Copy.reverseWrong
             return
         }
-        val started = core?.skill(if (sit) "sit" else "stand") ?: 0
-        if (started == 0) {
+        if (core?.skill(mood) ?: 0 == 0) {
             notice = Copy.reverseWrong
             return
         }
         notice = ""
-        promptSit = !promptSit
+        round += 1
     }
     Column(verticalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(Copy.reverseTitle, color = Color.White, fontSize = DuckTheme.Type.Label, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.weight(1f))
             Text(
-                if (notice.isNotEmpty()) notice else skillLabel(if (promptSit) "sit" else "stand"),
+                if (notice.isNotEmpty()) notice
+                else if (round >= 4) Copy.rallyDone else skillLabel(prompt),
                 color = Color.White.copy(alpha = 0.6f),
                 fontSize = DuckTheme.Type.Caption,
                 modifier = Modifier.testTag("reverse-status").semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
-            PathChip(skillLabel("sit"), testTag = "reverse-sit") { press(true) }
-            PathChip(skillLabel("stand"), testTag = "reverse-stand") { press(false) }
+            faces.take(2).forEach { mood ->
+                PathChip(skillLabel(mood), testTag = "reverse-$mood") { press(mood) }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
+            faces.drop(2).forEach { mood ->
+                PathChip(skillLabel(mood), testTag = "reverse-$mood") { press(mood) }
+            }
+            PathChip(Copy.echoStart, testTag = "reverse-start") { round = 0; notice = "" }
         }
     }
 }

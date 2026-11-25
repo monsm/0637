@@ -814,7 +814,7 @@ final class DuckUITests: XCTestCase {
             return element
         }
 
-        let reverse = scrollTo("reverse-stand")
+        let reverse = scrollTo("reverse-sad")
         XCTAssertTrue(reverse.exists && reverse.isHittable, "reverse command is missing")
         reverse.tap()
         XCTAssertTrue(anyElement("reverse-status").exists, "reverse status is missing")
