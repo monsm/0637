@@ -98,10 +98,10 @@ struct KickRally: View {
                 GameChip(title: Copy.rallyRightTurn, identifier: "rally-right",
                          enabled: step < 6) { tap(left: false) }
             }
-            GameChip(
-                title: step == 0 || step >= 6 ? Copy.echoStart : Copy.echoAgain,
-                identifier: "rally-start"
-            ) { step = 0; notice = "" }
+            GameChip(title: Copy.rallyGo, identifier: "rally-start") {
+                step = 0
+                notice = ""
+            }
         }
     }
 }
@@ -176,7 +176,7 @@ struct MoodCharade: View {
                 }
             }
             GameChip(
-                title: round == 0 || phase == 3 ? Copy.echoStart : Copy.echoAgain,
+                title: Copy.charadeGo,
                 identifier: "charade-start",
                 enabled: phase == 0 || phase == 3
             ) { start() }
@@ -221,7 +221,7 @@ struct MoodFreeze: View {
                     .foregroundStyle(.white.opacity(0.75))
                     .accessibilityIdentifier("freeze-banner")
             }
-            GameChip(title: Copy.echoStart, identifier: "freeze-start", enabled: !playing) {
+            GameChip(title: Copy.freezeGo, identifier: "freeze-start", enabled: !playing) {
                 start()
             }
         }

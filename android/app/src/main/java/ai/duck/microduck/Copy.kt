@@ -183,6 +183,11 @@ val quack get() = pick("Quack", "叫一声")
     val soundPromptCurious get() = pick("Whistle to make it curious", "吹口哨让它好奇")
     val soundHeard get() = pick("Heard it!", "听到了！")
     val soundMissed get() = pick("Nothing heard", "没听到")
+    // Each game's start key says its own words: Play more stacks several
+    // games, and a repeated 开始 made a tap land on the neighbour's start.
+    val rallyGo get() = pick("Start the rally", "开弓")
+    val charadeGo get() = pick("Start guessing", "开始猜")
+    val freezeGo get() = pick("Play a round", "演一段")
 
     /** The four pads are the duck's own synth voices, named as onomatopoeia. */
     fun echoSound(tag: String): String = when (tag) {

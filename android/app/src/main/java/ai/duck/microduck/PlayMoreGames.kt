@@ -105,10 +105,7 @@ fun KickRally(core: DuckCore?) {
             PathChip(Copy.rallyLeftTurn, enabled = step < 6, testTag = "rally-left") { tap(true) }
             PathChip(Copy.rallyRightTurn, enabled = step < 6, testTag = "rally-right") { tap(false) }
         }
-        PathChip(
-            if (step == 0 || step >= 6) Copy.echoStart else Copy.echoAgain,
-            testTag = "rally-start",
-        ) { step = 0; notice = "" }
+        PathChip(Copy.rallyGo, testTag = "rally-start") { step = 0; notice = "" }
     }
 }
 
@@ -193,7 +190,7 @@ fun MoodCharade(core: DuckCore?) {
             }
         }
         PathChip(
-            if (round == 0 || phase == 3) Copy.echoStart else Copy.echoAgain,
+            Copy.charadeGo,
             enabled = phase == 0 || phase == 3,
             testTag = "charade-start",
         ) { start() }
@@ -242,7 +239,7 @@ fun MoodFreeze(core: DuckCore?) {
                     .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
-        PathChip(Copy.echoStart, enabled = !playing, testTag = "freeze-start") { start() }
+        PathChip(Copy.freezeGo, enabled = !playing, testTag = "freeze-start") { start() }
     }
 }
 

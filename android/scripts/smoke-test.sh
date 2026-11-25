@@ -1799,7 +1799,7 @@ PYX
 
 # 左右开弓: four correct-foot taps must start two real kicks per foot.
 KL0=$(skill_count kick_left); KR0=$(skill_count kick_right)
-tap_games_control "左右开弓" "开始" || { echo "::error::no Kick rally start"; exit 1; }
+tap_games_control "左右开弓" "开弓" || { echo "::error::no Kick rally start"; exit 1; }
 sleep 0.5
 tap_games_control "左右开弓" "轮到左踢" > /dev/null 2>&1 || true
 sleep 0.8
@@ -1822,7 +1822,7 @@ else
 fi
 
 # 情绪哑剧: the duck performs a mood; the right chip earns its real yes.
-tap_games_control "情绪哑剧" "开始" > /dev/null 2>&1 || { echo "::error::no Mood charade start"; exit 1; }
+tap_games_control "情绪哑剧" "开始猜" > /dev/null 2>&1 || { echo "::error::no Mood charade start"; exit 1; }
 MOOD=""
 for _ in $(seq 1 30); do
   MOOD=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
@@ -1867,7 +1867,13 @@ else
 fi
 
 # 表情木头人: the duck's own timelines call the round (excited, then angry).
-tap_games_control "表情木头人" "开始" > /dev/null 2>&1 || { echo "::error::no Mood freeze start"; exit 1; }
+# The charade's yes may still be playing; a mood refused by the busy duck
+# would be skipped by the round, so wait for a still duck first.
+for _ in $(seq 1 40); do
+  emotion_idle && break
+  sleep 0.4
+done
+tap_games_control "表情木头人" "演一段" > /dev/null 2>&1 || { echo "::error::no Mood freeze start"; exit 1; }
 FREEZE_SEEN=" "
 for _ in $(seq 1 80); do
   NAME=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
