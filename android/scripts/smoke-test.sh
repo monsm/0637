@@ -1894,12 +1894,9 @@ else
 fi
 
 # 它今天有没有: the answer matches the real today-vs-day_started delta.
-# The freeze round before this one ends on its own emotion; the core refuses
-# a new emotion while another plays, so wait for a still duck first.
-for _ in $(seq 1 40); do
-  emotion_idle && break
-  sleep 0.4
-done
+# The freeze round before this one keeps performing its own mood sequence in
+# the background; the core refuses a new emotion while another plays. Ask,
+# and if no emotion started, wait out the sequence and ask again.
 PETS_DELTA=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
 import json,sys
 try:
@@ -1911,12 +1908,18 @@ except Exception:
 " 2>/dev/null || echo 0)
 if [ "$PETS_DELTA" -gt 0 ] 2>/dev/null; then EXPECT=yes; else EXPECT=no; fi
 EXPECT_BEFORE=$(emotion_count $EXPECT)
-tap_games_control "它今天有没有" "今天被摸过吗" > /dev/null 2>&1 || { echo "::error::no today-pets chip"; exit 1; }
 TODAY_OK=0
-for _ in $(seq 1 20); do
-  EXPECT_NOW=$(emotion_count $EXPECT)
-  if [ "$EXPECT_NOW" -gt "$EXPECT_BEFORE" ] 2>/dev/null; then TODAY_OK=1; break; fi
-  sleep 0.3
+for _attempt in 1 2 3; do
+  for _ in $(seq 1 60); do
+    emotion_idle && break
+    sleep 0.4
+  done
+  tap_games_control "它今天有没有" "今天被摸过吗" > /dev/null 2>&1 || break
+  for _ in $(seq 1 20); do
+    EXPECT_NOW=$(emotion_count $EXPECT)
+    if [ "$EXPECT_NOW" -gt "$EXPECT_BEFORE" ] 2>/dev/null; then TODAY_OK=1; break 2; fi
+    sleep 0.3
+  done
 done
 if [ "$TODAY_OK" = "1" ]; then
   echo "games: did-it-happen answered the real pets delta with a real $EXPECT"
