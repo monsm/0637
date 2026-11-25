@@ -66,7 +66,7 @@
 - **真实地基**：/state.life{pets,fed,metres,skills{},emotions{}}, /state.quests.streak, /state.quests.day; POST /pet, /feed, /path, /skill for the real rises. The note and baseline are shell-local (like the dance/alias stores); the counter is the duck's. The moved-counter guard mirrors quests.rs (re-baseline when now < baseline).
 - **验收**：Real /state change: with a sealed capsule at pets=N+1 and /state.life.pets=N it stays sealed; a real POST /pet followed by a state read with pets=N+1 opens it once and shows N+1. UI assertion: a relaunch before the pet leaves it sealed; a restored old save that lands past N+1 does not open it (baseline re-set); an already-met target is disabled with 'already done'.
 
-## 推荐下一批（小成本、高分）——已一次性交付（2026-11-25，见 REPORT 四之四十九）
+## 全部已交付（2026-11-26，十二张；见 REPORT 四之四十九、四之五十）
 
 1. **声音指挥官**（5/small）：喊出目标（逗笑/逗好奇），孩子对着麦克风拍手或吹口哨，鸭子用自己的分类器听见并用官方反应回答；有同名积木规则时如实显示规则接管。
 2. **表情木头人**（5/small）：鸭子演真实情绪，孩子在「动/定」之间跟着玩；回合长度就是情绪时间线自己的 `duration_s`（excited 3.3s、angry 2.5s…）。
