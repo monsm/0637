@@ -1995,16 +1995,6 @@ try: print(json.load(sys.stdin).get('care_time_scale',1.0))
 except Exception: print(-1)
 " 2>/dev/null || echo -1
 }
-body_idle() {
-  [ "$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    l = json.load(sys.stdin).get('label', '')
-    print('idle' if l in ('walk', 'stand') else l)
-except Exception:
-    print('err')
-" 2>/dev/null || echo err)" = "idle" ]
-}
 
 # 反向指令: the prompt names a mood; the child must do the opposite emotion
 # (laugh->sad, then sad->laugh). Emotions always start, so the counters are
@@ -2043,13 +2033,11 @@ for _ in $(seq 1 30); do
   if [ "$(life_int stand_ups)" -gt "$PM_STAND0" ] 2>/dev/null; then break; fi
   sleep 0.4
 done
-for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
 tap_games_control "照我做" "贴地抓取" > /dev/null 2>&1 || true
 for _ in $(seq 1 30); do
   if [ "$(life_int ground_picks)" -gt "$PM_PICK0" ] 2>/dev/null; then break; fi
   sleep 0.4
 done
-for _ in $(seq 1 40); do body_idle && break; sleep 0.4; done
 tap_games_control "照我做" "翻滚" > /dev/null 2>&1 || true
 PM_OK=0
 for _ in $(seq 1 25); do
