@@ -1187,12 +1187,31 @@ esac
 # to verbs is the core's, and a client can post text directly. Chinese and
 # English must name the same verbs.
 echo "--- heard ---"
-HEARD=$(api POST /heard '{"text":"翻滚"}' || true)
+# The core answers an intent within 300 ms; under a loaded runner the duck
+# can still be running a skill when the word arrives and the answer comes back
+# pending. One move at a time: retry the same word after the duck settles
+# (runs 45615493210 lost both checks to pending — the assertions are unchanged).
+heard_word() { # heard_word <text> <tries>
+  local last=""
+  for _ in $(seq 1 "${2:-4}"); do
+    last=$(api POST /heard "{\"text\":\"$1\"}" || true)
+    if printf '%s' "$last" | grep -q '"skill":"'; then
+      printf '%s' "$last"
+      return 0
+    fi
+    printf '%s' "$last" | grep -q '"pending":true' || { printf '%s' "$last"; return 1; }
+    wait_idle 60 > /dev/null
+    sleep 0.5
+  done
+  printf '%s' "$last"
+  return 1
+}
+HEARD=$(heard_word "翻滚" 4)
 printf '%s' "$HEARD" | grep -q '"skill":"roulade"'
 check $? "Chinese speech maps to a skill" "$(printf '%s' "$HEARD" | head -c 140)"
 # One move at a time: let the roll finish before the next word.
 wait_idle 100 > /dev/null
-HEARD2=$(api POST /heard '{"text":"excited"}' || true)
+HEARD2=$(heard_word "excited" 4)
 printf '%s' "$HEARD2" | grep -q '"skill":"excited"'
 check $? "English speech maps to the same table" "$(printf '%s' "$HEARD2" | head -c 140)"
 # The words are published for the user's own model: GET /heard and
