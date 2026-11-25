@@ -44,7 +44,7 @@
   "direction": "min"
  },
  "content_view_lines": {
-  "count": 1844,
+  "count": 1854,
   "direction": "max",
   "note": "2026-11-25: +35 for the floor props (model state, stage layer, tap routing, three stage accessibility actions)."
  },
@@ -94,7 +94,7 @@
   "direction": "min"
  },
  "shell_kt_lines": {
-  "count": 3844,
+  "count": 3852,
   "direction": "max",
   "note": "2026-11-25: +37 for the floor props (state, poll cue, stage layer call, tap routing, three stage a11y actions)."
  }

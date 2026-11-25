@@ -1422,18 +1422,18 @@ else
   echo "::warning::the quack object was not tappable; voice check skipped"
 fi
 
-# The floor props (2026-11-25): a tap on the ball asks the duck to kick.
-# The tap coordinates are the prop zone in stage fractions (StagePropsLayout),
-# not a fixed label: the props are scene, not chrome, so there is no
-# accessibility node behind them — the move itself is the evidence. The
-# honest field is the vet book's own counter (`/state.life.skills.kick_left`
-# counts what the core actually started, from any caller); a tap that asks
-# but is refused never moves it.
+# The floor props (2026-11-25): a tap on a prop asks the duck to play, and
+# the duck answers with its own real verb. The tap coordinates are the prop
+# zone in stage fractions (StagePropsLayout), not a fixed label: the props
+# are scene, not chrome, so there is no accessibility node behind them — the
+# move itself is the evidence. The honest field is the vet book's own
+# counter (`/state.life.skills.<name>` counts what the core actually
+# started, from any caller); a tap that asks but is refused never moves it.
 #
 # The stage occupies the middle of the portrait screen (title bar above,
 # pill/rail/shelf below), so a stage fraction is not a screen fraction. Read
 # the stage's own bounds from the dump (the scene carries the 鸭子舞台
-# content description) and map the ball zone through them.
+# content description) and map the prop zones through them.
 PROP_STAGE_W=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d'x' -f1)
 PROP_STAGE_H=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d'x' -f2)
 [ -n "$PROP_STAGE_W" ] || PROP_STAGE_W=320
@@ -1453,41 +1453,42 @@ for node in root.iter('node'):
         parts = node.get('bounds', '').replace('][', ',').strip('[]').split(',')
         if len(parts) == 4:
             left, top, right, bottom = map(int, parts)
-            print(left + (right - left) * 16 // 100, top + (bottom - top) * 68 // 100)
+            print(left, top, right - left, bottom - top)
             raise SystemExit(0)
 raise SystemExit(1)
 PY
 )
 if [ -n "$STAGE_XY" ]; then
-  BALL_X=${STAGE_XY%% *}
-  BALL_Y=${STAGE_XY##* }
+  set -- $STAGE_XY
+  S_L=$1; S_T=$2; S_W=$3; S_H=$4
+  BALL_X=$((S_L + S_W * 14 / 100)); BALL_Y=$((S_T + S_H * 62 / 100))
+  HOOP_X=$((S_L + S_W * 14 / 100)); HOOP_Y=$((S_T + S_H * 76 / 100))
 else
   # Fallback measured from the portrait CI screenshot (320x640): the stage
-  # spans ~85..445 px, so stage y 0.68 lands near 330.
-  BALL_X=$((PROP_STAGE_W * 16 / 100))
-  BALL_Y=$((PROP_STAGE_H * 52 / 100))
-  echo "::warning::the stage node was not in the dump; tapping the screenshot-measured ball point"
+  # spans ~85..445 px, so the upper floor row sits near y 310 and the lower
+  # row near y 360.
+  BALL_X=$((PROP_STAGE_W * 14 / 100)); BALL_Y=$((PROP_STAGE_H * 48 / 100))
+  HOOP_X=$((PROP_STAGE_W * 14 / 100)); HOOP_Y=$((PROP_STAGE_H * 56 / 100))
+  echo "::warning::the stage node was not in the dump; tapping the screenshot-measured prop points"
 fi
-KICKS_BEFORE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+
+skill_count() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
 import json,sys
 try:
-    s = json.load(sys.stdin).get('life',{}).get('skills',{}).get('kick_left',0)
+    s = json.load(sys.stdin).get('life',{}).get('skills',{}).get('$1',0)
     print(int(s))
 except Exception:
     print(-1)
-" 2>/dev/null || echo -1)
+" 2>/dev/null || echo -1
+}
+
+KICKS_BEFORE=$(skill_count kick_left)
 adb shell input tap $BALL_X $BALL_Y > /dev/null 2>&1 || true
 sleep 1
 PROP_OK=0
 for _ in $(seq 1 24); do
-  KICKS_NOW=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    s = json.load(sys.stdin).get('life',{}).get('skills',{}).get('kick_left',0)
-    print(int(s))
-except Exception:
-    print(-1)
-" 2>/dev/null || echo -1)
+  KICKS_NOW=$(skill_count kick_left)
   if [ "$KICKS_NOW" -gt "$KICKS_BEFORE" ] 2>/dev/null; then PROP_OK=1; break; fi
   sleep 0.25
 done
@@ -1505,6 +1506,25 @@ else
     echo "::error::tapping the ball did not start a real kick (kick counter and the label)"
     exit 1
   fi
+fi
+
+# The hoop (same batch): a tap asks for a roll, and the official roulade
+# policy really runs — the vet book's counter is the proof.
+sleep 1
+ROLLS_BEFORE=$(skill_count roulade)
+adb shell input tap $HOOP_X $HOOP_Y > /dev/null 2>&1 || true
+sleep 1
+ROLL_OK=0
+for _ in $(seq 1 24); do
+  ROLLS_NOW=$(skill_count roulade)
+  if [ "$ROLLS_NOW" -gt "$ROLLS_BEFORE" ] 2>/dev/null; then ROLL_OK=1; break; fi
+  sleep 0.25
+done
+if [ "$ROLL_OK" = "1" ]; then
+  echo "props: a hoop tap really started a roll (life.skills.roulade $ROLLS_BEFORE -> $ROLLS_NOW)"
+else
+  echo "::error::tapping the hoop did not start a real roll"
+  exit 1
 fi
 
 # The idle Live screen itself, portrait, no skill line on it: the Chinese state

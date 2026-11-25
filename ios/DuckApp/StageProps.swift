@@ -1,28 +1,36 @@
 import SwiftUI
 
 /// The stage props' real cues, published by the controller's /state poll:
-/// the idle glance's yaw (the core's own idle head command) and the vet
-/// book's counters. A kick fired by a rule, a neighbour or a skill counts
-/// exactly like one fired by a hand — the prop moves only when the duck
-/// really moved.
+/// the idle glance's yaw (the core's own idle head command), the vet book's
+/// counters, and the emotion timeline the duck is in right now. A kick fired
+/// by a rule, a neighbour or a skill counts exactly like one fired by a
+/// hand — the prop moves only when the duck really moved.
 struct PropCues: Equatable {
     var idleYaw: Double = 0
     var kickLeft = 0
     var kickRight = 0
     var groundPicks = 0
     var sitDowns = 0
+    var rolls = 0
+    /// The duck's own emotion timeline (`/state.emotion.name`), "" when none
+    /// is playing. The props answer it: a curious duck makes the mirror
+    /// glint, a laughing or sad one warms the cushion.
+    var emotion = ""
 }
 
-/// Props on the duck's floor: a ball it can kick, a block it can pick, a
-/// cushion it can sit on.
+/// Props on the duck's floor: a ball it can kick, blocks it can pick, a
+/// cushion it can sit on, a hoop it can roll through, and a mirror it can
+/// look into.
 ///
 /// Every prop answers with the duck's own body — the kick is the official
 /// ball_kick policy, the pick the ground_pick scheduler, the sit the loop's
-/// own sit. Nothing here invents a verb; the prop is a target, not an
-/// animation. The duck also reaches for props on its own: the idle
-/// look-around's real head command lights the prop it is looking at, and a
-/// kick, pick or sit it actually started moves the matching prop. A sleeping
-/// duck answers nothing — the core owns sleep.
+/// own sit, the roll the official roulade. Nothing here invents a verb; the
+/// prop is a target, not an animation. The duck also reaches for props on
+/// its own: the idle look-around's real head command lights the prop it is
+/// looking at, a kick/pick/sit/roll it actually started moves the matching
+/// prop, and its own emotions reach them — a curious duck's mirror glints,
+/// an excited one twirls the hoop. A sleeping duck answers nothing; the core
+/// owns sleep.
 ///
 /// The layer takes no touches: the stage gesture reads taps against the
 /// same zones (`StagePropsLayout.hit`), so the first screen's seven-control
@@ -31,6 +39,7 @@ final class StagePropsModel: ObservableObject {
     @Published private(set) var ballFlight: CGFloat = 0
     @Published private(set) var blockCarried = false
     @Published private(set) var warmGlow = false
+    @Published private(set) var hoopSpin: CGFloat = 0
     @Published private(set) var lookedAt: PropSide?
 
     private var last = PropCues()
@@ -50,12 +59,15 @@ final class StagePropsModel: ObservableObject {
         if cues.kickRight > last.kickRight { fly(1) }
         if cues.groundPicks > last.groundPicks { carry() }
         if cues.sitDowns > last.sitDowns { warm() }
+        if cues.rolls > last.rolls { spin() }
+        // The duck's own excitement reaches the hoop even when the emotion
+        // came from a rule, an achievement or a neighbour.
+        if cues.emotion == "excited" && last.emotion != "excited" { spin() }
     }
 
     private func fly(_ direction: CGFloat) {
         ballFlight = direction
-        let beat = UIAccessibility.isReduceMotionEnabled ? 0.0 : 0.8
-        DispatchQueue.main.asyncAfter(deadline: .now() + beat) { [weak self] in
+        beat(UIAccessibility.isReduceMotionEnabled ? 0.0 : 0.8) { [weak self] in
             guard let self, self.ballFlight == direction else { return }
             self.ballFlight = 0
         }
@@ -63,23 +75,34 @@ final class StagePropsModel: ObservableObject {
 
     private func carry() {
         blockCarried = true
-        let beat = UIAccessibility.isReduceMotionEnabled ? 0.0 : 1.0
-        DispatchQueue.main.asyncAfter(deadline: .now() + beat) { [weak self] in
+        beat(UIAccessibility.isReduceMotionEnabled ? 0.0 : 1.0) { [weak self] in
             self?.blockCarried = false
         }
     }
 
     private func warm() {
         warmGlow = true
-        let beat = UIAccessibility.isReduceMotionEnabled ? 0.0 : 2.0
-        DispatchQueue.main.asyncAfter(deadline: .now() + beat) { [weak self] in
+        beat(UIAccessibility.isReduceMotionEnabled ? 0.0 : 2.0) { [weak self] in
             self?.warmGlow = false
         }
+    }
+
+    private func spin() {
+        hoopSpin = 1
+        beat(UIAccessibility.isReduceMotionEnabled ? 0.0 : 1.2) { [weak self] in
+            self?.hoopSpin = 0
+        }
+    }
+
+    private func beat(_ delay: TimeInterval, _ work: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 }
 
 struct StageProps: View {
     @ObservedObject var model: StagePropsModel
+    /// The duck's own emotion timeline, "" when none is playing.
+    let emotion: String
     /// The duck is asleep — props go still, like the duck.
     let asleep: Bool
 
@@ -96,16 +119,24 @@ struct StageProps: View {
                         )
                         .opacity(1 - abs(model.ballFlight) * 0.40)
                 }
+                propVisual(.hoop, zone: StagePropsLayout.hoop, w: w, h: h) {
+                    hoop
+                        .rotationEffect(.degrees(Double(model.hoopSpin) * 140))
+                        .scaleEffect(1 + model.hoopSpin * 0.12)
+                }
                 propVisual(.block, zone: StagePropsLayout.block, w: w, h: h) {
                     block
                         .offset(y: model.blockCarried ? -h * 0.06 : 0)
                         .opacity(model.blockCarried ? 0.35 : 1)
                 }
+                propVisual(.mirror, zone: StagePropsLayout.mirror, w: w, h: h) {
+                    mirror
+                }
                 propVisual(.cushion, zone: StagePropsLayout.cushion, w: w, h: h) {
                     cushion
                         .overlay(
                             Capsule()
-                                .fill(Color.duckAction.opacity(model.warmGlow ? 0.35 : 0))
+                                .fill(Color.duckAction.opacity(cushionWarm ? 0.35 : 0))
                         )
                 }
             }
@@ -114,18 +145,25 @@ struct StageProps: View {
         .accessibilityHidden(true)
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : DuckMotion.slow, value: model.ballFlight)
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : DuckMotion.slow, value: model.blockCarried)
+        .animation(UIAccessibility.isReduceMotionEnabled ? nil : DuckMotion.slow, value: model.hoopSpin)
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : DuckMotion.slow, value: model.warmGlow)
         .animation(UIAccessibility.isReduceMotionEnabled ? nil : DuckMotion.base, value: model.lookedAt)
     }
 
+    /// The cushion warms for a real sit, and for the duck's own laugh or
+    /// sadness (its emotion timeline, not a guess).
+    private var cushionWarm: Bool {
+        model.warmGlow || emotion == "laugh" || emotion == "sad"
+    }
+
     /// One prop's visual, positioned at its zone's centre and glowing when
-    /// the duck is looking at it or just touched it.
+    /// the duck is looking at it, just touched it, or is feeling it.
     private func propVisual(
         _ kind: PropKind, zone: StagePropsLayout.Zone, w: CGFloat, h: CGFloat,
         @ViewBuilder visual: () -> some View
     ) -> some View {
         let glow = !asleep && (model.lookedAt == zone.side
-            || StagePropsLayout.hitCue(zone: zone, model: model, asleep: asleep))
+            || StagePropsLayout.hitCue(zone: zone, model: model, emotion: emotion, asleep: asleep))
         return visual()
             .position(x: zone.x * w, y: zone.y * h)
             .scaleEffect(glow ? 1.12 : 1)
@@ -156,6 +194,19 @@ struct StageProps: View {
         }
     }
 
+    /// The hoop: a brass ring the duck rolls through, under the ball.
+    private var hoop: some View {
+        Circle()
+            .strokeBorder(
+                LinearGradient(
+                    colors: [Color.duckBrass, Color.duckBrassDeep],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ),
+                lineWidth: 3
+            )
+            .frame(width: 30, height: 30)
+    }
+
     /// The block: a small wooden cube at the floor line, right of the duck.
     private var block: some View {
         ZStack {
@@ -170,6 +221,29 @@ struct StageProps: View {
             Circle()
                 .fill(Color.black.opacity(0.35))
                 .frame(width: 6, height: 6)
+        }
+    }
+
+    /// The mirror: a small silver disc under the block, for the duck's own
+    /// curious glances.
+    private var mirror: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color.white.opacity(0.92), Color.duckCeramic.opacity(0.55)],
+                        center: .topLeading, startRadius: 1, endRadius: 18
+                    )
+                )
+                .frame(width: 26, height: 26)
+            Circle()
+                .strokeBorder(Color.duckBrass, lineWidth: 2)
+                .frame(width: 26, height: 26)
+            Rectangle()
+                .fill(Color.white.opacity(0.75))
+                .frame(width: 8, height: 2)
+                .rotationEffect(.degrees(-38))
+                .offset(x: -3, y: -4)
         }
     }
 
@@ -189,7 +263,9 @@ struct StageProps: View {
 /// Which prop a tap lands on, if any.
 enum StagePropHit {
     case ball
+    case hoop
     case block
+    case mirror
     case cushion
 }
 
@@ -209,17 +285,25 @@ enum StagePropsLayout {
         let cueHit: StagePropHit
     }
 
-    static let ball = Zone(x: 0.16, y: 0.68, side: .left, cueHit: .ball)
-    static let block = Zone(x: 0.86, y: 0.68, side: .right, cueHit: .block)
-    static let cushion = Zone(x: 0.50, y: 0.75, side: .centre, cueHit: .cushion)
+    static let ball = Zone(x: 0.14, y: 0.62, side: .left, cueHit: .ball)
+    static let hoop = Zone(x: 0.14, y: 0.76, side: .left, cueHit: .hoop)
+    static let block = Zone(x: 0.86, y: 0.62, side: .right, cueHit: .block)
+    static let mirror = Zone(x: 0.86, y: 0.76, side: .right, cueHit: .mirror)
+    static let cushion = Zone(x: 0.50, y: 0.76, side: .centre, cueHit: .cushion)
 
-    /// Whether a prop is the one a real move just touched.
-    static func hitCue(zone: Zone, model: StagePropsModel, asleep: Bool) -> Bool {
+    /// Whether a prop is the one a real move (or the duck's own mood) just
+    /// touched. The mirror and cushion also answer the emotion timeline.
+    static func hitCue(
+        zone: Zone, model: StagePropsModel, emotion: String, asleep: Bool
+    ) -> Bool {
         guard !asleep else { return false }
         switch zone.cueHit {
-        case .ball: return model.ballFlight != 0
+        case .ball: return model.ballFlight != 0 || emotion == "excited"
+        case .hoop: return model.hoopSpin != 0 || emotion == "excited"
         case .block: return model.blockCarried
-        case .cushion: return model.warmGlow
+        case .mirror: return emotion == "curious"
+        case .cushion:
+            return model.warmGlow || emotion == "laugh" || emotion == "sad"
         }
     }
 
@@ -235,25 +319,29 @@ enum StagePropsLayout {
     /// zones sit beside and under the duck body (x 0.25–0.75, y 0.33–0.68),
     /// so the body keeps its own taps and the props keep the floor.
     static func hit(x: CGFloat, y: CGFloat) -> StagePropHit? {
-        if x < 0.25 && y > 0.58 { return .ball }
-        if x > 0.75 && y > 0.58 { return .block }
-        if x > 0.36 && x < 0.64 && y > 0.70 { return .cushion }
+        if x < 0.25 && y >= 0.50 && y < 0.70 { return .ball }
+        if x < 0.25 && y >= 0.70 { return .hoop }
+        if x > 0.75 && y >= 0.50 && y < 0.70 { return .block }
+        if x > 0.75 && y >= 0.70 { return .mirror }
+        if x > 0.34 && x < 0.66 && y >= 0.70 { return .cushion }
         return nil
     }
 }
 
 /// A prop was tapped: the duck does its real verb toward it. The prop's
-/// response comes from the vet book's counter a beat later, so the screen
-/// cannot claim a move the core refused.
+/// response comes from the vet book's counter (or the emotion timeline) a
+/// beat later, so the screen cannot claim a move the core refused.
 func propagate(_ prop: StagePropHit, controller: DuckController) {
     switch prop {
     case .ball: controller.trigger("kick_left")
+    case .hoop: controller.trigger("roulade")
     case .block: controller.groundPick()
+    case .mirror: controller.trigger("curious")
     case .cushion: controller.trigger("sit")
     }
     DuckHaptics.selection()
 }
 
 enum PropKind {
-    case ball, block, cushion
+    case ball, hoop, block, mirror, cushion
 }

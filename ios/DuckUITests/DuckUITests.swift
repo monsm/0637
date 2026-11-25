@@ -608,8 +608,8 @@ final class DuckUITests: XCTestCase {
             .matching(NSPredicate(format: "label == %@", "Duck stage"))
             .firstMatch
         let ball = stage.exists
-            ? stage.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.68))
-            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.68))
+            ? stage.coordinate(withNormalizedOffset: CGVector(dx: 0.14, dy: 0.62))
+            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.14, dy: 0.62))
         ball.tap()
 
         let verdict = app.staticTexts["duck-last-skill"]
@@ -627,6 +627,27 @@ final class DuckUITests: XCTestCase {
             verdict.label.contains("_"),
             "the verdict shows a raw wire name: \(verdict.label)"
         )
+
+        // The hoop below the ball: a tap asks for the official roll, and the
+        // top bar's verdict is the same accepted path.
+        usleep(1_500_000) // let the kick finish; a busy scheduler would refuse
+        let hoop = stage.exists
+            ? stage.coordinate(withNormalizedOffset: CGVector(dx: 0.14, dy: 0.76))
+            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.14, dy: 0.76))
+        hoop.tap()
+        var rolled = false
+        let rollDeadline = Date().addingTimeInterval(20)
+        while Date() < rollDeadline {
+            // English keeps the protocol word ("roulade"); the point is that
+            // the verdict is the roll, not still the kick.
+            let label = verdict.exists ? verdict.label.lowercased() : ""
+            if label.contains("roulade") || label.contains("roll") {
+                rolled = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(rolled, "tapping the hoop never started a real roll")
     }
 
     /// A composed postcard in Chinese, for B4 §6.5. It sorts last (Z) so the

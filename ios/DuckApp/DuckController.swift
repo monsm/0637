@@ -2856,10 +2856,13 @@ final class DuckController: ObservableObject {
             if let skills = life["skills"] as? [String: Any] {
                 cues.kickLeft = skills["kick_left"] as? Int ?? cues.kickLeft
                 cues.kickRight = skills["kick_right"] as? Int ?? cues.kickRight
+                cues.rolls = skills["roulade"] as? Int ?? cues.rolls
             }
             cues.groundPicks = life["ground_picks"] as? Int ?? cues.groundPicks
             cues.sitDowns = life["sit_downs"] as? Int ?? cues.sitDowns
         }
+        // The duck's own emotion timeline, not a guess: the props answer it.
+        cues.emotion = (json["emotion"] as? [String: Any])?["name"] as? String ?? ""
         if cues != propCues { propCues = cues }
     }
 
