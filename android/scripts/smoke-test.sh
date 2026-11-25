@@ -1669,7 +1669,7 @@ tap_games_control() {
   # uiautomator's resource-id here, so the title anchors the section).
   local title="$1" label="$2" w="$PROP_STAGE_W" h="$PROP_STAGE_H" coords
   local _i
-  for _i in $(seq 1 16); do
+  for _i in $(seq 1 30); do
     rm -f games-tap.xml
     adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
     adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
@@ -1711,7 +1711,7 @@ PYX
       adb shell input tap $coords > /dev/null 2>&1
       return 0
     fi
-    adb shell input swipe 160 560 160 200 300 > /dev/null 2>&1 || true
+    adb shell input swipe 160 560 160 60 300 > /dev/null 2>&1 || true
     sleep 0.5
   done
   return 1
