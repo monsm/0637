@@ -899,6 +899,23 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **修复后全绿（run 45507605941，`836932a`）**：Android + Contracts 绿，iOS 在 `b0d4c44` 已绿且本批未动 iOS 代码。冒烟日志实证：`echo game: Start began round 1 (the duck sang its sequence)`、`rock paper scissors: the duck answered the throw and the tally row is readable`；截图 `dist/ui-b4-android-games.png` 同屏可见「回声游戏 第 1 关」与「猜拳 你赢了！你 1 · 鸭 0」。掉帧 `jank 58.53% / p99 150 ms`，门内。
 
+### 四之四十六、舞台道具与鸭子自娱（2026-11-25）
+
+老板指令：加更多道具和鸭子互动，鸭子也能自己和道具互动。红线照旧——道具是舞台地面上的场景元素，不碰 61 维观测与安全层，七控件预算一分未动。
+
+**三个道具**（球/积木/坐垫）画在竖屏舞台地面（两端 `StageProps.swift`/`StageProps.kt`，场景层、无 clickable、不占触摸预算）。孩子点道具，鸭子用**真实动词**回应：点球→`kick_left`（官方 ball_kick 策略）/点积木→`ground_pick`/点坐垫→`sit`；道具只是目标，不自带假动画。
+
+**鸭子自己玩**，信号全来自已发布的真实字段，不造假：
+- `/state.idle.head`（核心自己的闲逛头部命令，takeover>0.1 时有效）→ 鸭子看向哪边，那边的道具亮起；
+- 真实计数 `life.skills.kick_left|kick_right`、`life.ground_picks`、`life.sit_downs` 的增量 → 对应道具动一下（环、规则、邻居或 AI 触发的动作和手指触发的同一路计数；被拒的动作不计）；
+- `care.asleep` → 道具静止，和鸭子一起安静。
+
+**无障碍**：道具是场景，屏幕阅读器通过舞台元素新增的三个命名动作（踢球/捡积木/坐垫）触达；a11y 自定义动作棘轮（min 7）升到 10。
+
+**验收**：Android `StagePropsTest`（5 例：身体区永不误中道具、地面分区命中、真实字段解析、无 takeover 的头部命令不算凝视、缺字段读 0）；Android 冒烟点球后断言 `life.skills.kick_left` 真增长（失败时回落到顶栏技能标签）；iOS `testTheBallTapStartsARealKick` 从舞台元素自己的坐标系点球、断言 `duck-last-skill` 出现踢。契约先改：features.yaml 增 `stage-props`（LEDGER_TOTAL 46→47）、ui-entries 增行、三个棘轮带注记重定（shell_kt_lines 3844、content_view_lines 1844、controller_published 109）。
+
+**首跑翻车与修复（run 45528619458）**：iOS/Contracts/Core 绿，Android 冒烟红在「点球没起踢」。CI 截图说明真相：道具确实画在舞台上了（左橙球、右木块），但冒烟按**屏幕**百分比点击（16%,72%）落在了舞台下方的状态胶囊/栏上——舞台只占屏幕中间约 85..445px。修复：冒烟先从 dump 里读「鸭子舞台」节点的真实 bounds，再按舞台比例算球的位置（实测 (51,329)，与截图一致）；读不到节点时用截图实测的 52% 兜底；iOS 测试同样改成从舞台元素自己的坐标系点击。
+
 ---
 
 ## 八、仓库与复现
