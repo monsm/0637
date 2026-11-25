@@ -1746,9 +1746,9 @@ PYX
       adb shell input swipe 160 300 160 60 300 > /dev/null 2>&1 || true
       still=0
     else
-      adb shell input swipe 160 560 160 140 300 > /dev/null 2>&1 || true
+      adb shell input swipe 160 520 160 320 300 > /dev/null 2>&1 || true
     fi
-    sleep 0.6
+    sleep 0.5
   done
   # The page is long; a failure means the section never scrolled in. Report
   # what IS on screen so the next run is told the truth rather than guessed.
@@ -2019,12 +2019,23 @@ for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 # 照我做: sit, stand, ground_pick, roulade in order, each a real verb.
 PM_SIT0=$(life_int sit_downs); PM_STAND0=$(life_int stand_ups)
 PM_PICK0=$(life_int ground_picks); PM_ROLL0=$(skill_count roulade)
+# Each pose is a real transition; the next tap waits for the previous one to
+# land in the book (a rise under load is seconds, and a busy duck refuses).
 tap_games_control "照我做" "坐下" > /dev/null 2>&1 || true
-sleep 2
+for _ in $(seq 1 30); do
+  if [ "$(life_int sit_downs)" -gt "$PM_SIT0" ] 2>/dev/null; then break; fi
+  sleep 0.4
+done
 tap_games_control "照我做" "站起" > /dev/null 2>&1 || true
-sleep 2
+for _ in $(seq 1 30); do
+  if [ "$(life_int stand_ups)" -gt "$PM_STAND0" ] 2>/dev/null; then break; fi
+  sleep 0.4
+done
 tap_games_control "照我做" "贴地抓取" > /dev/null 2>&1 || true
-sleep 3
+for _ in $(seq 1 30); do
+  if [ "$(life_int ground_picks)" -gt "$PM_PICK0" ] 2>/dev/null; then break; fi
+  sleep 0.4
+done
 tap_games_control "照我做" "翻滚" > /dev/null 2>&1 || true
 PM_OK=0
 for _ in $(seq 1 25); do
@@ -2045,9 +2056,9 @@ sleep 3
 M1=$(life_float metres)
 tap_games_control "红灯停绿灯行" "红灯！" > /dev/null 2>&1 || true
 sleep 0.8
-set -- $(pose_xy); PX1=$1; PY1=$2
+POS1=$(pose_xy); PX1=${POS1%% *}; PY1=${POS1##* }
 sleep 0.6
-set -- $(pose_xy); PX2=$1; PY2=$2
+POS2=$(pose_xy); PX2=${POS2%% *}; PY2=${POS2##* }
 STOP=$(python3 -c "print('yes' if ((($PX2)-($PX1))**2 + (($PY2)-($PY1))**2) ** 0.5 <= 0.15 else 'no')")
 WALKED=$(python3 -c "print('yes' if ($M1 - $M0) >= 0.3 else 'no')")
 [ "$WALKED" = "yes" ] || { echo "::error::green light did not walk (metres $M0 -> $M1)"; exit 1; }
@@ -2077,6 +2088,7 @@ tap_games_control "找一找" "摸头" > /dev/null 2>&1 || true
 sleep 2
 tap_games_control "找一找" "摸肚子" > /dev/null 2>&1 || true
 sleep 2
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 tap_games_control "找一找" "摸脚" > /dev/null 2>&1 || true
 FI_OK=0
 for _ in $(seq 1 25); do
@@ -2090,6 +2102,7 @@ echo "games: find-it delivered curious, a real pet and a real kick"
 for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 
 # 小账本: the numbers are today's real deltas; the duck nods.
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 LEDGER_YES0=$(emotion_count yes)
 tap_games_control "小账本" "读一读" > /dev/null 2>&1 || { echo "::error::no ledger read chip"; exit 1; }
 LED_OK=0
