@@ -553,7 +553,7 @@ features:
     page: play-more
     hops: 2
     conform_b4: extension
-    note: 左右开弓（节拍交替真踢）/情绪哑剧（演官方情绪、猜中点头）/表情木头人（用情绪时间线当回合钟）/它今天有没有（按 life.day_started 真实差值回答 yes/no）/声音指挥官（房间拍手或口哨，核心自己的分类器听见）；每条的分数都是 vetbook 真计数
+    note: 左右开弓/情绪哑剧/表情木头人/它今天有没有/声音指挥官，另加反向指令（反着做 sit/stand）/照我做（四连姿势）/红灯停绿灯行（真走真停）/快进一天（care_time_scale 60×）/找一找（头/肚子/脚真实反应）/小账本（今日真实增量）/传悄悄话（真声音猜音）；每条的分数都是 vetbook 真计数或 /state 真字段
     ios: implemented
     android: implemented
     data_chain: none

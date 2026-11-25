@@ -789,6 +789,80 @@ final class DuckUITests: XCTestCase {
         XCTAssertTrue(listening, "Sound Simon never started listening")
     }
 
+    /// The seven more games (2026-11-26), in sheet order after the five:
+    /// reverse command, follow the pose, red light, fast-forward day, find it,
+    /// little ledger and the whisper. Each section must be reachable and its
+    /// first control live; the deep core proofs live in the Android smoke.
+    func testTheSevenMoreGamesAreWired() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+        app.buttons["duck-more"].tap()
+        let playMore = app.buttons["more-playmore"]
+        XCTAssertTrue(playMore.waitForExistence(timeout: 10), "the Play-more row is missing")
+        playMore.tap()
+
+        func scrollTo(_ id: String, swipes: Int = 40) -> XCUIElement {
+            let element = anyElement(id)
+            var n = 0
+            while !(element.exists && element.isHittable) && n < swipes {
+                app.swipeUp()
+                n += 1
+            }
+            return element
+        }
+
+        let reverse = scrollTo("reverse-stand")
+        XCTAssertTrue(reverse.exists && reverse.isHittable, "reverse command is missing")
+        reverse.tap()
+        XCTAssertTrue(anyElement("reverse-status").exists, "reverse status is missing")
+
+        let posture = scrollTo("posture-sit")
+        XCTAssertTrue(posture.exists && posture.isHittable, "posture mirror is missing")
+        posture.tap()
+        XCTAssertTrue(anyElement("posture-status").exists, "posture status is missing")
+
+        let green = scrollTo("light-green")
+        XCTAssertTrue(green.exists && green.isHittable, "red light game is missing")
+        green.tap()
+        XCTAssertEqual(anyElement("light-status").label, "Green!", "green light status")
+        let red = anyElement("light-red")
+        red.tap()
+        XCTAssertEqual(anyElement("light-status").label, "Red!", "red light status")
+
+        let fast = scrollTo("fast-toggle")
+        XCTAssertTrue(fast.exists && fast.isHittable, "fast-forward toggle is missing")
+        fast.tap()
+        XCTAssertEqual(anyElement("fast-status").label, "Fast-forward on", "fast-forward status")
+        fast.tap()
+
+        let find = scrollTo("find-head")
+        XCTAssertTrue(find.exists && find.isHittable, "find-it game is missing")
+        find.tap()
+        XCTAssertTrue(anyElement("find-status").exists, "find status is missing")
+
+        let ledger = scrollTo("ledger-read")
+        XCTAssertTrue(ledger.exists && ledger.isHittable, "little ledger is missing")
+        ledger.tap()
+        var fact = false
+        let factDeadline = Date().addingTimeInterval(10)
+        while Date() < factDeadline {
+            if anyElement("ledger-line").exists, anyElement("ledger-line").label.contains("Walked") {
+                fact = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(fact, "little ledger never read a fact")
+
+        let whisper = scrollTo("whisper-start")
+        XCTAssertTrue(whisper.exists && whisper.isHittable, "whisper game is missing")
+        whisper.tap()
+        XCTAssertEqual(anyElement("whisper-status").label, "What did it say?", "whisper status")
+    }
+
     /// The self-play switch (2026-11-25): turned on, an idle duck walks to a
     /// prop and plays with it on its own. The verdict line is the proof the
     /// core accepted the verb; it is empty at launch and no other tap

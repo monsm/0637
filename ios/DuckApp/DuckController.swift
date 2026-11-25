@@ -3390,6 +3390,12 @@ final class DuckController: ObservableObject {
         voice.play(core: core, tag: tag)
     }
 
+    /// The care clock's own knob (the one CI drives at 200x): a real setting
+    /// the core clamps, not a UI-only speed.
+    func setCareTimeScale(_ scale: Int) {
+        postJSON("/config", ["care_time_scale": scale])
+    }
+
     /// One verb from the skill ring. `sit`, `stand` and `ground_pick` are the
     /// loop's own; the rest are manifest skills, and the core refuses an
     /// unknown name rather than pretending it started.

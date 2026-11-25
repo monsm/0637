@@ -134,6 +134,20 @@ struct PlayMoreSheet: View {
             DidItHappenToday(controller: controller)
             Divider()
             SoundSimon(controller: controller)
+            Divider()
+            ReverseCommand(controller: controller)
+            Divider()
+            PostureMirror(controller: controller)
+            Divider()
+            RedLightGreenLight(controller: controller)
+            Divider()
+            FastForwardDay(controller: controller)
+            Divider()
+            FindIt(controller: controller)
+            Divider()
+            LittleLedger(controller: controller)
+            Divider()
+            WhisperGame(controller: controller)
         }
     }
 }
