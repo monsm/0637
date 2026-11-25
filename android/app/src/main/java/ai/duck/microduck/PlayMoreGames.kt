@@ -209,13 +209,22 @@ fun MoodFreeze(core: DuckCore?) {
         if (playing) return
         playing = true
         scope.launch {
+            // The round clock is each mood's own timeline length (excited
+            // 3.3 s, angry 2.5 s, yes 1.7 s) plus a breath. Polling /state
+            // would let a slow fetch skip a mood and let other games'
+            // emotions bleed in; the published durations are the honest
+            // schedule.
             for (mood in sequence) {
                 banner = if (mood == "excited") Copy.freezeMove else Copy.freezeStop
-                if (core?.skill(mood) ?: 0 == 0) {
-                    delay(800)
-                    continue
-                }
-                while (playingEmotion(withContext(Dispatchers.IO) { fetchRawState() })) delay(300)
+                val started = core?.skill(mood) ?: 0
+                delay(
+                    when (mood) {
+                        "excited" -> 3600
+                        "angry" -> 2800
+                        else -> 2000
+                    }
+                )
+                if (started == 0) continue
             }
             banner = Copy.freezeDone
             playing = false

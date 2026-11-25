@@ -196,15 +196,16 @@ struct MoodFreeze: View {
         guard !playing else { return }
         playing = true
         Task { @MainActor in
+            // The round clock is each mood's own timeline length (excited
+            // 3.3 s, angry 2.5 s, yes 1.7 s) plus a breath. Polling /state
+            // would let a slow fetch skip a mood and let other games'
+            // emotions bleed in; the published durations are the honest
+            // schedule.
             for mood in sequence {
                 banner = mood == "excited" ? Copy.freezeMove : Copy.freezeStop
-                guard controller.trigger(mood) else {
-                    try? await Task.sleep(nanoseconds: 800_000_000)
-                    continue
-                }
-                while await duckEmotionPlaying() {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                }
+                _ = controller.trigger(mood)
+                let ms: UInt64 = mood == "excited" ? 3600 : (mood == "angry" ? 2800 : 2000)
+                try? await Task.sleep(nanoseconds: ms * 1_000_000)
             }
             banner = Copy.freezeDone
             playing = false
