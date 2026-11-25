@@ -43,6 +43,24 @@ internal val officialMoods = listOf(
     "laugh", "mmh", "mock", "no", "sad", "yes", "yes_fast",
 )
 
+/** Each mood's official timeline length, from upstream's keyframes. */
+internal fun moodDurationMs(name: String): Long = when (name) {
+    "angry" -> 2500
+    "curious" -> 2900
+    "defiant" -> 2100
+    "devastated" -> 8500
+    "excited" -> 3300
+    "impatient" -> 2500
+    "laugh" -> 2900
+    "mmh" -> 1900
+    "mock" -> 2500
+    "no" -> 1700
+    "sad" -> 7500
+    "yes" -> 1400
+    "yes_fast" -> 1400
+    else -> 2500
+}
+
 private fun moodSeed(fingerprint: String, round: Int): Long {
     var hash = -3750763034362895579L // 0xcbf29ce484222325
     for (byte in fingerprint.toByteArray(Charsets.UTF_8)) {
@@ -135,8 +153,11 @@ fun MoodCharade(core: DuckCore?) {
             return
         }
         phase = 1
+        // The guess opens when the mood's own timeline ends. The published
+        // durations are the honest clock; polling /state would let a slow
+        // fetch leave the chips disabled after the smoke already saw idle.
         scope.launch {
-            while (playingEmotion(withContext(Dispatchers.IO) { fetchRawState() })) delay(300)
+            delay(moodDurationMs(answer) + 300L)
             phase = 2
         }
     }
