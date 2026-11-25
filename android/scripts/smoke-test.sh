@@ -1960,11 +1960,33 @@ else
   exit 1
 fi
 
-# Back to the Live screen for the rest of the smoke: page, then drawer.
-adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-sleep 0.8
-adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
-sleep 0.8
+# Back to the Live screen for the rest of the smoke: the Play more sheet and
+# the drawer both have to be gone before the screenshot/rotation sections —
+# a sheet still up would be the thing the next screenshot captures, and it
+# also blocks the rotation the landscape cell needs.
+LIVE_OK=0
+for _ in $(seq 1 6); do
+  rm -f games-live.xml
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > games-live.xml 2>/dev/null || true
+  if python3 - <<'PYX'
+import xml.etree.ElementTree as ET
+try:
+    root = ET.parse('games-live.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+texts = {(n.get('text') or '') for n in root.iter('node')}
+raise SystemExit(0 if ({'喂食', 'Feed'} & texts and {'更多', 'More'} & texts) else 1)
+PYX
+  then
+    LIVE_OK=1
+    break
+  fi
+  adb shell input keyevent KEYCODE_BACK > /dev/null 2>&1 || true
+  sleep 1
+done
+[ "$LIVE_OK" = "1" ] || echo "::warning::the games section could not return to the Live screen"
 
 # The idle Live screen itself, portrait, no skill line on it: the Chinese state
 # a real user sees.
@@ -1990,8 +2012,29 @@ cp ui-b1-android-zh.png ui-b4-android.png
 # portrait again. The manifest handles orientation itself.
 adb shell settings put system accelerometer_rotation 0 > /dev/null 2>&1 || true
 adb shell settings put system user_rotation 1 > /dev/null 2>&1 || true
-sleep 3
-adb exec-out screencap -p > ui-b1-android-land.png || true
+# Rotation lands when the window manager gets to it; under load a fixed 3 s
+# can still be portrait (run 45682233086). Poll the frame instead.
+LAND_OK=0
+for _ in $(seq 1 8); do
+  sleep 2
+  adb exec-out screencap -p > ui-b1-android-land.png || true
+  if python3 - <<'PY'
+import struct
+try:
+    with open('ui-b1-android-land.png', 'rb') as handle:
+        header = handle.read(24)
+except Exception:
+    raise SystemExit(1)
+if header[:8] != b'\x89PNG\r\n\x1a\n':
+    raise SystemExit(1)
+width, height = struct.unpack('>II', header[16:24])
+raise SystemExit(0 if width > height else 1)
+PY
+  then
+    LAND_OK=1
+    break
+  fi
+done
 python3 - <<'PY' || exit 1
 import struct
 try:
