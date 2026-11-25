@@ -1698,8 +1698,21 @@ titles = [b for b in titles if b]
 if not titles:
     raise SystemExit(1)
 tb = titles[0]
-targets = [box(n) for n in root.iter('node') if (n.get('text') or '') == label]
-targets = [b for b in targets if b]
+# Only labels a CLICKABLE node wraps count: the same word can be a status
+# Text (dead) on screen while the real chip sits below the fold.
+clicks = [box(n) for n in root.iter('node') if n.get('clickable') == 'true']
+clicks = [b for b in clicks if b]
+targets = []
+for n in root.iter('node'):
+    if (n.get('text') or '') != label:
+        continue
+    tb2 = box(n)
+    if not tb2:
+        continue
+    for cb in clicks:
+        if cb[0] <= tb2[0] and cb[1] <= tb2[1] and cb[2] >= tb2[2] and cb[3] >= tb2[3]:
+            targets.append(cb)
+            break
 if not targets:
     raise SystemExit(1)
 
