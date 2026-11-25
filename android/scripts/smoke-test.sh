@@ -1894,6 +1894,12 @@ else
 fi
 
 # 它今天有没有: the answer matches the real today-vs-day_started delta.
+# The freeze round before this one ends on its own emotion; the core refuses
+# a new emotion while another plays, so wait for a still duck first.
+for _ in $(seq 1 40); do
+  emotion_idle && break
+  sleep 0.4
+done
 PETS_DELTA=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
 import json,sys
 try:
@@ -1921,6 +1927,12 @@ fi
 
 # 声音指挥官: a synthetic clap must be heard by the duck's own classifier and
 # the game must say so. The duck's default reaction (laugh) is the core's.
+# Let the today answer's yes/no finish first (the classifier itself always
+# fires, but a still duck keeps the default laugh honest).
+for _ in $(seq 1 40); do
+  emotion_idle && break
+  sleep 0.4
+done
 tap_games_control "声音指挥官" "拍手让它笑" > /dev/null 2>&1 || { echo "::error::no sound-clap chip"; exit 1; }
 sleep 0.5
 SOUND_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
