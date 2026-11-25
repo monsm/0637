@@ -340,6 +340,11 @@ final class DuckController: ObservableObject {
     @Published var careMood: Double = 0
     @Published var careBond: Double = 0
     @Published var careAsleep = false
+    /// The stage props' real cues: the idle glance's yaw (the core's own idle
+    /// head command) and the counters behind each prop. A kick fired by a
+    /// rule, a neighbour or a skill counts exactly like one fired by a hand —
+    /// the prop moves only when the duck really moved.
+    @Published var propCues = PropCues()
     /// The core's own heart reading (care.heart_bpm): the same numbers the
     /// three capsules above show, as one bpm for the palm.
     @Published var heartBpm: Double = 0
@@ -2604,6 +2609,7 @@ final class DuckController: ObservableObject {
                     } else {
                         self.behaviorSummary = "—"
                     }
+                    self.parsePropCues(json)
                     self.parseLeds(json["leds"])
                     self.parsePath(json["path"])
                     self.parseChorus(json["chorus"])
@@ -2829,6 +2835,32 @@ final class DuckController: ObservableObject {
                 self.refreshMicSummary()
             }
         }.resume()
+    }
+
+    /// The stage props' cues, from the /state fetch the poll already made:
+    /// the idle look-around's own head command (yaw is the third item, the
+    /// upstream `[neck, head, yaw, roll]` order) while it has the head, and
+    /// the vet book's real counters. A counter only ever grows when the duck
+    /// really moved — the props are the consequence, never the claim.
+    private func parsePropCues(_ json: [String: Any]) {
+        var cues = propCues
+        if let idle = json["idle"] as? [String: Any],
+           let takeover = idle["takeover"] as? Double, takeover > 0.1,
+           let head = idle["head"] as? [Any], head.count >= 3,
+           let yaw = head[2] as? Double {
+            cues.idleYaw = yaw
+        } else {
+            cues.idleYaw = 0
+        }
+        if let life = json["life"] as? [String: Any] {
+            if let skills = life["skills"] as? [String: Any] {
+                cues.kickLeft = skills["kick_left"] as? Int ?? cues.kickLeft
+                cues.kickRight = skills["kick_right"] as? Int ?? cues.kickRight
+            }
+            cues.groundPicks = life["ground_picks"] as? Int ?? cues.groundPicks
+            cues.sitDowns = life["sit_downs"] as? Int ?? cues.sitDowns
+        }
+        if cues != propCues { propCues = cues }
     }
 
     /// The virtual face, from the `leds` object the /state fetch already

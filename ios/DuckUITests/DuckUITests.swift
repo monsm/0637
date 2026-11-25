@@ -586,6 +586,45 @@ final class DuckUITests: XCTestCase {
         )
     }
 
+    /// The floor props (2026-11-25): a tap on the ball asks the duck to
+    /// play, and it answers with its own real verb. The tap coordinates are
+    /// the prop zone in stage fractions (StagePropsLayout), not a fixed
+    /// element: the props are scene, not chrome, so there is no accessibility
+    /// node behind them — the move itself is the evidence. The verdict is
+    /// `duck-last-skill`, which the shell only raises when the core accepted
+    /// the verb (`trigger` sets it on a non-zero start), so a refused kick
+    /// cannot read as a pass.
+    func testTheBallTapStartsARealKick() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+
+        // The prop zone in fractions: x 0.16, y 0.68 of the window (the
+        // stage spans the window in portrait).
+        let ball = app.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.16, dy: 0.68)
+        )
+        ball.tap()
+
+        let verdict = app.staticTexts["duck-last-skill"]
+        var kicked = false
+        let deadline = Date().addingTimeInterval(20)
+        while Date() < deadline {
+            if verdict.exists, verdict.label.lowercased().contains("kick") {
+                kicked = true
+                break
+            }
+            usleep(200_000)
+        }
+        XCTAssertTrue(kicked, "tapping the ball never started a real kick")
+        XCTAssertFalse(
+            verdict.label.contains("_"),
+            "the verdict shows a raw wire name: \(verdict.label)"
+        )
+    }
+
     /// A composed postcard in Chinese, for B4 §6.5. It sorts last (Z) so the
     /// newest card in the app container is this one; CI publishes it as the
     /// Chinese sample.

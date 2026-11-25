@@ -971,6 +971,26 @@
         "implemented": false,
         "note": "无 UI；核心路由已备"
       }
+    },
+    {
+      "id": "stage-props",
+      "zh": "舞台道具",
+      "conform_b4": "extension",
+      "note": "2026-11-25：舞台地面道具（球/积木/坐垫）——场景元素，不占七控件预算；点道具→鸭子真实技能；鸭子自己的闲逛视线（/state.idle.head）与真实计数驱动道具响应；睡着不动",
+      "ios": {
+        "implemented": true,
+        "anchor": [
+          "ios/DuckApp/StageProps.swift",
+          "StagePropsLayout"
+        ]
+      },
+      "android": {
+        "implemented": true,
+        "anchor": [
+          "android/app/src/main/java/ai/duck/microduck/StageProps.kt",
+          "StagePropsLayout"
+        ]
+      }
     }
   ]
 }

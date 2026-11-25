@@ -1422,6 +1422,64 @@ else
   echo "::warning::the quack object was not tappable; voice check skipped"
 fi
 
+# The floor props (2026-11-25): a tap on the ball asks the duck to kick.
+# The tap coordinates are the prop zone in stage fractions (StagePropsLayout),
+# not a fixed label: the props are scene, not chrome, so there is no
+# accessibility node behind them — the move itself is the evidence. The
+# honest field is the vet book's own counter (`/state.life.skills.kick_left`
+# counts what the core actually started, from any caller); a tap that asks
+# but is refused never moves it.
+#
+# The stage occupies the middle of the portrait screen (title bar above,
+# shelf below), so a stage fraction maps to a screen fraction with a small
+# offset. The ball zone is generous (stage x < 0.25, y > 0.58); screen
+# (16%, 72%) lands inside it on any layout, so the tap is not a fixed
+# stage fraction read as a screen one.
+PROP_STAGE_W=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d'x' -f1)
+PROP_STAGE_H=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 | cut -d'x' -f2)
+[ -n "$PROP_STAGE_W" ] || PROP_STAGE_W=320
+[ -n "$PROP_STAGE_H" ] || PROP_STAGE_H=640
+BALL_X=$((PROP_STAGE_W * 16 / 100))
+BALL_Y=$((PROP_STAGE_H * 72 / 100))
+KICKS_BEFORE=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    s = json.load(sys.stdin).get('life',{}).get('skills',{}).get('kick_left',0)
+    print(int(s))
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1)
+adb shell input tap $BALL_X $BALL_Y > /dev/null 2>&1 || true
+sleep 1
+PROP_OK=0
+for _ in $(seq 1 24); do
+  KICKS_NOW=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    s = json.load(sys.stdin).get('life',{}).get('skills',{}).get('kick_left',0)
+    print(int(s))
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1)
+  if [ "$KICKS_NOW" -gt "$KICKS_BEFORE" ] 2>/dev/null; then PROP_OK=1; break; fi
+  sleep 0.25
+done
+if [ "$PROP_OK" = "1" ]; then
+  echo "props: a ball tap really started a kick (life.skills.kick_left $KICKS_BEFORE -> $KICKS_NOW)"
+else
+  # Fall back to the top bar's skill label the shell raises from its own
+  # gesture path: a refusal must not read as a pass.
+  rm -f ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > ui.xml 2>/dev/null || true
+  if grep -qE '左踢|kick left' ui.xml; then
+    echo "props: a ball tap really started a kick (the top bar's skill label)"
+  else
+    echo "::error::tapping the ball did not start a real kick (kick counter and the label)"
+    exit 1
+  fi
+fi
+
 # The idle Live screen itself, portrait, no skill line on it: the Chinese state
 # a real user sees.
 adb exec-out screencap -p > ui-b1-android-zh.png || true
