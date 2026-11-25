@@ -1711,9 +1711,22 @@ PYX
       adb shell input tap $coords > /dev/null 2>&1
       return 0
     fi
-    adb shell input swipe 160 560 160 60 300 > /dev/null 2>&1 || true
-    sleep 0.5
+    adb shell input swipe 160 560 160 100 300 > /dev/null 2>&1 || true
+    sleep 0.6
   done
+  # The page is long; a failure means the section never scrolled in. Report
+  # what IS on screen so the next run is told the truth rather than guessed.
+  python3 - "$title" <<'PYX' || true
+import sys, xml.etree.ElementTree as ET
+title = sys.argv[1]
+try:
+    root = ET.parse('games-tap.xml').getroot()
+except Exception:
+    raise SystemExit(1)
+seen = sorted({(n.get('text') or '') for n in root.iter('node')
+               if (n.get('text') or '') and len((n.get('text') or '')) <= 8})
+print(f"::warning::'{title}' never reached the screen; on-screen titles: {seen[:24]}")
+PYX
   return 1
 }
 
