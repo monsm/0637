@@ -129,6 +129,13 @@ class StagePropsTest {
     }
 
     @Test
+    fun theWhisperCoversItsFourVoices() {
+        assertEquals(setOf("chirp", "coo", "inquire", "peck"), whisperTags.toSet())
+        assertEquals(4, (0L..7L).map { whisperTarget(it) }.toSet().size)
+        assertEquals(whisperTarget(9L), whisperTarget(13L))
+    }
+
+    @Test
     fun theMirrorMakesADifferentOfficialFaceEachTap() {
         // Whatever the session counter is, the next five faces are distinct
         // official emotions and advancing moves to the next one.

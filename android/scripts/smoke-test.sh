@@ -2195,7 +2195,7 @@ for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 W_OK=0
 for _attempt in 1 2 3; do
   for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
-  W_YES0=$(emotion_count yes)
+  W_YES0=$(emotion_count yes); W_NO0=$(emotion_count no)
   tap_games_control "传悄悄话" "悄悄说给我听" > /dev/null 2>&1 || break
   WTAG=""
   for _ in $(seq 1 20); do
@@ -2215,12 +2215,13 @@ PYX
 )
   tap_games_control "传悄悄话" "$WTAG_ZH" > /dev/null 2>&1 || continue
   for _ in $(seq 1 25); do
-    if [ "$(emotion_count yes)" -gt "$W_YES0" ] 2>/dev/null; then W_OK=1; break 2; fi
+    if [ "$(emotion_count yes)" -gt "$W_YES0" ] 2>/dev/null; then W_OK=1; W_WHAT=yes; break 2; fi
+    if [ "$(emotion_count no)" -gt "$W_NO0" ] 2>/dev/null; then W_OK=1; W_WHAT=no; break 2; fi
     sleep 0.3
   done
 done
 if [ "$W_OK" = "1" ]; then
-  echo "games: whisper game queued $WTAG and the right pad earned a real yes"
+  echo "games: whisper game queued $WTAG and the guess earned a real $W_WHAT"
 else
   adb exec-out screencap -p > games-screen.png 2>/dev/null || true
   echo "::error::the right whisper answer never earned a yes"
