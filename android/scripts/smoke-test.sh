@@ -3177,7 +3177,14 @@ playmore_games_check() {
   ok=0
   for _ in $(seq 1 3); do
     if tap_games_control "猜拳" "石头" > /dev/null 2>&1; then
-      sleep 1
+      sleep 0.8
+      # The duck's own move line sits UNDER the chips. The tap helper stops
+      # as soon as the chips are visible, so at font scale 2.0 the line can
+      # still be below the fold and uiautomator never dumps it (the score
+      # proves the round happened; the line was simply out of view). Reveal
+      # it before reading.
+      adb shell input swipe 160 520 160 300 350 > /dev/null 2>&1 || true
+      sleep 0.4
       for _ in 1 2 3 4; do
         screen_has_text "鸭子出了|The duck threw" && { ok=1; break; }
         sleep 0.6

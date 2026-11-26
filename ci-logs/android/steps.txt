@@ -1,5 +1,5 @@
-run=45773827480
-sha=e239c43be5a0d93e5e518dbf10e7956a2139c64a
+run=45777031415
+sha=0e0d024d6e4fb652ac99b11d49ce4f4b880a7295
 checkout=success
 rusttoolchain=success
 upstream=success
@@ -10,5 +10,5 @@ rustcore=success
 apk=success
 unittest=success
 gradlesetup=success
-emulator=failure
+emulator=success
 alignment=success
