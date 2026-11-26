@@ -936,6 +936,18 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 8 例（五个道具区、开关独立命中区、全部守卫逐项、选择的确定性、缺字段读 0 不冒充）；冒烟打开开关后在**没有任何道具点击**的情况下等 vetbook 计数真增长（最多 45 秒），随后关掉恢复静止；iOS `testTheDuckPlaysOnItsOwnWhenAsked` 打开开关、等顶栏出现真实技能判词、再关掉（选择持久化，测试必须给后面的用例留一只静止的鸭子）。契约与棘轮同步（shell 3897 / ContentView 1867 / published 109 / a11y 动作 12）。
 
+### 四之五十五、睡前哼一声（2026-11-26）
+
+- **玩法**：鸭子自己的闲置时钟走到约 600 秒时轻轻「咕咕」一声，690 秒再「叽」一声，然后照原定 720 秒打盹。两条声音都走核心的合成音通道，**从不调用 care.touch**——它们只报告困意，不能推迟打盹；被摸/被喂/醒来会让节拍重新开始。纯函数 `sleepCue` 两端单测（含「跳过了两个刻度就只报后一个」）。
+- **核心修复（本批挖出的真缺陷）**：闲置仪式与「被忽视的难过」都经由 `trigger_emotion` 演情绪，而它把情绪算作一次 `care.touch`（「人或规则要一个心情是关注」）。可这两处是鸭子**自己**的行为，不是关注：仪式每 30 秒就把 care 的闲置时钟清零一次，鸭子独自待着永远到不了 600 秒，也永远等不到 720 秒的打盹——与自己 care 时钟的承诺自相矛盾。两处改用 `start_emotion`（不 touch）；人/规则/AI 的情绪仍走 `trigger_emotion`。核心测试 `the_ducks_own_ritual_is_not_a_hand` 同时钉住「仪式不算手」与「人的心情仍算」；全 workspace 314 例通过。
+- **手机端修复**：`/state.care.idle_s` 发布的是**未乘倍速**的闲置秒数，而核心打盹判定用的是**乘过 `care_time_scale`** 的时钟。手机端原来直接拿发布值和 600/690 比，任何非 1× 的时钟都会在睡前声音到点前先睡着（CI 诊断实证：6× 下拨 5000 tick，发布值是 100 而不是 600）。两端现在读 `/state.care_time_scale` 并把发布值换算成与打盹同一个时钟。
+- **验收（run 45820897108，Android+Contracts；iOS 52c5bdd1 run 45827477252）**：冒烟把 App 中段重启后的 tick 等够大、用 6× 时钟把闲置拨到 600 与 690 care 秒，在安静间隙里先后听到真实的 `coo` 与 `chirp`，断言声音没有改动 `care.last_touch`，再以 200× 证明它照常入睡：
+  ```
+  sleep: the idle duck cooed at 600 s and chirped at 690 s without resetting the doze, then dozed on time
+  ```
+  `smoke test passed`；iOS `testTheLastLittleSoundsBeforeItDozes` 用同一协议（等 tick 够大、1× 清零节拍、按实际 tick 选 6×/10× 并持续重设时钟）。首轮 iOS 红在两处并已按真因修：舞蹈回放的 pick 被鸭子自己的时间线拒一次——Play 现在最多重试三次；睡眠测试等 5500 tick 超时（负载下只到 3868）——改为等 3200 tick 并自适应倍速。
+- **这一段的 CI 真因链（全部按日志修，不归抖动）**：① `tick - 30000` 在重启后为负 → 核心按 u64 读 `last_touch`，静默忽略（`idle_s` 停在 13.58）；② 空 `/state` 读让 POST 体畸形被拒 → `state_tick` 校验重试；③ 为挪开 `last_sound` 而放的 `greet` 反而触发了鸭子的 `mmh`（情绪会 touch）→ 删掉这个花招；④ 自娱开关的「关」从未被验证，漏点一次会让鸭子整段跑自娱 → 现在断言关闭；⑤ 发布值与打盹时钟不同步 → 两端乘 `care_time_scale`；⑥ 情绪哑剧偶发红在「答对没点头」→ 加记录与屏幕 dump，下一次红会自己说出原因。
+
 ### 四之五十四、道具分组积木规则（2026-11-26）
 
 - **玩法**：积木编辑器的动作选择器在动作词下新增「道具」一行——球=踢球（skill/kick_left）、呼啦圈=翻滚（skill/roulade）、积木=捡积木（skill/ground_pick）、坐垫=坐垫子（skill/sit）、镜子=照镜子（emotion/curious）。点一下就把动作和值一起选好，孩子写「拍手 → 踢球」不需要认识 wire 名；不新增任何触发词或动作词。

@@ -1760,6 +1760,75 @@ SELF_M1=$(life_float metres)
 if [ "$SELF_OK" = "1" ] &&
    [ "$(python3 -c "print('yes' if ($SELF_M1 - $SELF_M0) >= 0.3 else 'no')")" = "yes" ]; then
   echo "self-play: the idle duck played with a prop and strolled on its own (metres $SELF_M0 -> $SELF_M1)"
+
+# 自己开一场独角戏 (2026-11-26): a long idle (240 care-seconds, scaled like
+# the doze clock) earns one show — hoop roll, mirror look, ball kick, in that
+# order. The switch is on; the duck's own show never enters a dance recording,
+# so the vet-book counters are the only claim.
+show_chip_text() {
+  rm -f show-ui.xml
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > show-ui.xml 2>/dev/null || true
+}
+SHOW_ON=0
+for _attempt in 1 2 3 4 5; do
+  show_chip_text
+  if grep -q "自己玩 · 开" show-ui.xml || grep -q "Play on its own · on" show-ui.xml; then
+    SHOW_ON=1
+    break
+  fi
+  adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
+  sleep 0.8
+done
+[ "$SHOW_ON" = "1" ] || { echo "::error::the self-play switch never turned on for the show"; exit 1; }
+# Wait until the tick can carry a 1250-tick jump, then run a 10x clock:
+# published 25 s x 10 = 250 care-seconds, the show's long-idle mark.
+SHOW_TICK=0
+for _ in $(seq 1 150); do
+  SHOW_TICK=$(state_tick) || { sleep 1; continue; }
+  [ "$SHOW_TICK" -ge 1300 ] && break
+  sleep 1
+done
+[ "$SHOW_TICK" -ge 1300 ] || { echo "::error::the core tick never grew enough for the show"; exit 1; }
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":10}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
+RO0=$(skill_count roulade); CU0=$(emotion_count curious); KL0=$(skill_count kick_left)
+SHOW_RO=0; SHOW_CU=0; SHOW_KL=0; RO_AT=0; CU_AT=0; KL_AT=0; SHOW_I=0
+for _ in $(seq 1 80); do
+  SHOW_I=$((SHOW_I + 1))
+  if [ "$SHOW_RO" = "0" ] && [ "$(skill_count roulade)" -gt "$RO0" ] 2>/dev/null; then SHOW_RO=1; RO_AT=$SHOW_I; fi
+  if [ "$SHOW_CU" = "0" ] && [ "$(emotion_count curious)" -gt "$CU0" ] 2>/dev/null; then SHOW_CU=1; CU_AT=$SHOW_I; fi
+  if [ "$SHOW_KL" = "0" ] && [ "$(skill_count kick_left)" -gt "$KL0" ] 2>/dev/null; then SHOW_KL=1; KL_AT=$SHOW_I; fi
+  [ "$SHOW_RO$SHOW_CU$SHOW_KL" = "111" ] && break
+  # Hold the clock at the show's idle in case a stray attention reset it.
+  SHOW_TICK=$(state_tick) || { sleep 0.4; continue; }
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SHOW_TICK - 1250))}}" \
+    http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+  sleep 0.4
+done
+# Turn the switch off again (verified), restore the clock and wake the duck.
+SHOW_OFF=0
+for _attempt in 1 2 3 4 5; do
+  show_chip_text
+  if ! grep -q "自己玩 · 开" show-ui.xml && ! grep -q "Play on its own · on" show-ui.xml; then
+    SHOW_OFF=1
+    break
+  fi
+  adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
+  sleep 0.8
+done
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8765/pet > /dev/null 2>&1 || true
+[ "$SHOW_OFF" = "1" ] || { echo "::error::the self-play switch never turned back off after the show"; exit 1; }
+if [ "$SHOW_RO$SHOW_CU$SHOW_KL" = "111" ] &&
+   [ "$RO_AT" -gt 0 ] 2>/dev/null && [ "$RO_AT" -le "$CU_AT" ] 2>/dev/null &&
+   [ "$CU_AT" -le "$KL_AT" ] 2>/dev/null; then
+  echo "show: a long idle put on a three-beat show in order (roulade -> curious -> kick_left)"
+else
+  echo "::error::the one-duck show did not perform its three beats in order (roulade=$SHOW_RO@$RO_AT curious=$SHOW_CU@$CU_AT kick=$SHOW_KL@$KL_AT)"
+  exit 1
+fi
 else
   echo "::error::the self-play switch never produced both a prop move and its own stroll (counter=$SELF_OK metres $SELF_M0 -> $SELF_M1)"
   exit 1

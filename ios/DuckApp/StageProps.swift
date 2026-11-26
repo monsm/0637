@@ -40,6 +40,21 @@ let selfPlayCooldownTicks = 1250
 let sleepCueCooSeconds = 600.0
 let sleepCueChirpSeconds = 690.0
 
+/// The one-duck show: three real beats at its own props, in the order a
+/// child would meet them. Each is a standing verb the duck already has, so a
+/// refused beat is simply skipped and the next still runs.
+let showBeats = ["roulade", "curious", "kick_left"]
+
+/// A show waits for this much derived idle (care-seconds, scaled like the
+/// doze clock). Long enough that it is a reward for being left alone.
+let showIdleSeconds = 240.0
+
+/// Whether the show is due: the self-play switch is on, this long idle has
+/// not had its show yet, and the duck has really been alone that long.
+func showDue(idleS: Double, enabled: Bool, done: Bool) -> Bool {
+    enabled && !done && idleS >= showIdleSeconds
+}
+
 /// Which settling sound the idle clock calls for now, if any. If the clock
 /// jumps past both marks while the app was away, the later sound is the
 /// honest one; the moment for the earlier one has passed.

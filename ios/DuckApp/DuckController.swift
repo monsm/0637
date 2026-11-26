@@ -2900,12 +2900,39 @@ final class DuckController: ObservableObject {
         if sleepIdle < 30 {
             sleepCueCooed = false
             sleepCueChirped = false
+            showDone = false
         } else if calm {
             if let cue = sleepCue(idleS: sleepIdle, cooed: sleepCueCooed, chirped: sleepCueChirped) {
                 if cue == "chirp" { sleepCueChirped = true } else { sleepCueCooed = true }
                 queueSound(cue)
             }
         }
+    }
+
+    /// The show's beats, each waiting for the previous to finish. The core's
+    /// own timeline is the clock for the mood beat; the one-shots get a
+    /// child-friendly beat. A refused beat is skipped, not retried, so the
+    /// show never claims a move the core did not take.
+    private func playShow() {
+        let beats = showBeats
+        func beat(_ index: Int) {
+            guard index < beats.count else { return }
+            // No dance.record here: the show is the duck's own, not the
+            // child's choreography, even if a recording is open.
+            showBeat(beats[index])
+            let wait: TimeInterval = beats[index] == "curious" ? 3.2 : 1.6
+            DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+                beat(index + 1)
+            }
+        }
+        beat(0)
+    }
+
+    /// One show beat through the core's own skill door, deliberately without
+    /// the dance recorder trigger() carries.
+    private func showBeat(_ name: String) {
+        guard let core else { return }
+        _ = name.withCString { duck_core_trigger_skill(core, $0) }
     }
 
     /// With the switch on, an idle duck walks to a prop and plays with it.
@@ -2917,6 +2944,7 @@ final class DuckController: ObservableObject {
     private var sleepCueCooed = false
     private var sleepCueChirped = false
     private var selfBeats = 0
+    private var showDone = false
 
     func maybeSelfPlay() {
         guard ready, !pathActive,
@@ -2924,6 +2952,16 @@ final class DuckController: ObservableObject {
         let cues = propCues
         guard selfPlayDue(cues, asleep: careAsleep, enabled: true, lastTick: lastSelfPlayTick)
         else { return }
+        // A long idle earns one show: three real beats at its own props, in
+        // order, once per long idle. This is checked before the ordinary
+        // beat so the show is not replaced by a stroll.
+        let scaledIdle = cues.idleS * max(cues.careScale, 1)
+        if showDue(idleS: scaledIdle, enabled: true, done: showDone) {
+            showDone = true
+            lastSelfPlayTick = cues.tick
+            playShow()
+            return
+        }
         selfBeats += 1
         if selfBeats % 2 == 0 {
             // A short stroll of its own through the same real velocity channel
