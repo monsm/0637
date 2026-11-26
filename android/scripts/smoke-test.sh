@@ -2203,31 +2203,39 @@ else
 fi
 for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 
-# 小账本: the numbers are today's real deltas; the duck nods. Retry the read
-# if the nod was refused while another mood played.
+# 小账本: the numbers are today's real deltas; the duck nods. The nod proves
+# the read ran; the lines are checked after a small scroll because uiautomator
+# only reports what is visible.
 LED_OK=0
 for _attempt in 1 2 3; do
   for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
   LEDGER_YES0=$(emotion_count yes)
   tap_games_control "小账本" "读一读" > /dev/null 2>&1 || break
   for _ in $(seq 1 25); do
-    rm -f games-tap.xml
-    adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
-    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-    adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
-    if grep -q "走了" games-tap.xml && grep -q "被摸" games-tap.xml; then
-      if [ "$(emotion_count yes)" -gt "$LEDGER_YES0" ] 2>/dev/null; then LED_OK=1; break 2; fi
+    if [ "$(emotion_count yes)" -gt "$LEDGER_YES0" ] 2>/dev/null; then
+      LED_OK=1
+      break 2
     fi
-    sleep 0.4
+    sleep 0.3
   done
 done
-if [ "$LED_OK" = "1" ]; then
-  echo "games: little ledger showed today's real facts and the duck nodded"
-else
+[ "$LED_OK" = "1" ] || {
   adb exec-out screencap -p > games-screen.png 2>/dev/null || true
   echo "::error::little ledger did not read today's facts"
   exit 1
-fi
+}
+LED_LINES=0
+for _ in $(seq 1 6); do
+  rm -f games-tap.xml
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > games-tap.xml 2>/dev/null || true
+  if grep -q "走了" games-tap.xml && grep -q "被摸" games-tap.xml; then LED_LINES=1; break; fi
+  adb shell input swipe 160 520 160 320 300 > /dev/null 2>&1 || true
+  sleep 0.5
+done
+[ "$LED_LINES" = "1" ] || { echo "::error::the ledger read but its facts never rendered"; exit 1; }
+echo "games: little ledger showed today's real facts and the duck nodded"
 for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
 
 # 传悄悄话: the duck queues one real tag; the child names it from last_sound.
