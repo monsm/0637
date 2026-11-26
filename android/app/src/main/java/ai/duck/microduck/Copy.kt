@@ -215,6 +215,9 @@ val quack get() = pick("Quack", "叫一声")
     val whisperAgain get() = pick("Again", "再听一次")
     // A game card names the today-quest its real actions move. The title and
     // done flag come from /state.quests; the prefix is the only fixed words.
+    // The block editor's prop group: one tap writes "when I clap -> kick the
+    // ball" with words the duck already knows. No new action or trigger.
+    val ruleProps get() = pick("Props", "道具")
     val questNotePrefix get() = pick("Goal: ", "今日目标：")
     val questNoteDonePrefix get() = pick("Goal met: ", "今日目标达成：")
 

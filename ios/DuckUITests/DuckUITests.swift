@@ -967,6 +967,54 @@ final class DuckUITests: XCTestCase {
         if app.buttons["more-close"].exists { app.buttons["more-close"].tap() }
     }
 
+    /// The block editor groups the five floor props as one-tap actions. The
+    /// pick writes an existing action/value pair (the vocabulary is
+    /// unit-tested); Add proves the editor posts the block the pick set.
+    func testTheBlockEditorGroupsTheProps() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+        app.buttons["duck-more"].tap()
+        let row = app.buttons["more-blocks"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the Blocks row is missing")
+        row.tap()
+        XCTAssertTrue(
+            app.staticTexts["rules-title"].waitForExistence(timeout: 10),
+            "the block editor did not open"
+        )
+
+        func scrollTo(_ id: String, swipes: Int = 30) -> XCUIElement {
+            let element = anyElement(id)
+            var n = 0
+            while n < swipes {
+                if element.exists && element.frame.height > 0,
+                   app.frame.intersects(element.frame) {
+                    return element
+                }
+                app.swipeUp()
+                n += 1
+            }
+            return element
+        }
+        let ball = scrollTo("rule-prop-ball")
+        XCTAssertTrue(ball.exists && ball.isHittable, "the prop group is missing from the editor")
+        // The row scrolls sideways; the off-screen chips still have to exist.
+        for id in ["rule-prop-hoop", "rule-prop-block", "rule-prop-cushion", "rule-prop-mirror"] {
+            XCTAssertTrue(anyElement(id).exists, "\(id) is missing")
+        }
+        ball.tap()
+        let add = scrollTo("rule-add")
+        XCTAssertTrue(add.exists, "the Add block button is missing")
+        add.tap()
+        XCTAssertTrue(
+            anyElement("rule-0").waitForExistence(timeout: 8),
+            "the prop pick did not add a block"
+        )
+        app.buttons["rules-close"].tap()
+    }
+
     private func openDanceStudio() {
         app.buttons["duck-more"].tap()
         let row = app.buttons["more-dance"]

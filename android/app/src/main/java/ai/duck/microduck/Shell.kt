@@ -2056,7 +2056,11 @@ private fun RulesSheet(onClose: () -> Unit) {
         )
         else -> listOf("chirp", "coo", "greet", "inquire", "peck", "alarm")
     }
-    LaunchedEffect(action) { value = values.first() }
+    LaunchedEffect(action) {
+        // A prop pick sets both at once; only a kind change that leaves the
+        // old value meaningless resets it.
+        if (value !in values) value = values.first()
+    }
     // One paste action for both the empty state and its own chip.
     val pasteClip: () -> Unit = {
         pasteRulesFromClip(context, rules, rulesLoaded, ::applyRules)
@@ -2172,6 +2176,31 @@ private fun RulesSheet(onClose: () -> Unit) {
                 }
             }
             Text(Copy.ruleThen, color = Color.White.copy(alpha = 0.75f), fontSize = DuckTheme.Type.Label)
+            // The five floor props as one-tap actions: the child writes
+            // "clap -> kick the ball" without learning a wire name. Each
+            // pick is an existing action/value pair.
+            Text(Copy.ruleProps, color = Color.White.copy(alpha = 0.6f), fontSize = DuckTheme.Type.Caption)
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),
+            ) {
+                RULE_PROP_PICKS.forEach { pick ->
+                    RuleChip(
+                        when (pick.id) {
+                            "ball" -> Copy.propPlayBall
+                            "hoop" -> Copy.propPlayHoop
+                            "block" -> Copy.propPlayBlocks
+                            "cushion" -> Copy.propPlayCushion
+                            else -> Copy.propPlayMirror
+                        },
+                        "rule-prop-${pick.id}",
+                        action == pick.action && value == pick.value,
+                    ) {
+                        if (action != pick.action) action = pick.action
+                        value = pick.value
+                    }
+                }
+            }
             Row(
                 Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm),

@@ -104,11 +104,14 @@ class RulesShareTest {
     }
 
     @Test
-    fun `the core-only light action is not imported, as on iOS`() {
-        // rules.rs also accepts `light`, but neither editor offers it and the
-        // iOS importer drops it; a shared program must mean the same thing
-        // on both phones.
+    fun `a shared program may carry the lamp step`() {
+        // rules.rs accepts `light` and both editors offer it; the importer
+        // used to drop it on the stale belief that neither editor did, so a
+        // program authored on one phone lost its lamp step on the other.
         val text = """[{"trigger":"clap","action":"light","value":"yellow"}]"""
-        assertNull(parseSharedRules(text))
+        val imported = parseSharedRules(text)
+        assertEquals(1, imported?.size)
+        assertEquals("light", imported?.first()?.action)
+        assertEquals("yellow", imported?.first()?.value)
     }
 }
