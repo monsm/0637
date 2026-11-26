@@ -516,18 +516,17 @@ fun Shell(
             ) {
                 selfBeats += 1
                 if (selfBeats % 2 == 0) {
-                    // A short route it walks itself: three real points through
-                    // the core's own path follower. Nobody drew this one.
+                    // A short stroll of its own: the same real velocity channel
+                    // the stick uses, nobody steering it. The odometer is the
+                    // proof (life.metres), and a slip is reported as a slip.
                     val sign = if ((duck.fingerprint().hashCode() and 1) == 0) 1.0 else -1.0
-                    if (postPath(
-                            listOf(
-                                listOf(0.0, 0.0),
-                                listOf(0.5, sign * 0.2),
-                                listOf(1.0, 0.0),
-                            ),
-                        )
-                    ) {
-                        lastSelfTick = propCues.tick
+                    input.vx = 0.30
+                    input.wz = sign * 0.25
+                    lastSelfTick = propCues.tick
+                    launch {
+                        delay(2000)
+                        input.vx = 0.0
+                        input.wz = 0.0
                     }
                 } else {
                     val prop = selfPlayProp(duck.fingerprint(), propCues.tick)

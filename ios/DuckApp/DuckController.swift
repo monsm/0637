@@ -2909,11 +2909,14 @@ final class DuckController: ObservableObject {
         else { return }
         selfBeats += 1
         if selfBeats % 2 == 0 {
-            // A short route it walks itself: three real points through the
-            // core's own path follower. Nobody drew this one.
+            // A short stroll of its own through the same real velocity channel
+            // the stick uses; the odometer is the proof, a slip is a slip.
             let sign: Double = fingerprint.hashValue % 2 == 0 ? 1 : -1
-            postPath(points: [[0, 0], [0.5, sign * 0.2], [1.0, 0]])
+            joystick = CGPoint(x: sign * 0.25, y: 0.30)
             lastSelfPlayTick = cues.tick
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.joystick = .zero
+            }
             return
         }
         let prop = selfPlayProp(fingerprint: fingerprint, tick: cues.tick)
