@@ -936,6 +936,18 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 8 例（五个道具区、开关独立命中区、全部守卫逐项、选择的确定性、缺字段读 0 不冒充）；冒烟打开开关后在**没有任何道具点击**的情况下等 vetbook 计数真增长（最多 45 秒），随后关掉恢复静止；iOS `testTheDuckPlaysOnItsOwnWhenAsked` 打开开关、等顶栏出现真实技能判词、再关掉（选择持久化，测试必须给后面的用例留一只静止的鸭子）。契约与棘轮同步（shell 3897 / ContentView 1867 / published 109 / a11y 动作 12）。
 
+### 四之五十四、道具分组积木规则（2026-11-26）
+
+- **玩法**：积木编辑器的动作选择器在动作词下新增「道具」一行——球=踢球（skill/kick_left）、呼啦圈=翻滚（skill/roulade）、积木=捡积木（skill/ground_pick）、坐垫=坐垫子（skill/sit）、镜子=照镜子（emotion/curious）。点一下就把动作和值一起选好，孩子写「拍手 → 踢球」不需要认识 wire 名；不新增任何触发词或动作词。
+- **真实地基**：`rules.rs` 的 TRIGGERS/ACTIONS 不变；五个值与编辑器原有词表完全一致；规则仍经既有规则通道下发，执行的是真实动词，道具由计数回答。
+- **顺带修的真缺口**：分享导入词表两端都补上 `light`。两端编辑器早已提供灯步，但两端导入器在一个过时注释下把灯步静默丢掉（Android 测试甚至把这一丢当作契约）——现在灯步规则可以跨手机。
+- **验收（run 45789721681，Android+Contracts）**：冒烟在积木页读到道具行：
+  ```
+  blocks: the five floor props are one-tap actions in the editor
+  ```
+  `smoke test passed`；同一 run 的 `/state` 里真实 `rule_event {"action":"light","trigger":"clap","value":"blue"}` 证明补词表后灯规则照常执行。两端单测（iOS `RulePropPicksTests`、Android `RulePropPicksTest`）钉住映射与词表；iOS `testTheBlockEditorGroupsTheProps` 点球 → 添加 → 断言积木出现。
+- **棘轮**：`shell_kt_lines` 3986（+29，附注在 `contracts/ui-baseline.json`）。
+
 ### 四之五十三、编舞铺收录道具动作（2026-11-26）
 
 - **玩法**：录制舞蹈时，五个舞台道具也是舞步——球=踢、呼啦圈=翻滚、积木=贴地抓取、坐垫=坐、镜子=情绪。只有被核心接受的动词才会记步，被拒不记。
