@@ -909,6 +909,79 @@ final class DuckUITests: XCTestCase {
         XCTAssertEqual(soundNote.label, "Goal: Clap twice", "the sound note reads \(soundNote.label)")
     }
 
+    /// The dance studio records a real prop verb. While recording, a block
+    /// tap is a real ground pick; the strip carries its label (no quick tile
+    /// offers it), and Play replays the same verb, counted by the vet book.
+    func testTheDanceRecordsAPropVerb() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+
+        openDanceStudio()
+        let record = anyElement("dance-record")
+        XCTAssertTrue(record.waitForExistence(timeout: 10), "the dance sheet has no Record chip")
+        record.tap()
+        XCTAssertEqual(record.label, "Stop recording", "the Record chip did not start recording")
+        anyElement("dance-close").tap()
+        // Closing the studio returns to the drawer; close it to reach the stage.
+        let moreClose = app.buttons["more-close"]
+        XCTAssertTrue(moreClose.waitForExistence(timeout: 6), "the drawer did not return")
+        moreClose.tap()
+        usleep(500_000)
+
+        let stage = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Duck stage"))
+            .firstMatch
+        let block = stage.exists
+            ? stage.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.62))
+            : app.coordinate(withNormalizedOffset: CGVector(dx: 0.86, dy: 0.62))
+        let picksBefore = groundPicks()
+        var picked = false
+        for _ in 0..<3 {
+            block.tap()
+            let deadline = Date().addingTimeInterval(10)
+            while Date() < deadline {
+                if groundPicks() > picksBefore { picked = true; break }
+                usleep(300_000)
+            }
+            if picked { break }
+            usleep(2_000_000)
+        }
+        XCTAssertTrue(picked, "the block tap never started a real ground pick")
+
+        openDanceStudio()
+        let step = app.staticTexts["ground pick"]
+        XCTAssertTrue(step.waitForExistence(timeout: 10), "the recorded pick is not in the strip")
+        let picksPlayed = groundPicks()
+        anyElement("dance-play").tap()
+        var replayed = false
+        let playDeadline = Date().addingTimeInterval(15)
+        while Date() < playDeadline {
+            if groundPicks() > picksPlayed { replayed = true; break }
+            usleep(300_000)
+        }
+        XCTAssertTrue(replayed, "the dance playback never replayed the recorded pick")
+        anyElement("dance-close").tap()
+        if app.buttons["more-close"].exists { app.buttons["more-close"].tap() }
+    }
+
+    private func openDanceStudio() {
+        app.buttons["duck-more"].tap()
+        let row = app.buttons["more-dance"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the Dance Studio row is missing")
+        row.tap()
+    }
+
+    private func groundPicks() -> Int {
+        guard let data = try? Data(contentsOf: URL(string: "http://127.0.0.1:8765/state")!),
+              let state = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let life = state["life"] as? [String: Any],
+              let picks = life["ground_picks"] as? Int else { return -1 }
+        return picks
+    }
+
     /// Post a three-quest board built from the core's own blueprint ids, so
     /// the notes are deterministic on any calendar day.
     private func postQuestBoardForGameCards() {
