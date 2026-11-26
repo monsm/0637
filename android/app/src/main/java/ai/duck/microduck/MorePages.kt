@@ -344,6 +344,7 @@ private fun RpsGame(core: DuckCore?, fingerprint: () -> String) {
 @Composable
 internal fun PlayMoreSheet(
     core: DuckCore?,
+    quests: QuestBoardUi = QuestBoardUi(),
     input: DuckInput,
     stick: String,
     surfaceIsDirector: Boolean,
@@ -478,14 +479,14 @@ internal fun PlayMoreSheet(
             // Play: rock-paper-scissors with the duck's body — its own
             // sit/stand/kick answers, chosen by its own fingerprint.
             RpsGame(core) { core?.fingerprint().orEmpty() ?: "" }
-            KickRally(core)
-            MoodCharade(core)
+            KickRally(core, quests)
+            MoodCharade(core, quests)
             MoodFreeze(core)
             DidItHappenToday(core)
-            SoundSimon(core)
+            SoundSimon(core, quests)
             ReverseCommand(core)
             PostureMirror(core)
-            RedLightGreenLight(core, input)
+            RedLightGreenLight(core, input, quests)
             FastForwardDay()
             FindIt(core)
             LittleLedger(core)

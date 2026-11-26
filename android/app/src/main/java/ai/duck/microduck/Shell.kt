@@ -1472,6 +1472,7 @@ fun Shell(
     if (route == DuckRoute.PlayMore) {
         PlayMoreSheet(
             core = core,
+            quests = quests,
             input = input,
             stick = stick,
             surfaceIsDirector = surface == Surface.Director,
