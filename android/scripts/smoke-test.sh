@@ -895,25 +895,50 @@ if ! curl -sf --max-time 5 http://127.0.0.1:8765/state | grep -q '"mode":"roller
   exit 1
 fi
 curl -sf --max-time 20 -X POST -H 'Content-Type: application/json'   -d '{"mode":"walk"}' http://127.0.0.1:8765/mode > /dev/null || true
-sleep 3
+# Roller can leave the duck limp for a moment. A twist at a limp or still
+# seated duck is a zero-metre walk, and a failed /life fetch used to read as
+# that same zero — wait for a real walk-mode stand before driving.
+WALK_READY=0
+for _ in $(seq 1 24); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c '
+import json,sys
+try:
+    s = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if s.get("mode") == "walk" and s.get("label") in ("walk", "stand")
+                 and not s.get("fallen") and not s.get("paused")
+                 and not s.get("care", {}).get("asleep") else 1)
+' 2>/dev/null; then WALK_READY=1; break; fi
+  sleep 0.5
+done
 
 # Drive the duck through its own intent API, the way an external agent
-# would: the API holds the duck for a lease, so keep the twist coming.
-for _ in $(seq 1 8); do
-  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-    -d '{"vx":0.4,"vy":0.0,"wz":0.0}' http://127.0.0.1:8765/twist > /dev/null || true
-  sleep 0.3
-done
-curl -sf --max-time 5 http://127.0.0.1:8765/state | tee intent-state-walking.json || true
-# The vet book counts the distance the duck's own odometry estimates.
-WALKED=$(curl -sf --max-time 5 http://127.0.0.1:8765/life | python3 -c "
+# would: the API holds the duck for a lease, so keep the twist coming. A
+# zero after a whole drive can be a refused fetch (the emulator's server is
+# briefly busy), so re-read before calling the walk a failure.
+WALKED=0
+for _attempt in 1 2 3; do
+  for _ in $(seq 1 8); do
+    curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+      -d '{"vx":0.4,"vy":0.0,"wz":0.0}' http://127.0.0.1:8765/twist > /dev/null || true
+    sleep 0.3
+  done
+  WALKED=$(curl -sf --max-time 5 http://127.0.0.1:8765/life | python3 -c "
 import json,sys
 print(json.load(sys.stdin).get('metres', 0))
 " 2>/dev/null || echo 0)
+  python3 -c "
+import sys
+sys.exit(0 if float('${WALKED:-0}') > 0.01 else 1)
+" 2>/dev/null && break
+  sleep 2
+done
+curl -sf --max-time 5 http://127.0.0.1:8765/state | tee intent-state-walking.json || true
 python3 -c "
 import sys
 sys.exit(0 if float('${WALKED:-0}') > 0.01 else 1)
-" 2>/dev/null || { echo "::error::the vet book never counted the walk: metres=$WALKED"; exit 1; }
+" 2>/dev/null || { echo "::error::the vet book never counted the walk: metres=$WALKED (ready=$WALK_READY)"; exit 1; }
 echo "walk counted: $WALKED m"
 
 # A black screen is the failure this app is prone to (the core load used to
