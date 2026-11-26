@@ -1668,6 +1668,19 @@ try: print(json.load(sys.stdin).get('care_time_scale',1.0))
 except Exception: print(-1)
 " 2>/dev/null || echo -1
 }
+state_tick() {
+  local tick
+  for _ in $(seq 1 10); do
+    tick=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))' 2>/dev/null || true)
+    if [ -n "$tick" ] && [ "$tick" -gt 0 ] 2>/dev/null; then
+      printf '%s' "$tick"
+      return 0
+    fi
+    sleep 0.2
+  done
+  return 1
+}
+
 body_idle() {
   [ "$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
 import json,sys
@@ -1851,41 +1864,33 @@ SLEEP_OK=0
 IDLE_NOW=0
 # The clock is 4x here: the smoke reaches this point well before the core's
 # tick reaches 30000, so a 30000-tick jump would go negative and the restore
-# would silently ignore last_touch (serde reads it as u64). At 4x, 600 care
-# seconds is 7500 ticks and 690 is 8625 — both already behind us, and the
-# doze at 720 care seconds still stays ahead of the first beat.
+# would silently ignore last_touch. At 4x, 600 care seconds is 7500 ticks and
+# 690 is 8625. A stray heard sound is real attention and resets the clock
+# (that is the product), so the test re-establishes the 600 s condition
+# until the cue fires in a calm gap rather than pretending the room is silent.
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":4}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
 for _attempt in 1 2 3; do
   for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
   for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
+  NOW_TICK=$(state_tick) || continue
   # Reset the beats deterministically: a hand brings the clock to zero, the
   # poll sees it, and only then does the clock jump to 600 s.
-  NOW_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
   curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
     -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$NOW_TICK}}" \
     http://127.0.0.1:8765/care > /dev/null 2>&1 || true
   sleep 2.2
-  # No synthetic sound here: queueing one would make the duck emote (the core
-  # answers a greet), and an emotion touches care and resets the clock we are
-  # about to set. The grumble left last_sound=inquire, so a coo is a real
-  # transition on its own.
-  for _ in $(seq 1 20); do emotion_idle && break; sleep 0.3; done
-  SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
-  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 7500))}}" \
-    http://127.0.0.1:8765/care > /dev/null 2>&1 || true
-  # The core's own clock must show the jump: a rejected restore would read
-  # as "the duck stayed silent", not as a bug in the cue.
-  IDLE_NOW=0
-  for _ in $(seq 1 15); do
-    IDLE_NOW=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("idle_s",0))' 2>/dev/null || echo 0)
-    if python3 -c "import sys; sys.exit(0 if float('${IDLE_NOW:-0}') >= 590 else 1)" 2>/dev/null; then break; fi
-    sleep 0.3
-  done
   COO_OK=0
-  for _ in $(seq 1 15); do
-    if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"coo"'; then COO_OK=1; break; fi
-    sleep 0.4
+  for _sub in $(seq 1 30); do
+    TICK_NOW=$(state_tick) || { sleep 0.4; continue; }
+    curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+      -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((TICK_NOW - 7500))}}" \
+      http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+    IDLE_NOW=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("idle_s",0))' 2>/dev/null || echo 0)
+    if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"coo"'; then
+      COO_OK=1
+      break
+    fi
+    sleep 0.5
   done
   [ "$COO_OK" = "1" ] && { SLEEP_OK=1; break; }
 done
@@ -1909,23 +1914,30 @@ LT0=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import jso
 sleep 1.5
 LT1=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
 [ "$LT0" = "$LT1" ] || { echo "::error::the settling sound reset the doze clock"; exit 1; }
-# The quieter chirp at 690 s: move only the clock, not the duck.
-SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
-curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-  -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 8625))}}" \
-  http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+# The quieter chirp at 690 s, re-established until the cue lands.
 CHIRP_OK=0
-for _ in $(seq 1 20); do
+for _sub in $(seq 1 20); do
+  TICK_NOW=$(state_tick) || { sleep 0.4; continue; }
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((TICK_NOW - 8625))}}" \
+    http://127.0.0.1:8765/care > /dev/null 2>&1 || true
   if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"chirp"'; then CHIRP_OK=1; break; fi
-  sleep 0.4
+  sleep 0.5
 done
 [ "$CHIRP_OK" = "1" ] || { echo "::error::the idle duck never made its pre-doze chirp"; exit 1; }
 # The doze itself still arrives: at 200x its 720 care-seconds are seconds away.
-curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":200}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
 ASLEEP=0
-for _ in $(seq 1 20); do
-  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"asleep":true'; then ASLEEP=1; break; fi
-  sleep 0.4
+for _sub in $(seq 1 10); do
+  TICK_NOW=$(state_tick) || { sleep 0.4; continue; }
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((TICK_NOW - 8625))}}" \
+    http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":200}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
+  for _ in $(seq 1 8); do
+    if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"asleep":true'; then ASLEEP=1; break 2; fi
+    sleep 0.3
+  done
+  sleep 0.3
 done
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8765/pet > /dev/null 2>&1 || true
