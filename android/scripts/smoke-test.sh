@@ -1831,18 +1831,60 @@ echo "games: a hungry duck grumbled on its own (last_sound=inquire)"
 # 睡前哼一声: the duck's own idle clock announces the doze — a settling coo at
 # 600 derived seconds, a quieter chirp at 690 — and neither sound touches
 # care, so the 720 s doze still arrives on time. A hand resets the beats.
-for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
-SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
-curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-  -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 30000))}}" \
-  http://127.0.0.1:8765/care > /dev/null 2>&1 || true
-COO_OK=0
-for _ in $(seq 1 20); do
-  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"coo"'; then COO_OK=1; break; fi
+SLEEP_OK=0
+IDLE_NOW=0
+# A 1x clock is what this test measures; an earlier section's speed would
+# turn the jump into an instant doze.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
+for _attempt in 1 2 3; do
+  for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+  for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
+  # Reset the beats deterministically: a hand brings the clock to zero, the
+  # poll sees it, and only then does the clock jump to 600 s.
+  NOW_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$NOW_TICK}}" \
+    http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+  sleep 2.2
+  # Move the witness away from coo so a stale last_sound cannot pass.
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"tag":"greet"}' http://127.0.0.1:8765/sound > /dev/null 2>&1 || true
   sleep 0.4
+  SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 30000))}}" \
+    http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+  # The core's own clock must show the jump: a rejected restore would read
+  # as "the duck stayed silent", not as a bug in the cue.
+  IDLE_NOW=0
+  for _ in $(seq 1 15); do
+    IDLE_NOW=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("idle_s",0))' 2>/dev/null || echo 0)
+    if python3 -c "import sys; sys.exit(0 if float('${IDLE_NOW:-0}') >= 590 else 1)" 2>/dev/null; then break; fi
+    sleep 0.3
+  done
+  COO_OK=0
+  for _ in $(seq 1 15); do
+    if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"coo"'; then COO_OK=1; break; fi
+    sleep 0.4
+  done
+  [ "$COO_OK" = "1" ] && { SLEEP_OK=1; break; }
 done
-[ "$COO_OK" = "1" ] || { echo "::error::the idle duck never made its settling coo"; exit 1; }
-LT0=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
+if [ "$SLEEP_OK" != "1" ]; then
+  SLEEP_WHY=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c '
+import json,sys
+try:
+    s = json.load(sys.stdin)
+except Exception:
+    print("state unreadable")
+    raise SystemExit(0)
+care = s.get("care", {})
+print("idle_s=%s label=%s asleep=%s paused=%s emotion=%s last_sound=%s scale=%s" % (
+    care.get("idle_s"), s.get("label"), care.get("asleep"), s.get("paused"),
+    (s.get("emotion") or {}).get("name"), s.get("last_sound"), s.get("care_time_scale")))
+' 2>/dev/null || echo "state unreadable")
+  echo "::error::the idle duck never made its settling coo ($SLEEP_WHY)"
+  exit 1
+fi
+=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
 sleep 1.5
 LT1=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
 [ "$LT0" = "$LT1" ] || { echo "::error::the settling sound reset the doze clock"; exit 1; }
