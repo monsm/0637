@@ -383,6 +383,18 @@ check $? "the duck accepts a stroke" "$(printf '%s' "$PET" | head -c 120)"
 # cooldown plus a margin; a bang that still finds another reaction running
 # is retried after the next lapse rather than read as a failure.
 echo "--- startle ---"
+# The duck's own idle ritual speaks a mood every 30 s; a timeline that owns
+# the duck when the bang lands swallows the alarm (run 45865929654 read
+# last_sound=emotion:curious through all three attempts). The ritual is
+# background, not the subject here: hold it, let any running mood finish,
+# then restore it. This is the same honesty as the smoke's quiet room.
+api POST /config '{"idle_ritual_s":0}' > /dev/null || true
+for _ in $(seq 1 40); do
+  if api GET /state | python3 -c 'import json,sys; raise SystemExit(0 if json.load(sys.stdin).get("emotion") is None else 1)' 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
 STARTLED=""
 for attempt in 1 2 3; do
   BASE_TICK=$(api GET /state | field tick || true)
@@ -405,6 +417,7 @@ for attempt in 1 2 3; do
   echo "note  startle: attempt $attempt was swallowed by a running reaction (last_sound=$STARTLED); waiting out the cooldown"
 done
 [ "$STARTLED" = "alarm" ]; check $? "a loud room startles the duck" "last_sound=$STARTLED"
+api POST /config '{"idle_ritual_s":30}' > /dev/null || true
 api POST /sensor '{"sensor":"microphone","mode":"twin","value":{"rms":0.0,"peak_hz":0},"tick_ms":0}' > /dev/null || true
 
 # The same RMS/zero-crossing channel, classified: a loud high-frequency
