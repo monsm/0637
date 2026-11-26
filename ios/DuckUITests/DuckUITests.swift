@@ -1144,6 +1144,90 @@ final class DuckUITests: XCTestCase {
         app.buttons["rules-close"].tap()
     }
 
+    /// A long idle (240 care-seconds, scaled like the doze clock) earns one
+    /// three-beat show: roulade, curious, kick_left, in that order, with the
+    /// self-play switch on. The counters are the core's own.
+    func testTheDuckPutsOnAShow() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+        let chip = anyElement("stage-self-play")
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "the self-play chip is missing")
+        func waitForValue(_ want: String, timeout: TimeInterval) -> Bool {
+            let deadline = Date().addingTimeInterval(timeout)
+            while Date() < deadline {
+                if (chip.value as? String) == want { return true }
+                usleep(100_000)
+            }
+            return false
+        }
+        if (chip.value as? String) != "on" { chip.tap() }
+        XCTAssertTrue(waitForValue("on", timeout: 5), "the switch did not turn on")
+
+        func state() -> [String: Any]? {
+            guard let data = try? Data(contentsOf: URL(string: "http://127.0.0.1:8765/state")!)
+            else { return nil }
+            return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        }
+        func post(_ path: String, _ body: [String: Any]) {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:8765\(path)")!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 5
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            let done = DispatchSemaphore(value: 0)
+            URLSession.shared.dataTask(with: request) { _, _, _ in done.signal() }.resume()
+            _ = done.wait(timeout: .now() + 5)
+        }
+        func skill(_ name: String) -> Int {
+            ((state()?["life"] as? [String: Any])?["skills"] as? [String: Any])?[name] as? Int ?? 0
+        }
+        func emotion(_ name: String) -> Int {
+            ((state()?["life"] as? [String: Any])?["emotions"] as? [String: Any])?[name] as? Int ?? 0
+        }
+
+        // The tick must carry the 1250-tick jump the 10x clock needs.
+        var tick = 0
+        let tickDeadline = Date().addingTimeInterval(120)
+        while Date() < tickDeadline {
+            tick = (state()?["tick"] as? Int) ?? 0
+            if tick >= 1300 { break }
+            usleep(500_000)
+        }
+        XCTAssertGreaterThanOrEqual(tick, 1300, "the core tick stayed too small for the show")
+        post("/config", ["care_time_scale": 10])
+        let ro0 = skill("roulade"), cu0 = emotion("curious"), kl0 = skill("kick_left")
+        var ro = false, cu = false, kl = false
+        var roAt = 0, cuAt = 0, klAt = 0, step = 0
+        let showDeadline = Date().addingTimeInterval(40)
+        while Date() < showDeadline {
+            step += 1
+            if !ro, skill("roulade") > ro0 { ro = true; roAt = step }
+            if !cu, emotion("curious") > cu0 { cu = true; cuAt = step }
+            if !kl, skill("kick_left") > kl0 { kl = true; klAt = step }
+            if ro && cu && kl { break }
+            // Hold the clock at the show's idle in case a stray attention
+            // reset it; published 25 s x 10 = 250 care-seconds.
+            if let now = state()?["tick"] as? Int {
+                post("/care", ["care": [
+                    "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+                    "asleep": false, "last_touch": now - 1250,
+                ]])
+            }
+            usleep(400_000)
+        }
+        if (chip.value as? String) == "on" { chip.tap() }
+        post("/config", ["care_time_scale": 1])
+        post("/pet", [:])
+        XCTAssertTrue(ro && cu && kl, "the show missed a beat (roulade=\(ro) curious=\(cu) kick=\(kl))")
+        XCTAssertTrue(
+            roAt > 0 && roAt <= cuAt && cuAt <= klAt,
+            "the beats came out of order (\(roAt), \(cuAt), \(klAt))"
+        )
+    }
+
     private func openDanceStudio() {
         app.buttons["duck-more"].tap()
         let row = app.buttons["more-dance"]

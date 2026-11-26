@@ -40,6 +40,7 @@
 - **验收**：Switch on, no taps: within 30 s /state.path.active==true with path.total ≥ 3 and path.reached growing; when the round ends path.active==false and life.metres rose ≥ 0.3 m; a fall is reported as life.falls +1. A second route waits for the cooldown (pure unit test: same fingerprint+tick → same route).
 
 ### 自己开一场独角戏（A One-Duck Show） · 可玩性 5/10 · medium
+- **状态（2026-11-26）**：已交付。自娱开关打开且闲置达 240 care 秒（乘 care_time_scale）时演一次三拍：roulade → curious → kick_left，按序真实动作；被拒跳过；每段长闲置一次，触摸重置；走核心 skill 门、不进编舞录制。两端纯函数单测，冒烟与 iOS UI 测试按序断言三个计数。
 - **玩法**：Opt-in. On a long derived idle (≥ 240 s), once per long idle: a three-beat routine — hoop (real roulade), mirror (real curious), ball (real kick_left) — each beat waiting for the previous to finish, with /state.emotion{duration_s} as the beat clock (the same clock Mood Freeze uses). All three are standing verbs, so the show never leaves the duck seated. A refused beat is skipped and named skipped; the show never claims a move it did not get. Shares the coordinator and the 1250-tick cooldown.
 - **自主**：No tap: left alone long enough, it puts on a three-beat show at its own props.
 - **真实地基**：POST /skill roulade/curious/kick_left; /state.life.skills.roulade, /state.life.emotions.curious, /state.life.skills.kick_left; /state.emotion{name,duration_s}; label/paused/emotion guards; the self-play coordinator's 1250-tick cooldown (StageProps.swift).

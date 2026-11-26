@@ -94,8 +94,8 @@
   "direction": "min"
  },
  "shell_kt_lines": {
-  "count": 4002,
+  "count": 4022,
   "direction": "max",
-  "note": "2026-11-26: +1 for scaling the published care.idle_s by care_time_scale in the pre-doze cue (the core's doze uses the scaled clock; the published field is unscaled). Earlier: +15 for the two settling sounds, +29 for the block editor's prop group, +16 for the dance studio's prop recording, +44 for lifelike autonomy."
+  "note": "2026-11-26: +20 for the one-duck show — a long idle (240 care-seconds, scaled) earns one three-beat routine behind the self-play switch. Earlier: +1 for the scaled sleep cue, +15 for the two settling sounds, +29 for the block editor's prop group, +16 for the dance studio's prop recording, +44 for lifelike autonomy."
  }
 }

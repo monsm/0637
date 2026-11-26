@@ -456,6 +456,7 @@ fun Shell(
         var hungerGrumbled = false
         var sleepCueCooed = false
         var sleepCueChirped = false
+        var longIdleShown = false
         var selfBeats = 0
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
@@ -514,6 +515,7 @@ fun Shell(
                 if (sleepIdle < 30.0) {
                     sleepCueCooed = false
                     sleepCueChirped = false
+                    longIdleShown = false
                 } else if (calm) {
                     val cue = sleepCue(sleepIdle, sleepCueCooed, sleepCueChirped)
                     if (cue != null) {
@@ -530,34 +532,52 @@ fun Shell(
                 routeState.overlay != ShellOverlay.Ring &&
                 selfPlayDue(propCues, careUi?.asleep == true, true, lastSelfTick)
             ) {
-                selfBeats += 1
-                if (selfBeats % 2 == 0) {
-                    // A short stroll of its own: the same real velocity channel
-                    // the stick uses, nobody steering it. The odometer is the
-                    // proof (life.metres), and a slip is reported as a slip.
-                    val sign = if ((duck.fingerprint().hashCode() and 1) == 0) 1.0 else -1.0
-                    input.vx = 0.30
-                    input.wz = sign * 0.25
+                // A long idle earns one show: three real beats at its own
+                // props, in order, once per long idle. Checked before the
+                // ordinary beat so the show is not replaced by a stroll.
+                val showIdle = propCues.idleS * maxOf(propCues.careScale, 1.0)
+                if (showDue(showIdle, true, longIdleShown)) {
+                    longIdleShown = true
                     lastSelfTick = propCues.tick
                     launch {
-                        delay(2000)
-                        input.vx = 0.0
-                        input.wz = 0.0
+                        for (beat in SHOW_BEATS) {
+                            // The duck's own show never enters a recording:
+                            // this is the core's skill door, not the UI's.
+                            duck.skill(beat)
+                            delay(if (beat == "curious") 3200 else 1600)
+                        }
                     }
                 } else {
-                    val prop = selfPlayProp(duck.fingerprint(), propCues.tick)
-                    val side = prop.side()
-                    input.vx = 0.35
-                    input.wz = -side * 0.5
-                    launch {
-                        delay(1200)
-                        input.vx = 0.0
-                        input.wz = 0.0
-                        delay(150)
-                        val accepted = reactProp(prop, duck)
-                        if (accepted.isNotEmpty()) {
-                            lastSelfTick = propCues.tick
-                            lastSkill = accepted
+                    selfBeats += 1
+                    if (selfBeats % 2 == 0) {
+                        // A short stroll of its own: the same real velocity
+                        // channel the stick uses, nobody steering it. The
+                        // odometer is the proof (life.metres), and a slip is
+                        // reported as a slip.
+                        val sign = if ((duck.fingerprint().hashCode() and 1) == 0) 1.0 else -1.0
+                        input.vx = 0.30
+                        input.wz = sign * 0.25
+                        lastSelfTick = propCues.tick
+                        launch {
+                            delay(2000)
+                            input.vx = 0.0
+                            input.wz = 0.0
+                        }
+                    } else {
+                        val prop = selfPlayProp(duck.fingerprint(), propCues.tick)
+                        val side = prop.side()
+                        input.vx = 0.35
+                        input.wz = -side * 0.5
+                        launch {
+                            delay(1200)
+                            input.vx = 0.0
+                            input.wz = 0.0
+                            delay(150)
+                            val accepted = reactProp(prop, duck)
+                            if (accepted.isNotEmpty()) {
+                                lastSelfTick = propCues.tick
+                                lastSkill = accepted
+                            }
                         }
                     }
                 }
