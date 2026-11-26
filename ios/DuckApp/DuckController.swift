@@ -3414,7 +3414,15 @@ final class DuckController: ObservableObject {
     func groundPick() -> Bool {
         guard let core else { return false }
         // The C entry answers 0 on success, -1 on refusal.
-        return duck_core_ground_pick(core) == 0
+        let accepted = duck_core_ground_pick(core) == 0
+        // The block is one of the stage's five prop verbs: while a dance is
+        // being recorded, a real pick becomes a step like any skill tile.
+        // Playback replays the same verb through `trigger`, which accepts
+        // the loop's own `ground_pick`. A refusal records nothing.
+        if accepted {
+            dance.record("skill", value: "ground_pick", label: SkillLabel.of("ground_pick"))
+        }
+        return accepted
     }
 
     /// The duck's own synth voice: one official tag (chirp/coo/greet/inquire/

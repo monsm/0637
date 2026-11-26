@@ -789,6 +789,15 @@ fun Shell(
                 if (surface == Surface.Director) {
                     DirectorOverlay(duck, Modifier.fillMaxSize())
                 }
+                // A prop verb the child asked for — by touch or screen reader
+                // — is a dance step while recording; the duck's own self-play
+                // goes through the poll instead and never records.
+                fun playProp(prop: StageProp) {
+                    reactProp(prop, duck).takeIf { it.isNotEmpty() }?.let { accepted ->
+                        lastSkill = accepted
+                        dance.record("skill", accepted, skillLabel(accepted))
+                    }
+                }
                 Column(
                     Modifier
                         .fillMaxSize()
@@ -826,7 +835,14 @@ fun Shell(
                                     onPathDraw = onPathDraw,
                                     ringOpen = { ringOpen },
                                     onLongPress = { setRing(true) },
-                                    onSkillAccepted = { lastSkill = it },
+                                    onSkillAccepted = { accepted ->
+                                        lastSkill = accepted
+                                        // A dance records what the child did:
+                                        // a prop tap is a real verb like a
+                                        // skill tile (self-play never comes
+                                        // through this callback).
+                                        dance.record("skill", accepted, skillLabel(accepted))
+                                    },
                                     onToggleSelfPlay = toggleSelfPlay,
                                 )
                                 // D4: the stage is one accessible element with
@@ -854,23 +870,23 @@ fun Shell(
                                         // screen reader reaches them through
                                         // the same stage element's actions.
                                         CustomAccessibilityAction(Copy.propPlayBall) {
-                                            reactProp(StageProp.Ball, duck)
+                                            playProp(StageProp.Ball)
                                             true
                                         },
                                         CustomAccessibilityAction(Copy.propPlayHoop) {
-                                            reactProp(StageProp.Hoop, duck)
+                                            playProp(StageProp.Hoop)
                                             true
                                         },
                                         CustomAccessibilityAction(Copy.propPlayBlocks) {
-                                            reactProp(StageProp.Block, duck)
+                                            playProp(StageProp.Block)
                                             true
                                         },
                                         CustomAccessibilityAction(Copy.propPlayMirror) {
-                                            reactProp(StageProp.Mirror, duck)
+                                            playProp(StageProp.Mirror)
                                             true
                                         },
                                         CustomAccessibilityAction(Copy.propPlayCushion) {
-                                            reactProp(StageProp.Cushion, duck)
+                                            playProp(StageProp.Cushion)
                                             true
                                         },
                                         CustomAccessibilityAction(Copy.selfPlayAction) {

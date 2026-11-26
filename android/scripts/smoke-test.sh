@@ -1463,6 +1463,7 @@ if [ -n "$STAGE_XY" ]; then
   S_L=$1; S_T=$2; S_W=$3; S_H=$4
   BALL_X=$((S_L + S_W * 14 / 100)); BALL_Y=$((S_T + S_H * 62 / 100))
   HOOP_X=$((S_L + S_W * 14 / 100)); HOOP_Y=$((S_T + S_H * 76 / 100))
+  BLOCK_X=$((S_L + S_W * 86 / 100)); BLOCK_Y=$((S_T + S_H * 62 / 100))
   MIRROR_X=$((S_L + S_W * 86 / 100)); MIRROR_Y=$((S_T + S_H * 76 / 100))
   CHIP_X=$((S_L + S_W * 14 / 100)); CHIP_Y=$((S_T + S_H * 38 / 100))
 else
@@ -1471,6 +1472,7 @@ else
   # near y 360, and the self-play chip near y 225.
   BALL_X=$((PROP_STAGE_W * 14 / 100)); BALL_Y=$((PROP_STAGE_H * 48 / 100))
   HOOP_X=$((PROP_STAGE_W * 14 / 100)); HOOP_Y=$((PROP_STAGE_H * 56 / 100))
+  BLOCK_X=$((PROP_STAGE_W * 86 / 100)); BLOCK_Y=$((PROP_STAGE_H * 48 / 100))
   MIRROR_X=$((PROP_STAGE_W * 86 / 100)); MIRROR_Y=$((PROP_STAGE_H * 56 / 100))
   CHIP_X=$((PROP_STAGE_W * 14 / 100)); CHIP_Y=$((PROP_STAGE_H * 35 / 100))
   echo "::warning::the stage node was not in the dump; tapping the screenshot-measured prop points"
@@ -1708,6 +1710,68 @@ else
   echo "::error::the self-play switch never produced both a prop move and its own stroll (counter=$SELF_OK metres $SELF_M0 -> $SELF_M1)"
   exit 1
 fi
+
+# 编舞铺收录道具动作 (2026-11-26): while a dance is recording, a real prop
+# verb becomes a step, and playback replays the same verb through the same
+# intent. The block is the honest witness: no quick tile offers 贴地抓取, so
+# that label in the strip can only come from the recorded tap. Self-play does
+# not pass through this path, so the duck's own play cannot write into the
+# child's dance.
+DANCE_REC=0
+for _ in $(seq 1 3); do
+  tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+  sleep 1.2
+  if tap_text "编舞铺" > /dev/null 2>&1 || tap_text "Dance Studio" > /dev/null 2>&1; then
+    sleep 1
+    if tap_text "录制" > /dev/null 2>&1 || tap_text "Record" > /dev/null 2>&1; then
+      DANCE_REC=1
+      break
+    fi
+  fi
+  adb shell input keyevent 4 > /dev/null 2>&1 || true
+  sleep 0.5
+done
+[ "$DANCE_REC" = "1" ] || { echo "::error::the dance studio never started recording"; exit 1; }
+# Back to the stage with the recorder still on.
+adb shell input keyevent 4 > /dev/null 2>&1 || true
+sleep 1
+GP0=$(life_int ground_picks)
+DANCE_PICK=0
+for _attempt in 1 2 3; do
+  for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+  for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
+  adb shell input tap $BLOCK_X $BLOCK_Y > /dev/null 2>&1 || true
+  for _ in $(seq 1 24); do
+    if [ "$(life_int ground_picks)" -gt "$GP0" ] 2>/dev/null; then DANCE_PICK=1; break 2; fi
+    sleep 0.25
+  done
+done
+[ "$DANCE_PICK" = "1" ] || { echo "::error::the block tap never started a real ground pick"; exit 1; }
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+sleep 1.2
+tap_text "编舞铺" > /dev/null 2>&1 || tap_text "Dance Studio" > /dev/null 2>&1 || {
+  echo "::error::the drawer lost its Dance Studio row"; exit 1; }
+sleep 1
+rm -f dance-ui.xml
+adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+adb exec-out cat /sdcard/ui.xml > dance-ui.xml 2>/dev/null || true
+if ! grep -q "贴地抓取" dance-ui.xml; then
+  echo "::error::the recorded block pick is not in the dance strip"
+  exit 1
+fi
+GP1=$(life_int ground_picks)
+tap_text "播放" > /dev/null 2>&1 || tap_text "Play" > /dev/null 2>&1 || {
+  echo "::error::the dance sheet has no Play chip"; exit 1; }
+DANCE_PLAY=0
+for _ in $(seq 1 30); do
+  if [ "$(life_int ground_picks)" -gt "$GP1" ] 2>/dev/null; then DANCE_PLAY=1; break; fi
+  sleep 0.3
+done
+[ "$DANCE_PLAY" = "1" ] || { echo "::error::the dance playback never replayed the recorded pick"; exit 1; }
+echo "dance: a real block pick recorded as a step and playback replayed it"
+adb shell input keyevent 4 > /dev/null 2>&1 || true
+sleep 1
 
 # 高兴就翻个滚: set the mood just under the line, then a pet carries it over;
 # the duck rolls once and nods, with no other command.

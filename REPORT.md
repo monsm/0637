@@ -936,6 +936,21 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 8 例（五个道具区、开关独立命中区、全部守卫逐项、选择的确定性、缺字段读 0 不冒充）；冒烟打开开关后在**没有任何道具点击**的情况下等 vetbook 计数真增长（最多 45 秒），随后关掉恢复静止；iOS `testTheDuckPlaysOnItsOwnWhenAsked` 打开开关、等顶栏出现真实技能判词、再关掉（选择持久化，测试必须给后面的用例留一只静止的鸭子）。契约与棘轮同步（shell 3897 / ContentView 1867 / published 109 / a11y 动作 12）。
 
+### 四之五十二、游戏卡标注今日目标（2026-11-26）
+
+- **玩法**：会推动今日目标的四张游戏卡——左右开弓（skills）、情绪哑剧（moods）、声音指挥官（clap）、红灯停绿灯行（walk）——标题下多一行「今日目标：<目标标题>」，目标完成时写「今日目标达成：<目标标题>」。当天没有对应目标就整行不显示。文字与完成态直接来自 `/state.quests`，卡片不存本地副本、不自己算进度。
+- **真实地基**：`quests.rs` 的 BLUEPRINTS（walk/roll/pet/hold/feed/clap/whistle/moods/skills/peck/bond）与 `summary()`（id/title_zh/title_en/target/done/progress）；四张卡的动作经由 `life.skills`、`life.emotions`、`life.claps`、`life.metres` 推动这些目标，映射就是核心自己的 blueprint id。
+- **纯函数**：两端 `gameQuestID(game)` 与 `gameQuestNote(...)`；单测 iOS `DuckTests/QuestNoteTests.swift`、Android `QuestNoteTest.kt` 各 4 例（映射、无板/未映射不显示、映射 id 必须是核心 blueprint id、完成后措辞跟随）。
+- **验收（run 45777031415，Android+Contracts；iOS e239c43b run 45773873542）**：冒烟先给核心投一块三目标板（skills/moods/clap，id 全部来自核心 blueprint），再在「玩一玩」页读卡片：
+  ```
+  games: the kick-rally card names today's quest (做 2 个动作)
+  games: the mood-charade card names today's quest (做 2 个表情)
+  games: the sound-simon card names today's quest (拍手两次)
+  ```
+  十二张游戏原验收全过、`smoke test passed`；iOS `testTheGameCardsNameTodaysQuest` 用同一块板（启动固定英文）断言三张卡读 "Goal: Do 2 moves / Show 2 moods / Clap twice"。
+- **本批 CI 真因**：首跑红在 RPS 试玩（45773827480）。日志里比分已是「你 3 · 鸭 0」——三轮都真答了；「鸭子出了…」行在筹码行**下方**，2.0 字号下被屏幕底边裁掉，uiautomator 不 dump 视外节点。修法：点完把页面上推 220 px 再读该行（`0e0d024d`）。不是抖动。
+- **教训**：`git add -A` 曾把旧草稿目录 `work/`（2919 个文件）卷进本地提交；推送前发现 origin 未动，重置后只显式提交本批 13 个文件。以后在这个仓库只显式 `git add` 本批文件。
+
 ### 四之五十一、三条自主玩法：高兴打滚、饿了哼唧、自己散步（2026-11-26）
 
 出处：第二轮六维脑暴（`docs/PLAY_IDEAS_ROUND2_2026-11-26.md`，61 条审计后保留 10 条，先做三条自主行为）。三条都**没有新的请求通道**：用的全是核心已有的 `/state` 字段与官方动词，鸭子"自己想起来"做平时只有人戳它才做的事。

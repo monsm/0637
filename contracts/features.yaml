@@ -156,6 +156,7 @@ features:
     page: dance
     hops: 2
     conform_b4: ok
+    note: 录制时五个舞台道具的真实动词也是舞步（球=踢、圈=翻滚、积木=贴地抓取、坐垫=坐、镜子=情绪）；点击与屏幕阅读器动作走同一录制路径，鸭子自娱不录制；播放按同一意图通道重演，道具由真实计数回答
     ios: implemented
     android: implemented
     data_chain: none
