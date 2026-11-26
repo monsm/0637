@@ -454,6 +454,8 @@ fun Shell(
         // the state falling back.
         var moodRollArmed = false
         var hungerGrumbled = false
+        var sleepCueCooed = false
+        var sleepCueChirped = false
         var selfBeats = 0
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
@@ -504,6 +506,19 @@ fun Shell(
                 if (calm && !hungerGrumbled && careNow.hunger >= 0.8 && propCues.idleS >= 10.0) {
                     duck.queueSound("inquire")
                     hungerGrumbled = true
+                }
+                // The last little sounds before it dozes: care.idle_s is the
+                // same derived clock care.rs uses, and /sound never touches
+                // care, so the 720 s doze keeps its schedule.
+                if (propCues.idleS < 30.0) {
+                    sleepCueCooed = false
+                    sleepCueChirped = false
+                } else if (calm) {
+                    val cue = sleepCue(propCues.idleS, sleepCueCooed, sleepCueChirped)
+                    if (cue != null) {
+                        if (cue == "chirp") sleepCueChirped = true else sleepCueCooed = true
+                        duck.queueSound(cue)
+                    }
                 }
             }
             // Self-play: with the switch on, an idle duck walks to a prop and
