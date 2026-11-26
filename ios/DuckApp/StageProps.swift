@@ -25,6 +25,10 @@ struct PropCues: Equatable {
     // The autonomy cues: the duck's own mood and hunger.
     var mood: Double = 0
     var hunger: Double = 0
+    /// The care clock's speed. /state.care.idle_s is published unscaled;
+    /// care.rs scales it for the doze, so the shell must scale it too or a
+    /// fast clock dozes before its own settling sounds can fire.
+    var careScale: Double = 1
 }
 
 /// A self-play beat no sooner than this many simulated ticks (25 s at 50 Hz).

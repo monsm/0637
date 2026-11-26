@@ -31,6 +31,13 @@ final class SleepCuesTests: XCTestCase {
         XCTAssertEqual(sleepCue(idleS: 700, cooed: false, chirped: false), "chirp")
     }
 
+    func testThePublishedClockIsScaledLikeTheCoreDoze() {
+        // /state.care.idle_s is published unscaled; care.rs multiplies it by
+        // care_time_scale for the doze. The shell must do the same or a 6x
+        // clock dozes before its settling sounds can reach their marks.
+        XCTAssertEqual(sleepCue(idleS: 100 * 6, cooed: false, chirped: false), "coo")
+    }
+
     func testBothMarksArriveBeforeTheDoze() {
         XCTAssertLessThan(sleepCueCooSeconds, sleepCueChirpSeconds)
         XCTAssertLessThan(sleepCueChirpSeconds, 720)

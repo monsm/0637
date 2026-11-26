@@ -2847,6 +2847,7 @@ final class DuckController: ObservableObject {
         let idle = json["idle"] as? [String: Any]
         let takeover = idle?["takeover"] as? Double ?? 0
         cues.idleTakeover = takeover
+        cues.careScale = json["care_time_scale"] as? Double ?? 1
         if takeover > 0.1,
            let head = idle?["head"] as? [Any], head.count >= 3,
            let yaw = head[2] as? Double {
@@ -2895,11 +2896,12 @@ final class DuckController: ObservableObject {
         // (care.idle_s, the same number care.rs uses) crosses 600 s and
         // 690 s. POST /sound never calls care.touch, so the 720 s doze keeps
         // its schedule; a hand or a nap resets the beats.
-        if cues.idleS < 30 {
+        let sleepIdle = cues.idleS * max(cues.careScale, 1)
+        if sleepIdle < 30 {
             sleepCueCooed = false
             sleepCueChirped = false
         } else if calm {
-            if let cue = sleepCue(idleS: cues.idleS, cooed: sleepCueCooed, chirped: sleepCueChirped) {
+            if let cue = sleepCue(idleS: sleepIdle, cooed: sleepCueCooed, chirped: sleepCueChirped) {
                 if cue == "chirp" { sleepCueChirped = true } else { sleepCueCooed = true }
                 queueSound(cue)
             }
