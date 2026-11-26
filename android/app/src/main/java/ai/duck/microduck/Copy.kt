@@ -213,6 +213,10 @@ val quack get() = pick("Quack", "叫一声")
     val whisperListen get() = pick("Whisper to me", "悄悄说给我听")
     val whisperPrompt get() = pick("What did it say?", "它刚才说了什么？")
     val whisperAgain get() = pick("Again", "再听一次")
+    // A game card names the today-quest its real actions move. The title and
+    // done flag come from /state.quests; the prefix is the only fixed words.
+    val questNotePrefix get() = pick("Goal: ", "今日目标：")
+    val questNoteDonePrefix get() = pick("Goal met: ", "今日目标达成：")
 
     // Each game's start key says its own words: Play more stacks several
     // games, and a repeated 开始 made a tap land on the neighbour's start.

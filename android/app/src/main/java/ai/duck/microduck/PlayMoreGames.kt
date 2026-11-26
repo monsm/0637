@@ -77,9 +77,28 @@ private fun playingEmotion(state: String?): Boolean = try {
     false
 }
 
+/** The today-quest a game's real actions move, if any (the core's ids). */
+internal fun gameQuestId(game: String): String? = when (game) {
+    "kick-rally" -> "skills"
+    "mood-charade" -> "moods"
+    "sound-simon" -> "clap"
+    "red-light" -> "walk"
+    else -> null
+}
+
+/**
+ * The one-line note a game card shows from the real board: the quest's own
+ * title and done flag, straight from /state.quests. No board entry -> no
+ * note. Pure, so both ends can test it against a canned board.
+ */
+internal fun gameQuestNote(quests: QuestBoardUi, game: String): String? {
+    val quest = quests.quests.firstOrNull { it.id == gameQuestId(game) } ?: return null
+    return (if (quest.done) Copy.questNoteDonePrefix else Copy.questNotePrefix) + quest.title
+}
+
 /** 左右开弓: alternate feet on the count; each correct tap is a real kick. */
 @Composable
-fun KickRally(core: DuckCore?) {
+fun KickRally(core: DuckCore?, quests: QuestBoardUi = QuestBoardUi()) {
     var step by remember { mutableStateOf(0) }
     var notice by remember { mutableStateOf("") }
     val leftTurn = step % 2 == 0
@@ -120,6 +139,14 @@ fun KickRally(core: DuckCore?) {
                     .semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
+        gameQuestNote(quests, "kick-rally")?.let {
+            Text(
+                it,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = DuckTheme.Type.Micro,
+                modifier = Modifier.testTag("quest-note-kick-rally"),
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
             PathChip(Copy.rallyLeftTurn, enabled = step < 6, testTag = "rally-left") { tap(true) }
             PathChip(Copy.rallyRightTurn, enabled = step < 6, testTag = "rally-right") { tap(false) }
@@ -130,7 +157,7 @@ fun KickRally(core: DuckCore?) {
 
 /** 情绪哑剧: the duck performs a real mood; the child names it. */
 @Composable
-fun MoodCharade(core: DuckCore?) {
+fun MoodCharade(core: DuckCore?, quests: QuestBoardUi = QuestBoardUi()) {
     var answer by remember { mutableStateOf("") }
     var choices by remember { mutableStateOf(emptyList<String>()) }
     var phase by remember { mutableStateOf(0) } // 0 idle, 1 performing, 2 guessing, 3 answered
@@ -191,6 +218,14 @@ fun MoodCharade(core: DuckCore?) {
                 modifier = Modifier
                     .testTag("charade-status")
                     .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        gameQuestNote(quests, "mood-charade")?.let {
+            Text(
+                it,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = DuckTheme.Type.Micro,
+                modifier = Modifier.testTag("quest-note-mood-charade"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
@@ -332,7 +367,7 @@ fun DidItHappenToday(core: DuckCore?) {
 
 /** 声音指挥官: the room answers with a clap or a whistle; the duck reacts. */
 @Composable
-fun SoundSimon(core: DuckCore?) {
+fun SoundSimon(core: DuckCore?, quests: QuestBoardUi = QuestBoardUi()) {
     var status by remember { mutableStateOf("") }
     var listening by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -385,6 +420,14 @@ fun SoundSimon(core: DuckCore?) {
                 modifier = Modifier
                     .testTag("soundgame-status")
                     .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        gameQuestNote(quests, "sound-simon")?.let {
+            Text(
+                it,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = DuckTheme.Type.Micro,
+                modifier = Modifier.testTag("quest-note-sound-simon"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {
@@ -504,7 +547,7 @@ fun PostureMirror(core: DuckCore?) {
 
 /** 红灯停绿灯行: green keeps a real forward command going; red stops dead. */
 @Composable
-fun RedLightGreenLight(core: DuckCore?, input: DuckInput) {
+fun RedLightGreenLight(core: DuckCore?, input: DuckInput, quests: QuestBoardUi = QuestBoardUi()) {
     var green by remember { mutableStateOf(false) }
     LaunchedEffect(green) {
         while (green) {
@@ -524,6 +567,14 @@ fun RedLightGreenLight(core: DuckCore?, input: DuckInput) {
                 color = if (green) DuckTheme.StateGood else Color.White.copy(alpha = 0.7f),
                 fontSize = DuckTheme.Type.Caption,
                 modifier = Modifier.testTag("light-status").semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
+        gameQuestNote(quests, "red-light")?.let {
+            Text(
+                it,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = DuckTheme.Type.Micro,
+                modifier = Modifier.testTag("quest-note-red-light"),
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DuckTheme.Space.sm)) {

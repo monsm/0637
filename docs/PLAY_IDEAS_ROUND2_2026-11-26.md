@@ -7,6 +7,7 @@
 ## 保留（10 条，按可玩性/成本排序）
 
 ### 游戏卡标注今日目标（Game cards show which quest they help） · 可玩性 8/10 · small
+- **状态（2026-11-26）**：已交付。四张有真实计数映射的卡（左右开弓→skills、情绪哑剧→moods、声音指挥官→clap、红灯停绿灯行→walk）从 `/state.quests` 标注目标标题与完成态；纯函数两端单测、冒烟与 iOS UI 测试各投一块确定的目标板再读卡。
 - **玩法**：Free tier, default on. Every 玩一玩 card reads /state.quests and shows a one-line chip naming which of today's three goals its real actions move (kick rally → 做 2 个动作; mood charade → 做 2 个表情; sound simon → 拍手两次; red light → 走 2 米). The chip is a pure function of the /state.quests object — no local copy, no invented progress; no quests posted → no chip. The score stays exactly the vet-book counter.
 - **自主**：none — the child plays; the card only points at the same real counter.
 - **真实地基**：/state.quests (quests.rs summary: three quests with metric/target/baseline/done plus streak/best_streak) crossed with the twelve inline games (PlayMoreGames.swift, PlayMoreGames.kt), which already drive life.skills/emotions/ground_picks/metres/claps/whistles through the real intent route; the metric→counter mapping is quests.rs metric_value() itself.

@@ -863,6 +863,84 @@ final class DuckUITests: XCTestCase {
         XCTAssertEqual(anyElement("whisper-status").label, "What did it say?", "whisper status")
     }
 
+    /// The game cards name the today-quest their real actions move, straight
+    /// from /state.quests. The board is posted in the core's own blueprint
+    /// shape, then the note is read on the card it belongs to — no local
+    /// copy and no invented progress.
+    func testTheGameCardsNameTodaysQuest() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+        postQuestBoardForGameCards()
+        usleep(2_500_000) // one /state poll
+
+        app.buttons["duck-more"].tap()
+        let playMore = app.buttons["more-playmore"]
+        XCTAssertTrue(playMore.waitForExistence(timeout: 10), "the Play-more row is missing")
+        playMore.tap()
+
+        func scrollTo(_ id: String, swipes: Int = 40) -> XCUIElement {
+            let element = anyElement(id)
+            var n = 0
+            while n < swipes {
+                if element.exists && element.frame.height > 0,
+                   app.frame.intersects(element.frame) {
+                    return element
+                }
+                app.swipeUp()
+                n += 1
+            }
+            return element
+        }
+
+        // The three cards whose real counters the posted board names.
+        let kickNote = scrollTo("quest-note-kick-rally")
+        XCTAssertTrue(kickNote.exists, "the kick-rally card shows no quest note")
+        XCTAssertEqual(kickNote.label, "Goal: Do 2 moves", "the kick-rally note reads \(kickNote.label)")
+
+        let charadeNote = scrollTo("quest-note-mood-charade")
+        XCTAssertTrue(charadeNote.exists, "the mood-charade card shows no quest note")
+        XCTAssertEqual(charadeNote.label, "Goal: Show 2 moods", "the charade note reads \(charadeNote.label)")
+
+        let soundNote = scrollTo("quest-note-sound-simon")
+        XCTAssertTrue(soundNote.exists, "the sound-simon card shows no quest note")
+        XCTAssertEqual(soundNote.label, "Goal: Clap twice", "the sound note reads \(soundNote.label)")
+    }
+
+    /// Post a three-quest board built from the core's own blueprint ids, so
+    /// the notes are deterministic on any calendar day.
+    private func postQuestBoardForGameCards() {
+        guard let stateData = try? Data(contentsOf: URL(string: "http://127.0.0.1:8765/state")!),
+              let state = try? JSONSerialization.jsonObject(with: stateData) as? [String: Any],
+              let board = state["quests"] as? [String: Any],
+              let day = board["day"] as? String, !day.isEmpty
+        else {
+            XCTFail("the core did not publish a quest day")
+            return
+        }
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:8765/quests/day")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 5
+        let body: [String: Any] = [
+            "day": day,
+            "board": [
+                "day": day,
+                "quests": [
+                    ["id": "skills", "target": 2, "progress": 0.0, "done": false],
+                    ["id": "moods", "target": 2, "progress": 0.0, "done": false],
+                    ["id": "clap", "target": 2, "progress": 0.0, "done": false],
+                ],
+            ],
+        ]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { _, _, _ in done.signal() }.resume()
+        XCTAssertEqual(done.wait(timeout: .now() + 5), .success, "the quest board POST timed out")
+    }
+
     /// The self-play switch (2026-11-25): turned on, an idle duck walks to a
     /// prop and plays with it on its own. The verdict line is the proof the
     /// core accepted the verb; it is empty at launch and no other tap

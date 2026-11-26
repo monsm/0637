@@ -1868,6 +1868,46 @@ PYX
   return 1
 }
 
+# A visible line of text in the games sheet. The quest note is a plain Text
+# (not a control), so the proof is the dump: the same words the core's
+# /state.quests publishes, on the card whose actions move that quest.
+games_text_visible() {
+  local text="$1" i
+  [ -n "$text" ] || return 1
+  for i in $(seq 1 6); do
+    rm -f games-note.xml
+    adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+    adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+    adb exec-out cat /sdcard/ui.xml > games-note.xml 2>/dev/null || true
+    if grep -qF "$text" games-note.xml 2>/dev/null; then return 0; fi
+    sleep 0.5
+  done
+  return 1
+}
+
+# The game cards name the today-quest their real actions move. Post a board
+# built from the core's own blueprint ids (skills/moods/clap), then read the
+# titles back from /state so every assertion speaks the core's own words.
+QUEST_DAY=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("quests",{}).get("day",""))' 2>/dev/null || true)
+if [ -n "$QUEST_DAY" ]; then
+  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+    -d "{\"day\":\"$QUEST_DAY\",\"board\":{\"day\":\"$QUEST_DAY\",\"quests\":[{\"id\":\"skills\",\"target\":2,\"progress\":0.0,\"done\":false},{\"id\":\"moods\",\"target\":2,\"progress\":0.0,\"done\":false},{\"id\":\"clap\",\"target\":2,\"progress\":0.0,\"done\":false}]}}" \
+    http://127.0.0.1:8765/quests/day > /dev/null 2>&1 || true
+  sleep 2
+fi
+QUEST_TITLES=$(curl -sf --max-time 5 http://127.0.0.1:8765/state | python3 -c '
+import json, sys
+try:
+    board = json.load(sys.stdin).get("quests", {})
+except Exception:
+    raise SystemExit(0)
+by = {q.get("id"): (q.get("title_zh") or q.get("title_en") or "") for q in board.get("quests", [])}
+print("|".join(by.get(k, "") for k in ("skills", "moods", "clap")))
+' 2>/dev/null || true)
+QUEST_SKILLS_TITLE=$(printf '%s' "$QUEST_TITLES" | cut -d'|' -f1)
+QUEST_MOODS_TITLE=$(printf '%s' "$QUEST_TITLES" | cut -d'|' -f2)
+QUEST_CLAP_TITLE=$(printf '%s' "$QUEST_TITLES" | cut -d'|' -f3)
+
 # Open the Play more page: the drawer's 玩一玩 row, then let the sheet settle.
 tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
 sleep 1.5
@@ -1916,6 +1956,11 @@ for _ in $(seq 1 20); do
 done
 if [ "$RALLY_OK" = "1" ]; then
   echo "games: kick rally landed $((KL - KL0)) left and $((KR - KR0)) right real kicks"
+  if [ -n "$QUEST_SKILLS_TITLE" ]; then
+    games_text_visible "$QUEST_SKILLS_TITLE" || {
+      echo "::error::the kick-rally card does not name today's skills quest"; exit 1; }
+    echo "games: the kick-rally card names today's quest ($QUEST_SKILLS_TITLE)"
+  fi
 else
   echo "::error::kick rally did not land two real kicks per foot (left $KL0->$KL, right $KR0->$KR)"
   exit 1
@@ -1963,6 +2008,11 @@ PYX
 done
 if [ "$CHAR_OK" = "1" ]; then
   echo "games: mood charade performed $MOOD and the right answer earned a real yes"
+  if [ -n "$QUEST_MOODS_TITLE" ]; then
+    games_text_visible "$QUEST_MOODS_TITLE" || {
+      echo "::error::the mood-charade card does not name today's moods quest"; exit 1; }
+    echo "games: the mood-charade card names today's quest ($QUEST_MOODS_TITLE)"
+  fi
 else
   adb exec-out screencap -p > games-screen.png 2>/dev/null || true
   echo "::error::the right charade answer never earned the duck's yes"
@@ -2037,6 +2087,11 @@ for _ in $(seq 1 40); do
   sleep 0.4
 done
 tap_games_control "声音指挥官" "拍手让它笑" > /dev/null 2>&1 || { echo "::error::no sound-clap chip"; exit 1; }
+if [ -n "$QUEST_CLAP_TITLE" ]; then
+  games_text_visible "$QUEST_CLAP_TITLE" || {
+    echo "::error::the sound-simon card does not name today's clap quest"; exit 1; }
+  echo "games: the sound-simon card names today's quest ($QUEST_CLAP_TITLE)"
+fi
 sleep 0.5
 SOUND_TICK=$(python3 -c 'import time; print(int(time.time()*1000))')
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \

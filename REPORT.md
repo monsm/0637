@@ -936,6 +936,30 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 8 例（五个道具区、开关独立命中区、全部守卫逐项、选择的确定性、缺字段读 0 不冒充）；冒烟打开开关后在**没有任何道具点击**的情况下等 vetbook 计数真增长（最多 45 秒），随后关掉恢复静止；iOS `testTheDuckPlaysOnItsOwnWhenAsked` 打开开关、等顶栏出现真实技能判词、再关掉（选择持久化，测试必须给后面的用例留一只静止的鸭子）。契约与棘轮同步（shell 3897 / ContentView 1867 / published 109 / a11y 动作 12）。
 
+### 四之五十一、三条自主玩法：高兴打滚、饿了哼唧、自己散步（2026-11-26）
+
+出处：第二轮六维脑暴（`docs/PLAY_IDEAS_ROUND2_2026-11-26.md`，61 条审计后保留 10 条，先做三条自主行为）。三条都**没有新的请求通道**：用的全是核心已有的 `/state` 字段与官方动词，鸭子"自己想起来"做平时只有人戳它才做的事。
+
+| 行为 | 真实触发（全部来自 `/state`） | 动作 | 重新武装 |
+|---|---|---|---|
+| 高兴就翻个滚 | `care.mood` 上穿 0.80，且醒着/未冻结/未拎起/无情绪/站或走/无面板 | 官方 `roulade`，1.6 s 后接 `yes` | mood 掉回 0.70 以下 |
+| 饿了会哼唧 | `care.hunger ≥ 0.80` 且 `care.idle_s ≥ 10`，同样安静守卫 | `queueSound("inquire")`（核心官方 tag，`last_sound` 可查） | hunger 掉回 0.60 以下 |
+| 自己去散步 | 自娱开关打开、`selfPlayDue` 全守卫通过、25 s 模拟 tick 冷却已过 | 偶数拍：真实道具动词；奇数拍：真实速度通道 `vx=0.30, wz=±0.25` 走 2 秒 | 里程表 `life.metres` 增长为证 |
+
+**设计取舍**：① 三条都只在"没人动它"的窗口里发生——情绪在演、被拎起、画了路线、面板打开、睡着时一律不动作，避免与孩子正在做的操作打架；② 情绪选择用官方时间线自己的嗓音（`roulade`/`yes` 都带声），哼唧用核心自己的 `inquire` 合成音，不新造音效；③ 散步最初用 `/path` 铺 12 点路线，但 `/path` 是"人给鸭子画的路"，语义上不是鸭子自己走，且冒烟看不到 `path.active`；改用速度通道后鸭子确实自己迈步，验收读 `life.metres` 真实增量。
+
+**验收（Android 冒烟原文，run 45763821544）**：
+```
+self-play: the idle duck played with a prop and strolled on its own (metres 4.317420186305487 -> 4.624770147379862)
+games: a happiness crossing made the duck roll once and nod
+games: a hungry duck grumbled on its own (last_sound=inquire)
+```
+iOS 侧同构：`DuckController.parsePropCues` 驱动同一套守卫与 `maybeSelfPlay()`，`PropCues` 增 `mood/hunger`（不加 `@Published`，不占 109 的发布面）。
+
+**本批 CI 教训（一条真因）**：冒烟的小账本断了，日志是 `little ledger did not read today's facts`。真因不是游戏本身，而是同批为"悄悄话与回声共用四个声音词"新加的"只认标题下方控件"过滤——小账本的「读一读」和标题**同一行**，被误排除，点击从未落地。修法：控件**中心不低于标题顶线**即算本段（同排按钮算，上一段的同名音垫不算），`cffdd0c`。
+
+**棘轮**：`shell_kt_lines` 3941（+44，附注"lifelike autonomy"）。
+
 ### 四之四十八、镜子做鬼脸与道具的声音（2026-11-25）
 
 - **镜子做不同情绪**：每次被接受的镜子点击让鸭子做一个不同的官方情绪，顺序固定（curious → laugh → excited → sad → yes），一轮五个。核心一次只演一个情绪、坐着也演不了，所以被拒的点击**不推进顺序**，冒烟按 `/state.emotion` 等演完再点。这就是"对着镜子做鬼脸"——情绪时间线自带官方嗓音。

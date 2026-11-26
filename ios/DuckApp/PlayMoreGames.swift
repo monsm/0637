@@ -76,6 +76,28 @@ private struct GameChip: View {
     }
 }
 
+/// The today-quest a game's real actions move, if any. The ids are the
+/// core's own blueprint ids (`quests.rs` BLUEPRINTS); a game whose play does
+/// not move one of those counters names nothing.
+func gameQuestID(_ game: String) -> String? {
+    switch game {
+    case "kick-rally": return "skills"
+    case "mood-charade": return "moods"
+    case "sound-simon": return "clap"
+    case "red-light": return "walk"
+    default: return nil
+    }
+}
+
+/// The one-line note a game card shows from the real board: the quest's own
+/// title and done flag, straight from /state.quests. No board entry → no
+/// note. Pure, so both ends can test it against a canned board.
+func gameQuestNote(_ quests: [DuckController.QuestCard], game: String) -> String {
+    guard let id = gameQuestID(game),
+          let quest = quests.first(where: { $0.id == id }) else { return "" }
+    return (quest.done ? Copy.questNoteDonePrefix : Copy.questNotePrefix) + quest.title
+}
+
 /// 左右开弓: alternate feet on the count; each correct tap is a real kick.
 struct KickRally: View {
     @ObservedObject var controller: DuckController
@@ -111,6 +133,13 @@ struct KickRally: View {
                     .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.6))
                     .accessibilityIdentifier("rally-status")
+            }
+            let questNote = gameQuestNote(controller.quests, game: "kick-rally")
+            if !questNote.isEmpty {
+                Text(questNote)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .accessibilityIdentifier("quest-note-kick-rally")
             }
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
                 GameChip(title: Copy.rallyLeftTurn, identifier: "rally-left",
@@ -183,6 +212,13 @@ struct MoodCharade: View {
                     .font(.duckCaption)
                     .foregroundStyle(.white.opacity(0.6))
                     .accessibilityIdentifier("charade-status")
+            }
+            let questNote = gameQuestNote(controller.quests, game: "mood-charade")
+            if !questNote.isEmpty {
+                Text(questNote)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .accessibilityIdentifier("quest-note-mood-charade")
             }
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
                 ForEach(Array(choices.prefix(2)), id: \.self) { mood in
@@ -332,6 +368,13 @@ struct SoundSimon: View {
                     .foregroundStyle(.white.opacity(0.6))
                     .accessibilityIdentifier("soundgame-status")
             }
+            let questNote = gameQuestNote(controller.quests, game: "sound-simon")
+            if !questNote.isEmpty {
+                Text(questNote)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .accessibilityIdentifier("quest-note-sound-simon")
+            }
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
                 GameChip(title: Copy.soundPromptLaugh, identifier: "sound-clap",
                          enabled: !listening) { listen(kind: "clap") }
@@ -466,6 +509,13 @@ struct RedLightGreenLight: View {
                     .font(.duckCaption)
                     .foregroundStyle(green ? Color.duckGood : .white.opacity(0.7))
                     .accessibilityIdentifier("light-status")
+            }
+            let questNote = gameQuestNote(controller.quests, game: "red-light")
+            if !questNote.isEmpty {
+                Text(questNote)
+                    .font(.duckCaption)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .accessibilityIdentifier("quest-note-red-light")
             }
             DuckAdaptiveRow(spacing: DuckSpace.sm) {
                 GameChip(title: Copy.lightGreen, identifier: "light-green") {

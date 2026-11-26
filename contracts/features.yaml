@@ -553,7 +553,7 @@ features:
     page: play-more
     hops: 2
     conform_b4: extension
-    note: 左右开弓/情绪哑剧/表情木头人/它今天有没有/声音指挥官，另加反向指令（反着做 sit/stand）/照我做（四连姿势）/红灯停绿灯行（真走真停）/快进一天（care_time_scale 60×）/找一找（头/肚子/脚真实反应）/小账本（今日真实增量）/传悄悄话（真声音猜音）；每条的分数都是 vetbook 真计数或 /state 真字段
+    note: 左右开弓/情绪哑剧/表情木头人/它今天有没有/声音指挥官，另加反向指令（反着做 sit/stand）/照我做（四连姿势）/红灯停绿灯行（真走真停）/快进一天（care_time_scale 60×）/找一找（头/肚子/脚真实反应）/小账本（今日真实增量）/传悄悄话（真声音猜音）；每条的分数都是 vetbook 真计数或 /state 真字段；会推动今日目标的四张卡（左右开弓→skills、情绪哑剧→moods、声音指挥官→clap、红灯停绿灯行→walk）在标题下标注 /state.quests 里对应目标的真实标题与完成态，没有该目标就不标，不存本地副本
     ios: implemented
     android: implemented
     data_chain: none

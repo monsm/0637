@@ -483,6 +483,10 @@ enum Copy {
     static var whisperListen: String { pick("Whisper to me", "悄悄说给我听") }
     static var whisperPrompt: String { pick("What did it say?", "它刚才说了什么？") }
     static var whisperAgain: String { pick("Again", "再听一次") }
+    // A game card names the today-quest its real actions move. The title and
+    // done flag come from /state.quests; the prefix is the only fixed words.
+    static var questNotePrefix: String { pick("Goal: ", "今日目标：") }
+    static var questNoteDonePrefix: String { pick("Goal met: ", "今日目标达成：") }
 
     // Each game's start key says its own words: Play more stacks several
     // games, and a repeated 开始 made a tap land on the neighbour's start.
