@@ -1795,13 +1795,16 @@ for n in root.iter('node'):
         if cb[0] <= tb2[0] and cb[1] <= tb2[1] and cb[2] >= tb2[2] and cb[3] >= tb2[3]:
             targets.append(cb)
             break
+# The same label can exist in an earlier section (echo and whisper share the
+# four voice words); only a control BELOW this section's title belongs to it.
+targets = [b for b in targets if b[1] >= tb[3]]
 if not targets:
     raise SystemExit(1)
 
 def score(b):
     cx, cy = (b[0] + b[2]) // 2, (b[1] + b[3]) // 2
     tx, ty = (tb[0] + tb[2]) // 2, tb[3]
-    return (0 if cy >= ty else 100000) + abs(cy - ty) + abs(cx - tx) // 4
+    return abs(cy - ty) + abs(cx - tx) // 4
 
 b = min(targets, key=score)
 if b[0] >= 0 and b[1] >= 0 and b[2] <= w and b[3] <= h and b[2] > b[0] and b[3] > b[1]:
