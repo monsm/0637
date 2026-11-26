@@ -1833,9 +1833,12 @@ echo "games: a hungry duck grumbled on its own (last_sound=inquire)"
 # care, so the 720 s doze still arrives on time. A hand resets the beats.
 SLEEP_OK=0
 IDLE_NOW=0
-# A 1x clock is what this test measures; an earlier section's speed would
-# turn the jump into an instant doze.
-curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
+# The clock is 4x here: the smoke reaches this point well before the core's
+# tick reaches 30000, so a 30000-tick jump would go negative and the restore
+# would silently ignore last_touch (serde reads it as u64). At 4x, 600 care
+# seconds is 7500 ticks and 690 is 8625 — both already behind us, and the
+# doze at 720 care seconds still stays ahead of the first beat.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":4}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
 for _attempt in 1 2 3; do
   for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
   for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
@@ -1851,7 +1854,7 @@ for _attempt in 1 2 3; do
   sleep 0.4
   SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
   curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 30000))}}" \
+    -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 7500))}}" \
     http://127.0.0.1:8765/care > /dev/null 2>&1 || true
   # The core's own clock must show the jump: a rejected restore would read
   # as "the duck stayed silent", not as a bug in the cue.
@@ -1891,7 +1894,7 @@ LT1=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import jso
 # The quieter chirp at 690 s: move only the clock, not the duck.
 SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
-  -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 34500))}}" \
+  -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 8625))}}" \
   http://127.0.0.1:8765/care > /dev/null 2>&1 || true
 CHIRP_OK=0
 for _ in $(seq 1 20); do
