@@ -43,6 +43,14 @@ class SleepCuesTest {
     }
 
     @Test
+    fun thePublishedClockIsScaledLikeTheCoreDoze() {
+        // /state.care.idle_s is published unscaled; care.rs multiplies it by
+        // care_time_scale for the doze. The shell must do the same or a 6x
+        // clock dozes before its settling sounds can reach their marks.
+        assertEquals("coo", sleepCue(100.0 * 6, cooed = false, chirped = false))
+    }
+
+    @Test
     fun bothMarksArriveBeforeTheDoze() {
         assertTrue(SLEEP_CUE_COO_S < SLEEP_CUE_CHIRP_S)
         assertTrue(SLEEP_CUE_CHIRP_S < 720.0)

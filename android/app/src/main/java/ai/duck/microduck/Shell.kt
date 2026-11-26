@@ -510,11 +510,12 @@ fun Shell(
                 // The last little sounds before it dozes: care.idle_s is the
                 // same derived clock care.rs uses, and /sound never touches
                 // care, so the 720 s doze keeps its schedule.
-                if (propCues.idleS < 30.0) {
+                val sleepIdle = propCues.idleS * maxOf(propCues.careScale, 1.0)
+                if (sleepIdle < 30.0) {
                     sleepCueCooed = false
                     sleepCueChirped = false
                 } else if (calm) {
-                    val cue = sleepCue(propCues.idleS, sleepCueCooed, sleepCueChirped)
+                    val cue = sleepCue(sleepIdle, sleepCueCooed, sleepCueChirped)
                     if (cue != null) {
                         if (cue == "chirp") sleepCueChirped = true else sleepCueCooed = true
                         duck.queueSound(cue)

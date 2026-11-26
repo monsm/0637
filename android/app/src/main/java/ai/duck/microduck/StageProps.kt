@@ -71,6 +71,12 @@ data class PropCues(
     val carrying: Boolean = false,
     val idleS: Double = 0.0,
     val tick: Long = 0L,
+    /**
+     * The care clock's speed. /state.care.idle_s is published unscaled;
+     * care.rs scales it for the doze, so the shell must scale it too or a
+     * fast clock dozes before its own settling sounds can fire.
+     */
+    val careScale: Double = 1.0,
 )
 
 /**
@@ -105,6 +111,7 @@ fun parsePropCues(text: String): PropCues? = try {
         carrying = root.optBoolean("carrying", false),
         idleS = root.optJSONObject("care")?.optDouble("idle_s", 0.0) ?: 0.0,
         tick = root.optLong("tick", 0L),
+        careScale = root.optDouble("care_time_scale", 1.0),
     )
 } catch (_: Throwable) {
     null
