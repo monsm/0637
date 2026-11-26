@@ -4800,7 +4800,12 @@ impl<T: RobotIo> DuckRuntime<T> {
             let names = self.emotions.ritual_names();
             if !names.is_empty() {
                 let index = (self.clock.tick / period.max(1)) as usize % names.len();
-                let _ = self.trigger_emotion(&names[index]);
+                // The duck's own unprompted mood is not a hand: going through
+                // `trigger_emotion` here touched care every period, so a duck
+                // left alone reset its idle clock every 30 s and could never
+                // reach the 720 s doze its own care clock promises. The book
+                // still records the ritual line below.
+                let _ = self.start_emotion(&names[index]);
                 self.last_idle_ritual = Some(self.clock.tick);
                 self.book.note("idle_ritual".to_owned());
             }
@@ -4823,7 +4828,10 @@ impl<T: RobotIo> DuckRuntime<T> {
                 .is_none_or(|tick| self.clock.tick.saturating_sub(tick) >= 3000)
             && self.emotions.get("sad").is_some()
         {
-            let _ = self.trigger_emotion("sad");
+            // Its own neglect-sadness is not attention either; a hand would
+            // end the neglect, but the duck's own sad timeline must not keep
+            // postponing the doze it is drifting toward.
+            let _ = self.start_emotion("sad");
             self.last_sad = Some(self.clock.tick);
             self.book.note("sad".to_owned());
         }
@@ -5777,6 +5785,59 @@ mod tests {
             runtime.last_sound(),
             Some("coo"),
             "a due idle ritual must not speak over the wake coo"
+        );
+    }
+
+    /// The duck's own unprompted mood is not a hand: the idle ritual must
+    /// not reset the clock that lets it doze. Otherwise a duck left alone
+    /// never reaches DOZE_AFTER_S — its own settling ritual would touch care
+    /// every period and the 720 s doze could never arrive.
+    #[test]
+    fn the_ducks_own_ritual_is_not_a_hand() {
+        let probe = Probe {
+            sensors: Sensors::default(),
+            targets: [0.0; NUM_JOINTS],
+        };
+        let mut runtime = DuckRuntime::new(
+            probe,
+            test_policy(),
+            Tuning::default(),
+            SkillTuning::default(),
+            SafetyConfig::default(),
+        );
+        runtime.enable().ok();
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../upstream/microduck/robotd/emotions");
+        runtime.emotions = crate::emotion::Library::load(&dir).expect("official emotions");
+        runtime.set_idle_ritual(0.02);
+        runtime.last_idle_ritual = None;
+        for _ in 0..400 {
+            let _ = runtime.tick();
+        }
+        let before = runtime.care.last_touch;
+        let mut fired = false;
+        for _ in 0..2000 {
+            let _ = runtime.tick();
+            if runtime.last_idle_ritual.is_some() {
+                fired = true;
+                break;
+            }
+        }
+        assert!(fired, "the idle ritual never fired");
+        assert_eq!(
+            runtime.care.last_touch, before,
+            "the duck's own ritual must not count as a hand"
+        );
+
+        // A person asking for a mood is attention: that door still touches.
+        for _ in 0..400 {
+            let _ = runtime.tick();
+        }
+        let before_person = runtime.care.last_touch;
+        let _ = runtime.trigger_emotion("curious");
+        assert!(
+            runtime.care.last_touch > before_person,
+            "a person's mood is still attention"
         );
     }
 
