@@ -1796,8 +1796,10 @@ for n in root.iter('node'):
             targets.append(cb)
             break
 # The same label can exist in an earlier section (echo and whisper share the
-# four voice words); only a control BELOW this section's title belongs to it.
-targets = [b for b in targets if b[1] >= tb[3]]
+# four voice words). Keep controls whose centre is not above this section's
+# title: a same-row control (the ledger's 读一读) counts, an earlier section's
+# pad does not.
+targets = [b for b in targets if (b[1] + b[3]) // 2 >= tb[1]]
 if not targets:
     raise SystemExit(1)
 
