@@ -1849,9 +1849,11 @@ for _attempt in 1 2 3; do
     -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$NOW_TICK}}" \
     http://127.0.0.1:8765/care > /dev/null 2>&1 || true
   sleep 2.2
-  # Move the witness away from coo so a stale last_sound cannot pass.
-  curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"tag":"greet"}' http://127.0.0.1:8765/sound > /dev/null 2>&1 || true
-  sleep 0.4
+  # No synthetic sound here: queueing one would make the duck emote (the core
+  # answers a greet), and an emotion touches care and resets the clock we are
+  # about to set. The grumble left last_sound=inquire, so a coo is a real
+  # transition on its own.
+  for _ in $(seq 1 20); do emotion_idle && break; sleep 0.3; done
   SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
   curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
     -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 7500))}}" \
