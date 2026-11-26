@@ -368,6 +368,9 @@ jobs:
             CODE_SIGNING_ALLOWED=YES \
             > ios/build/xcodebuild-test.log 2>&1; then
             echo "::error::UI test failed"
+            # The assertion lines and the show's own diagnostics, so a red
+            # run names its cause instead of only the last test's tail.
+            grep -nE "error: -\[|SHOW-DIAG|Failing tests" ios/build/xcodebuild-test.log | tail -40 || true
             tail -n 160 ios/build/xcodebuild-test.log || true
             exit 1
           fi

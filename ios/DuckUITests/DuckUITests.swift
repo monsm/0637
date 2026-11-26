@@ -33,6 +33,13 @@ final class DuckUITests: XCTestCase {
 
     override func tearDownWithError() throws {
         XCUIDevice.shared.orientation = .portrait
+        // A failed test must not leave the self-play switch on for the next
+        // one: its own beats would reset the clock the sleep test needs, and
+        // a test that fails mid-way skips its own cleanup.
+        let chip = app.descendants(matching: .any)["stage-self-play"].firstMatch
+        if chip.exists, chip.isHittable, (chip.value as? String) == "on" {
+            chip.tap()
+        }
     }
 
     private func labelElement() -> XCUIElement {
@@ -1226,6 +1233,7 @@ final class DuckUITests: XCTestCase {
                 && ((state()?["care"] as? [String: Any])?["idle_s"] as? Double ?? 0) >= 20,
             "the show clock never armed (\(armedWhy))"
         )
+        print("SHOW-DIAG armed \(armedWhy()) switch=\(chip.value ?? "?")")
 
         chip.tap()
         XCTAssertTrue(waitForValue("on", timeout: 5), "the switch did not turn on for the show")
@@ -1268,7 +1276,9 @@ final class DuckUITests: XCTestCase {
             let idle = s["idle"] as? [String: Any]
             return "idle=\(care?["idle_s"] ?? "?") scale=\(s["care_time_scale"] ?? "?") label=\(label) emotion=\(emotionName) takeover=\(idle?["takeover"] ?? "?") asleep=\(care?["asleep"] ?? "?") carrying=\(s["carrying"] ?? "?") paused=\(s["paused"] ?? "?")"
         }()
+        print("SHOW-DIAG beats ro=\(ro) cu=\(cu) kl=\(kl) at=\(roAt),\(cuAt),\(klAt) \(missedWhy())")
         XCTAssertTrue(ro && cu && kl, "the show missed a beat (roulade=\(ro) curious=\(cu) kick=\(kl); \(missedWhy))")
+        print("SHOW-DIAG order \(roAt),\(cuAt),\(klAt)")
         XCTAssertTrue(
             roAt > 0 && roAt <= cuAt && cuAt <= klAt,
             "the beats came out of order (\(roAt), \(cuAt), \(klAt))"
