@@ -1607,6 +1607,51 @@ for face in curious laugh; do
 done
 echo "mirror: two taps made two different real emotions (curious, then laugh)"
 
+life_int() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print(int(json.load(sys.stdin).get('life',{}).get('$1',0)))
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1
+}
+life_float() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    print(json.load(sys.stdin).get('life',{}).get('$1',0.0))
+except Exception:
+    print(-1)
+" 2>/dev/null || echo -1
+}
+pose_xy() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    p=json.load(sys.stdin).get('pose',{}).get('position',[0,0,0]); print(p[0],p[1])
+except Exception:
+    print(0,0)
+" 2>/dev/null || echo "0 0"
+}
+care_scale() {
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try: print(json.load(sys.stdin).get('care_time_scale',1.0))
+except Exception: print(-1)
+" 2>/dev/null || echo -1
+}
+body_idle() {
+  [ "$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    l = json.load(sys.stdin).get('label', '')
+    print('idle' if l in ('walk', 'stand') else l)
+except Exception:
+    print('err')
+" 2>/dev/null || echo err)" = "idle" ]
+}
+
 # The self-play switch (2026-11-25): turned on, an idle duck walks to a prop
 # and plays with it on its own. The proof is the vet book's own counters
 # moving with no tap on any prop — the walk is the real velocity policy and
@@ -1641,35 +1686,26 @@ if ! grep -q "自己玩 · 开" self-ui.xml; then
   exit 1
 fi
 PLAY_BEFORE=$(play_count); SELF_M0=$(life_float metres)
-# Beats alternate prop play and a route it lays itself, so wait for both a
-# real counter and a real walk (path.active) before turning the switch off.
-SELF_OK=0; PATH_SEEN=0
+# Beats alternate prop play and a short stroll of its own, so wait for both a
+# real counter and a real walk on the odometer before turning the switch off.
+SELF_OK=0
 for _ in $(seq 1 220); do
   PLAY_NOW=$(play_count)
   if [ "$PLAY_NOW" -gt "$PLAY_BEFORE" ] 2>/dev/null; then SELF_OK=1; fi
-  if curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    p=json.load(sys.stdin).get('path') or {}
-    raise SystemExit(0 if p.get('active') else 1)
-except Exception:
-    raise SystemExit(1)
-" 2>/dev/null; then PATH_SEEN=1; fi
-  if [ "$SELF_OK" = "1" ] && [ "$PATH_SEEN" = "1" ]; then break; fi
+  SELF_M1=$(life_float metres)
+  if [ "$SELF_OK" = "1" ] &&
+     [ "$(python3 -c "print('yes' if ($SELF_M1 - $SELF_M0) >= 0.3 else 'no')")" = "yes" ]; then break; fi
   sleep 0.5
 done
 # Turn it back off so the rest of the smoke sees a still duck.
 adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
-for _ in $(seq 1 40); do
-  curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"active":true' || break
-  sleep 0.5
-done
+sleep 1
 SELF_M1=$(life_float metres)
-if [ "$SELF_OK" = "1" ] && [ "$PATH_SEEN" = "1" ] &&
+if [ "$SELF_OK" = "1" ] &&
    [ "$(python3 -c "print('yes' if ($SELF_M1 - $SELF_M0) >= 0.3 else 'no')")" = "yes" ]; then
-  echo "self-play: the idle duck played with a prop and walked its own route (metres $SELF_M0 -> $SELF_M1)"
+  echo "self-play: the idle duck played with a prop and strolled on its own (metres $SELF_M0 -> $SELF_M1)"
 else
-  echo "::error::the self-play switch never produced both a prop move and its own walk (counter=$SELF_OK path=$PATH_SEEN metres $SELF_M0 -> $SELF_M1)"
+  echo "::error::the self-play switch never produced both a prop move and its own stroll (counter=$SELF_OK metres $SELF_M0 -> $SELF_M1)"
   exit 1
 fi
 
@@ -2021,51 +2057,6 @@ else
 fi
 
 # The seven more games (2026-11-26), in sheet order after the first five.
-life_int() {
-  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    print(int(json.load(sys.stdin).get('life',{}).get('$1',0)))
-except Exception:
-    print(-1)
-" 2>/dev/null || echo -1
-}
-life_float() {
-  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    print(json.load(sys.stdin).get('life',{}).get('$1',0.0))
-except Exception:
-    print(-1)
-" 2>/dev/null || echo -1
-}
-pose_xy() {
-  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    p=json.load(sys.stdin).get('pose',{}).get('position',[0,0,0]); print(p[0],p[1])
-except Exception:
-    print(0,0)
-" 2>/dev/null || echo "0 0"
-}
-care_scale() {
-  curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try: print(json.load(sys.stdin).get('care_time_scale',1.0))
-except Exception: print(-1)
-" 2>/dev/null || echo -1
-}
-body_idle() {
-  [ "$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
-import json,sys
-try:
-    l = json.load(sys.stdin).get('label', '')
-    print('idle' if l in ('walk', 'stand') else l)
-except Exception:
-    print('err')
-" 2>/dev/null || echo err)" = "idle" ]
-}
-
 # 反向指令: the prompt names a mood; the child must do the opposite emotion
 # (laugh->sad, then sad->laugh). Emotions always start, so the counters are
 # the proof.
