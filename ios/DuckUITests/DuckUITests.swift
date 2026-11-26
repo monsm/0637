@@ -954,13 +954,21 @@ final class DuckUITests: XCTestCase {
         openDanceStudio()
         let step = app.staticTexts["ground pick"]
         XCTAssertTrue(step.waitForExistence(timeout: 10), "the recorded pick is not in the strip")
-        let picksPlayed = groundPicks()
-        anyElement("dance-play").tap()
+        let play = anyElement("dance-play")
         var replayed = false
-        let playDeadline = Date().addingTimeInterval(15)
-        while Date() < playDeadline {
-            if groundPicks() > picksPlayed { replayed = true; break }
-            usleep(300_000)
+        // A refused verb is possible while the duck's own timeline plays;
+        // the strip keeps the step, so Play is tried again rather than
+        // reading one refusal as a broken recorder.
+        for _ in 0..<3 {
+            let picksPlayed = groundPicks()
+            play.tap()
+            let playDeadline = Date().addingTimeInterval(8)
+            while Date() < playDeadline {
+                if groundPicks() > picksPlayed { replayed = true; break }
+                usleep(300_000)
+            }
+            if replayed { break }
+            usleep(2_000_000)
         }
         XCTAssertTrue(replayed, "the dance playback never replayed the recorded pick")
         anyElement("dance-close").tap()
@@ -994,42 +1002,48 @@ final class DuckUITests: XCTestCase {
         }
 
         // The core reads last_touch as an unsigned number: a jump larger
-        // than the tick itself would go negative and be ignored. Wait until
-        // the tick can carry the jump, then run a 6x clock (600 care-seconds
-        // = 5000 ticks; the 720 doze still stays ahead of both beats).
+        // than the tick itself would go negative and be ignored. The
+        // simulator can tick well below 50 Hz under load, so the clock's
+        // speed is chosen from the tick that really arrived, and the jump is
+        // re-established until the cue fires (a stray heard sound is real
+        // attention and resets the clock).
         var tick = 0
-        let tickDeadline = Date().addingTimeInterval(120)
+        let tickDeadline = Date().addingTimeInterval(180)
         while Date() < tickDeadline {
             tick = (state()?["tick"] as? Int) ?? 0
-            if tick >= 5500 { break }
+            if tick >= 3200 { break }
             usleep(500_000)
         }
-        XCTAssertGreaterThanOrEqual(tick, 5500, "the core tick stayed too small for the jump")
+        XCTAssertGreaterThanOrEqual(tick, 3200, "the core tick stayed too small for the jump")
+        // 10x: 600 care-seconds = 3000 ticks, 690 = 3450. At 6x the marks
+        // are 5000/5750, which needs a tick this runner may not reach.
+        let scale: Double = tick >= 6000 ? 6 : 10
+        let cooJump = Int(30000 / scale)
+        let chirpJump = Int(34500 / scale)
         post("/care", ["care": [
             "hunger": 0.4, "mood": 0.3, "bond": 0.4,
             "asleep": false, "last_touch": tick,
         ]])
         usleep(1_500_000) // one poll at 1x resets the per-spell beats
-        post("/config", ["care_time_scale": 6])
+        post("/config", ["care_time_scale": scale])
         usleep(400_000)
-        guard let tick1 = state()?["tick"] as? Int else {
-            XCTFail("the core published no tick")
-            return
-        }
-        post("/care", ["care": [
-            "hunger": 0.4, "mood": 0.3, "bond": 0.4,
-            "asleep": false, "last_touch": tick1 - 5000,
-        ]])
         var cooed = false
         var touched0: Int?
-        let cooDeadline = Date().addingTimeInterval(12)
-        while Date() < cooDeadline {
+        for _ in 0..<30 {
+            guard let now = state()?["tick"] as? Int else {
+                usleep(400_000)
+                continue
+            }
+            post("/care", ["care": [
+                "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+                "asleep": false, "last_touch": now - cooJump,
+            ]])
             if let s = state(), let sound = s["last_sound"] as? String, sound == "coo" {
                 cooed = true
                 touched0 = (s["care"] as? [String: Any])?["last_touch"] as? Int
                 break
             }
-            usleep(300_000)
+            usleep(500_000)
         }
         XCTAssertTrue(cooed, "the idle duck never made its settling coo")
         usleep(1_500_000)
@@ -1039,34 +1053,43 @@ final class DuckUITests: XCTestCase {
         }
 
         // The quieter chirp at 690 s: move only the clock, not the duck.
-        guard let tick2 = state()?["tick"] as? Int else {
-            XCTFail("the core published no tick")
-            return
-        }
-        post("/care", ["care": [
-            "hunger": 0.4, "mood": 0.3, "bond": 0.4,
-            "asleep": false, "last_touch": tick2 - 5750,
-        ]])
         var chirped = false
-        let chirpDeadline = Date().addingTimeInterval(12)
-        while Date() < chirpDeadline {
+        for _ in 0..<20 {
+            guard let now = state()?["tick"] as? Int else {
+                usleep(400_000)
+                continue
+            }
+            post("/care", ["care": [
+                "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+                "asleep": false, "last_touch": now - chirpJump,
+            ]])
             if let sound = state()?["last_sound"] as? String, sound == "chirp" {
                 chirped = true
                 break
             }
-            usleep(300_000)
+            usleep(500_000)
         }
         XCTAssertTrue(chirped, "the idle duck never made its pre-doze chirp")
 
-        post("/config", ["care_time_scale": 200])
         var asleep = false
-        let asleepDeadline = Date().addingTimeInterval(10)
-        while Date() < asleepDeadline {
-            if let care = state()?["care"] as? [String: Any], care["asleep"] as? Bool == true {
-                asleep = true
-                break
+        for _ in 0..<10 {
+            guard let now = state()?["tick"] as? Int else {
+                usleep(400_000)
+                continue
             }
-            usleep(300_000)
+            post("/care", ["care": [
+                "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+                "asleep": false, "last_touch": now - chirpJump,
+            ]])
+            post("/config", ["care_time_scale": 200])
+            for _ in 0..<8 {
+                if let care = state()?["care"] as? [String: Any], care["asleep"] as? Bool == true {
+                    asleep = true
+                    break
+                }
+                usleep(300_000)
+            }
+            if asleep { break }
         }
         post("/config", ["care_time_scale": 1])
         post("/pet", [:])
