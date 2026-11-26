@@ -1782,6 +1782,10 @@ for _attempt in 1 2 3 4 5; do
   sleep 0.8
 done
 [ "$SHOW_ON" = "1" ] || { echo "::error::the self-play switch never turned on for the show"; exit 1; }
+# The duck must be free: a show beat refused by a running timeline is
+# skipped by design, but this check wants the full three-beat run.
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
 # Wait until the tick can carry a 1250-tick jump, then run a 10x clock:
 # published 25 s x 10 = 250 care-seconds, the show's long-idle mark.
 SHOW_TICK=0
@@ -1793,12 +1797,19 @@ done
 [ "$SHOW_TICK" -ge 1300 ] || { echo "::error::the core tick never grew enough for the show"; exit 1; }
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":10}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
 RO0=$(skill_count roulade); CU0=$(emotion_count curious); KL0=$(skill_count kick_left)
-SHOW_RO=0; SHOW_CU=0; SHOW_KL=0; RO_AT=0; CU_AT=0; KL_AT=0; SHOW_I=0
+SHOW_RO=0; SHOW_CU=0; SHOW_KL=0; RO_AT=0; CU_AT=0; KL_AT=0; SHOW_I=0; SHOW_OFFED=0
 for _ in $(seq 1 80); do
   SHOW_I=$((SHOW_I + 1))
   if [ "$SHOW_RO" = "0" ] && [ "$(skill_count roulade)" -gt "$RO0" ] 2>/dev/null; then SHOW_RO=1; RO_AT=$SHOW_I; fi
   if [ "$SHOW_CU" = "0" ] && [ "$(emotion_count curious)" -gt "$CU0" ] 2>/dev/null; then SHOW_CU=1; CU_AT=$SHOW_I; fi
   if [ "$SHOW_KL" = "0" ] && [ "$(skill_count kick_left)" -gt "$KL0" ] 2>/dev/null; then SHOW_KL=1; KL_AT=$SHOW_I; fi
+  # The first accepted beat proves the show started. Turn the switch off now
+  # so an ordinary self-play beat cannot add a fourth move and blur the
+  # order; the show's remaining beats are already scheduled.
+  if [ "$SHOW_OFFED" = "0" ] && [ "$SHOW_RO$SHOW_CU" != "00" ]; then
+    adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
+    SHOW_OFFED=1
+  fi
   [ "$SHOW_RO$SHOW_CU$SHOW_KL" = "111" ] && break
   # Hold the clock at the show's idle in case a stray attention reset it.
   SHOW_TICK=$(state_tick) || { sleep 0.4; continue; }

@@ -1188,12 +1188,19 @@ final class DuckUITests: XCTestCase {
             ((state()?["life"] as? [String: Any])?["emotions"] as? [String: Any])?[name] as? Int ?? 0
         }
 
-        // The tick must carry the 1250-tick jump the 10x clock needs.
+        // The tick must carry the 1250-tick jump the 10x clock needs, and
+        // the duck must be free: a show beat refused by a running timeline
+        // is skipped by design, but this test wants the full three-beat run.
+        func isCalm() -> Bool {
+            guard let s = state() else { return false }
+            let label = s["label"] as? String
+            return s["emotion"] == nil && (label == "walk" || label == "stand")
+        }
         var tick = 0
         let tickDeadline = Date().addingTimeInterval(120)
         while Date() < tickDeadline {
             tick = (state()?["tick"] as? Int) ?? 0
-            if tick >= 1300 { break }
+            if tick >= 1300 && isCalm() { break }
             usleep(500_000)
         }
         XCTAssertGreaterThanOrEqual(tick, 1300, "the core tick stayed too small for the show")
@@ -1201,12 +1208,21 @@ final class DuckUITests: XCTestCase {
         let ro0 = skill("roulade"), cu0 = emotion("curious"), kl0 = skill("kick_left")
         var ro = false, cu = false, kl = false
         var roAt = 0, cuAt = 0, klAt = 0, step = 0
+        var switchedOff = false
         let showDeadline = Date().addingTimeInterval(40)
         while Date() < showDeadline {
             step += 1
             if !ro, skill("roulade") > ro0 { ro = true; roAt = step }
             if !cu, emotion("curious") > cu0 { cu = true; cuAt = step }
             if !kl, skill("kick_left") > kl0 { kl = true; klAt = step }
+            // The first accepted beat proves the show started. Turn the
+            // switch off now so the ordinary 25 s self-play beat cannot add
+            // a fourth move and blur the order; the show's remaining beats
+            // are already scheduled.
+            if !switchedOff, ro || cu {
+                switchedOff = true
+                if (chip.value as? String) == "on" { chip.tap() }
+            }
             if ro && cu && kl { break }
             // Hold the clock at the show's idle in case a stray attention
             // reset it; published 25 s x 10 = 250 care-seconds.
