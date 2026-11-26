@@ -1163,8 +1163,12 @@ final class DuckUITests: XCTestCase {
             }
             return false
         }
-        if (chip.value as? String) != "on" { chip.tap() }
-        XCTAssertTrue(waitForValue("on", timeout: 5), "the switch did not turn on")
+        // Start from off: the self-play test leaves it off, but a reused
+        // simulator may carry a different state.
+        if (chip.value as? String) == "on" {
+            chip.tap()
+            XCTAssertTrue(waitForValue("off", timeout: 5), "the switch did not turn off")
+        }
 
         func state() -> [String: Any]? {
             guard let data = try? Data(contentsOf: URL(string: "http://127.0.0.1:8765/state")!)
@@ -1188,23 +1192,43 @@ final class DuckUITests: XCTestCase {
             ((state()?["life"] as? [String: Any])?["emotions"] as? [String: Any])?[name] as? Int ?? 0
         }
 
-        // The tick must carry the 1250-tick jump the 10x clock needs, and
-        // the duck must be free: a show beat refused by a running timeline
-        // is skipped by design, but this test wants the full three-beat run.
-        func isCalm() -> Bool {
-            guard let s = state() else { return false }
-            let label = s["label"] as? String
-            return s["emotion"] == nil && (label == "walk" || label == "stand")
-        }
+        // The switch stays off while the clock is prepared: no ordinary
+        // self-play beat can run, so the first beat after it goes on is the
+        // show's own. Wait for a tick the 1250-tick jump fits.
         var tick = 0
         let tickDeadline = Date().addingTimeInterval(120)
         while Date() < tickDeadline {
             tick = (state()?["tick"] as? Int) ?? 0
-            if tick >= 1300 && isCalm() { break }
+            if tick >= 1300 { break }
             usleep(500_000)
         }
         XCTAssertGreaterThanOrEqual(tick, 1300, "the core tick stayed too small for the show")
         post("/config", ["care_time_scale": 10])
+        // Arm the clock (published 25 s x 10 = 250 care-seconds) and let the
+        // 1250-tick cooldown expire while the switch is still off.
+        let armDeadline = Date().addingTimeInterval(26)
+        while Date() < armDeadline {
+            if let now = state()?["tick"] as? Int {
+                post("/care", ["care": [
+                    "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+                    "asleep": false, "last_touch": now - 1250,
+                ]])
+            }
+            usleep(1_000_000)
+        }
+        let armedWhy = { () -> String in
+            guard let s = state() else { return "state unreadable" }
+            let care = s["care"] as? [String: Any]
+            return "idle=\(care?["idle_s"] ?? "?") scale=\(s["care_time_scale"] ?? "?")"
+        }()
+        XCTAssertTrue(
+            (state()?["care_time_scale"] as? Double ?? 0) == 10
+                && ((state()?["care"] as? [String: Any])?["idle_s"] as? Double ?? 0) >= 20,
+            "the show clock never armed (\(armedWhy))"
+        )
+
+        chip.tap()
+        XCTAssertTrue(waitForValue("on", timeout: 5), "the switch did not turn on for the show")
         let ro0 = skill("roulade"), cu0 = emotion("curious"), kl0 = skill("kick_left")
         var ro = false, cu = false, kl = false
         var roAt = 0, cuAt = 0, klAt = 0, step = 0
@@ -1216,16 +1240,15 @@ final class DuckUITests: XCTestCase {
             if !cu, emotion("curious") > cu0 { cu = true; cuAt = step }
             if !kl, skill("kick_left") > kl0 { kl = true; klAt = step }
             // The first accepted beat proves the show started. Turn the
-            // switch off now so the ordinary 25 s self-play beat cannot add
-            // a fourth move and blur the order; the show's remaining beats
-            // are already scheduled.
+            // switch off so no ordinary beat can add a fourth move; the
+            // show's remaining beats are already scheduled.
             if !switchedOff, ro || cu {
                 switchedOff = true
                 if (chip.value as? String) == "on" { chip.tap() }
             }
             if ro && cu && kl { break }
             // Hold the clock at the show's idle in case a stray attention
-            // reset it; published 25 s x 10 = 250 care-seconds.
+            // reset it.
             if let now = state()?["tick"] as? Int {
                 post("/care", ["care": [
                     "hunger": 0.4, "mood": 0.3, "bond": 0.4,
@@ -1237,7 +1260,15 @@ final class DuckUITests: XCTestCase {
         if (chip.value as? String) == "on" { chip.tap() }
         post("/config", ["care_time_scale": 1])
         post("/pet", [:])
-        XCTAssertTrue(ro && cu && kl, "the show missed a beat (roulade=\(ro) curious=\(cu) kick=\(kl))")
+        let missedWhy = { () -> String in
+            guard let s = state() else { return "state unreadable" }
+            let care = s["care"] as? [String: Any]
+            let label = s["label"] as? String ?? "?"
+            let emotionName = (s["emotion"] as? [String: Any])?["name"] as? String ?? "none"
+            let idle = s["idle"] as? [String: Any]
+            return "idle=\(care?["idle_s"] ?? "?") scale=\(s["care_time_scale"] ?? "?") label=\(label) emotion=\(emotionName) takeover=\(idle?["takeover"] ?? "?") asleep=\(care?["asleep"] ?? "?") carrying=\(s["carrying"] ?? "?") paused=\(s["paused"] ?? "?")"
+        }()
+        XCTAssertTrue(ro && cu && kl, "the show missed a beat (roulade=\(ro) curious=\(cu) kick=\(kl); \(missedWhy))")
         XCTAssertTrue(
             roAt > 0 && roAt <= cuAt && cuAt <= klAt,
             "the beats came out of order (\(roAt), \(cuAt), \(klAt))"
