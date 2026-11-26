@@ -94,8 +94,8 @@
   "direction": "min"
  },
  "shell_kt_lines": {
-  "count": 3986,
+  "count": 4001,
   "direction": "max",
-  "note": "2026-11-26: +29 for the block editor's prop group — five one-tap prop actions above the kind chips, setting the core's existing action/value pairs. Earlier: 2026-11-26 +16 for the dance studio's prop recording, +44 for lifelike autonomy."
+  "note": "2026-11-26: +15 for the two pre-doze settling sounds (a coo at a derived idle of 600 s, a chirp at 690 s; /sound never touches care, so the 720 s doze keeps its schedule). Earlier the same day: +29 for the block editor's prop group, +16 for the dance studio's prop recording, +44 for lifelike autonomy."
  }
 }

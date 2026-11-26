@@ -2891,6 +2891,19 @@ final class DuckController: ObservableObject {
             queueSound("inquire")
             hungerGrumbled = true
         }
+        // The last little sounds before it dozes: its derived idle clock
+        // (care.idle_s, the same number care.rs uses) crosses 600 s and
+        // 690 s. POST /sound never calls care.touch, so the 720 s doze keeps
+        // its schedule; a hand or a nap resets the beats.
+        if cues.idleS < 30 {
+            sleepCueCooed = false
+            sleepCueChirped = false
+        } else if calm {
+            if let cue = sleepCue(idleS: cues.idleS, cooed: sleepCueCooed, chirped: sleepCueChirped) {
+                if cue == "chirp" { sleepCueChirped = true } else { sleepCueCooed = true }
+                queueSound(cue)
+            }
+        }
     }
 
     /// With the switch on, an idle duck walks to a prop and plays with it.
@@ -2899,6 +2912,8 @@ final class DuckController: ObservableObject {
     private var lastSelfPlayTick = 0
     private var moodRollArmed = false
     private var hungerGrumbled = false
+    private var sleepCueCooed = false
+    private var sleepCueChirped = false
     private var selfBeats = 0
 
     func maybeSelfPlay() {

@@ -1803,6 +1803,51 @@ done
 curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}'   http://127.0.0.1:8765/feed > /dev/null 2>&1 || true
 echo "games: a hungry duck grumbled on its own (last_sound=inquire)"
 
+# 睡前哼一声: the duck's own idle clock announces the doze — a settling coo at
+# 600 derived seconds, a quieter chirp at 690 — and neither sound touches
+# care, so the 720 s doze still arrives on time. A hand resets the beats.
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 30000))}}" \
+  http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+COO_OK=0
+for _ in $(seq 1 20); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"coo"'; then COO_OK=1; break; fi
+  sleep 0.4
+done
+[ "$COO_OK" = "1" ] || { echo "::error::the idle duck never made its settling coo"; exit 1; }
+LT0=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
+sleep 1.5
+LT1=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
+[ "$LT0" = "$LT1" ] || { echo "::error::the settling sound reset the doze clock"; exit 1; }
+# The quieter chirp at 690 s: move only the clock, not the duck.
+SLEEP_TICK=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tick",0))')
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' \
+  -d "{\"care\":{\"hunger\":0.4,\"mood\":0.3,\"bond\":0.4,\"asleep\":false,\"last_touch\":$((SLEEP_TICK - 34500))}}" \
+  http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+CHIRP_OK=0
+for _ in $(seq 1 20); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"chirp"'; then CHIRP_OK=1; break; fi
+  sleep 0.4
+done
+[ "$CHIRP_OK" = "1" ] || { echo "::error::the idle duck never made its pre-doze chirp"; exit 1; }
+# The doze itself still arrives: at 200x its 720 care-seconds are seconds away.
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":200}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
+ASLEEP=0
+for _ in $(seq 1 20); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"asleep":true'; then ASLEEP=1; break; fi
+  sleep 0.4
+done
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{"care_time_scale":1}' http://127.0.0.1:8765/config > /dev/null 2>&1 || true
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:8765/pet > /dev/null 2>&1 || true
+[ "$ASLEEP" = "1" ] || { echo "::error::the duck did not doze on schedule after the settling sounds"; exit 1; }
+for _ in $(seq 1 20); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"asleep":false'; then break; fi
+  sleep 0.3
+done
+echo "sleep: the idle duck cooed at 600 s and chirped at 690 s without resetting the doze, then dozed on time"
+
 # The five small games (2026-11-25): inline on Play more like Echo and RPS.
 # Every prompt asks a real verb and every score is the vet book's counter, so
 # the proof is /state moving. The sheet is long; the helper below taps a

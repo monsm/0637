@@ -30,6 +30,21 @@ struct PropCues: Equatable {
 /// A self-play beat no sooner than this many simulated ticks (25 s at 50 Hz).
 let selfPlayCooldownTicks = 1250
 
+/// The last little sounds before the duck dozes (`care.rs` DOZE_AFTER_S=720):
+/// a settling coo at a derived idle of 600 s, a quieter chirp at 690 s. A
+/// sound never touches care, so neither can postpone the doze it announces.
+let sleepCueCooSeconds = 600.0
+let sleepCueChirpSeconds = 690.0
+
+/// Which settling sound the idle clock calls for now, if any. If the clock
+/// jumps past both marks while the app was away, the later sound is the
+/// honest one; the moment for the earlier one has passed.
+func sleepCue(idleS: Double, cooed: Bool, chirped: Bool) -> String? {
+    if idleS >= sleepCueChirpSeconds && !chirped { return "chirp" }
+    if idleS >= sleepCueCooSeconds && !cooed { return "coo" }
+    return nil
+}
+
 /// The duck must have been left alone this long before it goes to play.
 let selfPlayIdleSeconds = 10.0
 

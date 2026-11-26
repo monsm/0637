@@ -967,6 +967,93 @@ final class DuckUITests: XCTestCase {
         if app.buttons["more-close"].exists { app.buttons["more-close"].tap() }
     }
 
+    /// The last little sounds before the doze: a coo at a derived idle of
+    /// 600 s, a chirp at 690 s, neither touching care. The 720 s doze still
+    /// arrives on time, and a hand resets the beats.
+    func testTheLastLittleSoundsBeforeItDozes() throws {
+        XCTAssertTrue(
+            labelElement().waitForExistence(timeout: 120),
+            "the status panel never appeared - the app did not get past loading"
+        )
+        _ = waitForLabel(["walk", "stand"], timeout: 180)
+
+        func state() -> [String: Any]? {
+            guard let data = try? Data(contentsOf: URL(string: "http://127.0.0.1:8765/state")!)
+            else { return nil }
+            return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        }
+        func post(_ path: String, _ body: [String: Any]) {
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:8765\(path)")!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 5
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            let done = DispatchSemaphore(value: 0)
+            URLSession.shared.dataTask(with: request) { _, _, _ in done.signal() }.resume()
+            _ = done.wait(timeout: .now() + 5)
+        }
+
+        guard let tick = state()?["tick"] as? Int else {
+            XCTFail("the core published no tick")
+            return
+        }
+        post("/care", ["care": [
+            "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+            "asleep": false, "last_touch": tick - 30000,
+        ]])
+        var cooed = false
+        var touched0: Int?
+        let cooDeadline = Date().addingTimeInterval(12)
+        while Date() < cooDeadline {
+            if let s = state(), let sound = s["last_sound"] as? String, sound == "coo" {
+                cooed = true
+                touched0 = (s["care"] as? [String: Any])?["last_touch"] as? Int
+                break
+            }
+            usleep(300_000)
+        }
+        XCTAssertTrue(cooed, "the idle duck never made its settling coo")
+        usleep(1_500_000)
+        if let touched1 = (state()?["care"] as? [String: Any])?["last_touch"] as? Int,
+           let touched0 {
+            XCTAssertEqual(touched0, touched1, "the settling sound reset the doze clock")
+        }
+
+        // The quieter chirp at 690 s: move only the clock, not the duck.
+        guard let tick2 = state()?["tick"] as? Int else {
+            XCTFail("the core published no tick")
+            return
+        }
+        post("/care", ["care": [
+            "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+            "asleep": false, "last_touch": tick2 - 34500,
+        ]])
+        var chirped = false
+        let chirpDeadline = Date().addingTimeInterval(12)
+        while Date() < chirpDeadline {
+            if let sound = state()?["last_sound"] as? String, sound == "chirp" {
+                chirped = true
+                break
+            }
+            usleep(300_000)
+        }
+        XCTAssertTrue(chirped, "the idle duck never made its pre-doze chirp")
+
+        post("/config", ["care_time_scale": 200])
+        var asleep = false
+        let asleepDeadline = Date().addingTimeInterval(10)
+        while Date() < asleepDeadline {
+            if let care = state()?["care"] as? [String: Any], care["asleep"] as? Bool == true {
+                asleep = true
+                break
+            }
+            usleep(300_000)
+        }
+        post("/config", ["care_time_scale": 1])
+        post("/pet", [:])
+        XCTAssertTrue(asleep, "the duck did not doze on schedule after the settling sounds")
+    }
+
     /// The block editor groups the five floor props as one-tap actions. The
     /// pick writes an existing action/value pair (the vocabulary is
     /// unit-tested); Add proves the editor posts the block the pick set.

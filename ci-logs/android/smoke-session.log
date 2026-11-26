@@ -1,14 +1,14 @@
 Performing Streamed Install
 Success
 Starting: Intent { cmp=ai.duck.microduck/.MainActivity (has extras) }
-app alive with pid 2251
+app alive with pid 2289
 8765
-{"bringup":2,"care":{"asleep":false,"bond":0.09982615740740627,"budget_s":null,"heart_bpm":77.7,"hunger":0.1555629629629577,"idle_s":9.46,"last_touch":278,"mood":0.36028566064359574,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":11.9}},"care_time_scale":1.0,"carrying":false,"chorus":{"active":false,"moves":[],"peers":0,"role":"","started_tick":0},"emotion":null,"fallen":false,"gain":200,"gift_event":null,"gravity":[0.01589597552701079,0.0018985888314013814,-0.999871848449837],"health":{"reasons":[],"verdict":"healthy"},"idle":{"head":[0.14648412864439103,-0.13353065872638398,-0.058842432546181364,-0.005835956163406895],"takeover":1.0},"label":"walk","last_emotion_sound":"emotion:angry","last_heard":null,"last_ride_segment":null,"last_sound":"emotion:angry","leds":{"bars":2,"battery_percent":47.1546983017755,"color":null,"flashlight":0,"gauge":"Two","status":"Healthy"},"life":{"boots":1,"claps":0,"day_started":{"claps":0,"day":"2026-11-26","falls":1,"fed":0,"ground_picks":0,"metres":0.28621186033387774,"pets":0,"pickups":0,"powered_s":3.1000000000000023,"rolls":0,"sit_downs":0,"whistles":0},"days":[],"emotions":{"angry":1},"events":["fell","emotion:angry","idle_ritual"],"falls":1,"fed":0,"ground_picks":0,"held_s":0.0,"metres":0.33191234871707664,"pets":0,"pickups":0,"power_offs":0,"powered_s":15.019999999999769,"sit_downs":0,"sitting_s":0.0,"skills":{},"soft_landings":0,"sound_pets":0,"stand_ups":0,"standing_s":13.019999999999811,"torqued_s":15.019999999999769,"unlocks":{"emotion:angry":"2026-11-26"},"unlocks_backfilled":true,"wake_ups":0,"walking_s":0.0,"whistles":0},"limited_by":[],"mode":"walk","night":{"active":false,"quiet_s":0.0,"started_tick":0},"notice":null,"pad":{"on":false,"port":4210},"path":{"active":false,"points":[],"reached":0,"total":0},"paused":false,"peer_event":null,"peers":{"peers":[]},"performance":{"fps":9.999249306358324,"ticks_per_second":49.99624653179163},"pet_detect":{"petting":false,"since_tick":null},"pose":{"anchor_foot":1,"anchor_xy":[0.029187788263859062,-0.042292078793576465],"position":[0.00573616378884164,-0.015216574585333313,0.11607979132033093],"yaw":0.7756405133637548},"powered_off":false,"proprioception":{"battery_percent":47.048763310887324,"currents_ma":[25.856121391824175,75.92949908754883,55.922471506445206,201.95452130539692,54.35626557964779,63.76097581989745,193.29334796770783,33.460194359998724,43.60756735163782,0.0,16.07361814145221,70.07440095014823,100.16071846145977,300.27044688881097,94.6268238597629],"has_mouth":false,"imu":{"gravity":[0.015351605609398015,0.0019650229368238254,-0.9998802262721624],"gyro":[-0.010187328815165809,0.03637110527532924,0.010872826275031174],"quat":[0.9257050025406444,-0.003812480245397005,0.006734378835283452,0.37816710778081525]},"imu_ready":true,"mouth":0.2726531597732502,"names":["left_hip_yaw","left_hip_roll","left_hip_pitch","left_knee","left_ankle","neck_pitch","head_pitch","head_yaw","head_roll","mouth","right_hip_yaw","right_hip_roll","right_hip_pitch","right_knee","right_ankle"],"p_held":0.004295915365219116,"picked_up":false,"positions":[0.0402496260829593,-0.07777136928925885,-0.4567173735805328,0.04982231213328349,0.49287839303388536,0.10754172200016864,0.2576020745717643,-0.1016882685442643,-0.013874071756410759,0.0,-0.0073758778833689954,0.08156744051423641,0.444673611017315,-0.03730139886442842,-0.4696103568471981],"targets":[0.013753282401833638,-0.14601684728093897,-0.40081497814571393,-0.10160233987771856,0.5434091086999321,0.16656185188179545,0.11111465845044755,-0.09193135031025054,-0.06221293222264799,0.07928787479061154,0.020830593508719936,0.14496970012951396,0.3598864983058626,0.18149466053552132,-0.5521627504184788],"velocities":[0.029756661274330187,-0.0007169005667201546,0.00035697917192639884,-0.0019639590121567495,0.0015308238298145024,0.0005858515223423532,-0.007544954989898334,0.0460857170727459,-0.02509176071524829,0.0,-0.01001928194675947,0.0005338220106375739,-0.001384330484120329,0.00012026703395600887,-0.0002998043309556503],"volts":7.352780212974197},"quests":{"best_streak":0,"completed_today":0,"day":"2026-11-26","last_completed_day":"","quests":[{"done":false,"id":"roll","progress":0.0,"target":2.0,"title_en":"Roll over twice","title_zh":"翻两个滚"},{"done":false,"id":"pet","progress":0.0,"target":3.0,"title_en":"Pet the duck 3 times","title_zh":"摸摸鸭子 3 次"},{"done":false,"id":"hold","progress":0.0,"target":1.0,"title_en":"Pick the duck up","title_zh":"把鸭子抱起来"}],"streak":0},"rule_event":null,"sound_event":null,"speed":1.0,"tick":751,"trunk":[0.036667296709061,-0.020642018071207295,0.11546460296988091]}
+{"bringup":2,"care":{"asleep":false,"bond":0.09983078703703593,"budget_s":null,"heart_bpm":77.7,"hunger":0.1554148148148097,"idle_s":8.94,"last_touch":284,"mood":0.36003613047714056,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":14.5}},"care_time_scale":1.0,"carrying":false,"chorus":{"active":false,"moves":[],"peers":0,"role":"","started_tick":0},"emotion":null,"fallen":false,"gain":200,"gift_event":null,"gravity":[0.006397341965161138,0.0015467496642411604,-0.9999783405560629],"health":{"reasons":[],"verdict":"healthy"},"idle":{"head":[0.09064796162793001,-0.032931769083406795,-0.1471689925791395,0.013952678420604093],"takeover":1.0},"label":"walk","last_emotion_sound":"emotion:angry","last_heard":null,"last_ride_segment":null,"last_sound":"emotion:angry","leds":{"bars":2,"battery_percent":47.182971592604716,"color":null,"flashlight":0,"gauge":"Two","status":"Healthy"},"life":{"boots":1,"claps":0,"day_started":{"claps":0,"day":"2026-11-26","falls":0,"fed":0,"ground_picks":0,"metres":0.0,"pets":0,"pickups":0,"powered_s":0.1,"rolls":0,"sit_downs":0,"whistles":0},"days":[],"emotions":{"angry":1},"events":["fell","emotion:angry","idle_ritual"],"falls":1,"fed":0,"ground_picks":0,"held_s":0.0,"metres":0.33251114933574216,"pets":0,"pickups":0,"power_offs":0,"powered_s":14.619999999999777,"sit_downs":0,"sitting_s":0.0,"skills":{},"soft_landings":0,"sound_pets":0,"stand_ups":0,"standing_s":12.61999999999982,"torqued_s":14.619999999999777,"unlocks":{"emotion:angry":"2026-11-26"},"unlocks_backfilled":true,"wake_ups":0,"walking_s":0.0,"whistles":0},"limited_by":[],"mode":"walk","night":{"active":false,"quiet_s":0.0,"started_tick":0},"notice":null,"pad":{"on":false,"port":4210},"path":{"active":false,"points":[],"reached":0,"total":0},"paused":false,"peer_event":null,"peers":{"peers":[]},"performance":{"fps":9.816454274295344,"ticks_per_second":50.06391679890625},"pet_detect":{"petting":false,"since_tick":null},"pose":{"anchor_foot":1,"anchor_xy":[0.02909790388750683,-0.04213861940453668],"position":[0.005004616288428427,-0.015756155453885225,0.1160871210579644],"yaw":0.7728575685624812},"powered_off":false,"proprioception":{"battery_percent":46.88828701857685,"currents_ma":[9.049725656950415,81.90261711923749,53.59031972354591,228.26067351270203,64.0848040118986,116.44964392046799,288.78303221637105,46.27673722328981,22.95529962858852,0.0,9.033880719742578,87.62168112853396,114.70310561663312,327.5493668641966,120.98687692588904],"has_mouth":false,"imu":{"gravity":[0.006296698114593931,0.0016778321836756795,-0.9999787680106095],"gyro":[-0.02803250657343656,-0.011881422990212723,-0.02055630510069311],"quat":[0.926254981814963,-0.001963631533482664,0.0026000280567299765,0.376883393993775]},"imu_ready":true,"mouth":0.30628518923536074,"names":["left_hip_yaw","left_hip_roll","left_hip_pitch","left_knee","left_ankle","neck_pitch","head_pitch","head_yaw","head_roll","mouth","right_hip_yaw","right_hip_roll","right_hip_pitch","right_knee","right_ankle"],"p_held":0.003208160400390625,"picked_up":false,"positions":[0.033954891249212714,-0.0776798773484156,-0.4572783936768163,0.04816178408381898,0.49855697801185783,0.10647628250173435,0.4331963854451039,-0.24941858067635495,-0.011218498703943331,0.0,-0.008215259851807053,0.08173016868136064,0.446458712302642,-0.038183777413424616,-0.4798868030214796],"targets":[0.022124533685809904,-0.15116347501787497,-0.4021987448491875,-0.11879397986255145,0.5526389017496253,0.19852846720995723,0.1846928453740404,-0.19882333499138521,-0.0446860951502174,0.09983251247906637,0.016778687213699982,0.15471204883858614,0.35920096817022074,0.19231925242529585,-0.5672116239954759],"velocities":[-0.025809531351759,0.00046772547536651416,0.004748666298274876,-0.0006266653750409631,0.01776650719413377,-0.0000641229133858065,-0.33710531255531495,0.32685843425128536,-0.00021936895843458534,0.0,0.0007301103700907818,-0.0003198468936477453,0.0003819919268164893,-0.00015836198844934406,0.0009005779507267929],"volts":7.350212592297229},"quests":{"best_streak":0,"completed_today":0,"day":"2026-11-26","last_completed_day":"","quests":[{"done":false,"id":"roll","progress":0.0,"target":2.0,"title_en":"Roll over twice","title_zh":"翻两个滚"},{"done":false,"id":"pet","progress":0.0,"target":3.0,"title_en":"Pet the duck 3 times","title_zh":"摸摸鸭子 3 次"},{"done":false,"id":"hold","progress":0.0,"target":1.0,"title_en":"Pick the duck up","title_zh":"把鸭子抱起来"}],"streak":0},"rule_event":null,"sound_event":null,"speed":1.0,"tick":731,"trunk":[0.03600362477636216,-0.021338321991112883,0.11563041394509804]}
 emotions staged: 13
-performance: 49.258684676041106 ticks/s
-idle: takeover=1.0 head=0.4973144285163429
-care doze state: {"care":{"asleep":true,"bond":0.3987499999999993,"budget_s":null,"heart_bpm":46.0,"hunger":0.9400000000000013,"idle_s":17.240000000000002,"last_touch":472,"mood":-0.32859242611640205,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":23.6}},"care_time_scale":200.0}
-care: hunger 0.1590074074073989 -> 0.00042222222222222254, bond 0.12970439814814622 -> 0.14969884259259061, doze and wake ok
+performance: 49.59628667284959 ticks/s
+idle: takeover=1.0 head=0.4921132926117911
+care doze state: {"care":{"asleep":true,"bond":0.3987499999999993,"budget_s":null,"heart_bpm":46.0,"hunger":0.9400000000000013,"idle_s":17.5,"last_touch":458,"mood":-0.32859242611640205,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":26.6}},"care_time_scale":200.0}
+care: hunger 0.1589555555555471 -> 0.0003925925925925929, bond 0.12970578703703511 -> 0.14969976851851655, doze and wake ok
 --- night ---
 night: on -> asleep and quiet, pet -> woken_by_touch, off ok
 parent: 1 min -> bed at 200x, pet wakes, 0 -> unlimited
@@ -29,88 +29,4 @@ daily quests: progress stays honest after an action
 daily quests: a February streak survives March 1st (streak=3)
 daily quests: the shell's saved board restores with its progress (pet=0.5)
 fingerprint: "fingerprint":"69b4e43b681bead51f5736ff810c269316d5cb19903db6db3794b88c36bfe5c1"
-{"bringup":2,"care":{"asleep":false,"bond":0.21982800925925813,"budget_s":null,"heart_bpm":78.1,"hunger":0.1555037037036985,"idle_s":0.34,"last_touch":289,"mood":0.46995696941652043,"night":{"active":false,"started_tick":0},"parent":{"left_s":0.0,"used_s":13.4}},"care_time_scale":1.0,"carrying":false,"chorus":{"active":false,"moves":[],"peers":0,"role":"","started_tick":0},"emotion":null,"fallen":false,"gain":200,"gift_event":{"from":"peerci01","from_name":"Sunny","kind":"emotion","ok":false,"tick":2000,"value":"laugh"},"gravity":[0.02669409611405352,0.0190657592204831,-0.9994618162081021],"health":{"reasons":[],"verdict":"healthy"},"idle":{"head":[0.0,0.0,0.0,0.0],"takeover":0.0},"label":"walk","last_emotion_sound":null,"last_heard":{"text":"站起来","tick":872},"last_ride_segment":null,"last_sound":"alarm","leds":{"bars":2,"battery_percent":46.74850577353197,"color":null,"flashlight":0,"gauge":"Two","status":"Healthy"},"life":{"boots":1,"claps":3,"day_started":{"claps":3,"day":"2026-11-26","falls":3,"fed":1,"ground_picks":1,"metres":1.7189418683439455,"pets":5,"pickups":0,"powered_s":44.300000000001326,"rolls":2,"sit_downs":0,"whistles":1},"days":[{"claps":3,"day":"2026-11-26","falls":2,"fed":1,"ground_picks":1,"metres":1.4,"pets":5,"pickups":0,"powered_s":40.6,"rolls":2,"sit_downs":0,"whistles":1},{"claps":0,"day":"2026-03-01","falls":0,"fed":0,"ground_picks":0,"metres":0.0,"pets":0,"pickups":0,"powered_s":0.6,"rolls":0,"sit_downs":0,"whistles":0}],"emotions":{"angry":1,"curious":1,"excited":1,"laugh":2,"sad":1},"events":["fell","emotion:angry","idle_ritual","emotion:curious","skill:roulade","fell","feed","ground_pick","pet","pet","pet","woken_by_touch","emotion:excited","pet","clap","emotion:laugh","whistle","emotion:sad","sad","clap","skill:roulade","clap","fell","gift:emotion:laugh","chorus","pet","emotion:laugh","chorus","fell","fell"],"falls":5,"fed":1,"ground_picks":1,"held_s":0.0,"metres":2.883331621671806,"pets":5,"pickups":0,"power_offs":0,"powered_s":57.660000000003414,"sit_downs":0,"sitting_s":0.0,"skills":{"roulade":2},"soft_landings":0,"sound_pets":0,"stand_ups":0,"standing_s":48.900000000002045,"torqued_s":57.660000000003414,"unlocks":{"emotion:angry":"2026-11-26","emotion:curious":"2026-11-26","emotion:excited":"2026-11-26","emotion:laugh":"2026-11-26","emotion:sad":"2026-11-26","skill:roulade":"2026-11-26"},"unlocks_backfilled":true,"wake_ups":0,"walking_s":2.760000000000002,"whistles":1},"limited_by":[],"mode":"walk","night":{"active":false,"quiet_s":0.0,"started_tick":0},"notice":"no such sound: bark","pad":{"on":false,"port":4210},"path":{"active":false,"points":[],"reached":0,"total":0},"paused":false,"peer_event":{"from":"peerci01","kind":"greeted","name":"Sunny","tick":1970},"peers":{"id":"17269477","name":"CI Android","pair_code_set":true,"peers":[],"port":8766},"performance":{"fps":9.804911633998682,"ticks_per_second":50.00504933339328},"pet_detect":{"petting":false,"since_tick":null},"pose":{"anchor_foot":1,"anchor_xy":[0.27723900620508657,0.2001438481514083],"position":[0.2499218735568322,0.23407146756507663,0.11453174573810063],"yaw":0.8183561775775864},"powered_off":false,"proprioception":{"battery_percent":45.279082074122186,"currents_ma":[15.4501874009763,171.2421108945659,268.558124080816,661.2268601823337,94.13230738683791,68.10905851909922,216.24790191453567,121.99172896983201,47.544121420080444,0.0,26.624381124048373,242.69801168009062,344.1713999334246,148.17429102510616,329.98710603694053],"has_mouth":false,"imu":{"gravity":[0.027651407659816586,-0.006868605638599947,-0.9995940285490954],"gyro":[-1.4517124156431274,-0.3323439485946588,-1.3361469936795618],"quat":[0.9173739142585364,-0.0023494071493701278,0.01405226001389878,0.39777143652167696]},"imu_ready":true,"mouth":0.0,"names":["left_hip_yaw","left_hip_roll","left_hip_pitch","left_knee","left_ankle","neck_pitch","head_pitch","head_yaw","head_roll","mouth","right_hip_yaw","right_hip_roll","right_hip_pitch","right_knee","right_ankle"],"p_held":0.020957142114639282,"picked_up":false,"positions":[-0.06006777101242689,-0.08757389388615078,-0.4948193391875605,0.22611105513720509,0.5082128975350261,0.1356339158031384,0.37601668883066847,-0.00469106452832207,-0.048729498491405426,0.0,0.06409962806508993,-0.0100914162040559,0.28014826548657656,0.07398202736892576,-0.24740557430293525],"targets":[-0.036104608388468976,-0.22959979359538657,-0.29951334025358933,-0.5214188815648348,0.34854897306556165,0.19199271281207925,0.21801668409089453,0.1688682820247506,0.03479979757394504,-0.08726646259971647,0.02695372914363358,0.22933514536172314,-0.035238921996367814,-0.2507356674305786,-0.4853834146224144],"velocities":[0.1896204322792398,-0.6808700581296762,-1.7605287668845253,-4.616573134343844,-0.01156778377761572,-0.16219961897126914,-0.08529691042038967,1.9403171106539625,0.5403666136936132,0.0,-0.019036218769240408,-0.35202467641587104,-2.1594001613492746,-1.0013406868109234,0.0001913360711285113],"volts":7.3244653131859545},"quests":{"best_streak":1,"completed_today":0,"day":"2026-11-26","last_completed_day":"2026-11-25","quests":[{"done":false,"id":"pet","progress":0.5,"target":3.0,"title_en":"Pet the duck 3 times","title_zh":"摸摸鸭子 3 次"},{"done":false,"id":"roll","progress":0.0,"target":2.0,"title_en":"Roll over twice","title_zh":"翻两个滚"},{"done":false,"id":"walk","progress":0.5797764162039659,"target":2.0,"title_en":"Walk 2 m together","title_zh":"一起走 2 米"}],"streak":1},"rule_event":{"action":"light","tick":1925,"trigger":"clap","value":"blue"},"sound_event":{"kind":"clap","tick":1925},"speed":1.0,"tick":306,"trunk":[0.27684162291038855,0.23503479961291743,0.11371970850897845]}walk counted: 2.8911947601025587 m
-android-screen.png: 320x640 lit=69.0122% colours=64
-frame has content
-android-screen.png: region (0.3, 0.3, 0.7, 0.7) lit=75.1953% colours=64
-android-screen.png: colour (255,140,50) +/-110 -> 2979 px (want >= 150)
-android-screen.png: bright neutral shell (>= 120) -> 7877 px (want >= 600)
-android-screen.png: 320x640 lit=69.0122% colours=64
-frame has content
-android-screen-2.png: 320x640 lit=69.0996% colours=64
-frame has content
-android-screen.png vs android-screen-2.png: 5985/204800 pixels differ (2.9224%)
-the frames differ - the scene is live
---- companion survives a restart ---
-care before restart: 0.42297777777777495 0.32990694444444385 False
-care survived restart: hunger/bond=0.424 0.330
---- Director photo ---
-Director photo reached the preview with Save and Share
---- first screen speaks human ---
-portrait screenshot: 320x640
-first screen: 7 clickable controls
-first screen: no raw tokens, ticks, percentages or engine names; fully Chinese
-voice: the quack object queues the chirp
-props: a ball tap really started a kick (life.skills.kick_left 0 -> 1)
-props: the kick carries the duck's own peck voice (last_sound)
-props: a hoop tap really started a roll (life.skills.roulade 2 -> 3)
-mirror: two taps made two different real emotions (curious, then laugh)
-self-play: the idle duck played with a prop and strolled on its own (metres 4.351566569990243 -> 4.654020820828278)
-dance: a real block pick recorded as a step and playback replayed it
-games: a happiness crossing made the duck roll once and nod
-games: a hungry duck grumbled on its own (last_sound=inquire)
-games sheet opened with: ['玩一玩', '×', '取景', '驱动', '看', '姿态', '策略 AB 试穿', '开', '推一把对比', '观测摘录', '自动存明信片', '开分支，B 载入另一套策略，两边看', '驱动', '回声游戏', '开始', '叽', '咕咕', '嗒']
-games: kick rally landed 2 left and 2 right real kicks
-games: the kick-rally card names today's quest (做 2 个动作)
-games: mood charade performed mock and the right answer earned a real yes
-games: the mood-charade card names today's quest (做 2 个表情)
-games: mood freeze called the round (动起来/定住 shown while real moods play)
-games: did-it-happen answered the real pets delta with a real yes
-games: the sound-simon card names today's quest (拍手两次)
-games: sound Simon heard the synthetic clap and said so
-games: reverse command made the duck sad (against laugh) and laugh (against sad)
-games: posture mirror performed sit, stand, ground_pick and roulade
-games: red light stopped the duck; green walked 0.89 m
-games: fast-forward set the real care clock to 60x and back to 1x
-games: find-it delivered curious, a real pet and a real kick
-games: little ledger showed today's real facts and the duck nodded
-games: whisper game queued coo and the guess earned a real yes
-blocks: the five floor props are one-tap actions in the editor
-Chinese portrait screenshot: 320x640
-landscape screenshot: 640x320
-drawer: four groups, all rows, Chinese
-component state: the toggle row's selected trait flips with a real tap
-drawer screenshot: 320x640
-diary speak: honest note on screen, sheet alive after the tap
-skill verdict is human: no underscores
---- layers: back key, one sheet, lone duck ---
-lone duck: ensemble and chorus affordances stay on the sheet
-back from a sheet returns to the first screen
-ring is open; pressing back next
-back closed the ring and the app survived
-handover: one sheet at a time (duck sheet closed, shelf open)
---- first screen at font scale 2.0 ---
-large type: every verb and the time rail are on screen, no overlap
---- dense sheets at font scale 2.0 ---
-More: first element focused; every clickable target >= 48 dp
-Blocks: first element focused; every clickable target >= 48 dp
-Dance Studio: first element focused; every clickable target >= 48 dp
-Play more: first element focused; every clickable target >= 48 dp
-echo game: Start began round 1 (the duck sang its sequence)
-rock paper scissors: the duck answered the throw and the tally row is readable
-Neighbours: first element focused; every clickable target >= 48 dp
-Daily quests: first element focused; every clickable target >= 48 dp
-Ducky diary: first element focused; every clickable target >= 48 dp
-Postcards: first element focused; every clickable target >= 48 dp
-Mood book: first element focused; every clickable target >= 48 dp
-AI companion: first element focused; every clickable target >= 48 dp
-This duck: first element focused; every clickable target >= 48 dp
-Tools: first element focused; every clickable target >= 48 dp
-::warning::the tools page has no Days row at font scale 2.0
-Instrument: first element focused; every clickable target >= 48 dp
---- recomposition counter ---
-shell compositions since launch (last window): 8 (observed band: 2-3)
---- frame pacing (recorded, ceiling set from real runs) ---
-frame pacing: Janky frames: 245 (55.94%) | 90th percentile: 48ms | 95th percentile: 65ms | 99th percentile: 150ms
-frame pacing within the collapse ceiling (jank 55.94% <= 95, p99 150 ms <= 500)
-smoke test passed
+::error::the vet book never counted the walk: metres=0
