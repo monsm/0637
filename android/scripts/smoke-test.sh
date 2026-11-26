@@ -1884,7 +1884,7 @@ print("idle_s=%s label=%s asleep=%s paused=%s emotion=%s last_sound=%s scale=%s"
   echo "::error::the idle duck never made its settling coo ($SLEEP_WHY)"
   exit 1
 fi
-=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
+LT0=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
 sleep 1.5
 LT1=$(curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c 'import json,sys; print(json.load(sys.stdin).get("care",{}).get("last_touch",-1))')
 [ "$LT0" = "$LT1" ] || { echo "::error::the settling sound reset the doze clock"; exit 1; }
