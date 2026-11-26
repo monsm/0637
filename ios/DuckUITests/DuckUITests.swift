@@ -993,13 +993,32 @@ final class DuckUITests: XCTestCase {
             _ = done.wait(timeout: .now() + 5)
         }
 
-        guard let tick = state()?["tick"] as? Int else {
+        // The core reads last_touch as an unsigned number: a jump larger
+        // than the tick itself would go negative and be ignored. Wait until
+        // the tick can carry the jump, then run a 6x clock (600 care-seconds
+        // = 5000 ticks; the 720 doze still stays ahead of both beats).
+        var tick = 0
+        let tickDeadline = Date().addingTimeInterval(120)
+        while Date() < tickDeadline {
+            tick = (state()?["tick"] as? Int) ?? 0
+            if tick >= 5500 { break }
+            usleep(500_000)
+        }
+        XCTAssertGreaterThanOrEqual(tick, 5500, "the core tick stayed too small for the jump")
+        post("/care", ["care": [
+            "hunger": 0.4, "mood": 0.3, "bond": 0.4,
+            "asleep": false, "last_touch": tick,
+        ]])
+        usleep(1_500_000) // one poll at 1x resets the per-spell beats
+        post("/config", ["care_time_scale": 6])
+        usleep(400_000)
+        guard let tick1 = state()?["tick"] as? Int else {
             XCTFail("the core published no tick")
             return
         }
         post("/care", ["care": [
             "hunger": 0.4, "mood": 0.3, "bond": 0.4,
-            "asleep": false, "last_touch": tick - 30000,
+            "asleep": false, "last_touch": tick1 - 5000,
         ]])
         var cooed = false
         var touched0: Int?
@@ -1026,7 +1045,7 @@ final class DuckUITests: XCTestCase {
         }
         post("/care", ["care": [
             "hunger": 0.4, "mood": 0.3, "bond": 0.4,
-            "asleep": false, "last_touch": tick2 - 34500,
+            "asleep": false, "last_touch": tick2 - 5750,
         ]])
         var chirped = false
         let chirpDeadline = Date().addingTimeInterval(12)
