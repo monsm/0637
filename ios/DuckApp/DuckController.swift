@@ -176,10 +176,10 @@ final class DuckController: ObservableObject {
     /// The core's own trigger vocabulary (`core/duck-mobile-core/src/rules.rs:16`).
     /// "pet" is the 摸摸 trigger; "timer" is the clock the editor offers too.
     static let ruleTriggers: Set<String> = ["clap", "whistle", "pet", "timer"]
-    /// The editor's three actions. The core also accepts "light"
-    /// (`rules.rs:19`), but neither phone's editor offers it, so a shared
-    /// program stays inside the vocabulary both editors can show.
-    static let ruleActions: Set<String> = ["skill", "emotion", "sound"]
+    /// The editor's four actions, the same set rules.rs accepts
+    /// (`rules.rs:19`). Both phones' editors offer the lamp step, so a shared
+    /// program may carry it; the old three-word list silently dropped it.
+    static let ruleActions: Set<String> = ["skill", "emotion", "sound", "light"]
     /// A timer's period in whole simulated seconds. The core refuses a timer
     /// outside this window (`rules.rs:72-73,113-120`); the shell keeps the
     /// same bounds so a pasted program is never one the core rejects whole.

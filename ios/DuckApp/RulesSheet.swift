@@ -1,5 +1,34 @@
 import SwiftUI
 
+/// One floor prop as a one-tap rule action. The action and value are the
+/// core's existing words — the prop only groups them for the child
+/// (`ball=kick_left`, `hoop=roulade`, `block=ground_pick`, `cushion=sit`,
+/// `mirror=emotion`). Nothing here is a new trigger or a new action.
+struct DuckRulePropPick: Equatable {
+    let id: String
+    let action: String
+    let value: String
+
+    static let all: [DuckRulePropPick] = [
+        .init(id: "ball", action: "skill", value: "kick_left"),
+        .init(id: "hoop", action: "skill", value: "roulade"),
+        .init(id: "block", action: "skill", value: "ground_pick"),
+        .init(id: "cushion", action: "skill", value: "sit"),
+        .init(id: "mirror", action: "emotion", value: "curious"),
+    ]
+
+    /// The label the editor shows: the child-visible prop name.
+    var label: String {
+        switch id {
+        case "ball": return Copy.propPlayBall
+        case "hoop": return Copy.propPlayHoop
+        case "block": return Copy.propPlayBlocks
+        case "cushion": return Copy.propPlayCushion
+        default: return Copy.propPlayMirror
+        }
+    }
+}
+
 /// The block program: "when I clap, roll over". Two rows of big chips, one
 /// list of what is already running. Every change goes straight to the core,
 /// which executes it; this screen is an editor, not a second engine.
@@ -126,6 +155,27 @@ struct RulesSheet: View {
 
                     Text(Copy.ruleThen)
                         .font(.duckLabel.weight(.semibold))
+                    // The five floor props as one-tap actions: the child
+                    // writes "clap -> kick the ball" without learning a wire
+                    // name. Each pick is an existing action/value pair.
+                    Text(Copy.ruleProps)
+                        .font(.duckCaption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: DuckSpace.sm) {
+                            ForEach(DuckRulePropPick.all, id: \.id) { pick in
+                                chip(
+                                    pick.label,
+                                    selected: action == pick.action && value == pick.value,
+                                    id: "rule-prop-\(pick.id)"
+                                ) {
+                                    if action != pick.action { action = pick.action }
+                                    value = pick.value
+                                }
+                            }
+                        }
+                        .padding(.vertical, DuckSpace.xxs)
+                    }
                     chipRow(kinds, selected: action, kind: "action") { action = $0 }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: DuckSpace.sm) {
@@ -208,7 +258,11 @@ struct RulesSheet: View {
         }
         .padding(DuckSpace.xl)
         .onAppear { controller.loadRules() }
-        .onChange(of: action) { _, _ in value = valueOptions.first ?? "" }
+        .onChange(of: action) { _, _ in
+            // A prop pick sets both at once; only a kind change that leaves
+            // the old value meaningless resets it.
+            if !valueOptions.contains(value) { value = valueOptions.first ?? "" }
+        }
     }
 
     private func chipRow(

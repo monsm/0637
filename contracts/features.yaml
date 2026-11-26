@@ -147,6 +147,7 @@ features:
     page: blocks
     hops: 2
     conform_b4: ok
+    note: 动作选择器把五个舞台道具排成一行快捷动作（球=踢球/kick_left、圈=翻滚/roulade、积木=捡积木/ground_pick、坐垫=坐垫子/sit、镜子=照镜子/curious），点一下即选好既有 action+value，不新增触发词或动作词；分享导入词表两端补上 light（灯步早已在两端编辑器里，旧的三词表会把灯步静默丢掉）
     ios: implemented
     android: implemented
     data_chain: none

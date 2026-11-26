@@ -2425,6 +2425,33 @@ PYX
 done
 [ "$LIVE_OK" = "1" ] || echo "::warning::the games section could not return to the Live screen"
 
+# 道具分组积木规则 (2026-11-26): the block editor groups the five floor props
+# as one-tap actions under their own names. The words are the duck's prop
+# names; the pair each one sets is an existing action/value (unit-tested on
+# both ends). The editor is tall, so scroll until the row is really on screen.
+tap_text "更多" > /dev/null 2>&1 || tap_text "More" > /dev/null 2>&1 || true
+sleep 1.2
+tap_text "积木规则" > /dev/null 2>&1 || tap_text "Blocks" > /dev/null 2>&1 || {
+  echo "::error::the drawer has no Blocks row for the prop group"; exit 1; }
+sleep 1
+RULE_PROP_OK=0
+for _ in $(seq 1 8); do
+  rm -f props-rule.xml
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > props-rule.xml 2>/dev/null || true
+  if grep -q "踢球" props-rule.xml && grep -q "道具" props-rule.xml; then
+    RULE_PROP_OK=1
+    break
+  fi
+  adb shell input swipe 160 520 160 260 300 > /dev/null 2>&1 || true
+  sleep 0.4
+done
+[ "$RULE_PROP_OK" = "1" ] || { echo "::error::the block editor does not show the prop group"; exit 1; }
+echo "blocks: the five floor props are one-tap actions in the editor"
+adb shell input keyevent 4 > /dev/null 2>&1 || true
+sleep 0.5
+
 # The idle Live screen itself, portrait, no skill line on it: the Chinese state
 # a real user sees.
 adb exec-out screencap -p > ui-b1-android-zh.png || true

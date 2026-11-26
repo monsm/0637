@@ -134,7 +134,26 @@ fun saveRules(context: Context, rules: List<RuleUi>, onResult: (Boolean) -> Unit
 // and the iOS importer drops it; import must mean the same thing on both
 // phones, so the shared program uses this list too.
 internal val RULE_TRIGGERS = setOf("clap", "whistle", "pet", "timer")
-internal val RULE_ACTIONS = setOf("skill", "emotion", "sound")
+// The same four words rules.rs accepts. 'light' was missing here while the
+// editor already offered it and iOS already imported it: a shared program
+// with a lamp step was refused on Android alone.
+internal val RULE_ACTIONS = setOf("skill", "emotion", "sound", "light")
+
+/**
+ * The five floor props as one-tap rule actions. The action and value are the
+ * core's existing words — the prop only groups them for the child
+ * (ball=kick_left, hoop=roulade, block=ground_pick, cushion=sit,
+ * mirror=emotion). Nothing here is a new trigger or a new action.
+ */
+internal data class RulePropPick(val id: String, val action: String, val value: String)
+
+internal val RULE_PROP_PICKS = listOf(
+    RulePropPick("ball", "skill", "kick_left"),
+    RulePropPick("hoop", "skill", "roulade"),
+    RulePropPick("block", "skill", "ground_pick"),
+    RulePropPick("cushion", "skill", "sit"),
+    RulePropPick("mirror", "emotion", "curious"),
+)
 internal val RULE_TIMER_PERIOD = 5..3600
 internal const val RULE_MAX_STEPS = 4
 internal const val RULE_MAX_RULES = 8

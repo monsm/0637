@@ -21,6 +21,7 @@
 - **验收**：iOS: open Dance Studio, press Record, dismiss the sheet, tap the block → a step is recorded with kind/value 'ground_pick'; press Play → /state.life.ground_picks +1 and the block-carry cue fires. Android: tap any of the five props while recording → a step appears and playback moves the matching counter. A refused verb records no step. (The ball-on-iOS case already records today, so it proves nothing and is not the assertion.)
 
 ### 道具分组积木规则（Prop-grouped block rules） · 可玩性 7/10 · medium
+- **状态（2026-11-26）**：已交付。两端编辑器在动作词下加「道具」行（球/呼啦圈/积木/坐垫/镜子→既有 kick_left/roulade/ground_pick/sit/curious）。顺带修真缺口：分享导入词表两端补 `light`（两端编辑器早已提供灯步，旧的「三词表」会静默丢弃它）。映射为纯函数并两端单测，冒烟在积木页读到道具行，iOS UI 测试点球→添加并断言积木出现。
 - **玩法**：Opt-in, shell-side only (rules.rs untouched). The block editor's action picker groups the five prop verbs under the prop icons (ball=kick_left, hoop=roulade, block=ground_pick, cushion=sit, mirror=emotion), so a child writes '拍手 → 踢球'; the rule still POSTs through the existing rules channel and executes the real verb; the prop answers from the counter increment it already mirrors. No new trigger or action word is introduced.
 - **自主**：none — the duck performs the rule's real verb; the prop cue is the shell-side read of the counter it just earned.
 - **真实地基**：rules.rs TRIGGERS=[clap,whistle,pet,timer] and ACTIONS=[skill,emotion,sound,light] (unchanged); StageProps PropCues (StageProps.swift) / StageProps.kt cues already react to life.skills.kick_left, roulade, ground_picks, sit_downs, emotions.

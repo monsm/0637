@@ -485,6 +485,9 @@ enum Copy {
     static var whisperAgain: String { pick("Again", "再听一次") }
     // A game card names the today-quest its real actions move. The title and
     // done flag come from /state.quests; the prefix is the only fixed words.
+    // The block editor's prop group: one tap writes "when I clap -> kick the
+    // ball" with words the duck already knows. No new action or trigger.
+    static var ruleProps: String { pick("Props", "道具") }
     static var questNotePrefix: String { pick("Goal: ", "今日目标：") }
     static var questNoteDonePrefix: String { pick("Goal met: ", "今日目标达成：") }
 

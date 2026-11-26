@@ -936,6 +936,18 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 8 例（五个道具区、开关独立命中区、全部守卫逐项、选择的确定性、缺字段读 0 不冒充）；冒烟打开开关后在**没有任何道具点击**的情况下等 vetbook 计数真增长（最多 45 秒），随后关掉恢复静止；iOS `testTheDuckPlaysOnItsOwnWhenAsked` 打开开关、等顶栏出现真实技能判词、再关掉（选择持久化，测试必须给后面的用例留一只静止的鸭子）。契约与棘轮同步（shell 3897 / ContentView 1867 / published 109 / a11y 动作 12）。
 
+### 四之五十三、编舞铺收录道具动作（2026-11-26）
+
+- **玩法**：录制舞蹈时，五个舞台道具也是舞步——球=踢、呼啦圈=翻滚、积木=贴地抓取、坐垫=坐、镜子=情绪。只有被核心接受的动词才会记步，被拒不记。
+- **两端实现**：iOS 在 `DuckController.groundPick()` 被接受时记 `kind=skill, value=ground_pick`（其余四个道具原本就经由 `trigger`/`sit` 记录）；Android 在 Shell 的舞台点击回调与五个屏幕阅读器道具动作里，把 `reactProp` 返回的真实动词记成 `kind=skill`。鸭子自娱不走这两个路径，所以它自己的动作不会写进孩子的舞。
+- **播放**：编舞铺的 Play 走同一意图通道（`trigger`/onSkill 已支持 `sit`/`ground_pick`），vet-book 计数为证；道具由真实计数回答。
+- **验收（run 45782645370，Android+Contracts；iOS 34e2135c run 45782694441）**：冒烟在录制态真实点积木（`life.ground_picks` +1 才继续），重开编舞铺确认步条里有「贴地抓取」（快捷块里没有这个词，所以只可能是录下的那一步），按播放后计数再 +1：
+  ```
+  dance: a real block pick recorded as a step and playback replayed it
+  ```
+  iOS `testTheDanceRecordsAPropVerb`：开录制 → 关抽屉 → 点积木 → 重开确认步条 → Play → `/state.life.ground_picks` 增长。
+- **棘轮**：`shell_kt_lines` 3957（+16，附注在 `contracts/ui-baseline.json`）；`a11y_custom_actions` 13 是下限项，增加不算债。
+
 ### 四之五十二、游戏卡标注今日目标（2026-11-26）
 
 - **玩法**：会推动今日目标的四张游戏卡——左右开弓（skills）、情绪哑剧（moods）、声音指挥官（clap）、红灯停绿灯行（walk）——标题下多一行「今日目标：<目标标题>」，目标完成时写「今日目标达成：<目标标题>」。当天没有对应目标就整行不显示。文字与完成态直接来自 `/state.quests`，卡片不存本地副本、不自己算进度。
