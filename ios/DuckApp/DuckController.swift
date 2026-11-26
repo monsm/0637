@@ -2868,15 +2868,38 @@ final class DuckController: ObservableObject {
         // The self-play guards, from the same document.
         cues.paused = json["paused"] as? Bool ?? false
         cues.carrying = json["carrying"] as? Bool ?? false
-        cues.idleS = (json["care"] as? [String: Any])?["idle_s"] as? Double ?? 0
+        let care = json["care"] as? [String: Any]
+        cues.idleS = care?["idle_s"] as? Double ?? 0
+        cues.mood = care?["mood"] as? Double ?? cues.mood
+        cues.hunger = care?["hunger"] as? Double ?? cues.hunger
         cues.tick = json["tick"] as? Int ?? cues.tick
         if cues != propCues { propCues = cues }
+        // Lifelike autonomy from the duck's own numbers: a happy duck rolls
+        // once, a hungry one grumbles once; each re-arms only when the state
+        // falls back, so one spell is one act.
+        if cues.mood < 0.7 { moodRollArmed = true }
+        if cues.hunger < 0.6 { hungerGrumbled = false }
+        let calm = !careAsleep && !cues.paused && !cues.carrying && cues.emotion.isEmpty
+            && (label == "walk" || label == "stand")
+        if calm, moodRollArmed, cues.mood >= 0.8, trigger("roulade") {
+            moodRollArmed = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+                _ = self?.trigger("yes")
+            }
+        }
+        if calm, !hungerGrumbled, cues.hunger >= 0.8, cues.idleS >= 10 {
+            queueSound("inquire")
+            hungerGrumbled = true
+        }
     }
 
     /// With the switch on, an idle duck walks to a prop and plays with it.
     /// Called from the 1 Hz poll while the Live stage is unobstructed; every
     /// guard is a real /state field and the walk is the real velocity policy.
     private var lastSelfPlayTick = 0
+    private var moodRollArmed = false
+    private var hungerGrumbled = false
+    private var selfBeats = 0
 
     func maybeSelfPlay() {
         guard ready, !pathActive,
@@ -2884,6 +2907,15 @@ final class DuckController: ObservableObject {
         let cues = propCues
         guard selfPlayDue(cues, asleep: careAsleep, enabled: true, lastTick: lastSelfPlayTick)
         else { return }
+        selfBeats += 1
+        if selfBeats % 2 == 0 {
+            // A short route it walks itself: three real points through the
+            // core's own path follower. Nobody drew this one.
+            let sign: Double = fingerprint.hashValue % 2 == 0 ? 1 : -1
+            postPath(points: [[0, 0], [0.5, sign * 0.2], [1.0, 0]])
+            lastSelfPlayTick = cues.tick
+            return
+        }
         let prop = selfPlayProp(fingerprint: fingerprint, tick: cues.tick)
         let side: Double
         switch prop {

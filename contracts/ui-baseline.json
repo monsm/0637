@@ -94,8 +94,8 @@
   "direction": "min"
  },
  "shell_kt_lines": {
-  "count": 3897,
+  "count": 3941,
   "direction": "max",
-  "note": "2026-11-25: +8 for the self-play switch state and its poll scheduler (the walk pulse and the guarded verb)."
+  "note": "2026-11-26: +44 for the lifelike autonomy in the poll (happy roll, hungry grumble, self-play route beats)."
  }
 }
