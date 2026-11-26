@@ -1724,9 +1724,25 @@ for _ in $(seq 1 220); do
      [ "$(python3 -c "print('yes' if ($SELF_M1 - $SELF_M0) >= 0.3 else 'no')")" = "yes" ]; then break; fi
   sleep 0.5
 done
-# Turn it back off so the rest of the smoke sees a still duck.
-adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
-sleep 1
+# Turn it back off so the rest of the smoke sees a still duck. A missed
+# second tap would leave the duck playing on its own for the rest of the
+# run — touching care, moving props, making moods — so the OFF state is
+# verified, not assumed.
+SELF_OFF=0
+for _attempt in 1 2 3 4 5; do
+  adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
+  sleep 0.8
+  rm -f self-off.xml
+  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
+  adb exec-out cat /sdcard/ui.xml > self-off.xml 2>/dev/null || true
+  if ! grep -q "自己玩 · 开" self-off.xml && ! grep -q "Play on its own · on" self-off.xml; then
+    SELF_OFF=1
+    break
+  fi
+  sleep 0.4
+done
+[ "$SELF_OFF" = "1" ] || { echo "::error::the self-play switch never turned back off"; exit 1; }
 SELF_M1=$(life_float metres)
 if [ "$SELF_OK" = "1" ] &&
    [ "$(python3 -c "print('yes' if ($SELF_M1 - $SELF_M0) >= 0.3 else 'no')")" = "yes" ]; then
