@@ -450,6 +450,11 @@ fun Shell(
         var walkSession = 0.0
         var lastRolls: Int? = null
         var lastSelfTick = 0L
+        // Lifelike autonomy (2026-11-26): one act per spell, re-armed only by
+        // the state falling back.
+        var moodRollArmed = false
+        var hungerGrumbled = false
+        var selfBeats = 0
         while (true) {
             // One /state for the whole shell: no extra fetch can race the
             // snapshot it persists.
@@ -479,6 +484,28 @@ fun Shell(
             val label = stateText?.let(::parseLabel)
             if (label != null) behaviourRaw = label
             stateText?.let(::parsePropCues)?.let { if (it != propCues) propCues = it }
+            // A happy duck rolls once; a hungry one grumbles once. Both are
+            // the shell reading the core's own numbers, re-armed by them.
+            if (careNow != null) {
+                if (careNow.mood < 0.7) moodRollArmed = true
+                if (careNow.hunger < 0.6) hungerGrumbled = false
+                val calm = !careNow.asleep && !propCues.paused && !propCues.carrying &&
+                    propCues.emotion.isEmpty() &&
+                    (behaviourRaw == "walk" || behaviourRaw == "stand")
+                if (calm && moodRollArmed && careNow.mood >= 0.8) {
+                    if (duck.skill("roulade") != 0) {
+                        moodRollArmed = false
+                        launch {
+                            delay(1600)
+                            duck.skill("yes")
+                        }
+                    }
+                }
+                if (calm && !hungerGrumbled && careNow.hunger >= 0.8 && propCues.idleS >= 10.0) {
+                    duck.queueSound("inquire")
+                    hungerGrumbled = true
+                }
+            }
             // Self-play: with the switch on, an idle duck walks to a prop and
             // plays with it. Every guard is a real /state field; the walk is
             // the real velocity policy and the verb is the core's own. The
@@ -487,19 +514,36 @@ fun Shell(
                 routeState.overlay != ShellOverlay.Ring &&
                 selfPlayDue(propCues, careUi?.asleep == true, true, lastSelfTick)
             ) {
-                val prop = selfPlayProp(duck.fingerprint(), propCues.tick)
-                val side = prop.side()
-                input.vx = 0.35
-                input.wz = -side * 0.5
-                launch {
-                    delay(1200)
-                    input.vx = 0.0
-                    input.wz = 0.0
-                    delay(150)
-                    val accepted = reactProp(prop, duck)
-                    if (accepted.isNotEmpty()) {
+                selfBeats += 1
+                if (selfBeats % 2 == 0) {
+                    // A short route it walks itself: three real points through
+                    // the core's own path follower. Nobody drew this one.
+                    val sign = if ((duck.fingerprint().hashCode() and 1) == 0) 1.0 else -1.0
+                    if (postPath(
+                            listOf(
+                                listOf(0.0, 0.0),
+                                listOf(0.5, sign * 0.2),
+                                listOf(1.0, 0.0),
+                            ),
+                        )
+                    ) {
                         lastSelfTick = propCues.tick
-                        lastSkill = accepted
+                    }
+                } else {
+                    val prop = selfPlayProp(duck.fingerprint(), propCues.tick)
+                    val side = prop.side()
+                    input.vx = 0.35
+                    input.wz = -side * 0.5
+                    launch {
+                        delay(1200)
+                        input.vx = 0.0
+                        input.wz = 0.0
+                        delay(150)
+                        val accepted = reactProp(prop, duck)
+                        if (accepted.isNotEmpty()) {
+                            lastSelfTick = propCues.tick
+                            lastSkill = accepted
+                        }
                     }
                 }
             }

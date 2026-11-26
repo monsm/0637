@@ -22,6 +22,9 @@ struct PropCues: Equatable {
     var carrying = false
     var idleS: Double = 0
     var tick: Int = 0
+    // The autonomy cues: the duck's own mood and hunger.
+    var mood: Double = 0
+    var hunger: Double = 0
 }
 
 /// A self-play beat no sooner than this many simulated ticks (25 s at 50 Hz).

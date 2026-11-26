@@ -1640,22 +1640,68 @@ if ! grep -q "自己玩 · 开" self-ui.xml; then
   echo "::error::the self-play switch did not turn on (the chip still reads 自己玩)"
   exit 1
 fi
-PLAY_BEFORE=$(play_count)
-SELF_OK=0
-for _ in $(seq 1 90); do
-  sleep 0.5
+PLAY_BEFORE=$(play_count); SELF_M0=$(life_float metres)
+# Beats alternate prop play and a route it lays itself, so wait for both a
+# real counter and a real walk (path.active) before turning the switch off.
+SELF_OK=0; PATH_SEEN=0
+for _ in $(seq 1 220); do
   PLAY_NOW=$(play_count)
-  if [ "$PLAY_NOW" -gt "$PLAY_BEFORE" ] 2>/dev/null; then SELF_OK=1; break; fi
+  if [ "$PLAY_NOW" -gt "$PLAY_BEFORE" ] 2>/dev/null; then SELF_OK=1; fi
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | python3 -c "
+import json,sys
+try:
+    p=json.load(sys.stdin).get('path') or {}
+    raise SystemExit(0 if p.get('active') else 1)
+except Exception:
+    raise SystemExit(1)
+" 2>/dev/null; then PATH_SEEN=1; fi
+  if [ "$SELF_OK" = "1" ] && [ "$PATH_SEEN" = "1" ]; then break; fi
+  sleep 0.5
 done
 # Turn it back off so the rest of the smoke sees a still duck.
 adb shell input tap $CHIP_X $CHIP_Y > /dev/null 2>&1 || true
-sleep 1
-if [ "$SELF_OK" = "1" ]; then
-  echo "self-play: an idle duck walked to a prop and played on its own (counters $PLAY_BEFORE -> $PLAY_NOW)"
+for _ in $(seq 1 40); do
+  curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"active":true' || break
+  sleep 0.5
+done
+SELF_M1=$(life_float metres)
+if [ "$SELF_OK" = "1" ] && [ "$PATH_SEEN" = "1" ] &&
+   [ "$(python3 -c "print('yes' if ($SELF_M1 - $SELF_M0) >= 0.3 else 'no')")" = "yes" ]; then
+  echo "self-play: the idle duck played with a prop and walked its own route (metres $SELF_M0 -> $SELF_M1)"
 else
-  echo "::error::the self-play switch never produced a real move"
+  echo "::error::the self-play switch never produced both a prop move and its own walk (counter=$SELF_OK path=$PATH_SEEN metres $SELF_M0 -> $SELF_M1)"
   exit 1
 fi
+
+# 高兴就翻个滚: set the mood just under the line, then a pet carries it over;
+# the duck rolls once and nods, with no other command.
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+for _ in $(seq 1 30); do body_idle && break; sleep 0.4; done
+curl -sf --max-time 3 -X POST -H 'Content-Type: application/json'   -d '{"care":{"mood":0.69,"hunger":0.2,"bond":0.9}}' http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+sleep 3
+ROLL0=$(skill_count roulade); HAPPY_YES0=$(emotion_count yes)
+curl -sf --max-time 3 -X POST -H 'Content-Type: application/json' -d '{}'   http://127.0.0.1:8765/pet > /dev/null 2>&1 || true
+HAPPY=0
+for _ in $(seq 1 40); do
+  if [ "$(skill_count roulade)" -gt "$ROLL0" ] 2>/dev/null &&
+     [ "$(emotion_count yes)" -gt "$HAPPY_YES0" ] 2>/dev/null; then HAPPY=1; break; fi
+  sleep 0.4
+done
+[ "$HAPPY" = "1" ] || { echo "::error::the duck did not roll and nod when it got happy"; exit 1; }
+echo "games: a happiness crossing made the duck roll once and nod"
+
+# 饿了会哼唧: a hungry, idle duck grumbles once on its own; feeding re-arms it.
+for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
+sleep 12
+curl -sf --max-time 3 -X POST -H 'Content-Type: application/json'   -d '{"care":{"hunger":0.85,"mood":0.0,"bond":0.9}}' http://127.0.0.1:8765/care > /dev/null 2>&1 || true
+GRUMBLE=0
+for _ in $(seq 1 30); do
+  if curl -sf --max-time 3 http://127.0.0.1:8765/state | grep -q '"last_sound":"inquire"'; then GRUMBLE=1; break; fi
+  sleep 0.4
+done
+[ "$GRUMBLE" = "1" ] || { echo "::error::the hungry duck never grumbled on its own"; exit 1; }
+curl -sf --max-time 5 -X POST -H 'Content-Type: application/json' -d '{}'   http://127.0.0.1:8765/feed > /dev/null 2>&1 || true
+echo "games: a hungry duck grumbled on its own (last_sound=inquire)"
 
 # The five small games (2026-11-25): inline on Play more like Echo and RPS.
 # Every prompt asks a real verb and every score is the vet book's counter, so

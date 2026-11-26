@@ -943,6 +943,31 @@ QA 口径 7「每批验收必须可脚本化」的收尾：之前两批玩法（
 
 **验收**：Android 单测 9 例（新增：一轮五张脸互不重复、全是官方情绪）；冒烟先断言点球后 `last_sound=peck`，再站起鸭子、点镜子两次，断言 `life.emotions.curious`、`life.emotions.laugh` 各真增长（拒绝重试、演完再点）；iOS 测试在点球、点圈之后点镜子两次，断言顶栏判词先 `curious` 后 `laugh`。
 
+### 四之五十、十二张游戏全部落地（2026-11-26）
+
+全维度脑暴（`docs/PLAY_IDEAS_FULL_2026-11-25.md`）保留 12 条，先交付五张（四之四十九），本批补齐后七张，全部内联在「玩一玩」页：
+
+| 游戏 | 真实地基 | 验收证据（Android 冒烟原文） |
+|---|---|---|
+| 左右开弓 | 官方 `kick_left/right` + `life.skills` | `kick rally landed 2 left and 2 right real kicks` |
+| 情绪哑剧 | 13 官方情绪 + `life.emotions` | `mood charade performed mock and the right answer earned a real yes` |
+| 表情木头人 | 情绪时间线时长当回合钟 | `mood freeze called the round (动起来/定住 shown while real moods play)` |
+| 它今天有没有 | `life` 与 `life.day_started` 差值 | `did-it-happen answered the real pets delta with a real no` |
+| 声音指挥官 | 核心房间声分类器 + 默认反应 | `sound Simon heard the synthetic clap and said so` |
+| 反向指令 | 反向官方情绪（笑↔难过、兴奋↔好奇） | `reverse command made the duck sad (against laugh) and laugh (against sad)` |
+| 照我做 | sit/stand/ground_pick/roulade 真实转变 | `posture mirror performed sit, stand, ground_pick and roulade` |
+| 红灯停绿灯行 | 真实速度通道 + `life.metres`/`pose` | `red light stopped the duck; green walked 0.81 m` |
+| 快进一天 | 核心 `care_time_scale` 60×/1× | `fast-forward set the real care clock to 60x and back to 1x` |
+| 找一找 | 头=好奇、肚子=真摸、脚=真踢 | `find-it delivered curious, a real pet and a real kick` |
+| 小账本 | 今日真实增量（`life` vs `day_started`） | `little ledger showed today's real facts and the duck nodded` |
+| 传悄悄话 | 核心合成音 tag + 真实判词 | `whisper game queued peck and the guess earned a real yes` |
+
+**验证（`92d02b2` Android+Contracts、`bac3b76` iOS）**：Android 冒烟十二行全过，AX3 密集扫掠的回声/猜拳复验也过（`echo game: Start began round 1`、`rock paper scissors: the duck answered the throw`），横屏 `640x320`，掉帧 `61.42% / p99 150 ms`，`smoke test passed`；iOS 的 `testTheFiveSmallGamesAreWired` 与 `testTheSevenMoreGamesAreWired` 在同一应用代码上绿。
+
+**本批 CI 真因修复**（全部按日志修，不归抖动）：① 游戏段没先打开 Play more（脚本拼接误删）；② Compose testTag 不进 uiautomator 的 resource-id；③ 三个「开始」串台 → 各游戏开始键独立文案；④ 情绪游戏靠 `/state` 轮询翻页会跳段/串台 → 按官方时长排程；⑤ 长面板滚动会跨过单行标题 → 200 px 小步 + clickable 容器锚定（AX3 下同一页有死状态文字与真按钮同文案）；⑥ 反向指令对已在的姿态按「已如此」不加计数 → 改为反向情绪；⑦ 情绪被拒时各段重开一局重试（哑剧读新回合、照我做四势重放、找一找重放、账本重读、悄悄话重听）；⑧ 横屏轮询旋转、退出先回 Live；⑨ shellcheck SC2046。
+
+**已知取舍**：悄悄话的冒烟断言是「点击必须换来核心真实的点头或摇头」+ 目标选择纯函数单测（读 `last_sound` 可能与入队竞争，不能作为唯一正确性证明）；iOS 侧对应的目标用同一秒级规则，行为等价。
+
 **验证（`e092b74`）**：Android + Contracts 绿（iOS 在 `e29bfbe` 已绿：镜子/嗓音 UI 测试与首屏七控件都过）。冒烟实证五行：踢计数 `0 -> 1`、`last_sound=peck`、翻滚 `2 -> 3`、`mirror: two taps made two different real emotions (curious, then laugh)`、自娱计数 `7 -> 8`。两处 CI 教训：① `last_sound` 是单值字段，peck 的断言必须紧跟踢球，否则被呼啦圈的 chirp 覆盖（首跑红）；② `accessibilityAddTraits(.isButton)` 会让开关成为首屏第 8 个按钮、踩七控件预算——开关是场景元素，不带 button trait，语音辅助走舞台的「自己玩开关」命名动作（与 Android 同构）。
 
 ### 四之四十九、五张小游戏一次落地（2026-11-25）
