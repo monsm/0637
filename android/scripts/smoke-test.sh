@@ -2187,7 +2187,6 @@ fi
 # A round can be lost to a busy duck or a swallowed tap; each attempt starts
 # a fresh round and reads its own mood, so a retry cannot answer the old one.
 CHAR_OK=0
-CHAR_MOODS=""
 for _attempt in 1 2 3; do
   for _ in $(seq 1 40); do emotion_idle && break; sleep 0.4; done
   tap_games_control "情绪哑剧" "开始猜" > /dev/null 2>&1 || break
@@ -2204,7 +2203,6 @@ except Exception:
     sleep 0.3
   done
   [ -n "$MOOD" ] || continue
-  CHAR_MOODS="$CHAR_MOODS $MOOD"
   MOOD_ZH=$(python3 - "$MOOD" <<'PYX'
 import sys
 names = {
@@ -2220,7 +2218,7 @@ PYX
   sleep 0.6
   YES0=$(emotion_count yes)
   tap_games_control "情绪哑剧" "$MOOD_ZH" > /dev/null 2>&1 || continue
-  for _ in $(seq 1 33); do
+  for _ in $(seq 1 20); do
     if [ "$(emotion_count yes)" -gt "$YES0" ] 2>/dev/null; then CHAR_OK=1; break 2; fi
     sleep 0.3
   done
@@ -2234,19 +2232,7 @@ if [ "$CHAR_OK" = "1" ]; then
   fi
 else
   adb exec-out screencap -p > games-screen.png 2>/dev/null || true
-  echo "::error::the right charade answer never earned the duck's yes (moods tried:$CHAR_MOODS)"
-  adb shell rm -f /sdcard/ui.xml > /dev/null 2>&1 || true
-  adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 || true
-  adb exec-out cat /sdcard/ui.xml > charade-dump.xml 2>/dev/null || true
-  python3 - <<'PYX' || true
-import xml.etree.ElementTree as ET
-try:
-    root = ET.parse('charade-dump.xml').getroot()
-except Exception:
-    raise SystemExit(0)
-texts = [n.get('text') for n in root.iter('node') if (n.get('text') or '')]
-print("::warning::charade screen:", texts[:24])
-PYX
+  echo "::error::the right charade answer never earned the duck's yes"
   exit 1
 fi
 
